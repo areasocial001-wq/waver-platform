@@ -57,7 +57,7 @@ export const Hero = () => {
           </div>
           
           <div className="p-6 rounded-xl bg-card/30 backdrop-blur-sm border border-border/50 hover:border-secondary/50 transition-colors">
-            <div className="text-3xl font-bold text-secondary mb-2">2-10s</div>
+            <div className="text-3xl font-bold text-secondary mb-2">4-8s</div>
             <div className="text-sm text-muted-foreground">Durata Flessibile</div>
           </div>
           

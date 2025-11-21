@@ -19,17 +19,17 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8 bg-background/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
-              className="flex items-center gap-2 bg-muted text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Video className="w-4 h-4" />
               Text to Video
             </TabsTrigger>
             <TabsTrigger 
               value="image" 
-              className="flex items-center gap-2 bg-muted text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Image className="w-4 h-4" />
               Image to Video
