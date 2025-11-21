@@ -31,20 +31,59 @@ export const TextToVideoForm = () => {
         return;
       }
 
-      const { error } = await supabase.from("video_generations").insert({
-        user_id: user.id,
-        type: "text_to_video",
-        prompt: prompt,
-        duration: parseInt(duration),
-        resolution: resolution,
-        status: "pending"
+      // Save to database first
+      const { data: generationData, error: dbError } = await supabase
+        .from("video_generations")
+        .insert({
+          user_id: user.id,
+          type: "text_to_video",
+          prompt: prompt,
+          duration: parseInt(duration),
+          resolution: resolution,
+          status: "processing"
+        })
+        .select()
+        .single();
+
+      if (dbError) throw dbError;
+
+      toast.success("Generazione video avviata!", {
+        description: "Il video verrà generato in pochi minuti. Controlla lo storico per vedere il progresso."
       });
 
-      if (error) throw error;
+      // Start video generation in background
+      supabase.functions
+        .invoke("generate-video", {
+          body: {
+            type: "text_to_video",
+            prompt: prompt,
+            duration: parseInt(duration),
+            generationId: generationData.id
+          }
+        })
+        .then(async ({ data, error }) => {
+          if (error) {
+            console.error("Error starting generation:", error);
+            await supabase
+              .from("video_generations")
+              .update({ 
+                status: "failed", 
+                error_message: error.message 
+              })
+              .eq("id", generationData.id);
+            return;
+          }
 
-      toast.success("Parametri salvati!", {
-        description: "Puoi vedere le tue richieste nella sezione Storico"
-      });
+          if (data?.id) {
+            await supabase
+              .from("video_generations")
+              .update({ 
+                prediction_id: data.id,
+                status: "processing"
+              })
+              .eq("id", generationData.id);
+          }
+        });
       
       setPrompt("");
     } catch (error) {
