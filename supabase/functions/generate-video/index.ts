@@ -150,10 +150,13 @@ serve(async (req) => {
     console.log("Starting video generation with Google Veo 3.1");
 
     // Prepare request body for Google AI
+    // Ensure duration is between 4 and 8 seconds (Google Veo 3.1 requirement)
+    const validDuration = Math.max(4, Math.min(8, duration || 5));
+    
     const requestBody: any = {
       instances: [{}],
       parameters: {
-        durationSeconds: duration || 5,
+        durationSeconds: validDuration,
         aspectRatio: "16:9"
       }
     };
