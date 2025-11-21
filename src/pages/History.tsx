@@ -69,6 +69,37 @@ export default function History() {
     }
   };
 
+  const handleDownload = (videoUrl: string, generationId: string) => {
+    try {
+      // Convert base64 to blob
+      const base64Data = videoUrl.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'video/mp4' });
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `video-${generationId}.mp4`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success("Download avviato");
+    } catch (error) {
+      console.error("Error downloading video:", error);
+      toast.error("Errore nel download");
+    }
+  };
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
@@ -196,7 +227,7 @@ export default function History() {
                             variant="outline"
                             size="sm"
                             className="mt-2"
-                            onClick={() => window.open(gen.video_url, "_blank")}
+                            onClick={() => handleDownload(gen.video_url!, gen.id)}
                           >
                             <Download className="w-4 h-4 mr-2" />
                             Scarica Video
