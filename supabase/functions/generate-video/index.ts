@@ -148,10 +148,22 @@ serve(async (req) => {
     }
 
     console.log("Starting video generation with Google Veo 3.1");
+    console.log("Received duration:", duration, "Type:", typeof duration);
 
     // Prepare request body for Google AI
-    // Ensure duration is between 4 and 8 seconds (Google Veo 3.1 requirement)
-    const validDuration = Math.max(4, Math.min(8, duration || 5));
+    // Veo 3.1 only accepts exactly 4, 6, or 8 seconds (not values in between)
+    const parsedDuration = typeof duration === 'string' ? parseInt(duration) : duration;
+    let validDuration = 6; // default to 6
+    
+    if (parsedDuration <= 5) {
+      validDuration = 4;
+    } else if (parsedDuration <= 7) {
+      validDuration = 6;
+    } else {
+      validDuration = 8;
+    }
+    
+    console.log("Using validDuration:", validDuration);
     
     const requestBody: any = {
       instances: [{}],

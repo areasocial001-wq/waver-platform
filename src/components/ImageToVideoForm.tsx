@@ -12,7 +12,7 @@ export const ImageToVideoForm = () => {
   const [image, setImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState("5");
+  const [duration, setDuration] = useState("6");
   const [motion, setMotion] = useState("medium");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -191,9 +191,7 @@ export const ImageToVideoForm = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="4">4 secondi</SelectItem>
-              <SelectItem value="5">5 secondi</SelectItem>
               <SelectItem value="6">6 secondi</SelectItem>
-              <SelectItem value="7">7 secondi</SelectItem>
               <SelectItem value="8">8 secondi</SelectItem>
             </SelectContent>
           </Select>
