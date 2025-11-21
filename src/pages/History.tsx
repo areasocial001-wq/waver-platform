@@ -5,8 +5,9 @@ import { Navbar } from "@/components/Navbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Trash2, Image, FileText } from "lucide-react";
+import { Trash2, Image, FileText, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useVideoPolling } from "@/hooks/useVideoPolling";
 
 type VideoGeneration = {
   id: string;
@@ -19,15 +20,14 @@ type VideoGeneration = {
   image_name: string | null;
   status: string;
   created_at: string;
+  prediction_id: string | null;
+  video_url: string | null;
+  error_message: string | null;
 };
 
 export default function History() {
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchGenerations();
-  }, []);
 
   const fetchGenerations = async () => {
     try {
@@ -45,6 +45,12 @@ export default function History() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchGenerations();
+  }, []);
+
+  useVideoPolling(generations, fetchGenerations);
 
   const handleDelete = async (id: string) => {
     try {
@@ -146,7 +152,7 @@ export default function History() {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 items-center">
                         <Badge variant="outline">
                           Durata: {gen.duration}s
                         </Badge>
@@ -161,11 +167,54 @@ export default function History() {
                           </Badge>
                         )}
                         <Badge
-                          variant={gen.status === "completed" ? "default" : "secondary"}
+                          variant={
+                            gen.status === "completed" 
+                              ? "default" 
+                              : gen.status === "failed"
+                              ? "destructive"
+                              : "secondary"
+                          }
                         >
-                          {gen.status}
+                          {gen.status === "processing" && (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          )}
+                          {gen.status === "completed" && "✓ Completato"}
+                          {gen.status === "processing" && "Generazione..."}
+                          {gen.status === "failed" && "✗ Errore"}
+                          {gen.status === "pending" && "In attesa"}
                         </Badge>
                       </div>
+
+                      {gen.status === "completed" && gen.video_url && (
+                        <div className="mt-4">
+                          <video
+                            src={gen.video_url}
+                            controls
+                            className="w-full rounded-lg border border-border max-h-96"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => window.open(gen.video_url, "_blank")}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Scarica Video
+                          </Button>
+                        </div>
+                      )}
+
+                      {gen.status === "failed" && gen.error_message && (
+                        <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive text-sm">
+                          {gen.error_message}
+                        </div>
+                      )}
+
+                      {gen.status === "processing" && (
+                        <div className="mt-2 p-2 rounded bg-primary/10 text-primary text-sm">
+                          Il video è in fase di generazione. La pagina si aggiornerà automaticamente.
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

@@ -18,44 +18,53 @@ export type Database = {
         Row: {
           created_at: string | null
           duration: number
+          error_message: string | null
           id: string
           image_name: string | null
           image_url: string | null
           motion_intensity: string | null
+          prediction_id: string | null
           prompt: string | null
           resolution: string | null
           status: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at: string | null
           user_id: string | null
+          video_url: string | null
         }
         Insert: {
           created_at?: string | null
           duration: number
+          error_message?: string | null
           id?: string
           image_name?: string | null
           image_url?: string | null
           motion_intensity?: string | null
+          prediction_id?: string | null
           prompt?: string | null
           resolution?: string | null
           status?: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
           user_id?: string | null
+          video_url?: string | null
         }
         Update: {
           created_at?: string | null
           duration?: number
+          error_message?: string | null
           id?: string
           image_name?: string | null
           image_url?: string | null
           motion_intensity?: string | null
+          prediction_id?: string | null
           prompt?: string | null
           resolution?: string | null
           status?: string | null
           type?: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
           user_id?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }
