@@ -69,8 +69,18 @@ serve(async (req) => {
         
         const videoBlob = await videoResponse.blob();
         const arrayBuffer = await videoBlob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        const videoUrl = `data:video/mp4;base64,${base64}`;
+        
+        // Convert to base64 in chunks to avoid stack overflow
+        const uint8Array = new Uint8Array(arrayBuffer);
+        const chunkSize = 0x8000; // 32KB chunks
+        let base64 = '';
+        
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+          base64 += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        
+        const videoUrl = `data:video/mp4;base64,${btoa(base64)}`;
 
         // Update database
         if (body.generationId) {
