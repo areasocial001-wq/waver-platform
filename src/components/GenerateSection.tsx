@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TextToVideoForm } from "./TextToVideoForm";
-import { ImageToVideoForm } from "./ImageToVideoForm";
-import { Video, Image } from "lucide-react";
+import { Video } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -18,52 +19,26 @@ export const GenerateSection = () => {
           </p>
         </div>
 
-        <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
-            <TabsTrigger value="text" className="flex items-center gap-2">
-              <Video className="w-4 h-4" />
-              Text to Video
-            </TabsTrigger>
-            <TabsTrigger value="image" className="flex items-center gap-2">
-              <Image className="w-4 h-4" />
-              Image to Video
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="text">
-            <Card className="border-primary/20 bg-card/50 backdrop-blur-sm shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Video className="w-5 h-5 text-primary" />
-                  Text to Video (T2V)
-                </CardTitle>
-                <CardDescription>
-                  Descrivi il video che vuoi creare e lascia che Waver lo generi per te
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TextToVideoForm />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="image">
-            <Card className="border-accent/20 bg-card/50 backdrop-blur-sm shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Image className="w-5 h-5 text-accent" />
-                  Image to Video (I2V)
-                </CardTitle>
-                <CardDescription>
-                  Carica un'immagine e trasformala in un video dinamico
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ImageToVideoForm />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <Card className="border-primary/20 bg-card/50 backdrop-blur-sm shadow-soft">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Video className="w-5 h-5 text-primary" />
+              Text to Video (T2V)
+            </CardTitle>
+            <CardDescription>
+              Descrivi il video che vuoi creare e lascia che Waver lo generi per te
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                L'Image to Video non è al momento disponibile con questa API. Utilizza la generazione Text to Video.
+              </AlertDescription>
+            </Alert>
+            <TextToVideoForm />
+          </CardContent>
+        </Card>
       </div>
     </section>
   );
