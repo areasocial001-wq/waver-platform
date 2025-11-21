@@ -16,7 +16,7 @@ export const useVideoPolling = (
       for (const gen of processingGenerations) {
         try {
           const { data, error } = await supabase.functions.invoke("generate-video", {
-            body: { predictionId: gen.prediction_id }
+            body: { operationId: gen.prediction_id, generationId: gen.id }
           });
 
           if (error) {

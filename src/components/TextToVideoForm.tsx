@@ -99,8 +99,8 @@ export const TextToVideoForm = () => {
       <Alert className="border-primary/30 bg-primary/5">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription>
-          Configura i parametri del tuo video. Waver è un modello open source - 
-          dovrai hostarlo tu stesso o usare un servizio di terze parti per generare il video.
+          Genera video ad alta qualità usando Google Veo 3, il modello AI più avanzato per la generazione video. 
+          La generazione richiede qualche minuto.
         </AlertDescription>
       </Alert>
 
@@ -137,9 +137,8 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2">2 secondi</SelectItem>
               <SelectItem value="5">5 secondi</SelectItem>
-              <SelectItem value="10">10 secondi</SelectItem>
+              <SelectItem value="8">8 secondi</SelectItem>
             </SelectContent>
           </Select>
         </div>
