@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      video_generations: {
+        Row: {
+          created_at: string | null
+          duration: number
+          id: string
+          image_name: string | null
+          image_url: string | null
+          motion_intensity: string | null
+          prompt: string | null
+          resolution: string | null
+          status: string | null
+          type: Database["public"]["Enums"]["generation_type"]
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          duration: number
+          id?: string
+          image_name?: string | null
+          image_url?: string | null
+          motion_intensity?: string | null
+          prompt?: string | null
+          resolution?: string | null
+          status?: string | null
+          type: Database["public"]["Enums"]["generation_type"]
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          duration?: number
+          id?: string
+          image_name?: string | null
+          image_url?: string | null
+          motion_intensity?: string | null
+          prompt?: string | null
+          resolution?: string | null
+          status?: string | null
+          type?: Database["public"]["Enums"]["generation_type"]
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +67,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      generation_type: "text_to_video" | "image_to_video"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +194,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      generation_type: ["text_to_video", "image_to_video"],
+    },
   },
 } as const
