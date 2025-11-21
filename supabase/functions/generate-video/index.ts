@@ -31,6 +31,7 @@ serve(async (req) => {
           method: "GET",
           headers: {
             "x-goog-api-key": GOOGLE_AI_API_KEY,
+            "Content-Type": "application/json",
           },
         }
       );
@@ -49,14 +50,23 @@ serve(async (req) => {
           throw new Error(`Video generation failed: ${operation.error.message}`);
         }
 
-        // Get video URL from response
-        const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        // Get video URL from response (REST API format)
+        const videoUri = operation.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
         if (!videoUri) {
           throw new Error("No video URI in response");
         }
 
         // Download video and convert to base64
-        const videoResponse = await fetch(`${videoUri}&key=${GOOGLE_AI_API_KEY}`);
+        const videoResponse = await fetch(videoUri, {
+          headers: {
+            "x-goog-api-key": GOOGLE_AI_API_KEY,
+          },
+        });
+        
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download video: ${videoResponse.status}`);
+        }
+        
         const videoBlob = await videoResponse.blob();
         const arrayBuffer = await videoBlob.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
@@ -111,54 +121,46 @@ serve(async (req) => {
       );
     }
 
-    console.log("Starting video generation with Google Veo 3");
+    console.log("Starting video generation with Google Veo 3.1");
 
     // Prepare request body for Google AI
     const requestBody: any = {
-      prompt: prompt,
-      config: {
-        aspectRatio: "16:9",
-        durationSeconds: duration || 5,
-        personGeneration: "dont_allow",
-      }
+      instances: [{
+        prompt: prompt
+      }]
     };
 
     // Add image for image-to-video
     if (type === "image_to_video" && image_url) {
-      console.log("Generating video from image with Veo 3");
+      console.log("Generating video from image with Veo 3.1");
       
-      // Convert image to inline data
-      let imageData;
+      // Convert image to inline data format
+      let imageBytes;
       if (image_url.startsWith('data:')) {
         // Extract base64 data
         const matches = image_url.match(/^data:([^;]+);base64,(.+)$/);
         if (matches) {
-          imageData = {
-            mimeType: matches[1],
-            data: matches[2]
-          };
+          imageBytes = matches[2];
         }
       } else {
         // If it's a URL, fetch and convert
         const imageResponse = await fetch(image_url);
         const imageBlob = await imageResponse.blob();
         const arrayBuffer = await imageBlob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-        imageData = {
-          mimeType: "image/jpeg",
-          data: base64
-        };
+        imageBytes = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
       }
       
-      requestBody.config.referenceImage = {
-        inlineData: imageData
+      // Add image to the instance
+      requestBody.instances[0].image = {
+        imageBytes: imageBytes,
+        mimeType: "image/png"
       };
     }
 
     console.log("Calling Google AI API for video generation");
 
     const response = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:generateVideos",
+      "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning",
       {
         method: "POST",
         headers: {
