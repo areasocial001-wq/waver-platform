@@ -123,6 +123,58 @@ serve(async (req) => {
 
     console.log("Starting video generation with Google Veo 3.1");
 
+    // Note: For image-to-video, we need to upload the image first using Files API
+    let uploadedFileUri = null;
+    if (type === "image_to_video" && image_url) {
+      console.log("Uploading image for video generation");
+      
+      // Convert image to blob
+      let imageBlob: Blob | null = null;
+      if (image_url.startsWith('data:')) {
+        // Extract base64 data and convert to blob
+        const matches = image_url.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1];
+          const base64 = matches[2];
+          const binaryString = atob(base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          imageBlob = new Blob([bytes], { type: mimeType });
+        }
+      } else {
+        // If it's a URL, fetch it
+        const imageResponse = await fetch(image_url);
+        imageBlob = await imageResponse.blob();
+      }
+
+      if (!imageBlob) {
+        throw new Error("Failed to convert image to blob");
+      }
+
+      // Upload to Google Files API
+      const formData = new FormData();
+      formData.append('file', imageBlob, 'image.png');
+      
+      const uploadResponse = await fetch(
+        `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GOOGLE_AI_API_KEY}`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      if (!uploadResponse.ok) {
+        const error = await uploadResponse.text();
+        throw new Error(`File upload error: ${uploadResponse.status} - ${error}`);
+      }
+
+      const uploadResult = await uploadResponse.json();
+      uploadedFileUri = uploadResult.file.uri;
+      console.log("Image uploaded:", uploadedFileUri);
+    }
+
     // Prepare request body for Google AI
     const requestBody: any = {
       instances: [{
@@ -130,30 +182,10 @@ serve(async (req) => {
       }]
     };
 
-    // Add image for image-to-video
-    if (type === "image_to_video" && image_url) {
-      console.log("Generating video from image with Veo 3.1");
-      
-      // Convert image to inline data format
-      let imageBytes;
-      if (image_url.startsWith('data:')) {
-        // Extract base64 data
-        const matches = image_url.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          imageBytes = matches[2];
-        }
-      } else {
-        // If it's a URL, fetch and convert
-        const imageResponse = await fetch(image_url);
-        const imageBlob = await imageResponse.blob();
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        imageBytes = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      }
-      
-      // Add image to the instance
-      requestBody.instances[0].image = {
-        imageBytes: imageBytes,
-        mimeType: "image/png"
+    // Add uploaded file reference for image-to-video
+    if (uploadedFileUri) {
+      requestBody.instances[0].referenceImage = {
+        fileUri: uploadedFileUri
       };
     }
 
