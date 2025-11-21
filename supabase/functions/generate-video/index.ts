@@ -56,20 +56,17 @@ serve(async (req) => {
     if (type === "image_to_video" && image_url) {
       console.log("Starting image-to-video generation");
       output = await replicate.predictions.create({
-        model: "aicapcut/stable-video-diffusion-img2vid-xt-optimized",
+        version: "b840152c70e887773e95b24d1f1e8fd2aea448fcf093de801d3627f0a197409f",
         input: {
-          image: image_url,
-          motion_bucket_id: 127,
-          fps: 7,
-          num_frames: duration === 2 ? 14 : duration === 5 ? 25 : 50,
-          cond_aug: 0.02,
+          prompt: prompt || "A cinematic video",
+          input_image: image_url,
         }
       });
     } else {
       // For text-to-video generation - using text-to-image as placeholder
       console.log("Starting text-to-image generation (video placeholder)");
       output = await replicate.predictions.create({
-        model: "black-forest-labs/flux-schnell",
+        version: "bf53bdb93d739c9c915091cfa5f49ca662d11273a5eb30e7a2ec1939bcf27a00",
         input: {
           prompt: prompt,
           go_fast: true,
