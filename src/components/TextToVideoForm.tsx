@@ -21,17 +21,11 @@ export const TextToVideoForm = () => {
 
     setIsLoading(true);
     
-    // Simulate generation process
-    toast.info("Preparazione della richiesta...", {
-      description: "Verrai reindirizzato al bot Discord di Waver"
+    toast.success("Parametri pronti!", {
+      description: "Ora puoi usare questi parametri con la tua installazione di Waver o un servizio API"
     });
-
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success("Pronto!", {
-        description: "Usa il comando sul Discord di Waver per generare il video"
-      });
-    }, 2000);
+    
+    setIsLoading(false);
   };
 
   const examplePrompts = [
@@ -45,8 +39,8 @@ export const TextToVideoForm = () => {
       <Alert className="border-primary/30 bg-primary/5">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription>
-          Questa piattaforma si integra con il bot Discord di Waver. Dopo aver preparato i parametri, 
-          utilizza il bot Discord per generare il video.
+          Configura i parametri del tuo video. Waver è un modello open source - 
+          dovrai hostarlo tu stesso o usare un servizio di terze parti per generare il video.
         </AlertDescription>
       </Alert>
 

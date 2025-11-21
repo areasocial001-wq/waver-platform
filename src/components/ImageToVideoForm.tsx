@@ -45,16 +45,11 @@ export const ImageToVideoForm = () => {
 
     setIsLoading(true);
     
-    toast.info("Preparazione della richiesta...", {
-      description: "Verrai reindirizzato al bot Discord di Waver"
+    toast.success("Parametri pronti!", {
+      description: "Ora puoi usare questi parametri con la tua installazione di Waver o un servizio API"
     });
-
-    setTimeout(() => {
-      setIsLoading(false);
-      toast.success("Pronto!", {
-        description: "Usa il comando sul Discord di Waver per generare il video"
-      });
-    }, 2000);
+    
+    setIsLoading(false);
   };
 
   return (
@@ -62,8 +57,8 @@ export const ImageToVideoForm = () => {
       <Alert className="border-accent/30 bg-accent/5">
         <AlertCircle className="h-4 w-4 text-accent" />
         <AlertDescription>
-          Carica un'immagine e Waver la trasformerà in un video dinamico. 
-          Utilizza il bot Discord per completare la generazione.
+          Carica un'immagine e configura i parametri. Waver è un modello open source - 
+          dovrai hostarlo tu stesso o usare un servizio di terze parti per generare il video.
         </AlertDescription>
       </Alert>
 
