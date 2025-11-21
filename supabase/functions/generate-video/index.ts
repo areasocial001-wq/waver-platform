@@ -75,7 +75,7 @@ serve(async (req) => {
       }
 
       const response = await fetch(
-        "https://router.huggingface.co/models/stabilityai/stable-video-diffusion-img2vid-xt",
+        "https://router.huggingface.co/hf-inference/models/stabilityai/stable-video-diffusion-img2vid-xt",
         {
           method: "POST",
           headers: {
@@ -105,7 +105,7 @@ serve(async (req) => {
       console.log("Generating video from text");
       
       const response = await fetch(
-        "https://router.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b",
+        "https://router.huggingface.co/hf-inference/models/damo-vilab/text-to-video-ms-1.7b",
         {
           method: "POST",
           headers: {
