@@ -56,26 +56,27 @@ serve(async (req) => {
     if (type === "image_to_video" && image_url) {
       console.log("Starting image-to-video generation");
       output = await replicate.predictions.create({
-        version: "a07f252abbbd7d47c2bdbdb374d1e0e3e1f88e97f24301500c9b5196e7f5cd00",
+        model: "aicapcut/stable-video-diffusion-img2vid-xt-optimized",
         input: {
           image: image_url,
-          prompt: prompt || "animate this image",
-          num_frames: duration === 2 ? 25 : duration === 5 ? 50 : 100,
-          fps: 10,
+          motion_bucket_id: 127,
+          fps: 7,
+          num_frames: duration === 2 ? 14 : duration === 5 ? 25 : 50,
+          cond_aug: 0.02,
         }
       });
     } else {
-      // For text-to-video generation - using a text-to-image model as placeholder
-      // since true text-to-video models are less common on Replicate
+      // For text-to-video generation - using text-to-image as placeholder
       console.log("Starting text-to-image generation (video placeholder)");
       output = await replicate.predictions.create({
-        version: "5599ed30703defd1d160a25a63321b4dec97101d98b4674bcc56e41f62f35637",
+        model: "black-forest-labs/flux-schnell",
         input: {
           prompt: prompt,
           go_fast: true,
           num_outputs: 1,
           aspect_ratio: "16:9",
           output_format: "webp",
+          num_inference_steps: 4,
         }
       });
     }
