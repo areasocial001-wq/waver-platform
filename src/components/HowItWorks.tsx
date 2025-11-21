@@ -12,14 +12,14 @@ export const HowItWorks = () => {
     },
     {
       icon: MessageSquare,
-      title: "2. Vai su Discord",
-      description: "Unisciti al server Discord di Waver e accedi al bot ufficiale per la generazione dei video.",
+      title: "2. Scegli il Metodo",
+      description: "Waver è open source: puoi hostarlo tu stesso, usare servizi di terze parti, o attendere API future.",
       color: "text-secondary",
     },
     {
       icon: Zap,
       title: "3. Genera il Video",
-      description: "Usa il comando del bot con i parametri che hai configurato e ricevi il tuo video in pochi minuti!",
+      description: "Usa i parametri configurati con il tuo metodo scelto per generare il video!",
       color: "text-accent",
     },
   ];
@@ -53,49 +53,47 @@ export const HowItWorks = () => {
           })}
         </div>
 
-        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-secondary/5 backdrop-blur-sm">
+        <Card className="border-accent/30 bg-gradient-to-br from-accent/5 to-primary/5 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
-              <MessageSquare className="w-6 h-6 text-primary" />
-              Accedi al Bot Discord di Waver
+              <MessageSquare className="w-6 h-6 text-accent" />
+              Come Usare Waver
             </CardTitle>
             <CardDescription className="text-base">
-              Il bot Discord ufficiale di Waver è il modo più semplice per generare i tuoi video. 
-              Unisciti alla community e inizia subito!
+              Waver è un modello open source. Ecco le tue opzioni per utilizzarlo:
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <h4 className="font-semibold mb-2">🖥️ Self-Hosting</h4>
+                <p className="text-sm text-muted-foreground">
+                  Scarica e installa Waver sul tuo server seguendo le istruzioni su GitHub. Richiede GPU potente.
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <h4 className="font-semibold mb-2">🌐 Servizi di Terze Parti</h4>
+                <p className="text-sm text-muted-foreground">
+                  Alcuni provider potrebbero offrire Waver come servizio API. Cerca "Waver API" online.
+                </p>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                <h4 className="font-semibold mb-2">🔮 API Ufficiale (In Arrivo)</h4>
+                <p className="text-sm text-muted-foreground">
+                  ByteDance potrebbe rilasciare un'API ufficiale in futuro. Resta aggiornato sul repository GitHub.
+                </p>
+              </div>
+            </div>
             <Button 
               size="lg"
-              className="bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow-primary transition-all duration-300"
-              onClick={() => window.open("http://opensource.bytedance.com/discord/invite", "_blank")}
+              className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow-primary transition-all duration-300"
+              onClick={() => window.open("https://github.com/FoundationVision/Waver", "_blank")}
             >
-              Unisciti a Discord
+              Visita GitHub Ufficiale
               <ExternalLink className="w-4 h-4 ml-2" />
             </Button>
           </CardContent>
         </Card>
-
-        <div className="mt-12 p-6 rounded-lg bg-muted/20 border border-border/50">
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-accent" />
-            Comandi Discord Utili
-          </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-start gap-2">
-              <code className="px-2 py-1 rounded bg-muted text-foreground">/generate</code>
-              <span className="text-muted-foreground">Genera un video da testo</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <code className="px-2 py-1 rounded bg-muted text-foreground">/image-to-video</code>
-              <span className="text-muted-foreground">Genera un video da immagine</span>
-            </div>
-            <div className="flex items-start gap-2">
-              <code className="px-2 py-1 rounded bg-muted text-foreground">/help</code>
-              <span className="text-muted-foreground">Mostra tutti i comandi disponibili</span>
-            </div>
-          </div>
-        </div>
       </div>
     </section>
   );
