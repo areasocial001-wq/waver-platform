@@ -18,13 +18,13 @@ export const Footer = () => {
 
           <div>
             <h4 className="font-semibold mb-4 text-foreground">Risorse</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+            <ul className="space-y-2 text-sm">
               <li>
                 <a 
                   href="http://www.waver.video/" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                  className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                 >
                   Sito Ufficiale Waver
                   <ExternalLink className="w-3 h-3" />
@@ -35,7 +35,7 @@ export const Footer = () => {
                   href="https://arxiv.org/pdf/2508.15761" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                  className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                 >
                   Technical Report
                   <ExternalLink className="w-3 h-3" />
@@ -46,7 +46,7 @@ export const Footer = () => {
                   href="http://opensource.bytedance.com/discord/invite" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="hover:text-primary transition-colors inline-flex items-center gap-1"
+                  className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
                 >
                   Discord Community
                   <ExternalLink className="w-3 h-3" />
@@ -61,7 +61,7 @@ export const Footer = () => {
               variant="outline"
               size="sm"
               onClick={() => window.open("https://github.com/FoundationVision/Waver", "_blank")}
-              className="bg-muted/50 hover:bg-muted border-border/50"
+              className="bg-card hover:bg-accent text-foreground border-border"
             >
               <Github className="w-4 h-4 mr-2" />
               GitHub Repository
