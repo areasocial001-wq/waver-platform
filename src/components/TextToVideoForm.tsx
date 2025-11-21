@@ -48,11 +48,11 @@ export const TextToVideoForm = () => {
       if (dbError) throw dbError;
 
       toast.success("Generazione video avviata!", {
-        description: "Il video verrà generato in pochi minuti. Controlla lo storico per vedere il progresso."
+        description: "Il video verrà generato. Attendi qualche istante..."
       });
 
-      // Start video generation in background
-      supabase.functions
+      // Generate video synchronously
+      const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: {
             type: "text_to_video",
@@ -60,30 +60,24 @@ export const TextToVideoForm = () => {
             duration: parseInt(duration),
             generationId: generationData.id
           }
-        })
-        .then(async ({ data, error }) => {
-          if (error) {
-            console.error("Error starting generation:", error);
-            await supabase
-              .from("video_generations")
-              .update({ 
-                status: "failed", 
-                error_message: error.message 
-              })
-              .eq("id", generationData.id);
-            return;
-          }
-
-          if (data?.id) {
-            await supabase
-              .from("video_generations")
-              .update({ 
-                prediction_id: data.id,
-                status: "processing"
-              })
-              .eq("id", generationData.id);
-          }
         });
+
+      if (error) {
+        console.error("Error generating video:", error);
+        await supabase
+          .from("video_generations")
+          .update({ 
+            status: "failed", 
+            error_message: error.message 
+          })
+          .eq("id", generationData.id);
+        toast.error("Errore nella generazione del video");
+        return;
+      }
+
+      toast.success("Video generato con successo!", {
+        description: "Vai allo storico per vedere il tuo video."
+      });
       
       setPrompt("");
     } catch (error) {
