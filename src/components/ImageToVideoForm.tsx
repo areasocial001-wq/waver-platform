@@ -122,8 +122,8 @@ export const ImageToVideoForm = () => {
       <Alert className="border-accent/30 bg-accent/5">
         <AlertCircle className="h-4 w-4 text-accent" />
         <AlertDescription>
-          Carica un'immagine e configura i parametri. Waver è un modello open source - 
-          dovrai hostarlo tu stesso o usare un servizio di terze parti per generare il video.
+          Anima le tue immagini usando Google Veo 3. Carica un'immagine e descrivi come vuoi che si animi.
+          La generazione richiede qualche minuto.
         </AlertDescription>
       </Alert>
 
@@ -190,9 +190,8 @@ export const ImageToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2">2 secondi</SelectItem>
               <SelectItem value="5">5 secondi</SelectItem>
-              <SelectItem value="10">10 secondi</SelectItem>
+              <SelectItem value="8">8 secondi</SelectItem>
             </SelectContent>
           </Select>
         </div>
