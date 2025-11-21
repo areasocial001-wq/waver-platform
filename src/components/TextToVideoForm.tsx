@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -13,7 +14,7 @@ export const TextToVideoForm = () => {
   const [resolution, setResolution] = useState("720p");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Inserisci una descrizione per il video");
       return;
@@ -21,11 +22,37 @@ export const TextToVideoForm = () => {
 
     setIsLoading(true);
     
-    toast.success("Parametri pronti!", {
-      description: "Ora puoi usare questi parametri con la tua installazione di Waver o un servizio API"
-    });
-    
-    setIsLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Devi effettuare l'accesso");
+        setIsLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.from("video_generations").insert({
+        user_id: user.id,
+        type: "text_to_video",
+        prompt: prompt,
+        duration: parseInt(duration),
+        resolution: resolution,
+        status: "pending"
+      });
+
+      if (error) throw error;
+
+      toast.success("Parametri salvati!", {
+        description: "Puoi vedere le tue richieste nella sezione Storico"
+      });
+      
+      setPrompt("");
+    } catch (error) {
+      console.error("Error saving generation:", error);
+      toast.error("Errore nel salvare i parametri");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const examplePrompts = [

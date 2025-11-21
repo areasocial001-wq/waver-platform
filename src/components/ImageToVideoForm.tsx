@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Sparkles, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/integrations/supabase/client";
 
 export const ImageToVideoForm = () => {
   const [image, setImage] = useState<File | null>(null);
@@ -37,7 +38,7 @@ export const ImageToVideoForm = () => {
     setImagePreview("");
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!image) {
       toast.error("Carica un'immagine prima di procedere");
       return;
@@ -45,11 +46,41 @@ export const ImageToVideoForm = () => {
 
     setIsLoading(true);
     
-    toast.success("Parametri pronti!", {
-      description: "Ora puoi usare questi parametri con la tua installazione di Waver o un servizio API"
-    });
-    
-    setIsLoading(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast.error("Devi effettuare l'accesso");
+        setIsLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.from("video_generations").insert({
+        user_id: user.id,
+        type: "image_to_video",
+        prompt: prompt || null,
+        duration: parseInt(duration),
+        motion_intensity: motion,
+        image_name: image.name,
+        image_url: imagePreview,
+        status: "pending"
+      });
+
+      if (error) throw error;
+
+      toast.success("Parametri salvati!", {
+        description: "Puoi vedere le tue richieste nella sezione Storico"
+      });
+      
+      setImage(null);
+      setImagePreview("");
+      setPrompt("");
+    } catch (error) {
+      console.error("Error saving generation:", error);
+      toast.error("Errore nel salvare i parametri");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
