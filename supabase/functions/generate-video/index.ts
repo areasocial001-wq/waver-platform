@@ -107,12 +107,12 @@ serve(async (req) => {
     }
 
     // Start new video generation
-    const { type, prompt, image_url, duration, generationId } = body;
+    const { type, prompt, image_url, image, duration, resolution, generationId } = body;
 
-    if (!type || !prompt) {
+    if (!type) {
       return new Response(
         JSON.stringify({ 
-          error: "Missing required fields: type and prompt are required" 
+          error: "Missing required field: type is required" 
         }), 
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -121,11 +121,24 @@ serve(async (req) => {
       );
     }
 
-    // Check if image-to-video is requested
-    if (type === "image_to_video") {
+    // For text-to-video, prompt is required
+    if (type === "text_to_video" && !prompt) {
       return new Response(
         JSON.stringify({ 
-          error: "Image-to-video is not supported by the Google AI API. This feature requires Google Vertex AI API. Please use text-to-video instead." 
+          error: "Missing required field: prompt is required for text-to-video" 
+        }), 
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+
+    // For image-to-video, image is required
+    if (type === "image_to_video" && !image && !image_url) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Missing required field: image is required for image-to-video" 
         }), 
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -136,12 +149,38 @@ serve(async (req) => {
 
     console.log("Starting video generation with Google Veo 3.1");
 
-    // Prepare request body for Google AI (text-to-video only)
+    // Prepare request body for Google AI
     const requestBody: any = {
-      instances: [{
-        prompt: prompt
-      }]
+      instances: [{}],
+      parameters: {
+        durationSeconds: duration || 5,
+        aspectRatio: "16:9"
+      }
     };
+
+    // Add prompt if provided
+    if (prompt) {
+      requestBody.instances[0].prompt = prompt;
+    }
+
+    // Add image for image-to-video generation
+    if (type === "image_to_video" && (image || image_url)) {
+      const imageData = image || image_url;
+      const base64Data = imageData.split(',')[1]; // Remove data:image/...;base64, prefix
+      const mimeType = imageData.startsWith('data:image/png') ? 'image/png' : 
+                      imageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+      
+      requestBody.instances[0].image = {
+        bytesBase64Encoded: base64Data,
+        mimeType: mimeType
+      };
+      console.log("Added image for image-to-video generation");
+    }
+
+    // Add resolution for text-to-video if provided
+    if (type === "text_to_video" && resolution) {
+      requestBody.parameters.resolution = resolution;
+    }
 
     console.log("Calling Google AI API for video generation");
 
