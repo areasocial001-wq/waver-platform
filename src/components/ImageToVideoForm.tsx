@@ -190,7 +190,10 @@ export const ImageToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="4">4 secondi</SelectItem>
               <SelectItem value="5">5 secondi</SelectItem>
+              <SelectItem value="6">6 secondi</SelectItem>
+              <SelectItem value="7">7 secondi</SelectItem>
               <SelectItem value="8">8 secondi</SelectItem>
             </SelectContent>
           </Select>
