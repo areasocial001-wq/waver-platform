@@ -17,7 +17,7 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Risorse</h4>
+            <h4 className="font-semibold mb-4 text-foreground">Risorse</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a 
@@ -56,12 +56,12 @@ export const Footer = () => {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-4">Open Source</h4>
+            <h4 className="font-semibold mb-4 text-foreground">Open Source</h4>
             <Button
               variant="outline"
               size="sm"
               onClick={() => window.open("https://github.com/FoundationVision/Waver", "_blank")}
-              className="border-border hover:bg-muted"
+              className="bg-muted/50 hover:bg-muted border-border/50"
             >
               <Github className="w-4 h-4 mr-2" />
               GitHub Repository
