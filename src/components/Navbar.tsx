@@ -56,6 +56,7 @@ export const Navbar = () => {
               variant="outline"
               size="sm"
               onClick={() => navigate("/")}
+              className="bg-muted/50 hover:bg-muted border-border/50"
             >
               <Home className="w-4 h-4 mr-2" />
               Home
@@ -65,6 +66,7 @@ export const Navbar = () => {
               variant="outline"
               size="sm"
               onClick={() => navigate("/history")}
+              className="bg-muted/50 hover:bg-muted border-border/50"
             >
               <History className="w-4 h-4 mr-2" />
               Storico
@@ -74,6 +76,7 @@ export const Navbar = () => {
             variant="outline"
             size="sm"
             onClick={handleSignOut}
+            className="bg-muted/50 hover:bg-muted border-border/50"
           >
             <LogOut className="w-4 h-4 mr-2" />
             Esci
