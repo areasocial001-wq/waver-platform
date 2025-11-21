@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState("5");
+  const [duration, setDuration] = useState("6");
   const [resolution, setResolution] = useState("720p");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -138,9 +138,7 @@ export const TextToVideoForm = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="4">4 secondi</SelectItem>
-              <SelectItem value="5">5 secondi</SelectItem>
               <SelectItem value="6">6 secondi</SelectItem>
-              <SelectItem value="7">7 secondi</SelectItem>
               <SelectItem value="8">8 secondi</SelectItem>
             </SelectContent>
           </Select>
