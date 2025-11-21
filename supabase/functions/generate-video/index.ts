@@ -121,47 +121,27 @@ serve(async (req) => {
       );
     }
 
+    // Check if image-to-video is requested
+    if (type === "image_to_video") {
+      return new Response(
+        JSON.stringify({ 
+          error: "Image-to-video is not supported by the Google AI API. This feature requires Google Vertex AI API. Please use text-to-video instead." 
+        }), 
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        }
+      );
+    }
+
     console.log("Starting video generation with Google Veo 3.1");
 
-    // Prepare request body for Google AI
+    // Prepare request body for Google AI (text-to-video only)
     const requestBody: any = {
       instances: [{
         prompt: prompt
       }]
     };
-
-    // Add image data for image-to-video using inlineData format
-    if (type === "image_to_video" && image_url) {
-      console.log("Adding image to request for image-to-video generation");
-      
-      // Extract base64 data from data URL
-      let base64Data = '';
-      let mimeType = 'image/png';
-      
-      if (image_url.startsWith('data:')) {
-        const matches = image_url.match(/^data:([^;]+);base64,(.+)$/);
-        if (matches) {
-          mimeType = matches[1];
-          base64Data = matches[2];
-        } else {
-          throw new Error("Invalid image data URL format");
-        }
-      } else {
-        // If it's a URL, fetch and convert to base64
-        const imageResponse = await fetch(image_url);
-        const imageBlob = await imageResponse.blob();
-        const arrayBuffer = await imageBlob.arrayBuffer();
-        base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      }
-      
-      // Add image in the correct format for Veo API
-      requestBody.instances[0].image = {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType
-        }
-      };
-    }
 
     console.log("Calling Google AI API for video generation");
 
