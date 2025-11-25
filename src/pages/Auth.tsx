@@ -71,14 +71,18 @@ export default function Auth() {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log("Tentativo di accesso con email:", email);
+    
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      toast.error("Credenziali non valide");
+      console.error("Errore durante l'accesso:", error);
+      toast.error(`Errore: ${error.message}`);
     } else {
+      console.log("Accesso riuscito:", data);
       toast.success("Accesso effettuato!");
     }
     setLoading(false);
