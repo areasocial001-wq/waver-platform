@@ -56,28 +56,39 @@ serve(async (req) => {
           throw new Error("No video URI in response");
         }
 
-        // Use the video URL directly instead of downloading and converting
-        const videoUrl = videoUri;
+        // Store the internal Google URI - we'll proxy it through our endpoint
+        const internalVideoUri = videoUri;
 
-        // Update database
+        // Update database with internal URI
         if (body.generationId) {
           const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
           const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
           const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
           const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
+          // Create proxy URL for the client to use
+          const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(internalVideoUri)}`;
+
           await supabaseClient
             .from('video_generations')
             .update({
               status: 'completed',
-              video_url: videoUrl,
+              video_url: proxyUrl,
             })
             .eq('id', body.generationId);
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: proxyUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
         }
 
         return new Response(JSON.stringify({ 
           status: "succeeded",
-          output: videoUrl 
+          output: internalVideoUri 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
