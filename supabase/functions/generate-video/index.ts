@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import Replicate from "https://esm.sh/replicate@0.25.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,6 +25,66 @@ serve(async (req) => {
     // Check if it's a polling request
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
+      
+      // Check if it's a Replicate prediction (format: replicate:prediction_id)
+      if (body.operationId.startsWith('replicate:')) {
+        const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
+        if (!REPLICATE_API_KEY) {
+          throw new Error("REPLICATE_API_KEY is not set");
+        }
+        
+        const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+        const predictionId = body.operationId.replace('replicate:', '');
+        
+        console.log("Polling Replicate prediction:", predictionId);
+        const prediction = await replicate.predictions.get(predictionId);
+        console.log("Replicate prediction status:", prediction);
+        
+        if (prediction.status === "succeeded") {
+          const videoUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+
+            return new Response(JSON.stringify({ 
+              status: "succeeded",
+              output: videoUrl 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (prediction.status === "failed") {
+          throw new Error(`Replicate generation failed: ${prediction.error || "Unknown error"}`);
+        } else {
+          // Still processing
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
       
       const pollResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/${body.operationId}`,
@@ -197,7 +258,7 @@ serve(async (req) => {
 
     console.log("Calling Google AI API for video generation");
 
-    const response = await fetch(
+    let response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning",
       {
         method: "POST",
@@ -208,6 +269,62 @@ serve(async (req) => {
         body: JSON.stringify(requestBody),
       }
     );
+
+    // Check if Google API returned quota error (429), fallback to Replicate
+    if (!response.ok && response.status === 429) {
+      console.log("Google quota exceeded, falling back to Replicate");
+      
+      const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
+      if (!REPLICATE_API_KEY) {
+        const error = await response.text();
+        throw new Error(`Google AI API error: ${response.status} - ${error}`);
+      }
+
+      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+      
+      // Use minimax/video-01 model on Replicate
+      const replicateInput: any = {
+        prompt: prompt || "A video based on the provided image",
+      };
+
+      // For image-to-video, add the image
+      if (type === "image_to_video" && (image || image_url)) {
+        replicateInput.first_frame_image = image || image_url;
+      }
+
+      console.log("Starting Replicate generation with minimax/video-01");
+      const prediction = await replicate.predictions.create({
+        model: "minimax/video-01",
+        input: replicateInput,
+      });
+
+      console.log("Replicate prediction started:", prediction);
+
+      // Save Replicate prediction ID to database
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `replicate:${prediction.id}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `replicate:${prediction.id}`,
+        provider: "replicate"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     if (!response.ok) {
       const error = await response.text();
