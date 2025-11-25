@@ -69,19 +69,15 @@ export default function History() {
     }
   };
 
-  const handleDownload = (videoUrl: string, generationId: string) => {
+  const handleDownload = async (videoUrl: string, generationId: string) => {
     try {
-      // Convert base64 to blob
-      const base64Data = videoUrl.split(',')[1];
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
+      toast.info("Download in corso...");
       
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
+      // Fetch the video from the proxy URL
+      const response = await fetch(videoUrl);
+      if (!response.ok) throw new Error("Download failed");
       
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'video/mp4' });
+      const blob = await response.blob();
       
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -93,7 +89,7 @@ export default function History() {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      toast.success("Download avviato");
+      toast.success("Download completato");
     } catch (error) {
       console.error("Error downloading video:", error);
       toast.error("Errore nel download");
