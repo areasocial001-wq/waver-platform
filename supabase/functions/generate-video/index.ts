@@ -56,41 +56,8 @@ serve(async (req) => {
           throw new Error("No video URI in response");
         }
 
-        // Download video and convert to base64
-        const videoResponse = await fetch(videoUri, {
-          headers: {
-            "x-goog-api-key": GOOGLE_AI_API_KEY,
-          },
-        });
-        
-        if (!videoResponse.ok) {
-          throw new Error(`Failed to download video: ${videoResponse.status}`);
-        }
-        
-        const videoBlob = await videoResponse.blob();
-        const arrayBuffer = await videoBlob.arrayBuffer();
-        
-        // Manual base64 encoding to avoid stack overflow with btoa()
-        const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        const uint8Array = new Uint8Array(arrayBuffer);
-        let base64 = '';
-        
-        for (let i = 0; i < uint8Array.length; i += 3) {
-          const byte1 = uint8Array[i];
-          const byte2 = i + 1 < uint8Array.length ? uint8Array[i + 1] : 0;
-          const byte3 = i + 2 < uint8Array.length ? uint8Array[i + 2] : 0;
-          
-          const enc1 = byte1 >> 2;
-          const enc2 = ((byte1 & 3) << 4) | (byte2 >> 4);
-          const enc3 = ((byte2 & 15) << 2) | (byte3 >> 6);
-          const enc4 = byte3 & 63;
-          
-          base64 += base64Chars[enc1] + base64Chars[enc2];
-          base64 += (i + 1 < uint8Array.length) ? base64Chars[enc3] : '=';
-          base64 += (i + 2 < uint8Array.length) ? base64Chars[enc4] : '=';
-        }
-        
-        const videoUrl = `data:video/mp4;base64,${base64}`;
+        // Use the video URL directly instead of downloading and converting
+        const videoUrl = videoUri;
 
         // Update database
         if (body.generationId) {
