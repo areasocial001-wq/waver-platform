@@ -91,14 +91,30 @@ export const ImageToVideoForm = () => {
 
       if (error) {
         console.error("Error generating video:", error);
+        
+        // Check for specific error types
+        const errorMessage = error.message || String(error);
+        let userMessage = "Errore nella generazione del video";
+        
+        if (errorMessage.includes("429") || errorMessage.includes("quota") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
+          userMessage = "Quota API Google esaurita. Riprova più tardi o verifica il tuo piano Google AI.";
+        } else if (errorMessage.includes("401") || errorMessage.includes("unauthorized")) {
+          userMessage = "Errore di autenticazione API. Verifica la configurazione.";
+        } else if (errorMessage.includes("timeout")) {
+          userMessage = "Timeout durante la generazione. Riprova.";
+        }
+        
         await supabase
           .from("video_generations")
           .update({ 
             status: "failed", 
-            error_message: error.message 
+            error_message: errorMessage 
           })
           .eq("id", generationData.id);
-        toast.error("Errore nella generazione del video");
+        
+        toast.error(userMessage, {
+          description: errorMessage.includes("429") ? "La generazione video richiede crediti API Google." : undefined
+        });
         return;
       }
 
