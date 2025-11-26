@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TextToVideoForm } from "./TextToVideoForm";
 import { ImageToVideoForm } from "./ImageToVideoForm";
-import { Video, Image } from "lucide-react";
+import { ImageGenerationForm } from "./ImageGenerationForm";
+import { Video, Image, Sparkles } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -19,7 +20,7 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -33,6 +34,13 @@ export const GenerateSection = () => {
             >
               <Image className="w-4 h-4" />
               Image to Video
+            </TabsTrigger>
+            <TabsTrigger 
+              value="generate-image" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+            >
+              <Sparkles className="w-4 h-4" />
+              Genera Immagini
             </TabsTrigger>
           </TabsList>
 
@@ -66,6 +74,23 @@ export const GenerateSection = () => {
               </CardHeader>
               <CardContent>
                 <ImageToVideoForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="generate-image">
+            <Card className="border-accent/20 bg-card/50 backdrop-blur-sm shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-accent" />
+                  Generazione Immagini
+                </CardTitle>
+                <CardDescription>
+                  Crea scenografie e storyboard professionali con Replicate Flux AI
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ImageGenerationForm />
               </CardContent>
             </Card>
           </TabsContent>
