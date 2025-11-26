@@ -80,7 +80,7 @@ export const Navbar = () => {
                 className="bg-card hover:bg-accent text-foreground border-border"
               >
                 <History className="w-4 h-4 mr-2" />
-                Video
+                Storico
               </Button>
             </>
           )}
