@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { TextToVideoForm } from "./TextToVideoForm";
 import { ImageToVideoForm } from "./ImageToVideoForm";
 import { ImageGenerationForm } from "./ImageGenerationForm";
-import { Video, Image, Sparkles } from "lucide-react";
+import { StoryboardEditor } from "./StoryboardEditor";
+import { Video, Image, Sparkles, Layout } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -20,7 +21,7 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-4 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -41,6 +42,13 @@ export const GenerateSection = () => {
             >
               <Sparkles className="w-4 h-4" />
               Genera Immagini
+            </TabsTrigger>
+            <TabsTrigger 
+              value="storyboard" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Layout className="w-4 h-4" />
+              Storyboard
             </TabsTrigger>
           </TabsList>
 
@@ -91,6 +99,23 @@ export const GenerateSection = () => {
               </CardHeader>
               <CardContent>
                 <ImageGenerationForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="storyboard">
+            <Card className="border-primary/20 bg-card/50 backdrop-blur-sm shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Layout className="w-5 h-5 text-primary" />
+                  Editor Storyboard
+                </CardTitle>
+                <CardDescription>
+                  Combina più immagini in uno storyboard professionale con layout personalizzabili
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StoryboardEditor />
               </CardContent>
             </Card>
           </TabsContent>
