@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3 } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images } from "lucide-react";
 import html2canvas from "html2canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useImageGallery } from "@/contexts/ImageGalleryContext";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface StoryboardPanel {
   id: string;
@@ -121,7 +123,10 @@ export const StoryboardEditor = () => {
   const [panels, setPanels] = useState<StoryboardPanel[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("custom");
+  const [draggedImageUrl, setDraggedImageUrl] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState(true);
   const storyboardRef = useRef<HTMLDivElement>(null);
+  const { images } = useImageGallery();
 
   const initializePanels = (layoutType: LayoutType, captions: string[] = []) => {
     const config = LAYOUT_CONFIG[layoutType];
@@ -177,6 +182,25 @@ export const StoryboardEditor = () => {
     setPanels(prev => prev.map(panel => 
       panel.id === panelId ? { ...panel, imageUrl: null } : panel
     ));
+  };
+
+  const handleDragStart = (imageUrl: string) => {
+    setDraggedImageUrl(imageUrl);
+  };
+
+  const handleDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: DragEvent, panelId: string) => {
+    e.preventDefault();
+    if (draggedImageUrl) {
+      setPanels(prev => prev.map(panel => 
+        panel.id === panelId ? { ...panel, imageUrl: draggedImageUrl } : panel
+      ));
+      toast.success("Immagine aggiunta al pannello!");
+      setDraggedImageUrl(null);
+    }
   };
 
   const handleExport = async () => {
@@ -305,6 +329,15 @@ export const StoryboardEditor = () => {
         </div>
         
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowGallery(!showGallery)}
+            className={showGallery ? "bg-primary/10" : ""}
+          >
+            <Images className="mr-2 h-4 w-4" />
+            {showGallery ? "Nascondi" : "Mostra"} Galleria ({images.length})
+          </Button>
+
           <Select value={layout} onValueChange={(value) => handleLayoutChange(value as LayoutType)}>
             <SelectTrigger className="w-[180px] bg-background/50 border-border">
               <SelectValue />
@@ -338,64 +371,114 @@ export const StoryboardEditor = () => {
         </div>
       </div>
 
-      <Card className="p-8 bg-card/50" ref={storyboardRef}>
-        <div className="mb-6 text-center">
-          <h2 className="text-3xl font-bold text-foreground">{title}</h2>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {showGallery && images.length > 0 && (
+          <Card className="lg:col-span-1 p-4 bg-card/50 border-accent/20">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-3">
+                <Images className="h-5 w-5 text-accent" />
+                <h3 className="font-semibold">Galleria Immagini</h3>
+              </div>
+              <Alert className="border-accent/50 bg-accent/10">
+                <AlertDescription className="text-xs">
+                  Trascina le immagini nei pannelli dello storyboard
+                </AlertDescription>
+              </Alert>
+              <ScrollArea className="h-[600px]">
+                <div className="space-y-3 pr-4">
+                  {images.map((image) => (
+                    <Card
+                      key={image.id}
+                      className="cursor-grab active:cursor-grabbing hover:border-accent/50 transition-colors overflow-hidden"
+                      draggable
+                      onDragStart={() => handleDragStart(image.url)}
+                    >
+                      <img
+                        src={image.url}
+                        alt={image.prompt}
+                        className="w-full h-auto object-cover"
+                      />
+                      <div className="p-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {image.prompt}
+                        </p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          </Card>
+        )}
 
-        <div 
-          className="grid gap-4"
-          style={{
-            gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
-            gridTemplateRows: `repeat(${config.rows}, 1fr)`,
-          }}
-        >
-          {panels.map((panel, index) => (
-            <Card 
-              key={panel.id}
-              className="relative group overflow-hidden border-border bg-background/30 aspect-video"
+        <div className={showGallery && images.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
+
+          <Card className="p-8 bg-card/50" ref={storyboardRef}>
+            <div className="mb-6 text-center">
+              <h2 className="text-3xl font-bold text-foreground">{title}</h2>
+            </div>
+
+            <div 
+              className="grid gap-4"
+              style={{
+                gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
+                gridTemplateRows: `repeat(${config.rows}, 1fr)`,
+              }}
             >
-              {panel.imageUrl ? (
-                <>
-                  <img 
-                    src={panel.imageUrl} 
-                    alt={`Panel ${index + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  <Button
-                    size="icon"
-                    variant="destructive"
-                    className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleRemoveImage(panel.id)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  {panel.caption && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 text-sm">
-                      {panel.caption}
-                    </div>
+              {panels.map((panel, index) => (
+                <Card 
+                  key={panel.id}
+                  className="relative group overflow-hidden border-border bg-background/30 aspect-video"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, panel.id)}
+                >
+                  {panel.imageUrl ? (
+                    <>
+                      <img 
+                        src={panel.imageUrl} 
+                        alt={`Panel ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => handleRemoveImage(panel.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      {panel.caption && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 text-sm">
+                          {panel.caption}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <label 
+                      className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-accent/10 transition-colors"
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, panel.id)}
+                    >
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(panel.id, file);
+                        }}
+                      />
+                      <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">Trascina o clicca</span>
+                      <span className="text-xs text-muted-foreground">Pannello {index + 1}</span>
+                    </label>
                   )}
-                </>
-              ) : (
-                <label className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-accent/10 transition-colors">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(panel.id, file);
-                    }}
-                  />
-                  <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
-                  <span className="text-sm text-muted-foreground">Clicca per caricare</span>
-                  <span className="text-xs text-muted-foreground">Pannello {index + 1}</span>
-                </label>
-              )}
-            </Card>
-          ))}
+                </Card>
+              ))}
+            </div>
+          </Card>
         </div>
-      </Card>
+      </div>
 
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
