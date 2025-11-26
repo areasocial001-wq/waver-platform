@@ -1,4 +1,6 @@
-import { useState, useRef, DragEvent } from "react";
+import { useState, useRef, DragEvent, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -6,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save } from "lucide-react";
 import html2canvas from "html2canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -121,13 +123,16 @@ const TEMPLATES: StoryboardTemplate[] = [
 ];
 
 export const StoryboardEditor = () => {
+  const [searchParams] = useSearchParams();
   const [layout, setLayout] = useState<LayoutType>("3x2");
   const [title, setTitle] = useState("Il Mio Storyboard");
   const [panels, setPanels] = useState<StoryboardPanel[]>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("custom");
   const [draggedImageUrl, setDraggedImageUrl] = useState<string | null>(null);
   const [showGallery, setShowGallery] = useState(true);
+  const [currentStoryboardId, setCurrentStoryboardId] = useState<string | null>(null);
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
@@ -141,6 +146,39 @@ export const StoryboardEditor = () => {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  useEffect(() => {
+    const storyboardId = searchParams.get('storyboardId');
+    if (storyboardId) {
+      loadStoryboard(storyboardId);
+    }
+  }, [searchParams]);
+
+  const loadStoryboard = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('storyboards')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        toast.error("Storyboard non trovato");
+        return;
+      }
+
+      setCurrentStoryboardId(data.id);
+      setTitle(data.title);
+      setLayout(data.layout as LayoutType);
+      setSelectedTemplate(data.template_type as TemplateType);
+      setPanels((data.panels as unknown as StoryboardPanel[]) || []);
+      toast.success("Storyboard caricato!");
+    } catch (error: any) {
+      console.error("Error loading storyboard:", error);
+      toast.error("Errore nel caricamento");
+    }
+  };
 
   const initializePanels = (layoutType: LayoutType, captions: string[] = []) => {
     const config = LAYOUT_CONFIG[layoutType];
@@ -229,6 +267,60 @@ export const StoryboardEditor = () => {
         toast.success("Pannelli riordinati!");
         return reorderedPanels;
       });
+    }
+  };
+
+  const handleSaveStoryboard = async () => {
+    if (!title.trim()) {
+      toast.error("Inserisci un titolo per lo storyboard");
+      return;
+    }
+
+    if (panels.every(p => !p.imageUrl)) {
+      toast.error("Aggiungi almeno un'immagine");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi essere autenticato per salvare");
+        return;
+      }
+
+      const storyboardData = {
+        title,
+        layout,
+        template_type: selectedTemplate,
+        panels: panels as any,
+        user_id: user.id,
+      };
+
+      if (currentStoryboardId) {
+        const { error } = await supabase
+          .from('storyboards')
+          .update(storyboardData)
+          .eq('id', currentStoryboardId);
+
+        if (error) throw error;
+        toast.success("Storyboard aggiornato!");
+      } else {
+        const { data, error } = await supabase
+          .from('storyboards')
+          .insert([storyboardData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCurrentStoryboardId(data.id);
+        toast.success("Storyboard salvato!");
+      }
+    } catch (error: any) {
+      console.error("Error saving storyboard:", error);
+      toast.error("Errore nel salvataggio");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -379,6 +471,24 @@ export const StoryboardEditor = () => {
               ))}
             </SelectContent>
           </Select>
+
+          <Button 
+            onClick={handleSaveStoryboard}
+            disabled={isSaving || !title.trim()}
+            className="bg-gradient-to-r from-primary to-primary/80"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Salvataggio...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                {currentStoryboardId ? "Aggiorna" : "Salva"}
+              </>
+            )}
+          </Button>
 
           <Button 
             onClick={handleExport}
