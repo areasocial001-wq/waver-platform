@@ -23,6 +23,7 @@ interface StoryboardPanel {
   id: string;
   imageUrl: string | null;
   caption: string;
+  note?: string;
 }
 
 type LayoutType = "2x2" | "3x2" | "4x2" | "2x3" | "3x3";
@@ -191,6 +192,7 @@ export const StoryboardEditor = () => {
       id: `panel-${i}`,
       imageUrl: null,
       caption: captions[i] || "",
+      note: "",
     }));
     setPanels(newPanels);
   };
@@ -231,6 +233,12 @@ export const StoryboardEditor = () => {
   const handleCaptionChange = (panelId: string, caption: string) => {
     setPanels(prev => prev.map(panel => 
       panel.id === panelId ? { ...panel, caption } : panel
+    ));
+  };
+
+  const handleNoteChange = (panelId: string, note: string) => {
+    setPanels(prev => prev.map(panel => 
+      panel.id === panelId ? { ...panel, note } : panel
     ));
   };
 
@@ -664,23 +672,42 @@ export const StoryboardEditor = () => {
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Type className="h-5 w-5 text-primary" />
-          Didascalie
+          Didascalie e Note
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {panels.map((panel, index) => (
-            <div key={panel.id} className="space-y-2">
-              <Label htmlFor={`caption-${panel.id}`}>
+            <div key={panel.id} className="space-y-3">
+              <Label className="text-base font-semibold">
                 Pannello {index + 1}
               </Label>
-              <Textarea
-                id={`caption-${panel.id}`}
-                value={panel.caption}
-                onChange={(e) => handleCaptionChange(panel.id, e.target.value)}
-                placeholder="Aggiungi una didascalia..."
-                rows={2}
-                className="resize-none bg-background/50 border-border"
-                disabled={!panel.imageUrl}
-              />
+              <div className="space-y-2">
+                <Label htmlFor={`caption-${panel.id}`} className="text-sm text-muted-foreground">
+                  Didascalia (visibile sotto l'immagine)
+                </Label>
+                <Textarea
+                  id={`caption-${panel.id}`}
+                  value={panel.caption}
+                  onChange={(e) => handleCaptionChange(panel.id, e.target.value)}
+                  placeholder="Aggiungi una didascalia..."
+                  rows={2}
+                  className="resize-none bg-background/50 border-border"
+                  disabled={!panel.imageUrl}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`note-${panel.id}`} className="text-sm text-muted-foreground">
+                  Note tecniche/creative (solo per te)
+                </Label>
+                <Textarea
+                  id={`note-${panel.id}`}
+                  value={panel.note || ""}
+                  onChange={(e) => handleNoteChange(panel.id, e.target.value)}
+                  placeholder="Es: Illuminazione naturale, angolo 45°, focus sul prodotto..."
+                  rows={3}
+                  className="resize-none bg-background/50 border-border"
+                  disabled={!panel.imageUrl}
+                />
+              </div>
             </div>
           ))}
         </div>
