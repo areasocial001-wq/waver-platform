@@ -14,6 +14,7 @@ interface StoryboardPanel {
   id: string;
   imageUrl: string | null;
   caption: string;
+  note?: string;
 }
 
 interface Storyboard {
@@ -204,6 +205,32 @@ export default function ViewStoryboard() {
                 </Card>
               ))}
             </div>
+
+            {storyboard.panels.some(p => p.note?.trim()) && (
+              <div className="mt-8 space-y-4">
+                <h3 className="text-xl font-semibold text-foreground border-b border-border pb-2">
+                  Note Tecniche e Creative
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {storyboard.panels.map((panel, index) => 
+                    panel.note?.trim() ? (
+                      <Card key={panel.id} className="p-4 bg-background/50 border-border">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              Pannello {index + 1}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                            {panel.note}
+                          </p>
+                        </div>
+                      </Card>
+                    ) : null
+                  )}
+                </div>
+              </div>
+            )}
           </Card>
         </div>
       </main>
