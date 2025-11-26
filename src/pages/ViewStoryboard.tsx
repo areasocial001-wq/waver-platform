@@ -4,11 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Download, ArrowLeft, Tag as TagIcon } from "lucide-react";
+import { Loader2, Download, ArrowLeft, Tag as TagIcon, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface StoryboardPanel {
   id: string;
@@ -80,7 +82,7 @@ export default function ViewStoryboard() {
     }
   };
 
-  const handleExport = async () => {
+  const handleExportPNG = async () => {
     if (!storyboardRef.current || !storyboard) return;
     
     setIsExporting(true);
@@ -100,12 +102,118 @@ export default function ViewStoryboard() {
           link.download = `${storyboard.title.replace(/\s+/g, "_")}_storyboard.png`;
           link.click();
           URL.revokeObjectURL(url);
-          toast.success("Storyboard esportato con successo!");
+          toast.success("Storyboard esportato in PNG!");
         }
       }, "image/png");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Errore durante l'esportazione");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!storyboardRef.current || !storyboard) return;
+    
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      let yPosition = margin;
+
+      // Title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(storyboard.title, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
+
+      // Creation date
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Creato il ${new Date(storyboard.created_at).toLocaleDateString('it-IT')}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
+
+      // Tags
+      if (storyboard.tags.length > 0) {
+        pdf.text(`Tag: ${storyboard.tags.join(', ')}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 10;
+      }
+
+      // Storyboard image
+      const canvas = await html2canvas(storyboardRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        logging: false,
+        useCORS: true,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      if (yPosition + imgHeight > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      
+      pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+      yPosition += imgHeight + 10;
+
+      // Notes section
+      const panelsWithNotes = storyboard.panels.filter(p => p.note?.trim() || p.caption?.trim());
+      if (panelsWithNotes.length > 0) {
+        if (yPosition > pageHeight - 40) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Didascalie e Note', margin, yPosition);
+        yPosition += 10;
+
+        panelsWithNotes.forEach((panel, idx) => {
+          const panelIndex = storyboard.panels.findIndex(p => p.id === panel.id);
+          
+          if (yPosition > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+
+          pdf.setFontSize(12);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`Pannello ${panelIndex + 1}`, margin, yPosition);
+          yPosition += 7;
+
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+
+          if (panel.caption?.trim()) {
+            pdf.setFont('helvetica', 'italic');
+            const captionLines = pdf.splitTextToSize(`Didascalia: ${panel.caption}`, pageWidth - (margin * 2));
+            pdf.text(captionLines, margin + 5, yPosition);
+            yPosition += captionLines.length * 5 + 3;
+          }
+
+          if (panel.note?.trim()) {
+            pdf.setFont('helvetica', 'normal');
+            const noteLines = pdf.splitTextToSize(`Note: ${panel.note}`, pageWidth - (margin * 2));
+            pdf.text(noteLines, margin + 5, yPosition);
+            yPosition += noteLines.length * 5 + 5;
+          }
+
+          yPosition += 5;
+        });
+      }
+
+      pdf.save(`${storyboard.title.replace(/\s+/g, "_")}_storyboard.pdf`);
+      toast.success("Storyboard esportato in PDF!");
+    } catch (error) {
+      console.error("Export PDF error:", error);
+      toast.error("Errore durante l'esportazione PDF");
     } finally {
       setIsExporting(false);
     }
@@ -135,23 +243,36 @@ export default function ViewStoryboard() {
               Torna alla Home
             </Button>
             
-            <Button 
-              onClick={handleExport}
-              disabled={isExporting}
-              variant="outline"
-            >
-              {isExporting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Esportazione...
-                </>
-              ) : (
-                <>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  disabled={isExporting}
+                  variant="outline"
+                >
+                  {isExporting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Esportazione...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Esporta
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPNG} disabled={isExporting}>
                   <Download className="mr-2 h-4 w-4" />
-                  Esporta PNG
-                </>
-              )}
-            </Button>
+                  Esporta come PNG
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPDF} disabled={isExporting}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Esporta come PDF (con note)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <Card className="p-8 bg-card/50" ref={storyboardRef}>

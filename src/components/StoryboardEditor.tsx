@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText } from "lucide-react";
 import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import { SortablePanel } from "./SortablePanel";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface StoryboardPanel {
   id: string;
@@ -337,7 +339,7 @@ export const StoryboardEditor = () => {
     }
   };
 
-  const handleExport = async () => {
+  const handleExportPNG = async () => {
     if (!storyboardRef.current) return;
     
     setIsExporting(true);
@@ -357,12 +359,114 @@ export const StoryboardEditor = () => {
           link.download = `${title.replace(/\s+/g, "_")}_storyboard.png`;
           link.click();
           URL.revokeObjectURL(url);
-          toast.success("Storyboard esportato con successo!");
+          toast.success("Storyboard esportato in PNG!");
         }
       }, "image/png");
     } catch (error) {
       console.error("Export error:", error);
       toast.error("Errore durante l'esportazione");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!storyboardRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      let yPosition = margin;
+
+      // Title
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(title, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 15;
+
+      // Tags
+      if (tags.length > 0) {
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Tag: ${tags.join(', ')}`, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 10;
+      }
+
+      // Storyboard image
+      const canvas = await html2canvas(storyboardRef.current, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        logging: false,
+        useCORS: true,
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = pageWidth - (margin * 2);
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      if (yPosition + imgHeight > pageHeight - margin) {
+        pdf.addPage();
+        yPosition = margin;
+      }
+      
+      pdf.addImage(imgData, 'PNG', margin, yPosition, imgWidth, imgHeight);
+      yPosition += imgHeight + 10;
+
+      // Notes section
+      const panelsWithNotes = panels.filter(p => p.note?.trim() || p.caption?.trim());
+      if (panelsWithNotes.length > 0) {
+        if (yPosition > pageHeight - 40) {
+          pdf.addPage();
+          yPosition = margin;
+        }
+
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Didascalie e Note', margin, yPosition);
+        yPosition += 10;
+
+        panelsWithNotes.forEach((panel, idx) => {
+          const panelIndex = panels.findIndex(p => p.id === panel.id);
+          
+          if (yPosition > pageHeight - 30) {
+            pdf.addPage();
+            yPosition = margin;
+          }
+
+          pdf.setFontSize(12);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text(`Pannello ${panelIndex + 1}`, margin, yPosition);
+          yPosition += 7;
+
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+
+          if (panel.caption?.trim()) {
+            pdf.setFont('helvetica', 'italic');
+            const captionLines = pdf.splitTextToSize(`Didascalia: ${panel.caption}`, pageWidth - (margin * 2));
+            pdf.text(captionLines, margin + 5, yPosition);
+            yPosition += captionLines.length * 5 + 3;
+          }
+
+          if (panel.note?.trim()) {
+            pdf.setFont('helvetica', 'normal');
+            const noteLines = pdf.splitTextToSize(`Note: ${panel.note}`, pageWidth - (margin * 2));
+            pdf.text(noteLines, margin + 5, yPosition);
+            yPosition += noteLines.length * 5 + 5;
+          }
+
+          yPosition += 5;
+        });
+      }
+
+      pdf.save(`${title.replace(/\s+/g, "_")}_storyboard.pdf`);
+      toast.success("Storyboard esportato in PDF!");
+    } catch (error) {
+      console.error("Export PDF error:", error);
+      toast.error("Errore durante l'esportazione PDF");
     } finally {
       setIsExporting(false);
     }
@@ -563,23 +667,36 @@ export const StoryboardEditor = () => {
             )}
           </Button>
 
-          <Button 
-            onClick={handleExport}
-            disabled={isExporting || panels.every(p => !p.imageUrl)}
-            variant="outline"
-          >
-            {isExporting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Esportazione...
-              </>
-            ) : (
-              <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                disabled={isExporting || panels.every(p => !p.imageUrl)}
+                variant="outline"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Esportazione...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Esporta
+                  </>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleExportPNG} disabled={isExporting}>
                 <Download className="mr-2 h-4 w-4" />
-                Esporta PNG
-              </>
-            )}
-          </Button>
+                Esporta come PNG
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportPDF} disabled={isExporting}>
+                <FileText className="mr-2 h-4 w-4" />
+                Esporta come PDF (con note)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
