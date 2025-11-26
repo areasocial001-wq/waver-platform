@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download } from "lucide-react";
+import { Loader2, Sparkles, Download, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useImageGallery } from "@/contexts/ImageGalleryContext";
 
 export const ImageGenerationForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -15,6 +16,7 @@ export const ImageGenerationForm = () => {
   const [model, setModel] = useState("black-forest-labs/flux-schnell");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const { addImage } = useImageGallery();
 
   const examplePrompts = [
     "A futuristic cityscape at sunset with flying cars",
@@ -72,6 +74,18 @@ export const ImageGenerationForm = () => {
   const handleDownload = () => {
     if (generatedImage) {
       window.open(generatedImage, '_blank');
+    }
+  };
+
+  const handleSaveToGallery = () => {
+    if (generatedImage) {
+      addImage({
+        url: generatedImage,
+        prompt,
+        aspectRatio,
+        model,
+      });
+      toast.success("Immagine salvata nella galleria!");
     }
   };
 
@@ -167,14 +181,24 @@ export const ImageGenerationForm = () => {
                 className="w-full h-auto"
               />
             </div>
-            <Button 
-              onClick={handleDownload}
-              variant="outline"
-              className="w-full"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Scarica Immagine
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button 
+                onClick={handleSaveToGallery}
+                variant="default"
+                className="w-full bg-gradient-to-r from-primary to-primary/80"
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Salva in Galleria
+              </Button>
+              <Button 
+                onClick={handleDownload}
+                variant="outline"
+                className="w-full"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Scarica
+              </Button>
+            </div>
           </Card>
         )}
 
