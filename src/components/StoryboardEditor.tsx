@@ -6,12 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical } from "lucide-react";
 import html2canvas from "html2canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortablePanel } from "./SortablePanel";
 
 interface StoryboardPanel {
   id: string;
@@ -128,6 +131,17 @@ export const StoryboardEditor = () => {
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const initializePanels = (layoutType: LayoutType, captions: string[] = []) => {
     const config = LAYOUT_CONFIG[layoutType];
     const totalPanels = config.cols * config.rows;
@@ -200,6 +214,21 @@ export const StoryboardEditor = () => {
       ));
       toast.success("Immagine aggiunta al pannello!");
       setDraggedImageUrl(null);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setPanels((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        
+        const reorderedPanels = arrayMove(items, oldIndex, newIndex);
+        toast.success("Pannelli riordinati!");
+        return reorderedPanels;
+      });
     }
   };
 
@@ -412,70 +441,47 @@ export const StoryboardEditor = () => {
         )}
 
         <div className={showGallery && images.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
-
           <Card className="p-8 bg-card/50" ref={storyboardRef}>
             <div className="mb-6 text-center">
               <h2 className="text-3xl font-bold text-foreground">{title}</h2>
             </div>
 
-            <div 
-              className="grid gap-4"
-              style={{
-                gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
-                gridTemplateRows: `repeat(${config.rows}, 1fr)`,
-              }}
+            <Alert className="mb-4 border-primary/50 bg-primary/10">
+              <GripVertical className="h-4 w-4 text-primary" />
+              <AlertDescription>
+                Trascina l'icona <GripVertical className="inline h-3 w-3" /> in alto a sinistra di ogni pannello per riordinare la sequenza
+              </AlertDescription>
+            </Alert>
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {panels.map((panel, index) => (
-                <Card 
-                  key={panel.id}
-                  className="relative group overflow-hidden border-border bg-background/30 aspect-video"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, panel.id)}
+              <SortableContext items={panels.map(p => p.id)} strategy={rectSortingStrategy}>
+                <div 
+                  className="grid gap-4"
+                  style={{
+                    gridTemplateColumns: `repeat(${config.cols}, 1fr)`,
+                    gridTemplateRows: `repeat(${config.rows}, 1fr)`,
+                  }}
                 >
-                  {panel.imageUrl ? (
-                    <>
-                      <img 
-                        src={panel.imageUrl} 
-                        alt={`Panel ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <Button
-                        size="icon"
-                        variant="destructive"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => handleRemoveImage(panel.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      {panel.caption && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white p-2 text-sm">
-                          {panel.caption}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <label 
-                      className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-accent/10 transition-colors"
+                  {panels.map((panel, index) => (
+                    <SortablePanel
+                      key={panel.id}
+                      id={panel.id}
+                      imageUrl={panel.imageUrl}
+                      caption={panel.caption}
+                      index={index}
+                      onImageUpload={(file) => handleImageUpload(panel.id, file)}
+                      onRemoveImage={() => handleRemoveImage(panel.id)}
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, panel.id)}
-                    >
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(panel.id, file);
-                        }}
-                      />
-                      <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
-                      <span className="text-sm text-muted-foreground">Trascina o clicca</span>
-                      <span className="text-xs text-muted-foreground">Pannello {index + 1}</span>
-                    </label>
-                  )}
-                </Card>
-              ))}
-            </div>
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </Card>
         </div>
       </div>
