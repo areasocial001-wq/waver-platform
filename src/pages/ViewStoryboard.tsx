@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Download, ArrowLeft } from "lucide-react";
+import { Loader2, Download, ArrowLeft, Tag as TagIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import html2canvas from "html2canvas";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -20,6 +21,7 @@ interface Storyboard {
   title: string;
   layout: string;
   panels: StoryboardPanel[];
+  tags: string[];
   created_at: string;
 }
 
@@ -65,6 +67,7 @@ export default function ViewStoryboard() {
         title: data.title,
         layout: data.layout,
         created_at: data.created_at,
+        tags: (data.tags as string[]) || [],
         panels: (data.panels as unknown as StoryboardPanel[]) || []
       });
     } catch (error: any) {
@@ -151,11 +154,21 @@ export default function ViewStoryboard() {
           </div>
 
           <Card className="p-8 bg-card/50" ref={storyboardRef}>
-            <div className="mb-6 text-center">
+            <div className="mb-6 text-center space-y-3">
               <h2 className="text-3xl font-bold text-foreground">{storyboard.title}</h2>
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground">
                 Creato il {new Date(storyboard.created_at).toLocaleDateString('it-IT')}
               </p>
+              {storyboard.tags.length > 0 && (
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {storyboard.tags.map((tag, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-xs">
+                      <TagIcon className="h-3 w-3 mr-1" />
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div 

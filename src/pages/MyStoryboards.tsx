@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Trash2, Edit, Share2, Eye, Plus, Search, Filter, X } from "lucide-react";
+import { Loader2, Trash2, Edit, Share2, Eye, Plus, Search, Filter, X, Tag as TagIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
@@ -19,6 +19,7 @@ interface Storyboard {
   layout: string;
   template_type: string;
   panels: any[];
+  tags: string[];
   is_public: boolean;
   created_at: string;
   updated_at: string;
@@ -35,6 +36,7 @@ export default function MyStoryboards() {
   const [searchQuery, setSearchQuery] = useState("");
   const [templateFilter, setTemplateFilter] = useState<string>("all");
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("updated_desc");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -58,6 +60,7 @@ export default function MyStoryboards() {
         is_public: item.is_public,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        tags: (item.tags as string[]) || [],
         panels: (item.panels as unknown as any[]) || []
       })));
     } catch (error: any) {
@@ -137,6 +140,11 @@ export default function MyStoryboards() {
         return false;
       }
       
+      // Tag filter
+      if (tagFilter !== "all" && !sb.tags.includes(tagFilter)) {
+        return false;
+      }
+      
       return true;
     })
     .sort((a, b) => {
@@ -158,15 +166,17 @@ export default function MyStoryboards() {
     });
 
   const uniqueTemplates = Array.from(new Set(storyboards.map(sb => sb.template_type)));
+  const allTags = Array.from(new Set(storyboards.flatMap(sb => sb.tags))).sort();
 
   const clearFilters = () => {
     setSearchQuery("");
     setTemplateFilter("all");
     setVisibilityFilter("all");
+    setTagFilter("all");
     setSortBy("updated_desc");
   };
 
-  const hasActiveFilters = searchQuery || templateFilter !== "all" || visibilityFilter !== "all" || sortBy !== "updated_desc";
+  const hasActiveFilters = searchQuery || templateFilter !== "all" || visibilityFilter !== "all" || tagFilter !== "all" || sortBy !== "updated_desc";
 
   if (loading) {
     return (
@@ -245,7 +255,7 @@ export default function MyStoryboards() {
                 </div>
 
                 {showFilters && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Template</label>
                       <Select value={templateFilter} onValueChange={setTemplateFilter}>
@@ -277,6 +287,26 @@ export default function MyStoryboards() {
                           <SelectItem value="all">Tutti</SelectItem>
                           <SelectItem value="public">Pubblici</SelectItem>
                           <SelectItem value="private">Privati</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center gap-1">
+                        <TagIcon className="h-3 w-3" />
+                        Tag
+                      </label>
+                      <Select value={tagFilter} onValueChange={setTagFilter}>
+                        <SelectTrigger className="bg-background/50 border-border">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutti i tag</SelectItem>
+                          {allTags.map(tag => (
+                            <SelectItem key={tag} value={tag}>
+                              {tag}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -340,6 +370,15 @@ export default function MyStoryboards() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                      {storyboard.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {storyboard.tags.map((tag, idx) => (
+                            <Badge key={idx} variant="secondary" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Aggiornato: {new Date(storyboard.updated_at).toLocaleDateString('it-IT')}
                       </p>

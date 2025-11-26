@@ -21,6 +21,7 @@ export type Database = {
           is_public: boolean
           layout: string
           panels: Json
+          tags: string[] | null
           template_type: string
           title: string
           updated_at: string
@@ -32,6 +33,7 @@ export type Database = {
           is_public?: boolean
           layout: string
           panels?: Json
+          tags?: string[] | null
           template_type: string
           title: string
           updated_at?: string
@@ -43,6 +45,7 @@ export type Database = {
           is_public?: boolean
           layout?: string
           panels?: Json
+          tags?: string[] | null
           template_type?: string
           title?: string
           updated_at?: string
