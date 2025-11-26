@@ -8,10 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon } from "lucide-react";
 import html2canvas from "html2canvas";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -133,6 +134,8 @@ export const StoryboardEditor = () => {
   const [draggedImageUrl, setDraggedImageUrl] = useState<string | null>(null);
   const [showGallery, setShowGallery] = useState(true);
   const [currentStoryboardId, setCurrentStoryboardId] = useState<string | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
@@ -173,6 +176,7 @@ export const StoryboardEditor = () => {
       setLayout(data.layout as LayoutType);
       setSelectedTemplate(data.template_type as TemplateType);
       setPanels((data.panels as unknown as StoryboardPanel[]) || []);
+      setTags((data.tags as string[]) || []);
       toast.success("Storyboard caricato!");
     } catch (error: any) {
       console.error("Error loading storyboard:", error);
@@ -294,6 +298,7 @@ export const StoryboardEditor = () => {
         layout,
         template_type: selectedTemplate,
         panels: panels as any,
+        tags,
         user_id: user.id,
       };
 
@@ -439,15 +444,75 @@ export const StoryboardEditor = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-4 items-center justify-between">
-        <div className="flex-1 min-w-[200px]">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Titolo storyboard..."
-            className="bg-background/50 border-border text-lg font-semibold"
-          />
-        </div>
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Titolo storyboard..."
+              className="bg-background/50 border-border text-lg font-semibold"
+            />
+          </div>
+
+        <Card className="p-4 bg-card/50">
+          <div className="space-y-3">
+            <Label className="flex items-center gap-2 text-sm font-semibold">
+              <TagIcon className="h-4 w-4 text-primary" />
+              Tag Personalizzati
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && tagInput.trim()) {
+                    e.preventDefault();
+                    const newTags = tagInput.split(/[,\s]+/).filter(t => t.trim());
+                    setTags(prev => [...new Set([...prev, ...newTags.map(t => t.trim())])]);
+                    setTagInput("");
+                  }
+                }}
+                placeholder="Aggiungi tag (premi Invio o virgola per aggiungere)..."
+                className="bg-background/50 border-border"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (tagInput.trim()) {
+                    const newTags = tagInput.split(/[,\s]+/).filter(t => t.trim());
+                    setTags(prev => [...new Set([...prev, ...newTags.map(t => t.trim())])]);
+                    setTagInput("");
+                  }
+                }}
+                disabled={!tagInput.trim()}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag, index) => (
+                  <Badge key={index} variant="secondary" className="gap-1">
+                    {tag}
+                    <button
+                      onClick={() => setTags(prev => prev.filter((_, i) => i !== index))}
+                      className="ml-1 hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Usa tag per categorizzare i tuoi storyboard (es: "commerciale", "2024", "cliente-X")
+            </p>
+          </div>
+        </Card>
+      </div>
         
         <div className="flex gap-2">
           <Button
