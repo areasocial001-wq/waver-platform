@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Trash2, Edit, Share2, Eye, Plus, Search, Filter, X, Tag as TagIcon } from "lucide-react";
+import { Loader2, Trash2, Edit, Share2, Eye, Plus, Search, Filter, X, Tag as TagIcon, Lock } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,6 +21,7 @@ interface Storyboard {
   panels: any[];
   tags: string[];
   is_public: boolean;
+  share_password: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +59,7 @@ export default function MyStoryboards() {
         layout: item.layout,
         template_type: item.template_type,
         is_public: item.is_public,
+        share_password: item.share_password,
         created_at: item.created_at,
         updated_at: item.updated_at,
         tags: (item.tags as string[]) || [],
@@ -359,11 +361,16 @@ export default function MyStoryboards() {
                 {filteredStoryboards.map((storyboard) => (
                   <Card key={storyboard.id} className="overflow-hidden hover:border-primary/50 transition-colors">
                     <CardHeader>
-                      <CardTitle className="flex items-center justify-between">
+                      <CardTitle className="flex items-center justify-between gap-2">
                         <span className="truncate">{storyboard.title}</span>
-                        {storyboard.is_public && (
-                          <Eye className="h-4 w-4 text-green-500 flex-shrink-0" />
-                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {storyboard.share_password && (
+                            <Lock className="h-4 w-4 text-amber-500" />
+                          )}
+                          {storyboard.is_public && (
+                            <Eye className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
                       </CardTitle>
                       <CardDescription>
                         Layout: {storyboard.layout} • {getPanelCount(storyboard.panels)}/{storyboard.panels.length} pannelli

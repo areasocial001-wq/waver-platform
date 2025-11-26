@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,6 +20,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
 import { SortablePanel } from "./SortablePanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Switch } from "@/components/ui/switch";
 
 interface StoryboardPanel {
   id: string;
@@ -139,6 +140,8 @@ export const StoryboardEditor = () => {
   const [currentStoryboardId, setCurrentStoryboardId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [sharePassword, setSharePassword] = useState("");
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
@@ -180,6 +183,8 @@ export const StoryboardEditor = () => {
       setSelectedTemplate(data.template_type as TemplateType);
       setPanels((data.panels as unknown as StoryboardPanel[]) || []);
       setTags((data.tags as string[]) || []);
+      setIsPasswordProtected(!!data.share_password);
+      setSharePassword(data.share_password || "");
       toast.success("Storyboard caricato!");
     } catch (error: any) {
       console.error("Error loading storyboard:", error);
@@ -309,6 +314,7 @@ export const StoryboardEditor = () => {
         template_type: selectedTemplate,
         panels: panels as any,
         tags,
+        share_password: isPasswordProtected && sharePassword.trim() ? sharePassword.trim() : null,
         user_id: user.id,
       };
 
@@ -622,6 +628,47 @@ export const StoryboardEditor = () => {
             <p className="text-xs text-muted-foreground">
               Usa tag per categorizzare i tuoi storyboard (es: "commerciale", "2024", "cliente-X")
             </p>
+          </div>
+        </Card>
+
+        <Card className="p-4 bg-card/50">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                {isPasswordProtected ? (
+                  <Lock className="h-4 w-4 text-primary" />
+                ) : (
+                  <Unlock className="h-4 w-4 text-muted-foreground" />
+                )}
+                Protezione con Password
+              </Label>
+              <Switch
+                checked={isPasswordProtected}
+                onCheckedChange={(checked) => {
+                  setIsPasswordProtected(checked);
+                  if (!checked) setSharePassword("");
+                }}
+              />
+            </div>
+            {isPasswordProtected && (
+              <div className="space-y-2">
+                <Input
+                  type="password"
+                  value={sharePassword}
+                  onChange={(e) => setSharePassword(e.target.value)}
+                  placeholder="Imposta una password..."
+                  className="bg-background/50 border-border"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Gli utenti dovranno inserire questa password per visualizzare lo storyboard condiviso
+                </p>
+              </div>
+            )}
+            {!isPasswordProtected && (
+              <p className="text-xs text-muted-foreground">
+                Abilita per richiedere una password prima di visualizzare lo storyboard condiviso
+              </p>
+            )}
           </div>
         </Card>
       </div>

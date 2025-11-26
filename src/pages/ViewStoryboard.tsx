@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Loader2, Download, ArrowLeft, Tag as TagIcon, FileText } from "lucide-react";
+import { Loader2, Download, ArrowLeft, Tag as TagIcon, FileText, Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Navbar } from "@/components/Navbar";
@@ -26,6 +28,7 @@ interface Storyboard {
   panels: StoryboardPanel[];
   tags: string[];
   created_at: string;
+  share_password: string | null;
 }
 
 const LAYOUT_CONFIG: Record<string, { cols: number; rows: number }> = {
@@ -42,13 +45,16 @@ export default function ViewStoryboard() {
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const storyboardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchStoryboard();
   }, [id]);
 
-  const fetchStoryboard = async () => {
+  const fetchStoryboard = async (attemptPassword?: string) => {
     try {
       const { data, error } = await supabase
         .from('storyboards')
@@ -65,14 +71,31 @@ export default function ViewStoryboard() {
         return;
       }
 
+      // Check if password is required
+      if (data.share_password) {
+        if (!attemptPassword) {
+          setShowPasswordPrompt(true);
+          setLoading(false);
+          return;
+        }
+
+        if (attemptPassword !== data.share_password) {
+          setPasswordError("Password errata");
+          setLoading(false);
+          return;
+        }
+      }
+
       setStoryboard({
         id: data.id,
         title: data.title,
         layout: data.layout,
         created_at: data.created_at,
         tags: (data.tags as string[]) || [],
-        panels: (data.panels as unknown as StoryboardPanel[]) || []
+        panels: (data.panels as unknown as StoryboardPanel[]) || [],
+        share_password: data.share_password,
       });
+      setShowPasswordPrompt(false);
     } catch (error: any) {
       console.error("Error fetching storyboard:", error);
       toast.error("Errore nel caricamento dello storyboard");
@@ -80,6 +103,13 @@ export default function ViewStoryboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setLoading(true);
+    fetchStoryboard(password);
   };
 
   const handleExportPNG = async () => {
@@ -223,6 +253,67 @@ export default function ViewStoryboard() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (showPasswordPrompt) {
+    return (
+      <div className="min-h-screen bg-background dark">
+        <Navbar />
+        <main className="container mx-auto px-6 py-20">
+          <div className="max-w-md mx-auto">
+            <Card className="p-8 bg-card/50">
+              <div className="space-y-6">
+                <div className="text-center space-y-2">
+                  <Lock className="h-12 w-12 text-primary mx-auto" />
+                  <h2 className="text-2xl font-bold">Storyboard Protetto</h2>
+                  <p className="text-muted-foreground">
+                    Questo storyboard è protetto da password. Inserisci la password per visualizzarlo.
+                  </p>
+                </div>
+                <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        setPasswordError("");
+                      }}
+                      placeholder="Inserisci la password..."
+                      className="bg-background/50 border-border"
+                      autoFocus
+                    />
+                    {passwordError && (
+                      <p className="text-sm text-destructive">{passwordError}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate("/")}
+                      className="flex-1"
+                    >
+                      Annulla
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={!password.trim()}
+                      className="flex-1 bg-gradient-to-r from-primary to-primary/80"
+                    >
+                      Accedi
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </Card>
+          </div>
+        </main>
+        <Footer />
       </div>
     );
   }
