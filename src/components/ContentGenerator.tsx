@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Copy, Sparkles, FileText } from "lucide-react";
+import { Loader2, Copy, Sparkles, FileText, Plus, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { CustomTemplateDialog } from "./CustomTemplateDialog";
+import { ApplyTemplateDialog } from "./ApplyTemplateDialog";
 
 const TEMPLATES = {
   instagram: [
@@ -149,6 +152,16 @@ type Variant = {
   content: string;
 };
 
+type UserTemplate = {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  prompt_template: string;
+  parameters: { name: string; description: string }[];
+  is_favorite: boolean;
+};
+
 export const ContentGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [contentType, setContentType] = useState("general");
@@ -158,6 +171,118 @@ export const ContentGenerator = () => {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
   const [selectedTones, setSelectedTones] = useState<(keyof typeof TONES)[]>(["formal", "casual", "technical"]);
+  
+  // Custom templates state
+  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showApplyDialog, setShowApplyDialog] = useState(false);
+  const [selectedUserTemplate, setSelectedUserTemplate] = useState<UserTemplate | null>(null);
+
+  useEffect(() => {
+    // loadUserTemplates(); // Uncomment when migration is successful
+  }, []);
+
+  const loadUserTemplates = async () => {
+    // Uncomment when migration is successful
+    /*
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('user_templates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserTemplates(data || []);
+    } catch (error) {
+      console.error('Errore caricamento template:', error);
+      toast.error("Errore nel caricamento dei template");
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+    */
+    setIsLoadingTemplates(false);
+  };
+
+  const saveUserTemplate = async (templateData: {
+    name: string;
+    description: string;
+    category: string;
+    prompt_template: string;
+    parameters: { name: string; description: string }[];
+  }) => {
+    // Uncomment when migration is successful
+    /*
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi essere autenticato");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('user_templates')
+        .insert({
+          user_id: user.id,
+          ...templateData,
+        });
+
+      if (error) throw error;
+
+      toast.success("Template salvato!");
+      loadUserTemplates();
+    } catch (error) {
+      console.error('Errore salvataggio template:', error);
+      toast.error("Errore nel salvataggio del template");
+    }
+    */
+    toast.info("Funzionalità disponibile dopo la configurazione del database");
+  };
+
+  const deleteUserTemplate = async (templateId: string) => {
+    // Uncomment when migration is successful
+    /*
+    try {
+      const { error } = await supabase
+        .from('user_templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      toast.success("Template eliminato");
+      loadUserTemplates();
+    } catch (error) {
+      console.error('Errore eliminazione template:', error);
+      toast.error("Errore nell'eliminazione del template");
+    }
+    */
+    toast.info("Funzionalità disponibile dopo la configurazione del database");
+  };
+
+  const toggleFavorite = async (template: UserTemplate) => {
+    // Uncomment when migration is successful
+    /*
+    try {
+      const { error } = await supabase
+        .from('user_templates')
+        .update({ is_favorite: !template.is_favorite })
+        .eq('id', template.id);
+
+      if (error) throw error;
+
+      loadUserTemplates();
+    } catch (error) {
+      console.error('Errore aggiornamento favorito:', error);
+      toast.error("Errore nell'aggiornamento");
+    }
+    */
+    toast.info("Funzionalità disponibile dopo la configurazione del database");
+  };
 
   const applyTemplate = (template: typeof TEMPLATES.instagram[0]) => {
     setPrompt(template.prompt);
@@ -511,14 +636,118 @@ export const ContentGenerator = () => {
             </TabsContent>
 
             <TabsContent value="templates" className="space-y-6 mt-6">
-              <Tabs defaultValue="instagram" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Template</h3>
+                <Button
+                  onClick={() => setShowCreateDialog(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Crea Template Personalizzato
+                </Button>
+              </div>
+
+              <Tabs defaultValue="predefined" className="w-full">
+                <TabsList className="grid w-full grid-cols-6">
+                  <TabsTrigger value="custom">I Miei</TabsTrigger>
+                  <TabsTrigger value="predefined">Predefiniti</TabsTrigger>
                   <TabsTrigger value="instagram">Instagram</TabsTrigger>
                   <TabsTrigger value="twitter">Twitter</TabsTrigger>
                   <TabsTrigger value="blog">Blog</TabsTrigger>
                   <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="product">Prodotti</TabsTrigger>
                 </TabsList>
+
+                <TabsContent value="custom" className="space-y-4 mt-4">
+                  {isLoadingTemplates ? (
+                    <p className="text-center text-muted-foreground">Caricamento...</p>
+                  ) : userTemplates.length === 0 ? (
+                    <Card>
+                      <CardContent className="py-8 text-center">
+                        <p className="text-muted-foreground mb-4">
+                          Nessun template personalizzato ancora
+                        </p>
+                        <Button onClick={() => setShowCreateDialog(true)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Crea il tuo primo template
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {userTemplates.map((template) => (
+                        <Card key={template.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <CardTitle className="text-lg flex items-center justify-between">
+                              <span className="flex items-center gap-2">
+                                <FileText className="w-5 h-5 text-primary" />
+                                {template.name}
+                              </span>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleFavorite(template)}
+                                >
+                                  <Star className={`w-4 h-4 ${template.is_favorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteUserTemplate(template.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </CardTitle>
+                            <CardDescription>{template.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <Button
+                              onClick={() => {
+                                setSelectedUserTemplate(template);
+                                setShowApplyDialog(true);
+                              }}
+                              variant="outline"
+                              className="w-full"
+                            >
+                              Usa Template
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="predefined" className="space-y-4 mt-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {[...TEMPLATES.instagram, ...TEMPLATES.twitter, ...TEMPLATES.blog.slice(0, 2)].map((template, index) => (
+                      <Card key={index} className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            {template.title}
+                          </CardTitle>
+                          <CardDescription>{template.description}</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Button
+                            onClick={() => {
+                              applyTemplate(template);
+                              const customTab = document.querySelector('[value="custom"]') as HTMLElement;
+                              customTab?.click();
+                            }}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            Usa Template
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </TabsContent>
 
                 {Object.entries(TEMPLATES).map(([category, templates]) => (
                   <TabsContent key={category} value={category} className="space-y-4 mt-4">
@@ -556,6 +785,23 @@ export const ContentGenerator = () => {
           </Tabs>
         </CardContent>
       </Card>
+
+      <CustomTemplateDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSave={saveUserTemplate}
+      />
+
+      <ApplyTemplateDialog
+        open={showApplyDialog}
+        onOpenChange={setShowApplyDialog}
+        template={selectedUserTemplate}
+        onApply={(filledPrompt) => {
+          setPrompt(filledPrompt);
+          const customTab = document.querySelector('[value="custom"]') as HTMLElement;
+          customTab?.click();
+        }}
+      />
     </div>
   );
 };
