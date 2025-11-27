@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -12,6 +12,7 @@ export const Navbar = () => {
   const [user, setUser] = useState<User | null>(null);
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
+  const isContentGeneratorPage = location.pathname === "/content-generator";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -52,7 +53,7 @@ export const Navbar = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.email}
           </span>
-          {isHistoryPage || isStoryboardsPage ? (
+          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage ? (
             <Button
               variant="outline"
               size="sm"
@@ -81,6 +82,15 @@ export const Navbar = () => {
               >
                 <History className="w-4 h-4 mr-2" />
                 Storico
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/content-generator")}
+                className="bg-card hover:bg-accent text-foreground border-border"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                AI Content
               </Button>
             </>
           )}

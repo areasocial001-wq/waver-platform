@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import History from "./pages/History";
 import MyStoryboards from "./pages/MyStoryboards";
 import ViewStoryboard from "./pages/ViewStoryboard";
+import ContentGenerator from "./pages/ContentGenerator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/history" element={<History />} />
             <Route path="/my-storyboards" element={<MyStoryboards />} />
             <Route path="/storyboard/:id" element={<ViewStoryboard />} />
+            <Route path="/content-generator" element={<ContentGenerator />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
