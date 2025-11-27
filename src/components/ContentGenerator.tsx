@@ -116,17 +116,61 @@ const TEMPLATES = {
   ]
 };
 
+const TONES = {
+  formal: {
+    label: "Formale",
+    description: "Tono professionale e istituzionale",
+    instruction: "Riscrivi il seguente contenuto in tono formale e professionale, adatto a comunicazioni istituzionali o documenti ufficiali. Usa linguaggio elegante, preciso e rispettoso."
+  },
+  casual: {
+    label: "Casual",
+    description: "Tono amichevole e informale",
+    instruction: "Riscrivi il seguente contenuto in tono casual e amichevole, come se stessi parlando con un amico. Usa linguaggio colloquiale, contrazioni e un approccio rilassato."
+  },
+  technical: {
+    label: "Tecnico",
+    description: "Tono esperto e dettagliato",
+    instruction: "Riscrivi il seguente contenuto in tono tecnico e dettagliato, usando terminologia specialistica appropriata. Mantieni precisione e chiarezza per un pubblico esperto."
+  },
+  persuasive: {
+    label: "Persuasivo",
+    description: "Tono convincente e orientato all'azione",
+    instruction: "Riscrivi il seguente contenuto in tono persuasivo e convincente, con focus sui benefici e call-to-action. Usa tecniche di copywriting per massimizzare l'engagement."
+  },
+  empathetic: {
+    label: "Empatico",
+    description: "Tono comprensivo e supportivo",
+    instruction: "Riscrivi il seguente contenuto in tono empatico e comprensivo, mostrando sensibilità ed emozione. Connetti a livello umano con il lettore."
+  }
+};
+
+type Variant = {
+  tone: keyof typeof TONES;
+  content: string;
+};
+
 export const ContentGenerator = () => {
   const [prompt, setPrompt] = useState("");
   const [contentType, setContentType] = useState("general");
   const [generatedContent, setGeneratedContent] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [variants, setVariants] = useState<Variant[]>([]);
+  const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
+  const [selectedTones, setSelectedTones] = useState<(keyof typeof TONES)[]>(["formal", "casual", "technical"]);
 
   const applyTemplate = (template: typeof TEMPLATES.instagram[0]) => {
     setPrompt(template.prompt);
     setSelectedTemplate(template.title);
     toast.success(`Template "${template.title}" applicato!`);
+  };
+
+  const toggleTone = (tone: keyof typeof TONES) => {
+    setSelectedTones(prev => 
+      prev.includes(tone) 
+        ? prev.filter(t => t !== tone)
+        : [...prev, tone]
+    );
   };
 
   const handleGenerate = async () => {
@@ -214,9 +258,102 @@ export const ContentGenerator = () => {
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(generatedContent);
+  const copyToClipboard = (content: string = generatedContent) => {
+    navigator.clipboard.writeText(content);
     toast.success("Contenuto copiato!");
+  };
+
+  const generateVariants = async () => {
+    if (!generatedContent.trim()) {
+      toast.error("Genera prima un contenuto");
+      return;
+    }
+
+    if (selectedTones.length === 0) {
+      toast.error("Seleziona almeno un tono");
+      return;
+    }
+
+    setIsGeneratingVariants(true);
+    setVariants([]);
+
+    try {
+      const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-content`;
+
+      // Generate variants sequentially to avoid rate limits
+      const newVariants: Variant[] = [];
+
+      for (const tone of selectedTones) {
+        const toneConfig = TONES[tone];
+        const variantPrompt = `${toneConfig.instruction}\n\nContenuto originale:\n${generatedContent}`;
+
+        let variantContent = "";
+
+        const response = await fetch(CHAT_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            prompt: variantPrompt,
+            contentType: "general"
+          }),
+        });
+
+        if (!response.ok) {
+          console.error(`Errore per variante ${tone}`);
+          continue;
+        }
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        if (!reader) continue;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex: number;
+          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (line.startsWith(":") || line.trim() === "") continue;
+            if (!line.startsWith("data: ")) continue;
+
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) {
+                variantContent += content;
+              }
+            } catch {
+              buffer = line + "\n" + buffer;
+              break;
+            }
+          }
+        }
+
+        newVariants.push({ tone, content: variantContent });
+        setVariants([...newVariants]); // Update UI progressively
+      }
+
+      toast.success(`${newVariants.length} varianti generate!`);
+    } catch (error) {
+      console.error('Errore:', error);
+      toast.error("Errore nella generazione delle varianti");
+    } finally {
+      setIsGeneratingVariants(false);
+    }
   };
 
   return (
@@ -282,20 +419,92 @@ export const ContentGenerator = () => {
               </Button>
 
               {generatedContent && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Contenuto Generato</Label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copyToClipboard}
-                    >
-                      <Copy className="w-4 h-4 mr-2" />
-                      Copia
-                    </Button>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Contenuto Generato</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard()}
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copia
+                      </Button>
+                    </div>
+                    <div className="bg-muted p-4 rounded-lg min-h-[200px] whitespace-pre-wrap">
+                      {generatedContent}
+                    </div>
                   </div>
-                  <div className="bg-muted p-4 rounded-lg min-h-[200px] whitespace-pre-wrap">
-                    {generatedContent}
+
+                  <div className="border-t pt-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label>Genera Varianti con Toni Diversi</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Seleziona i toni per cui vuoi generare versioni alternative del contenuto
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(TONES).map(([key, tone]) => (
+                          <Button
+                            key={key}
+                            variant={selectedTones.includes(key as keyof typeof TONES) ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => toggleTone(key as keyof typeof TONES)}
+                            disabled={isGeneratingVariants}
+                          >
+                            {tone.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={generateVariants}
+                      disabled={isGeneratingVariants || selectedTones.length === 0}
+                      className="w-full"
+                      variant="secondary"
+                    >
+                      {isGeneratingVariants ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generazione varianti in corso...
+                        </>
+                      ) : (
+                        `Genera ${selectedTones.length} Variante${selectedTones.length > 1 ? 'i' : ''}`
+                      )}
+                    </Button>
+
+                    {variants.length > 0 && (
+                      <div className="space-y-4 mt-4">
+                        <Label>Varianti Generate</Label>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {variants.map((variant) => (
+                            <Card key={variant.tone}>
+                              <CardHeader>
+                                <CardTitle className="text-base flex items-center justify-between">
+                                  <span>{TONES[variant.tone].label}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => copyToClipboard(variant.content)}
+                                  >
+                                    <Copy className="w-4 h-4" />
+                                  </Button>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                  {TONES[variant.tone].description}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent>
+                                <div className="bg-muted p-3 rounded-lg max-h-[300px] overflow-y-auto text-sm whitespace-pre-wrap">
+                                  {variant.content}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
