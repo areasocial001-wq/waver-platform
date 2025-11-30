@@ -18,6 +18,8 @@ export const ImageToVideoForm = () => {
   const [motion, setMotion] = useState("medium");
   const [cameraMovement, setCameraMovement] = useState<string>("none");
   const [composition, setComposition] = useState<string>("medium");
+  const [audioType, setAudioType] = useState<string>("none");
+  const [audioPrompt, setAudioPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
@@ -105,6 +107,26 @@ export const ImageToVideoForm = () => {
       // Add user prompt
       const userPrompt = prompt || (isSequential ? "smooth transition between frames" : "animate this image");
       cinematicPrompt += userPrompt;
+      
+      // Add audio generation instructions
+      if (audioType !== "none" && audioPrompt) {
+        cinematicPrompt += ". ";
+        
+        switch (audioType) {
+          case "dialogue":
+            // Use quotation marks for dialogue as per Veo 3.1 best practices
+            cinematicPrompt += `Dialogue: "${audioPrompt}"`;
+            break;
+          case "sfx":
+            // Describe sound effects clearly
+            cinematicPrompt += `SFX: ${audioPrompt}`;
+            break;
+          case "ambient":
+            // Define background soundscape
+            cinematicPrompt += `Ambient noise: ${audioPrompt}`;
+            break;
+        }
+      }
       
       const description = isSequential 
         ? `Sequential video: ${cinematicPrompt}` 
@@ -314,6 +336,53 @@ export const ImageToVideoForm = () => {
             : "Esempio: 'La persona si muove lentamente verso la camera'"
           }
         </p>
+      </div>
+
+      <div className="space-y-4 p-4 rounded-lg bg-accent/10 border border-accent/30">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          🔊 Audio Sincronizzato (Opzionale)
+        </h3>
+        
+        <div className="space-y-2">
+          <Label htmlFor="audio-type">Tipo Audio</Label>
+          <Select value={audioType} onValueChange={setAudioType}>
+            <SelectTrigger id="audio-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nessuno</SelectItem>
+              <SelectItem value="dialogue">Dialogo - Parole parlate</SelectItem>
+              <SelectItem value="sfx">SFX - Effetti sonori</SelectItem>
+              <SelectItem value="ambient">Ambient - Suoni ambientali</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {audioType !== "none" && (
+          <div className="space-y-2">
+            <Label htmlFor="audio-prompt">
+              {audioType === "dialogue" ? "Testo del Dialogo" : 
+               audioType === "sfx" ? "Descrizione Effetti" : 
+               "Descrizione Ambiente Sonoro"}
+            </Label>
+            <Textarea
+              id="audio-prompt"
+              placeholder={
+                audioType === "dialogue" ? "Es: Hello, welcome to my channel" :
+                audioType === "sfx" ? "Es: thunder cracks in the distance, footsteps on wet pavement" :
+                "Es: the quiet hum of a starship bridge, distant traffic noise"
+              }
+              value={audioPrompt}
+              onChange={(e) => setAudioPrompt(e.target.value)}
+              className="min-h-[80px] resize-none"
+            />
+            <p className="text-xs text-muted-foreground">
+              {audioType === "dialogue" && "Veo 3.1 genererà il dialogo parlato sincronizzato con il video"}
+              {audioType === "sfx" && "Descrivi gli effetti sonori che vuoi sentire"}
+              {audioType === "ambient" && "Descrivi l'atmosfera sonora di fondo"}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border">
