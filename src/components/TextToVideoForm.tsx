@@ -12,6 +12,8 @@ export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("6");
   const [resolution, setResolution] = useState("720p");
+  const [cameraMovement, setCameraMovement] = useState<string>("none");
+  const [composition, setComposition] = useState<string>("medium");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGenerate = async () => {
@@ -31,13 +33,46 @@ export const TextToVideoForm = () => {
         return;
       }
 
+      // Build cinematic prompt with camera controls
+      let cinematicPrompt = "";
+      
+      // Add camera movement
+      if (cameraMovement !== "none") {
+        const cameraMovements = {
+          "dolly_in": "Slow dolly in shot, camera smoothly pushes toward the subject",
+          "dolly_out": "Slow dolly out shot, camera smoothly pulls away from the subject",
+          "tracking": "Smooth tracking shot following the subject's movement",
+          "crane_up": "Crane shot ascending upward revealing the scene from above",
+          "crane_down": "Crane shot descending from above down to the subject",
+          "pan_left": "Slow pan left across the scene",
+          "pan_right": "Slow pan right across the scene",
+          "aerial": "Aerial view, high angle perspective looking down",
+          "pov": "POV shot, first person perspective",
+          "orbit": "Orbital camera movement circling around the subject"
+        };
+        cinematicPrompt += cameraMovements[cameraMovement] + ", ";
+      }
+      
+      // Add composition style
+      const compositionStyles = {
+        "extreme_close": "Extreme close-up shot",
+        "close": "Close-up shot",
+        "medium": "Medium shot",
+        "wide": "Wide shot",
+        "extreme_wide": "Extreme wide shot establishing the full scene"
+      };
+      cinematicPrompt += compositionStyles[composition] + ", ";
+      
+      // Add user prompt
+      cinematicPrompt += prompt;
+
       // Save to database first
       const { data: generationData, error: dbError } = await supabase
         .from("video_generations")
         .insert({
           user_id: user.id,
           type: "text_to_video",
-          prompt: prompt,
+          prompt: cinematicPrompt,
           duration: parseInt(duration),
           resolution: resolution,
           status: "processing"
@@ -56,7 +91,7 @@ export const TextToVideoForm = () => {
         .invoke("generate-video", {
           body: {
             type: "text_to_video",
-            prompt: prompt,
+            prompt: cinematicPrompt,
             duration: parseInt(duration),
             generationId: generationData.id
           }
@@ -142,6 +177,50 @@ export const TextToVideoForm = () => {
               {example}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          🎬 Controlli Cinematografici
+        </h3>
+        
+        <div className="space-y-2">
+          <Label htmlFor="t2v-camera-movement">Movimento Camera</Label>
+          <Select value={cameraMovement} onValueChange={setCameraMovement}>
+            <SelectTrigger id="t2v-camera-movement">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nessuno (Statico)</SelectItem>
+              <SelectItem value="dolly_in">Dolly In - Avvicinamento</SelectItem>
+              <SelectItem value="dolly_out">Dolly Out - Allontanamento</SelectItem>
+              <SelectItem value="tracking">Tracking - Segui soggetto</SelectItem>
+              <SelectItem value="crane_up">Crane Up - Gru verso l'alto</SelectItem>
+              <SelectItem value="crane_down">Crane Down - Gru verso il basso</SelectItem>
+              <SelectItem value="pan_left">Pan Left - Panoramica sinistra</SelectItem>
+              <SelectItem value="pan_right">Pan Right - Panoramica destra</SelectItem>
+              <SelectItem value="aerial">Aerial - Vista aerea</SelectItem>
+              <SelectItem value="pov">POV - Prima persona</SelectItem>
+              <SelectItem value="orbit">Orbit - Rotazione circolare</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="t2v-composition">Inquadratura</Label>
+          <Select value={composition} onValueChange={setComposition}>
+            <SelectTrigger id="t2v-composition">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="extreme_close">Extreme Close-up - Dettaglio estremo</SelectItem>
+              <SelectItem value="close">Close-up - Primo piano</SelectItem>
+              <SelectItem value="medium">Medium Shot - Piano medio</SelectItem>
+              <SelectItem value="wide">Wide Shot - Campo largo</SelectItem>
+              <SelectItem value="extreme_wide">Extreme Wide - Campo lunghissimo</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

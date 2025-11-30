@@ -16,6 +16,8 @@ export const ImageToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("6");
   const [motion, setMotion] = useState("medium");
+  const [cameraMovement, setCameraMovement] = useState<string>("none");
+  const [composition, setComposition] = useState<string>("medium");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
@@ -69,9 +71,44 @@ export const ImageToVideoForm = () => {
       }
 
       const isSequential = !!endImage;
+      
+      // Build cinematic prompt with camera controls
+      let cinematicPrompt = "";
+      
+      // Add camera movement
+      if (cameraMovement !== "none") {
+        const cameraMovements = {
+          "dolly_in": "Slow dolly in shot, camera smoothly pushes toward the subject",
+          "dolly_out": "Slow dolly out shot, camera smoothly pulls away from the subject",
+          "tracking": "Smooth tracking shot following the subject's movement",
+          "crane_up": "Crane shot ascending upward revealing the scene from above",
+          "crane_down": "Crane shot descending from above down to the subject",
+          "pan_left": "Slow pan left across the scene",
+          "pan_right": "Slow pan right across the scene",
+          "aerial": "Aerial view, high angle perspective looking down",
+          "pov": "POV shot, first person perspective",
+          "orbit": "Orbital camera movement circling around the subject"
+        };
+        cinematicPrompt += cameraMovements[cameraMovement] + ", ";
+      }
+      
+      // Add composition style
+      const compositionStyles = {
+        "extreme_close": "Extreme close-up shot",
+        "close": "Close-up shot",
+        "medium": "Medium shot",
+        "wide": "Wide shot",
+        "extreme_wide": "Extreme wide shot establishing the full scene"
+      };
+      cinematicPrompt += compositionStyles[composition] + ", ";
+      
+      // Add user prompt
+      const userPrompt = prompt || (isSequential ? "smooth transition between frames" : "animate this image");
+      cinematicPrompt += userPrompt;
+      
       const description = isSequential 
-        ? `Sequential video: ${prompt || "smooth transition"}` 
-        : prompt || "animate this image";
+        ? `Sequential video: ${cinematicPrompt}` 
+        : cinematicPrompt;
 
       // Save to database first
       const { data: generationData, error: dbError } = await supabase
@@ -100,7 +137,7 @@ export const ImageToVideoForm = () => {
       // Generate video synchronously
       const requestBody: any = {
         type: "image_to_video",
-        prompt: prompt || (isSequential ? "smooth transition between frames" : "animate this image"),
+        prompt: cinematicPrompt,
         start_image: startImagePreview,
         duration: parseInt(duration),
         generationId: generationData.id
@@ -277,6 +314,50 @@ export const ImageToVideoForm = () => {
             : "Esempio: 'La persona si muove lentamente verso la camera'"
           }
         </p>
+      </div>
+
+      <div className="space-y-4 p-4 rounded-lg bg-muted/30 border border-border">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          🎬 Controlli Cinematografici
+        </h3>
+        
+        <div className="space-y-2">
+          <Label htmlFor="camera-movement">Movimento Camera</Label>
+          <Select value={cameraMovement} onValueChange={setCameraMovement}>
+            <SelectTrigger id="camera-movement">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Nessuno (Statico)</SelectItem>
+              <SelectItem value="dolly_in">Dolly In - Avvicinamento</SelectItem>
+              <SelectItem value="dolly_out">Dolly Out - Allontanamento</SelectItem>
+              <SelectItem value="tracking">Tracking - Segui soggetto</SelectItem>
+              <SelectItem value="crane_up">Crane Up - Gru verso l'alto</SelectItem>
+              <SelectItem value="crane_down">Crane Down - Gru verso il basso</SelectItem>
+              <SelectItem value="pan_left">Pan Left - Panoramica sinistra</SelectItem>
+              <SelectItem value="pan_right">Pan Right - Panoramica destra</SelectItem>
+              <SelectItem value="aerial">Aerial - Vista aerea</SelectItem>
+              <SelectItem value="pov">POV - Prima persona</SelectItem>
+              <SelectItem value="orbit">Orbit - Rotazione circolare</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="composition">Inquadratura</Label>
+          <Select value={composition} onValueChange={setComposition}>
+            <SelectTrigger id="composition">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="extreme_close">Extreme Close-up - Dettaglio estremo</SelectItem>
+              <SelectItem value="close">Close-up - Primo piano</SelectItem>
+              <SelectItem value="medium">Medium Shot - Piano medio</SelectItem>
+              <SelectItem value="wide">Wide Shot - Campo largo</SelectItem>
+              <SelectItem value="extreme_wide">Extreme Wide - Campo lunghissimo</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
