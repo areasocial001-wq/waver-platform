@@ -7,6 +7,7 @@ import { Sparkles, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -16,7 +17,27 @@ export const TextToVideoForm = () => {
   const [composition, setComposition] = useState<string>("medium");
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [isLoading, setIsLoading] = useState(false);
+
+  const handlePresetChange = (preset: ScenePreset) => {
+    setSelectedPreset(preset.id);
+    setCameraMovement(preset.cameraMovement);
+    setComposition(preset.composition);
+    setAudioType(preset.audioType);
+    
+    // Auto-fill audio prompt if preset has suggestion
+    if (preset.audioSuggestion && !audioPrompt) {
+      setAudioPrompt(preset.audioSuggestion);
+    }
+    
+    // Show guidance in toast
+    if (preset.promptGuidance) {
+      toast.info("Suggerimento preset", {
+        description: preset.promptGuidance
+      });
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -176,6 +197,8 @@ export const TextToVideoForm = () => {
           La generazione richiede qualche minuto.
         </AlertDescription>
       </Alert>
+
+      <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
       <div className="space-y-2">
         <Label htmlFor="prompt">Descrizione del Video</Label>

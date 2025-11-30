@@ -7,6 +7,7 @@ import { Upload, Sparkles, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -20,6 +21,7 @@ export const ImageToVideoForm = () => {
   const [composition, setComposition] = useState<string>("medium");
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
@@ -52,6 +54,25 @@ export const ImageToVideoForm = () => {
     } else {
       setEndImage(null);
       setEndImagePreview("");
+    }
+  };
+
+  const handlePresetChange = (preset: ScenePreset) => {
+    setSelectedPreset(preset.id);
+    setCameraMovement(preset.cameraMovement);
+    setComposition(preset.composition);
+    setAudioType(preset.audioType);
+    
+    // Auto-fill audio prompt if preset has suggestion
+    if (preset.audioSuggestion && !audioPrompt) {
+      setAudioPrompt(preset.audioSuggestion);
+    }
+    
+    // Show guidance in toast
+    if (preset.promptGuidance) {
+      toast.info("Suggerimento preset", {
+        description: preset.promptGuidance
+      });
     }
   };
 
@@ -314,6 +335,8 @@ export const ImageToVideoForm = () => {
           )}
         </div>
       </div>
+
+      <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
       <div className="space-y-2">
         <Label htmlFor="i2v-prompt">
