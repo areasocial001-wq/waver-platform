@@ -166,7 +166,7 @@ serve(async (req) => {
     }
 
     // Start new video generation
-    const { type, prompt, image_url, image, duration, resolution, generationId } = body;
+    const { type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId } = body;
 
     if (!type) {
       return new Response(
@@ -193,11 +193,11 @@ serve(async (req) => {
       );
     }
 
-    // For image-to-video, image is required
-    if (type === "image_to_video" && !image && !image_url) {
+    // For image-to-video, at least start_image is required
+    if (type === "image_to_video" && !image && !image_url && !start_image) {
       return new Response(
         JSON.stringify({ 
-          error: "Missing required field: image is required for image-to-video" 
+          error: "Missing required field: start_image is required for image-to-video" 
         }), 
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -238,17 +238,34 @@ serve(async (req) => {
     }
 
     // Add image for image-to-video generation
-    if (type === "image_to_video" && (image || image_url)) {
-      const imageData = image || image_url;
-      const base64Data = imageData.split(',')[1]; // Remove data:image/...;base64, prefix
-      const mimeType = imageData.startsWith('data:image/png') ? 'image/png' : 
-                      imageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+    if (type === "image_to_video") {
+      // Use start_image if provided, otherwise fallback to legacy image/image_url
+      const startImageData = start_image || image || image_url;
       
-      requestBody.instances[0].image = {
-        bytesBase64Encoded: base64Data,
-        mimeType: mimeType
-      };
-      console.log("Added image for image-to-video generation");
+      if (startImageData) {
+        const base64Data = startImageData.split(',')[1]; // Remove data:image/...;base64, prefix
+        const mimeType = startImageData.startsWith('data:image/png') ? 'image/png' : 
+                        startImageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+        
+        requestBody.instances[0].image = {
+          bytesBase64Encoded: base64Data,
+          mimeType: mimeType
+        };
+        console.log("Added start image for image-to-video generation");
+      }
+
+      // Add end image if provided (for sequential/first-last-frame mode)
+      if (end_image) {
+        const endBase64Data = end_image.split(',')[1];
+        const endMimeType = end_image.startsWith('data:image/png') ? 'image/png' : 
+                           end_image.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+        
+        requestBody.instances[0].endFrameImage = {
+          bytesBase64Encoded: endBase64Data,
+          mimeType: endMimeType
+        };
+        console.log("Added end image for first-last-frame generation");
+      }
     }
 
     // Add resolution for text-to-video if provided
@@ -287,9 +304,17 @@ serve(async (req) => {
         prompt: prompt || "A video based on the provided image",
       };
 
-      // For image-to-video, add the image
-      if (type === "image_to_video" && (image || image_url)) {
-        replicateInput.first_frame_image = image || image_url;
+      // For image-to-video, add the image(s)
+      if (type === "image_to_video") {
+        const startImageData = start_image || image || image_url;
+        if (startImageData) {
+          replicateInput.first_frame_image = startImageData;
+        }
+        // Note: Replicate minimax/video-01 may not support end_frame
+        // If end_image is provided, we just use the start frame for Replicate fallback
+        if (end_image) {
+          console.log("Warning: Replicate fallback may not support end_frame. Using start frame only.");
+        }
       }
 
       console.log("Starting Replicate generation with minimax/video-01");
