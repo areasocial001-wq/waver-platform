@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Trash2, Image, FileText, Download, Loader2 } from "lucide-react";
+import { Footer } from "@/components/Footer";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
+import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 
 type VideoGeneration = {
   id: string;
@@ -52,50 +52,6 @@ export default function History() {
 
   useVideoPolling(generations, fetchGenerations);
 
-  const handleDelete = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("video_generations")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      setGenerations(generations.filter(g => g.id !== id));
-      toast.success("Richiesta eliminata");
-    } catch (error) {
-      console.error("Error deleting generation:", error);
-      toast.error("Errore nell'eliminazione");
-    }
-  };
-
-  const handleDownload = async (videoUrl: string, generationId: string) => {
-    try {
-      toast.info("Download in corso...");
-      
-      // Fetch the video from the proxy URL
-      const response = await fetch(videoUrl);
-      if (!response.ok) throw new Error("Download failed");
-      
-      const blob = await response.blob();
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `video-${generationId}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast.success("Download completato");
-    } catch (error) {
-      console.error("Error downloading video:", error);
-      toast.error("Errore nel download");
-    }
-  };
-
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
@@ -110,7 +66,7 @@ export default function History() {
 
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
               <p className="text-muted-foreground">Caricamento...</p>
             </div>
           ) : generations.length === 0 ? (
@@ -122,133 +78,14 @@ export default function History() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
-              {generations.map((gen) => (
-                <Card key={gen.id}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        {gen.type === "image_to_video" ? (
-                          <Image className="w-5 h-5 text-accent" />
-                        ) : (
-                          <FileText className="w-5 h-5 text-primary" />
-                        )}
-                        <div>
-                          <CardTitle className="text-lg">
-                            {gen.type === "image_to_video"
-                              ? "Video da Immagine"
-                              : "Video da Testo"}
-                          </CardTitle>
-                          <CardDescription>
-                            {new Date(gen.created_at).toLocaleDateString("it-IT", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit"
-                            })}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(gen.id)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {gen.prompt && (
-                        <div>
-                          <p className="text-sm font-medium mb-1">Prompt:</p>
-                          <p className="text-sm text-muted-foreground">{gen.prompt}</p>
-                        </div>
-                      )}
-                      
-                      {gen.image_url && (
-                        <div>
-                          <p className="text-sm font-medium mb-2">Immagine:</p>
-                          <img
-                            src={gen.image_url}
-                            alt={gen.image_name || "Preview"}
-                            className="rounded-lg max-w-xs max-h-48 object-contain border border-border"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-2 items-center">
-                        <Badge variant="outline">
-                          Durata: {gen.duration}s
-                        </Badge>
-                        {gen.resolution && (
-                          <Badge variant="outline">
-                            {gen.resolution}
-                          </Badge>
-                        )}
-                        {gen.motion_intensity && (
-                          <Badge variant="outline">
-                            Movimento: {gen.motion_intensity}
-                          </Badge>
-                        )}
-                        <Badge
-                          variant={
-                            gen.status === "completed" 
-                              ? "default" 
-                              : gen.status === "failed"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                        >
-                          {gen.status === "processing" && (
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          )}
-                          {gen.status === "completed" && "✓ Completato"}
-                          {gen.status === "processing" && "Generazione..."}
-                          {gen.status === "failed" && "✗ Errore"}
-                          {gen.status === "pending" && "In attesa"}
-                        </Badge>
-                      </div>
-
-                      {gen.status === "completed" && gen.video_url && (
-                        <div className="mt-4">
-                          <video
-                            src={gen.video_url}
-                            controls
-                            className="w-full rounded-lg border border-border max-h-96"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2"
-                            onClick={() => handleDownload(gen.video_url!, gen.id)}
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Scarica Video
-                          </Button>
-                        </div>
-                      )}
-
-                      {gen.status === "failed" && gen.error_message && (
-                        <div className="mt-2 p-2 rounded bg-destructive/10 text-destructive text-sm">
-                          {gen.error_message}
-                        </div>
-                      )}
-
-                      {gen.status === "processing" && (
-                        <div className="mt-2 p-2 rounded bg-primary/10 text-primary text-sm">
-                          Il video è in fase di generazione. La pagina si aggiornerà automaticamente.
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {generations.map((generation) => (
+                <VideoGenerationCard key={generation.id} generation={generation} />
               ))}
             </div>
           )}
         </div>
+        <Footer />
       </div>
     </AuthGuard>
   );
