@@ -9,38 +9,51 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 
 export const ImageToVideoForm = () => {
-  const [image, setImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string>("");
+  const [startImage, setStartImage] = useState<File | null>(null);
+  const [startImagePreview, setStartImagePreview] = useState<string>("");
+  const [endImage, setEndImage] = useState<File | null>(null);
+  const [endImagePreview, setEndImagePreview] = useState<string>("");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("6");
   const [motion, setMotion] = useState("medium");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         toast.error("Seleziona un file immagine valido");
         return;
       }
-      setImage(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        const result = e.target?.result as string;
+        if (type === 'start') {
+          setStartImage(file);
+          setStartImagePreview(result);
+        } else {
+          setEndImage(file);
+          setEndImagePreview(result);
+        }
       };
       reader.readAsDataURL(file);
-      toast.success("Immagine caricata con successo");
+      toast.success(`${type === 'start' ? 'Start' : 'End'} frame caricato con successo`);
     }
   };
 
-  const removeImage = () => {
-    setImage(null);
-    setImagePreview("");
+  const removeImage = (type: 'start' | 'end') => {
+    if (type === 'start') {
+      setStartImage(null);
+      setStartImagePreview("");
+    } else {
+      setEndImage(null);
+      setEndImagePreview("");
+    }
   };
 
   const handleGenerate = async () => {
-    if (!image) {
-      toast.error("Carica un'immagine prima di procedere");
+    if (!startImage) {
+      toast.error("Carica almeno lo start frame per procedere");
       return;
     }
 
@@ -55,17 +68,22 @@ export const ImageToVideoForm = () => {
         return;
       }
 
+      const isSequential = !!endImage;
+      const description = isSequential 
+        ? `Sequential video: ${prompt || "smooth transition"}` 
+        : prompt || "animate this image";
+
       // Save to database first
       const { data: generationData, error: dbError } = await supabase
         .from("video_generations")
         .insert({
           user_id: user.id,
           type: "image_to_video",
-          prompt: prompt || "animate this image",
+          prompt: description,
           duration: parseInt(duration),
           motion_intensity: motion,
-          image_name: image.name,
-          image_url: imagePreview,
+          image_name: isSequential ? `${startImage.name} → ${endImage.name}` : startImage.name,
+          image_url: startImagePreview,
           status: "processing"
         })
         .select()
@@ -74,19 +92,28 @@ export const ImageToVideoForm = () => {
       if (dbError) throw dbError;
 
       toast.success("Generazione video avviata!", {
-        description: "Il video verrà generato. Attendi qualche istante..."
+        description: isSequential 
+          ? "Creazione video sequenziale tra i due frame..." 
+          : "Il video verrà generato. Attendi qualche istante..."
       });
 
       // Generate video synchronously
+      const requestBody: any = {
+        type: "image_to_video",
+        prompt: prompt || (isSequential ? "smooth transition between frames" : "animate this image"),
+        start_image: startImagePreview,
+        duration: parseInt(duration),
+        generationId: generationData.id
+      };
+
+      // Add end image if provided
+      if (isSequential) {
+        requestBody.end_image = endImagePreview;
+      }
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
-          body: {
-            type: "image_to_video",
-            prompt: prompt || "animate this image",
-            image_url: imagePreview,
-            duration: parseInt(duration),
-            generationId: generationData.id
-          }
+          body: requestBody
         });
 
       if (error) {
@@ -122,8 +149,10 @@ export const ImageToVideoForm = () => {
         description: "Vai allo storico per vedere il tuo video."
       });
       
-      setImage(null);
-      setImagePreview("");
+      setStartImage(null);
+      setStartImagePreview("");
+      setEndImage(null);
+      setEndImagePreview("");
       setPrompt("");
     } catch (error) {
       console.error("Error saving generation:", error);
@@ -138,63 +167,115 @@ export const ImageToVideoForm = () => {
       <Alert className="border-accent/30 bg-accent/5">
         <AlertCircle className="h-4 w-4 text-accent" />
         <AlertDescription>
-          Anima le tue immagini usando Google Veo 3. Carica un'immagine e descrivi come vuoi che si animi.
-          La generazione richiede qualche minuto.
+          Anima le tue immagini usando Google Veo 3.1. Carica solo lo start frame per animazione singola, 
+          oppure start + end frame per creare una transizione video sequenziale fluida tra due immagini.
         </AlertDescription>
       </Alert>
 
-      <div className="space-y-2">
-        <Label>Immagine Sorgente</Label>
-        {!imagePreview ? (
-          <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-accent/50 transition-colors">
-            <input
-              type="file"
-              id="image-upload"
-              className="hidden"
-              accept="image/*"
-              onChange={handleImageChange}
-            />
-            <label
-              htmlFor="image-upload"
-              className="cursor-pointer flex flex-col items-center gap-2"
-            >
-              <Upload className="w-12 h-12 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Clicca per caricare un'immagine
-              </p>
-              <p className="text-xs text-muted-foreground">
-                PNG, JPG o WEBP (max 10MB)
-              </p>
-            </label>
-          </div>
-        ) : (
-          <div className="relative rounded-lg overflow-hidden border border-border">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="w-full h-auto max-h-96 object-contain bg-muted"
-            />
-            <button
-              onClick={removeImage}
-              className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Start Frame (Obbligatorio)</Label>
+          {!startImagePreview ? (
+            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent/50 transition-colors">
+              <input
+                type="file"
+                id="start-image-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => handleImageChange(e, 'start')}
+              />
+              <label
+                htmlFor="start-image-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="w-10 h-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Carica start frame
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  PNG, JPG o WEBP
+                </p>
+              </label>
+            </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden border border-border">
+              <img
+                src={startImagePreview}
+                alt="Start Frame"
+                className="w-full h-auto max-h-64 object-contain bg-muted"
+              />
+              <button
+                onClick={() => removeImage('start')}
+                className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>End Frame (Opzionale)</Label>
+          {!endImagePreview ? (
+            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent/50 transition-colors">
+              <input
+                type="file"
+                id="end-image-upload"
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => handleImageChange(e, 'end')}
+              />
+              <label
+                htmlFor="end-image-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Upload className="w-10 h-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Carica end frame
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Per transizione sequenziale
+                </p>
+              </label>
+            </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden border border-border">
+              <img
+                src={endImagePreview}
+                alt="End Frame"
+                className="w-full h-auto max-h-64 object-contain bg-muted"
+              />
+              <button
+                onClick={() => removeImage('end')}
+                className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="i2v-prompt">Descrizione del Movimento (Opzionale)</Label>
+        <Label htmlFor="i2v-prompt">
+          {endImage ? "Descrizione della Transizione (Opzionale)" : "Descrizione del Movimento (Opzionale)"}
+        </Label>
         <Textarea
           id="i2v-prompt"
-          placeholder="Descrivi come vuoi che l'immagine si animi..."
+          placeholder={
+            endImage 
+              ? "Descrivi come vuoi che avvenga la transizione tra i due frame..."
+              : "Descrivi come vuoi che l'immagine si animi..."
+          }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           className="min-h-[100px] resize-none"
         />
         <p className="text-xs text-muted-foreground">
-          Esempio: "La persona si muove lentamente verso la camera"
+          {endImage 
+            ? "Esempio: 'smooth camera movement from first to second scene'"
+            : "Esempio: 'La persona si muove lentamente verso la camera'"
+          }
         </p>
       </div>
 
@@ -230,24 +311,34 @@ export const ImageToVideoForm = () => {
 
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || !image}
+        disabled={isLoading || !startImage}
         className="w-full bg-gradient-accent text-accent-foreground hover:opacity-90 shadow-glow-accent transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {isLoading ? "Preparazione..." : "Genera Video da Immagine"}
+        {isLoading ? "Preparazione..." : endImage ? "Genera Video Sequenziale" : "Genera Video da Immagine"}
       </Button>
 
-      {image && (
+      {startImage && (
         <div className="p-4 rounded-lg bg-muted/30 border border-border">
           <p className="text-sm text-muted-foreground mb-2">
             <strong>Parametri selezionati:</strong>
           </p>
           <div className="text-sm space-y-1">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Immagine:</span>
-              <span className="font-medium">{image.name}</span>
+              <span className="text-muted-foreground">Modalità:</span>
+              <span className="font-medium">{endImage ? "Transizione Sequenziale" : "Animazione Singola"}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Start Frame:</span>
+              <span className="font-medium">{startImage.name}</span>
+            </div>
+            {endImage && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">End Frame:</span>
+                <span className="font-medium">{endImage.name}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Durata:</span>
               <span className="font-medium">{duration}s</span>
