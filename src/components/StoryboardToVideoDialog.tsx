@@ -33,6 +33,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
   const [audioType, setAudioType] = useState<"none" | "dialogue" | "sfx" | "ambient">("none");
   const [audioPrompt, setAudioPrompt] = useState("");
   const [transitionPrompt, setTransitionPrompt] = useState("");
+  const [transitionStyle, setTransitionStyle] = useState("smooth");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
@@ -100,7 +101,8 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
         if (genError) throw genError;
 
         // Build prompt with all parameters
-        let fullPrompt = transitionPrompt || `Smooth transition from scene ${i + 1} to scene ${i + 2}`;
+        const selectedTransition = transitionTemplates.find(t => t.value === transitionStyle);
+        let fullPrompt = transitionPrompt || selectedTransition?.description || `Smooth transition from scene ${i + 1} to scene ${i + 2}`;
         
         if (startPanel.caption) {
           fullPrompt += `. Starting scene: ${startPanel.caption}`;
@@ -170,6 +172,57 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
     { value: "aerial", label: "Aerial - Vista aerea" },
     { value: "pov", label: "POV - Punto di vista" },
     { value: "orbit", label: "Orbit - Rotazione attorno" },
+  ];
+
+  const transitionTemplates = [
+    { 
+      value: "smooth", 
+      label: "Smooth - Transizione fluida",
+      description: "Smooth, seamless transition with natural motion blur and gradual transformation between scenes",
+      icon: "🌊"
+    },
+    { 
+      value: "fade", 
+      label: "Fade - Dissolvenza",
+      description: "Gradual fade transition with cross-dissolve effect, overlapping the end of first scene with beginning of second",
+      icon: "🌫️"
+    },
+    { 
+      value: "dissolve", 
+      label: "Dissolve - Sovrapposizione",
+      description: "Cinematic dissolve with temporal blending, elements from both scenes briefly visible simultaneously creating dream-like effect",
+      icon: "✨"
+    },
+    { 
+      value: "wipe", 
+      label: "Wipe - Cancellazione direzionale",
+      description: "Dynamic wipe transition where new scene progressively replaces old scene with visible edge moving across frame from left to right",
+      icon: "↔️"
+    },
+    { 
+      value: "zoom", 
+      label: "Zoom - Ingrandimento/Riduzione",
+      description: "Zoom transition with camera pushing into first scene then pulling back to reveal second scene, creating depth and spatial continuity",
+      icon: "🔍"
+    },
+    { 
+      value: "morph", 
+      label: "Morph - Trasformazione organica",
+      description: "Organic morphing transition where objects and shapes from first scene gradually transform into elements of second scene",
+      icon: "🦋"
+    },
+    { 
+      value: "push", 
+      label: "Push - Spinta laterale",
+      description: "Push transition where new scene slides in from right while pushing old scene out to left, maintaining spatial relationship",
+      icon: "➡️"
+    },
+    { 
+      value: "spin", 
+      label: "Spin - Rotazione 3D",
+      description: "3D spin transition with camera rotating around vertical axis, first scene on front face, second scene revealed on back",
+      icon: "🌀"
+    },
   ];
 
   return (
@@ -250,6 +303,34 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
             </Select>
           </div>
 
+          {/* Transition Style */}
+          <div className="space-y-2">
+            <Label className="text-base font-semibold">Stile Transizione</Label>
+            <Select value={transitionStyle} onValueChange={setTransitionStyle}>
+              <SelectTrigger className="h-auto min-h-[44px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {transitionTemplates.map((template) => (
+                  <SelectItem key={template.value} value={template.value} className="cursor-pointer">
+                    <div className="flex items-start gap-3 py-2">
+                      <span className="text-2xl" style={{ lineHeight: 1 }}>{template.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{template.label}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                          {template.description.split(',')[0]}
+                        </div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {transitionTemplates.find(t => t.value === transitionStyle)?.description}
+            </p>
+          </div>
+
           {/* Camera Movement */}
           <div className="space-y-2">
             <Label>Movimento Camera</Label>
@@ -299,15 +380,15 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
 
           {/* Transition Prompt */}
           <div className="space-y-2">
-            <Label>Prompt Transizioni (Opzionale)</Label>
+            <Label>Prompt Transizioni Personalizzato (Opzionale)</Label>
             <Textarea
               value={transitionPrompt}
               onChange={(e) => setTransitionPrompt(e.target.value)}
-              placeholder="Descrivi come devono avvenire le transizioni tra le scene..."
+              placeholder="Personalizza ulteriormente le transizioni con istruzioni specifiche..."
               className="min-h-[100px]"
             />
             <p className="text-sm text-muted-foreground">
-              Lascia vuoto per transizioni automatiche basate sui caption dei pannelli
+              Lascia vuoto per usare solo il template selezionato. Se compili questo campo, sovrascriverà il template di transizione.
             </p>
           </div>
 
