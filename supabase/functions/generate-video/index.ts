@@ -22,6 +22,10 @@ serve(async (req) => {
       throw new Error("GOOGLE_AI_API_KEY is not set");
     }
 
+    // Validate Kling credentials have actual values, not just empty strings
+    const hasValidKlingCredentials = KLING_ACCESS_KEY && KLING_ACCESS_KEY.trim().length > 0 && 
+                                     KLING_SECRET_KEY && KLING_SECRET_KEY.trim().length > 0;
+
     body = await req.json();
     console.log("Generate video request:", body);
 
@@ -31,8 +35,8 @@ serve(async (req) => {
       
       // Check if it's a Kling task (format: kling:task_id)
       if (body.operationId.startsWith('kling:')) {
-        if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
-          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not set");
+        if (!hasValidKlingCredentials) {
+          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not properly configured. Please check your Lovable Cloud secrets.");
         }
         
         const taskId = body.operationId.replace('kling:', '');
@@ -281,7 +285,7 @@ serve(async (req) => {
     }
 
     // Use Kling API if end_image is provided (it supports start/end frames)
-    if (type === "image_to_video" && end_image && KLING_ACCESS_KEY && KLING_SECRET_KEY) {
+    if (type === "image_to_video" && end_image && hasValidKlingCredentials) {
       console.log("Starting video generation with Kling 2.1 (supports start/end frames)");
       
       const startImageData = start_image || image || image_url;
