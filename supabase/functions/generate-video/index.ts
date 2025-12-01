@@ -25,6 +25,14 @@ serve(async (req) => {
     // Validate Kling credentials have actual values, not just empty strings
     const hasValidKlingCredentials = KLING_ACCESS_KEY && KLING_ACCESS_KEY.trim().length > 0 && 
                                      KLING_SECRET_KEY && KLING_SECRET_KEY.trim().length > 0;
+    
+    console.log("Kling credentials check:", {
+      hasAccessKey: !!KLING_ACCESS_KEY,
+      hasSecretKey: !!KLING_SECRET_KEY,
+      accessKeyLength: KLING_ACCESS_KEY?.length || 0,
+      secretKeyLength: KLING_SECRET_KEY?.length || 0,
+      isValid: hasValidKlingCredentials
+    });
 
     body = await req.json();
     console.log("Generate video request:", body);
