@@ -1,7 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { VideoGenerationCard } from "./VideoGenerationCard";
-import { Video, Clock } from "lucide-react";
+import { Video, Clock, Sparkles } from "lucide-react";
+
+type VideoBatch = {
+  id: string;
+  transition_style: string | null;
+  duration: number;
+  camera_movement: string | null;
+  audio_type: string | null;
+};
 
 type VideoGeneration = {
   id: string;
@@ -24,9 +32,10 @@ type VideoGeneration = {
 interface StoryboardVideoBatchCardProps {
   batchId: string;
   videos: VideoGeneration[];
+  batchInfo?: VideoBatch;
 }
 
-export const StoryboardVideoBatchCard = ({ batchId, videos }: StoryboardVideoBatchCardProps) => {
+export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo }: StoryboardVideoBatchCardProps) => {
   const sortedVideos = [...videos].sort((a, b) => 
     (a.sequence_order ?? 0) - (b.sequence_order ?? 0)
   );
@@ -39,6 +48,28 @@ export const StoryboardVideoBatchCard = ({ batchId, videos }: StoryboardVideoBat
     completedCount === totalCount ? "bg-green-500/10 text-green-500 border-green-500/20" :
     videos.some(v => v.status === "failed") ? "bg-red-500/10 text-red-500 border-red-500/20" :
     "bg-blue-500/10 text-blue-500 border-blue-500/20";
+
+  const transitionIcons: Record<string, string> = {
+    smooth: "🌊",
+    fade: "🌫️",
+    dissolve: "✨",
+    wipe: "↔️",
+    zoom: "🔍",
+    morph: "🦋",
+    push: "➡️",
+    spin: "🌀",
+  };
+
+  const transitionLabels: Record<string, string> = {
+    smooth: "Smooth",
+    fade: "Fade",
+    dissolve: "Dissolve",
+    wipe: "Wipe",
+    zoom: "Zoom",
+    morph: "Morph",
+    push: "Push",
+    spin: "Spin",
+  };
 
   return (
     <Card className="overflow-hidden border-2 border-primary/20">
@@ -60,6 +91,12 @@ export const StoryboardVideoBatchCard = ({ batchId, videos }: StoryboardVideoBat
           <div>
             {videos.length} transizioni
           </div>
+          {batchInfo?.transition_style && (
+            <Badge variant="outline" className="gap-1">
+              <span>{transitionIcons[batchInfo.transition_style] || "✨"}</span>
+              {transitionLabels[batchInfo.transition_style] || batchInfo.transition_style}
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-6">

@@ -10,6 +10,14 @@ import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
 
+type VideoBatch = {
+  id: string;
+  transition_style: string | null;
+  duration: number;
+  camera_movement: string | null;
+  audio_type: string | null;
+};
+
 type VideoGeneration = {
   id: string;
   type: "text_to_video" | "image_to_video";
@@ -30,6 +38,7 @@ type VideoGeneration = {
 
 export default function History() {
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
+  const [batches, setBatches] = useState<Map<string, VideoBatch>>(new Map());
   const [loading, setLoading] = useState(true);
 
   const fetchGenerations = async () => {
@@ -41,6 +50,23 @@ export default function History() {
 
       if (error) throw error;
       setGenerations(data || []);
+
+      // Fetch batch info for videos that belong to batches
+      const batchIds = [...new Set(data?.filter(g => g.batch_id).map(g => g.batch_id))];
+      if (batchIds.length > 0) {
+        const { data: batchData, error: batchError } = await supabase
+          .from("storyboard_video_batches")
+          .select("id, transition_style, duration, camera_movement, audio_type")
+          .in("id", batchIds);
+
+        if (batchError) throw batchError;
+        
+        const batchMap = new Map<string, VideoBatch>();
+        batchData?.forEach(batch => {
+          batchMap.set(batch.id, batch as VideoBatch);
+        });
+        setBatches(batchMap);
+      }
     } catch (error) {
       console.error("Error fetching generations:", error);
       toast.error("Errore nel caricare lo storico");
@@ -84,14 +110,14 @@ export default function History() {
             <div className="space-y-6">
               {(() => {
                 // Group videos by batch_id
-                const batches = new Map<string, VideoGeneration[]>();
+                const videoBatches = new Map<string, VideoGeneration[]>();
                 const standaloneVideos: VideoGeneration[] = [];
 
                 generations.forEach(gen => {
                   if (gen.batch_id) {
-                    const batch = batches.get(gen.batch_id) || [];
+                    const batch = videoBatches.get(gen.batch_id) || [];
                     batch.push(gen);
-                    batches.set(gen.batch_id, batch);
+                    videoBatches.set(gen.batch_id, batch);
                   } else {
                     standaloneVideos.push(gen);
                   }
@@ -100,14 +126,19 @@ export default function History() {
                 return (
                   <>
                     {/* Batch videos */}
-                    {Array.from(batches.entries()).map(([batchId, videos]) => (
-                      <StoryboardVideoBatchCard key={batchId} batchId={batchId} videos={videos} />
+                    {Array.from(videoBatches.entries()).map(([batchId, videos]) => (
+                      <StoryboardVideoBatchCard 
+                        key={batchId} 
+                        batchId={batchId} 
+                        videos={videos}
+                        batchInfo={batches.get(batchId)}
+                      />
                     ))}
 
                     {/* Standalone videos */}
                     {standaloneVideos.length > 0 && (
                       <>
-                        {batches.size > 0 && (
+                        {videoBatches.size > 0 && (
                           <div className="mt-8 mb-4">
                             <h2 className="text-xl font-semibold">Video Singoli</h2>
                             <p className="text-sm text-muted-foreground">Video generati individualmente</p>
