@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      storyboard_video_batches: {
+        Row: {
+          audio_prompt: string | null
+          audio_type: string | null
+          camera_movement: string | null
+          completed_videos: number
+          created_at: string
+          duration: number
+          id: string
+          status: string
+          storyboard_id: string
+          total_videos: number
+          transition_prompt: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_prompt?: string | null
+          audio_type?: string | null
+          camera_movement?: string | null
+          completed_videos?: number
+          created_at?: string
+          duration: number
+          id?: string
+          status?: string
+          storyboard_id: string
+          total_videos: number
+          transition_prompt?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_prompt?: string | null
+          audio_type?: string | null
+          camera_movement?: string | null
+          completed_videos?: number
+          created_at?: string
+          duration?: number
+          id?: string
+          status?: string
+          storyboard_id?: string
+          total_videos?: number
+          transition_prompt?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storyboard_video_batches_storyboard_id_fkey"
+            columns: ["storyboard_id"]
+            isOneToOne: false
+            referencedRelation: "storyboards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       storyboards: {
         Row: {
           created_at: string
@@ -58,6 +114,7 @@ export type Database = {
       }
       video_generations: {
         Row: {
+          batch_id: string | null
           created_at: string | null
           duration: number
           error_message: string | null
@@ -68,6 +125,7 @@ export type Database = {
           prediction_id: string | null
           prompt: string | null
           resolution: string | null
+          sequence_order: number | null
           status: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at: string | null
@@ -75,6 +133,7 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          batch_id?: string | null
           created_at?: string | null
           duration: number
           error_message?: string | null
@@ -85,6 +144,7 @@ export type Database = {
           prediction_id?: string | null
           prompt?: string | null
           resolution?: string | null
+          sequence_order?: number | null
           status?: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
@@ -92,6 +152,7 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          batch_id?: string | null
           created_at?: string | null
           duration?: number
           error_message?: string | null
@@ -102,13 +163,22 @@ export type Database = {
           prediction_id?: string | null
           prompt?: string | null
           resolution?: string | null
+          sequence_order?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
           user_id?: string | null
           video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "video_generations_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "storyboard_video_batches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

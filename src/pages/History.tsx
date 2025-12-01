@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
+import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
 
 type VideoGeneration = {
   id: string;
@@ -23,6 +24,8 @@ type VideoGeneration = {
   prediction_id: string | null;
   video_url: string | null;
   error_message: string | null;
+  batch_id: string | null;
+  sequence_order: number | null;
 };
 
 export default function History() {
@@ -78,10 +81,48 @@ export default function History() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {generations.map((generation) => (
-                <VideoGenerationCard key={generation.id} generation={generation} />
-              ))}
+            <div className="space-y-6">
+              {(() => {
+                // Group videos by batch_id
+                const batches = new Map<string, VideoGeneration[]>();
+                const standaloneVideos: VideoGeneration[] = [];
+
+                generations.forEach(gen => {
+                  if (gen.batch_id) {
+                    const batch = batches.get(gen.batch_id) || [];
+                    batch.push(gen);
+                    batches.set(gen.batch_id, batch);
+                  } else {
+                    standaloneVideos.push(gen);
+                  }
+                });
+
+                return (
+                  <>
+                    {/* Batch videos */}
+                    {Array.from(batches.entries()).map(([batchId, videos]) => (
+                      <StoryboardVideoBatchCard key={batchId} batchId={batchId} videos={videos} />
+                    ))}
+
+                    {/* Standalone videos */}
+                    {standaloneVideos.length > 0 && (
+                      <>
+                        {batches.size > 0 && (
+                          <div className="mt-8 mb-4">
+                            <h2 className="text-xl font-semibold">Video Singoli</h2>
+                            <p className="text-sm text-muted-foreground">Video generati individualmente</p>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {standaloneVideos.map((generation) => (
+                            <VideoGenerationCard key={generation.id} generation={generation} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )}
         </div>
