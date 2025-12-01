@@ -21,6 +21,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStr
 import { SortablePanel } from "./SortablePanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
+import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
 
 interface StoryboardPanel {
   id: string;
@@ -713,6 +714,14 @@ export const StoryboardEditor = () => {
               </>
             )}
           </Button>
+
+          {currentStoryboardId && panels.filter(p => p.imageUrl).length >= 2 && (
+            <StoryboardToVideoDialog
+              storyboardId={currentStoryboardId}
+              panels={panels}
+              onSuccess={() => toast.success("Controlla la pagina Storia per vedere i video generati")}
+            />
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
