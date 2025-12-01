@@ -70,6 +70,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
           audio_type: audioType !== "none" ? audioType : null,
           audio_prompt: audioPrompt || null,
           transition_prompt: transitionPrompt || null,
+          transition_style: transitionStyle,
         })
         .select()
         .single();
