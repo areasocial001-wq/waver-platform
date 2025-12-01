@@ -27,6 +27,7 @@ export type Database = {
           storyboard_id: string
           total_videos: number
           transition_prompt: string | null
+          transition_speed: string | null
           transition_style: string | null
           updated_at: string
           user_id: string
@@ -43,6 +44,7 @@ export type Database = {
           storyboard_id: string
           total_videos: number
           transition_prompt?: string | null
+          transition_speed?: string | null
           transition_style?: string | null
           updated_at?: string
           user_id: string
@@ -59,6 +61,7 @@ export type Database = {
           storyboard_id?: string
           total_videos?: number
           transition_prompt?: string | null
+          transition_speed?: string | null
           transition_style?: string | null
           updated_at?: string
           user_id?: string

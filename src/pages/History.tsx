@@ -13,6 +13,7 @@ import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard"
 type VideoBatch = {
   id: string;
   transition_style: string | null;
+  transition_speed: string | null;
   duration: number;
   camera_movement: string | null;
   audio_type: string | null;
@@ -56,7 +57,7 @@ export default function History() {
       if (batchIds.length > 0) {
         const { data: batchData, error: batchError } = await supabase
           .from("storyboard_video_batches")
-          .select("id, transition_style, duration, camera_movement, audio_type")
+          .select("id, transition_style, transition_speed, duration, camera_movement, audio_type")
           .in("id", batchIds);
 
         if (batchError) throw batchError;
