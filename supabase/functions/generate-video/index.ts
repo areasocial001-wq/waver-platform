@@ -253,19 +253,6 @@ serve(async (req) => {
         };
         console.log("Added start image for image-to-video generation");
       }
-
-      // Add end image if provided (for sequential/first-last-frame mode)
-      if (end_image) {
-        const endBase64Data = end_image.split(',')[1];
-        const endMimeType = end_image.startsWith('data:image/png') ? 'image/png' : 
-                           end_image.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
-        
-        requestBody.instances[0].endFrameImage = {
-          bytesBase64Encoded: endBase64Data,
-          mimeType: endMimeType
-        };
-        console.log("Added end image for first-last-frame generation");
-      }
     }
 
     // Add resolution for text-to-video if provided
