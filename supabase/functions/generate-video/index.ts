@@ -15,6 +15,9 @@ serve(async (req) => {
 
   try {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+    const KLING_ACCESS_KEY = Deno.env.get("KLING_ACCESS_KEY");
+    const KLING_SECRET_KEY = Deno.env.get("KLING_SECRET_KEY");
+    
     if (!GOOGLE_AI_API_KEY) {
       throw new Error("GOOGLE_AI_API_KEY is not set");
     }
@@ -25,6 +28,77 @@ serve(async (req) => {
     // Check if it's a polling request
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
+      
+      // Check if it's a Kling task (format: kling:task_id)
+      if (body.operationId.startsWith('kling:')) {
+        if (!KLING_ACCESS_KEY || !KLING_SECRET_KEY) {
+          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not set");
+        }
+        
+        const taskId = body.operationId.replace('kling:', '');
+        console.log("Polling Kling task:", taskId);
+        
+        const klingResponse = await fetch(`https://api.klingai.com/v1/videos/image2video/${taskId}`, {
+          method: "GET",
+          headers: {
+            "X-Access-Key": KLING_ACCESS_KEY,
+            "X-Secret-Key": KLING_SECRET_KEY,
+          },
+        });
+
+        if (!klingResponse.ok) {
+          const error = await klingResponse.text();
+          throw new Error(`Kling API error: ${klingResponse.status} - ${error}`);
+        }
+
+        const klingData = await klingResponse.json();
+        console.log("Kling task status:", klingData);
+        
+        if (klingData.data.task_status === "succeed") {
+          const videoUrl = klingData.data.task_result.videos[0].url;
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+
+            return new Response(JSON.stringify({ 
+              status: "succeeded",
+              output: videoUrl 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (klingData.data.task_status === "failed") {
+          throw new Error(`Kling generation failed: ${klingData.data.task_status_msg || "Unknown error"}`);
+        } else {
+          // Still processing
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
       
       // Check if it's a Replicate prediction (format: replicate:prediction_id)
       if (body.operationId.startsWith('replicate:')) {
@@ -204,6 +278,82 @@ serve(async (req) => {
           status: 400,
         }
       );
+    }
+
+    // Use Kling API if end_image is provided (it supports start/end frames)
+    if (type === "image_to_video" && end_image && KLING_ACCESS_KEY && KLING_SECRET_KEY) {
+      console.log("Starting video generation with Kling 2.1 (supports start/end frames)");
+      
+      const startImageData = start_image || image || image_url;
+      
+      // Prepare Kling API request
+      const klingPayload: any = {
+        model_name: "kling-v1-5",
+        prompt: prompt || "Smooth transition between images",
+        negative_prompt: "",
+        cfg_scale: 0.5,
+        mode: "std",
+        camera_control: {
+          type: "simple",
+          config: {
+            horizontal: 0,
+            vertical: 0,
+            pan: 0,
+            tilt: 0,
+            roll: 0,
+            zoom: 0
+          }
+        },
+        image: startImageData.split(',')[1], // Remove data:image/...;base64, prefix
+        image_tail: end_image.split(',')[1],  // End frame
+        duration: duration || 5
+      };
+
+      console.log("Calling Kling API for image-to-video with start/end frames");
+
+      const klingResponse = await fetch("https://api.klingai.com/v1/videos/image2video", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Access-Key": KLING_ACCESS_KEY,
+          "X-Secret-Key": KLING_SECRET_KEY,
+        },
+        body: JSON.stringify(klingPayload),
+      });
+
+      if (!klingResponse.ok) {
+        const error = await klingResponse.text();
+        console.error("Kling API error:", error);
+        throw new Error(`Kling API error: ${klingResponse.status} - ${error}`);
+      }
+
+      const klingData = await klingResponse.json();
+      console.log("Kling task started:", klingData);
+
+      // Save Kling task ID to database
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `kling:${klingData.data.task_id}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `kling:${klingData.data.task_id}`,
+        provider: "kling"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
     console.log("Starting video generation with Google Veo 3.1");
