@@ -6,6 +6,7 @@ import { Video, Clock, Sparkles } from "lucide-react";
 type VideoBatch = {
   id: string;
   transition_style: string | null;
+  transition_speed: string | null;
   duration: number;
   camera_movement: string | null;
   audio_type: string | null;
@@ -71,6 +72,18 @@ export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo }: Storybo
     spin: "Spin",
   };
 
+  const speedIcons: Record<string, string> = {
+    fast: "⚡",
+    normal: "➡️",
+    slow: "🐌",
+  };
+
+  const speedLabels: Record<string, string> = {
+    fast: "Veloce",
+    normal: "Normale",
+    slow: "Lento",
+  };
+
   return (
     <Card className="overflow-hidden border-2 border-primary/20">
       <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 pb-4">
@@ -95,6 +108,12 @@ export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo }: Storybo
             <Badge variant="outline" className="gap-1">
               <span>{transitionIcons[batchInfo.transition_style] || "✨"}</span>
               {transitionLabels[batchInfo.transition_style] || batchInfo.transition_style}
+            </Badge>
+          )}
+          {batchInfo?.transition_speed && (
+            <Badge variant="outline" className="gap-1">
+              <span>{speedIcons[batchInfo.transition_speed] || "➡️"}</span>
+              {speedLabels[batchInfo.transition_speed] || batchInfo.transition_speed}
             </Badge>
           )}
         </div>

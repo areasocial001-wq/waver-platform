@@ -34,6 +34,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
   const [audioPrompt, setAudioPrompt] = useState("");
   const [transitionPrompt, setTransitionPrompt] = useState("");
   const [transitionStyle, setTransitionStyle] = useState("smooth");
+  const [transitionSpeed, setTransitionSpeed] = useState<"fast" | "normal" | "slow">("normal");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
@@ -71,6 +72,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
           audio_prompt: audioPrompt || null,
           transition_prompt: transitionPrompt || null,
           transition_style: transitionStyle,
+          transition_speed: transitionSpeed,
         })
         .select()
         .single();
@@ -114,6 +116,13 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
 
         if (cameraMovement !== "none") {
           fullPrompt += `. Camera: ${cameraMovement}`;
+        }
+
+        // Add transition speed instruction
+        if (transitionSpeed === "fast") {
+          fullPrompt += `. Transition: quick, snappy, energetic pacing`;
+        } else if (transitionSpeed === "slow") {
+          fullPrompt += `. Transition: slow, gradual, smooth pacing`;
         }
 
         if (audioType !== "none" && audioPrompt) {
@@ -302,6 +311,24 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
                 <SelectItem value="8">8 secondi</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Transition Speed */}
+          <div className="space-y-2">
+            <Label>Velocità Transizione</Label>
+            <Select value={transitionSpeed} onValueChange={(v) => setTransitionSpeed(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fast">⚡ Veloce - Transizioni rapide e dinamiche</SelectItem>
+                <SelectItem value="normal">➡️ Normale - Velocità bilanciata</SelectItem>
+                <SelectItem value="slow">🐌 Lento - Transizioni graduali e fluide</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Controlla la velocità del movimento durante le transizioni, indipendente dalla durata totale
+            </p>
           </div>
 
           {/* Transition Style */}
