@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,21 @@ export const ImageToVideoForm = () => {
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Reset duration to valid value when switching between modes
+  useEffect(() => {
+    if (endImage) {
+      // Kling API mode - default to 5 seconds
+      if (duration !== "5" && duration !== "10") {
+        setDuration("5");
+      }
+    } else {
+      // Google Veo mode - default to 6 seconds
+      if (duration !== "4" && duration !== "6" && duration !== "8") {
+        setDuration("6");
+      }
+    }
+  }, [endImage]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
     const file = e.target.files?.[0];
@@ -189,15 +204,6 @@ export const ImageToVideoForm = () => {
       // Add end image if provided
       if (isSequential) {
         requestBody.end_image = endImagePreview;
-        
-        // Inform user about Kling API duration rounding
-        const requestedDuration = parseInt(duration);
-        if (requestedDuration !== 5 && requestedDuration !== 10) {
-          const actualDuration = requestedDuration >= 8 ? 10 : 5;
-          toast.info("Durata adattata per Kling API", {
-            description: `La durata di ${requestedDuration}s è stata arrotondata a ${actualDuration}s (Kling supporta solo 5 o 10 secondi).`
-          });
-        }
       }
 
       const { data, error } = await supabase.functions
@@ -463,17 +469,33 @@ export const ImageToVideoForm = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="i2v-duration">Durata</Label>
+          <Label htmlFor="i2v-duration">
+            Durata {endImage && <span className="text-xs text-accent">(Kling API)</span>}
+          </Label>
           <Select value={duration} onValueChange={setDuration}>
             <SelectTrigger id="i2v-duration">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="4">4 secondi</SelectItem>
-              <SelectItem value="6">6 secondi</SelectItem>
-              <SelectItem value="8">8 secondi</SelectItem>
+              {endImage ? (
+                <>
+                  <SelectItem value="5">5 secondi</SelectItem>
+                  <SelectItem value="10">10 secondi</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value="4">4 secondi</SelectItem>
+                  <SelectItem value="6">6 secondi</SelectItem>
+                  <SelectItem value="8">8 secondi</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
+          {endImage && (
+            <p className="text-xs text-muted-foreground">
+              Kling supporta solo 5 o 10 secondi
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
