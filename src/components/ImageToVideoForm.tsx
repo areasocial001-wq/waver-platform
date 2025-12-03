@@ -189,6 +189,15 @@ export const ImageToVideoForm = () => {
       // Add end image if provided
       if (isSequential) {
         requestBody.end_image = endImagePreview;
+        
+        // Inform user about Kling API duration rounding
+        const requestedDuration = parseInt(duration);
+        if (requestedDuration !== 5 && requestedDuration !== 10) {
+          const actualDuration = requestedDuration >= 8 ? 10 : 5;
+          toast.info("Durata adattata per Kling API", {
+            description: `La durata di ${requestedDuration}s è stata arrotondata a ${actualDuration}s (Kling supporta solo 5 o 10 secondi).`
+          });
+        }
       }
 
       const { data, error } = await supabase.functions
