@@ -365,17 +365,40 @@ serve(async (req) => {
       
       const startImageData = start_image || image || image_url;
       
+      console.log("DEBUG - start_image present:", !!start_image);
+      console.log("DEBUG - image present:", !!image);
+      console.log("DEBUG - image_url present:", !!image_url);
+      console.log("DEBUG - startImageData present:", !!startImageData);
+      console.log("DEBUG - end_image present:", !!end_image);
+      
       if (!startImageData) {
         throw new Error("Start image is required for Kling image-to-video generation");
       }
       
+      // Extract base64 data from data URLs
+      const extractBase64 = (data: string): string => {
+        if (!data) return "";
+        if (data.includes(',')) {
+          return data.split(',')[1];
+        }
+        return data;
+      };
+      
+      const startBase64 = extractBase64(startImageData);
+      const endBase64 = extractBase64(end_image);
+      
+      console.log("DEBUG - startBase64 length:", startBase64?.length || 0);
+      console.log("DEBUG - endBase64 length:", endBase64?.length || 0);
+      
+      if (!startBase64 || startBase64.length < 100) {
+        throw new Error("Invalid start image base64 data");
+      }
+      
       // Prepare Kling API request
-      // For image_tail (start/end frame) support:
-      // - std mode only supports 5s duration
-      // - pro mode supports 5s and 10s duration
+      // For image_tail (start/end frame) support, use pro mode for better compatibility
       const requestedDuration = duration && duration >= 8 ? 10 : 5;
-      // Use pro mode for 10s, std mode for 5s (std+10s doesn't support image_tail)
-      const klingMode = requestedDuration === 10 ? "pro" : "std";
+      // Always use pro mode with image_tail for better compatibility
+      const klingMode = "pro";
       const klingDuration = String(requestedDuration);
       
       console.log(`Kling config: mode=${klingMode}, duration=${klingDuration}s`);
@@ -386,10 +409,14 @@ serve(async (req) => {
         negative_prompt: "",
         cfg_scale: 0.5,
         mode: klingMode,
-        image: startImageData.includes(',') ? startImageData.split(',')[1] : startImageData,
-        image_tail: end_image.includes(',') ? end_image.split(',')[1] : end_image,
+        image: startBase64,
+        image_tail: endBase64,
         duration: klingDuration
       };
+      
+      console.log("Kling payload keys:", Object.keys(klingPayload));
+      console.log("Kling image field length:", klingPayload.image?.length || 0);
+      console.log("Kling image_tail field length:", klingPayload.image_tail?.length || 0);
 
       console.log("Calling Kling API for image-to-video with start/end frames");
 
