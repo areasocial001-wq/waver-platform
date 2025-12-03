@@ -1,10 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { create, getNumericDate } from "https://deno.land/x/djwt@v2.8/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Generate JWT token for Kling API authentication
+async function generateKlingJWT(accessKey: string, secretKey: string): Promise<string> {
+  const header = { alg: "HS256" as const, typ: "JWT" };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: accessKey,
+    exp: now + 1800, // 30 minutes expiration
+    nbf: now - 5,    // valid from 5 seconds ago
+  };
+  
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(secretKey);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  
+  return await create(header, payload, key);
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -50,11 +74,14 @@ serve(async (req) => {
         const taskId = body.operationId.replace('kling:', '');
         console.log("Polling Kling task:", taskId);
         
+        // Generate JWT token for Kling API
+        const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
+        console.log("Generated Kling JWT for polling");
+        
         const klingResponse = await fetch(`https://api.klingai.com/v1/videos/image2video/${taskId}`, {
           method: "GET",
           headers: {
-            "X-Access-Key": KLING_ACCESS_KEY,
-            "X-Secret-Key": KLING_SECRET_KEY,
+            "Authorization": `Bearer ${klingJWT}`,
           },
         });
 
@@ -323,12 +350,15 @@ serve(async (req) => {
 
       console.log("Calling Kling API for image-to-video with start/end frames");
 
+      // Generate JWT token for Kling API
+      const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
+      console.log("Generated Kling JWT for video generation");
+
       const klingResponse = await fetch("https://api.klingai.com/v1/videos/image2video", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Access-Key": KLING_ACCESS_KEY,
-          "X-Secret-Key": KLING_SECRET_KEY,
+          "Authorization": `Bearer ${klingJWT}`,
         },
         body: JSON.stringify(klingPayload),
       });
