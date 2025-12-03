@@ -230,30 +230,70 @@ serve(async (req) => {
           throw new Error("No video URI in response");
         }
 
-        // Store the internal Google URI - we'll proxy it through our endpoint
-        const internalVideoUri = videoUri;
+        console.log("Video ready, downloading from Google:", videoUri);
 
-        // Update database with internal URI
+        // Download video from Google's API
+        const videoResponse = await fetch(videoUri, {
+          headers: {
+            "x-goog-api-key": GOOGLE_AI_API_KEY,
+          },
+        });
+
+        if (!videoResponse.ok) {
+          throw new Error(`Failed to download video: ${videoResponse.status}`);
+        }
+
+        // Get video as blob
+        const videoBlob = await videoResponse.blob();
+        console.log("Video downloaded, size:", videoBlob.size, "bytes");
+
+        // Upload to Supabase Storage
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        // Generate unique filename
+        const timestamp = Date.now();
+        const randomId = crypto.randomUUID().slice(0, 8);
+        const fileName = `videos/${body.generationId || timestamp}-${randomId}.mp4`;
+
+        // Upload to storage bucket
+        const { data: uploadData, error: uploadError } = await supabaseClient
+          .storage
+          .from('generated-videos')
+          .upload(fileName, videoBlob, {
+            contentType: 'video/mp4',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error("Upload error:", uploadError);
+          throw new Error(`Failed to upload video: ${uploadError.message}`);
+        }
+
+        // Get public URL
+        const { data: publicUrlData } = supabaseClient
+          .storage
+          .from('generated-videos')
+          .getPublicUrl(fileName);
+
+        const permanentVideoUrl = publicUrlData.publicUrl;
+        console.log("Video uploaded to storage:", permanentVideoUrl);
+
+        // Update database with permanent URL
         if (body.generationId) {
-          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-          const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
-          // Create proxy URL for the client to use
-          const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(internalVideoUri)}`;
-
           await supabaseClient
             .from('video_generations')
             .update({
               status: 'completed',
-              video_url: proxyUrl,
+              video_url: permanentVideoUrl,
             })
             .eq('id', body.generationId);
 
           return new Response(JSON.stringify({ 
             status: "succeeded",
-            output: proxyUrl 
+            output: permanentVideoUrl 
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
@@ -262,7 +302,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({ 
           status: "succeeded",
-          output: internalVideoUri 
+          output: permanentVideoUrl 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
