@@ -326,6 +326,9 @@ serve(async (req) => {
       const startImageData = start_image || image || image_url;
       
       // Prepare Kling API request
+      // Kling API only accepts duration values of 5 or 10 seconds
+      const klingDuration = (duration && duration >= 8) ? "10" : "5";
+      
       const klingPayload: any = {
         model_name: "kling-v1-5",
         prompt: prompt || "Smooth transition between images",
@@ -345,7 +348,7 @@ serve(async (req) => {
         },
         image: startImageData.split(',')[1], // Remove data:image/...;base64, prefix
         image_tail: end_image.split(',')[1],  // End frame
-        duration: duration || 5
+        duration: klingDuration
       };
 
       console.log("Calling Kling API for image-to-video with start/end frames");
