@@ -365,29 +365,29 @@ serve(async (req) => {
       
       const startImageData = start_image || image || image_url;
       
+      if (!startImageData) {
+        throw new Error("Start image is required for Kling image-to-video generation");
+      }
+      
       // Prepare Kling API request
-      // Kling API only accepts duration values of 5 or 10 seconds
-      const klingDuration = (duration && duration >= 8) ? "10" : "5";
+      // For image_tail (start/end frame) support:
+      // - std mode only supports 5s duration
+      // - pro mode supports 5s and 10s duration
+      const requestedDuration = duration && duration >= 8 ? 10 : 5;
+      // Use pro mode for 10s, std mode for 5s (std+10s doesn't support image_tail)
+      const klingMode = requestedDuration === 10 ? "pro" : "std";
+      const klingDuration = String(requestedDuration);
+      
+      console.log(`Kling config: mode=${klingMode}, duration=${klingDuration}s`);
       
       const klingPayload: any = {
         model_name: "kling-v1-5",
         prompt: prompt || "Smooth transition between images",
         negative_prompt: "",
         cfg_scale: 0.5,
-        mode: "std",
-        camera_control: {
-          type: "simple",
-          config: {
-            horizontal: 0,
-            vertical: 0,
-            pan: 0,
-            tilt: 0,
-            roll: 0,
-            zoom: 0
-          }
-        },
-        image: startImageData.split(',')[1], // Remove data:image/...;base64, prefix
-        image_tail: end_image.split(',')[1],  // End frame
+        mode: klingMode,
+        image: startImageData.includes(',') ? startImageData.split(',')[1] : startImageData,
+        image_tail: end_image.includes(',') ? end_image.split(',')[1] : end_image,
         duration: klingDuration
       };
 
