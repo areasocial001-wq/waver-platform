@@ -267,6 +267,35 @@ export const ImageToVideoForm = () => {
         </AlertDescription>
       </Alert>
 
+      {/* API Indicator */}
+      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+        endImage 
+          ? "bg-purple-500/10 border-purple-500/30" 
+          : "bg-emerald-500/10 border-emerald-500/30"
+      }`}>
+        <div className={`w-3 h-3 rounded-full animate-pulse ${
+          endImage ? "bg-purple-500" : "bg-emerald-500"
+        }`} />
+        <div className="flex-1">
+          <p className="text-sm font-medium">
+            {endImage ? "Kling 2.1 API" : "Google Veo 3.1"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {endImage 
+              ? "Transizione sequenziale tra start e end frame" 
+              : "Animazione singola con audio sincronizzato"
+            }
+          </p>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+          endImage 
+            ? "bg-purple-500/20 text-purple-300" 
+            : "bg-emerald-500/20 text-emerald-300"
+        }`}>
+          {endImage ? "Sequential" : "Standard"}
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Start Frame (Obbligatorio)</Label>
