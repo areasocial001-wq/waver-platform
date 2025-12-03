@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.generate-content]
 verify_jwt = false
+
+[functions.cleanup-old-videos]
+verify_jwt = false
