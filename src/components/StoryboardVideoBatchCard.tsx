@@ -1,7 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { VideoGenerationCard } from "./VideoGenerationCard";
-import { Video, Clock, Sparkles } from "lucide-react";
+import { Video, Clock, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useState } from "react";
 
 type VideoBatch = {
   id: string;
@@ -34,9 +49,41 @@ interface StoryboardVideoBatchCardProps {
   batchId: string;
   videos: VideoGeneration[];
   batchInfo?: VideoBatch;
+  onDelete?: () => void;
 }
 
-export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo }: StoryboardVideoBatchCardProps) => {
+export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo, onDelete }: StoryboardVideoBatchCardProps) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteBatch = async () => {
+    setIsDeleting(true);
+    try {
+      // Delete all videos in this batch first
+      const { error: videosError } = await supabase
+        .from("video_generations")
+        .delete()
+        .eq("batch_id", batchId);
+
+      if (videosError) throw videosError;
+
+      // Delete the batch record
+      const { error: batchError } = await supabase
+        .from("storyboard_video_batches")
+        .delete()
+        .eq("id", batchId);
+
+      if (batchError) throw batchError;
+
+      toast.success("Batch eliminato con successo");
+      onDelete?.();
+    } catch (error) {
+      console.error("Error deleting batch:", error);
+      toast.error("Errore durante l'eliminazione del batch");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const sortedVideos = [...videos].sort((a, b) => 
     (a.sequence_order ?? 0) - (b.sequence_order ?? 0)
   );
@@ -92,9 +139,41 @@ export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo }: Storybo
             <Video className="h-5 w-5 text-primary" />
             Video Sequenziale da Storyboard
           </CardTitle>
-          <Badge variant="outline" className={statusColor}>
-            {completedCount}/{totalCount} completati
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={statusColor}>
+              {completedCount}/{totalCount} completati
+            </Badge>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Eliminare questo batch?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Questa azione eliminerà tutti i {totalCount} video in questo batch. 
+                    L'operazione non può essere annullata.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteBatch}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Elimina batch
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
         </div>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
           <div className="flex items-center gap-1">
