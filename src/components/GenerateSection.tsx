@@ -5,7 +5,8 @@ import { TextToVideoForm } from "./TextToVideoForm";
 import { ImageToVideoForm } from "./ImageToVideoForm";
 import { ImageGenerationForm } from "./ImageGenerationForm";
 import { StoryboardEditor } from "./StoryboardEditor";
-import { Video, Image, Sparkles, Layout } from "lucide-react";
+import { VideoToAudioForm } from "./VideoToAudioForm";
+import { Video, Image, Sparkles, Layout, Volume2 } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -21,7 +22,7 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-4xl mx-auto grid-cols-4 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-5 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -35,6 +36,13 @@ export const GenerateSection = () => {
             >
               <Image className="w-4 h-4" />
               Image to Video
+            </TabsTrigger>
+            <TabsTrigger 
+              value="video-audio" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground"
+            >
+              <Volume2 className="w-4 h-4" />
+              Video to Audio
             </TabsTrigger>
             <TabsTrigger 
               value="generate-image" 
@@ -82,6 +90,23 @@ export const GenerateSection = () => {
               </CardHeader>
               <CardContent>
                 <ImageToVideoForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="video-audio">
+            <Card className="border-secondary/20 bg-card/50 backdrop-blur-sm shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Volume2 className="w-5 h-5 text-secondary" />
+                  Video to Audio (V2A)
+                </CardTitle>
+                <CardDescription>
+                  Rigenera l'audio di un video esistente con TTS professionale ElevenLabs
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VideoToAudioForm />
               </CardContent>
             </Card>
           </TabsContent>
