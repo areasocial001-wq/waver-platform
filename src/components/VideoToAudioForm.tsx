@@ -11,6 +11,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AudioWaveform } from "./AudioWaveform";
 import { AudioEqualizer, EqualizerSettings, DEFAULT_EQUALIZER_SETTINGS } from "./AudioEqualizer";
 import { VideoExporter } from "./VideoExporter";
+import { AudioEffects, AudioEffectsSettings, DEFAULT_EFFECTS_SETTINGS } from "./AudioEffects";
+import { AudioMixer, AudioMixerSettings, DEFAULT_MIXER_SETTINGS } from "./AudioMixer";
 
 // Constants for optimal speed calculation
 // Baseline: ~15 characters per second at 1.0x speed for comfortable speech
@@ -52,6 +54,8 @@ export function VideoToAudioForm() {
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [equalizerSettings, setEqualizerSettings] = useState<EqualizerSettings>(DEFAULT_EQUALIZER_SETTINGS);
+  const [effectsSettings, setEffectsSettings] = useState<AudioEffectsSettings>(DEFAULT_EFFECTS_SETTINGS);
+  const [mixerSettings, setMixerSettings] = useState<AudioMixerSettings>(DEFAULT_MIXER_SETTINGS);
   
   // Segment selection
   const [segmentStart, setSegmentStart] = useState(0);
@@ -557,6 +561,19 @@ export function VideoToAudioForm() {
                 settings={equalizerSettings}
                 onSettingsChange={setEqualizerSettings}
               />
+
+              {/* Audio Effects */}
+              <AudioEffects
+                settings={effectsSettings}
+                onSettingsChange={setEffectsSettings}
+              />
+
+              {/* Audio Mixer */}
+              <AudioMixer
+                settings={mixerSettings}
+                onSettingsChange={setMixerSettings}
+                hasOriginalAudio={!!videoUrl}
+              />
               
               <div className="flex gap-2 flex-wrap">
                 {videoUrl && (
@@ -602,6 +619,8 @@ export function VideoToAudioForm() {
                   audioUrl={generatedAudioUrl}
                   segmentStart={segmentStart}
                   segmentEnd={segmentEnd}
+                  mixerSettings={mixerSettings}
+                  effectsSettings={effectsSettings}
                 />
               )}
 
