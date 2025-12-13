@@ -39,26 +39,74 @@ export const ImageToVideoForm = () => {
     }
   }, [endImage]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
+  // Compress and resize image to prevent Out of Memory errors
+  const compressImage = (file: File, maxWidth: number = 1280, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        img.src = e.target?.result as string;
+      };
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Convert to JPEG for smaller file size
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'start' | 'end') => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         toast.error("Seleziona un file immagine valido");
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
+      
+      try {
+        toast.info("Ottimizzazione immagine in corso...");
+        const compressedImage = await compressImage(file, 1280, 0.85);
+        
         if (type === 'start') {
           setStartImage(file);
-          setStartImagePreview(result);
+          setStartImagePreview(compressedImage);
         } else {
           setEndImage(file);
-          setEndImagePreview(result);
+          setEndImagePreview(compressedImage);
         }
-      };
-      reader.readAsDataURL(file);
-      toast.success(`${type === 'start' ? 'Start' : 'End'} frame caricato con successo`);
+        
+        toast.success(`${type === 'start' ? 'Start' : 'End'} frame caricato con successo`);
+      } catch (error) {
+        console.error("Error compressing image:", error);
+        toast.error("Errore nell'ottimizzazione dell'immagine");
+      }
     }
   };
 
