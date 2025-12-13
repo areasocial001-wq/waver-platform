@@ -163,6 +163,7 @@ export default function History() {
                           batchId={batchId} 
                           videos={videos}
                           batchInfo={batches.get(batchId)}
+                          onDelete={fetchGenerations}
                         />
                       ))}
 
