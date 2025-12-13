@@ -1,10 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 interface VideoGenerationCardProps {
   generation: {
@@ -23,6 +23,27 @@ interface VideoGenerationCardProps {
 export const VideoGenerationCard = ({ generation }: VideoGenerationCardProps) => {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Lazy loading: only load video when card is visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (cardRef.current) {
+      observer.observe(cardRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (generation.status === "processing") {
@@ -97,21 +118,37 @@ export const VideoGenerationCard = ({ generation }: VideoGenerationCardProps) =>
   };
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50">
+    <Card ref={cardRef} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50">
       <CardContent className="p-0">
         <div className="aspect-video bg-muted relative overflow-hidden">
           {generation.status === "completed" && generation.video_url ? (
-            <video
-              src={generation.video_url}
-              controls
-              className="w-full h-full object-cover"
-            />
-          ) : generation.image_url ? (
+            shouldLoadVideo ? (
+              <video
+                src={generation.video_url}
+                controls
+                className="w-full h-full object-cover"
+                preload="metadata"
+              />
+            ) : (
+              <div 
+                className="w-full h-full flex items-center justify-center cursor-pointer bg-muted hover:bg-muted/80 transition-colors"
+                onClick={() => setShouldLoadVideo(true)}
+              >
+                <div className="text-center space-y-2">
+                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
+                    <Play className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Clicca per caricare</p>
+                </div>
+              </div>
+            )
+          ) : generation.image_url && isVisible ? (
             <div className="relative w-full h-full">
               <img
                 src={generation.image_url}
                 alt="Preview"
                 className="w-full h-full object-cover opacity-50"
+                loading="lazy"
               />
               {generation.status === "processing" && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/60 backdrop-blur-sm">
