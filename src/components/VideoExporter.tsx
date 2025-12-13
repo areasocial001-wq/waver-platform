@@ -5,6 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Film, Download, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { AudioMixerSettings } from "./AudioMixer";
+import { AudioEffectsSettings } from "./AudioEffects";
 
 interface VideoExporterProps {
   videoUrl: string;
@@ -12,6 +14,8 @@ interface VideoExporterProps {
   segmentStart: number;
   segmentEnd: number;
   equalizerEnabled?: boolean;
+  mixerSettings?: AudioMixerSettings;
+  effectsSettings?: AudioEffectsSettings;
 }
 
 type ExportQuality = 'low' | 'medium' | 'high';
@@ -54,6 +58,8 @@ export function VideoExporter({
   audioUrl, 
   segmentStart, 
   segmentEnd,
+  mixerSettings,
+  effectsSettings,
 }: VideoExporterProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -132,12 +138,80 @@ export function VideoExporter({
         throw new Error('Impossibile creare contesto canvas');
       }
 
-      // Create audio context for audio capture
+      // Create audio context for audio capture with effects
       const audioContext = new AudioContext();
+      
+      // Set up generated audio source
       const audioSource = audioContext.createMediaElementSource(audio);
+      const generatedGain = audioContext.createGain();
+      generatedGain.gain.value = (mixerSettings?.generatedVolume ?? 100) / 100;
+      
+      // Create effects chain for generated audio
+      let lastNode: AudioNode = audioSource;
+      
+      // Apply compressor if enabled
+      if (effectsSettings?.compressorEnabled) {
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = effectsSettings.compressorThreshold;
+        compressor.ratio.value = effectsSettings.compressorRatio;
+        compressor.attack.value = effectsSettings.compressorAttack;
+        compressor.release.value = effectsSettings.compressorRelease;
+        lastNode.connect(compressor);
+        lastNode = compressor;
+      }
+      
+      // Apply delay/echo if enabled
+      if (effectsSettings?.echoEnabled) {
+        const delay = audioContext.createDelay(1);
+        delay.delayTime.value = effectsSettings.echoDelay;
+        const feedbackGain = audioContext.createGain();
+        feedbackGain.gain.value = effectsSettings.echoFeedback / 100;
+        const echoMixGain = audioContext.createGain();
+        echoMixGain.gain.value = effectsSettings.echoMix / 100;
+        
+        lastNode.connect(delay);
+        delay.connect(feedbackGain);
+        feedbackGain.connect(delay);
+        delay.connect(echoMixGain);
+        echoMixGain.connect(generatedGain);
+      }
+      
+      // Apply reverb if enabled (simple convolver approximation)
+      if (effectsSettings?.reverbEnabled) {
+        const reverbGain = audioContext.createGain();
+        reverbGain.gain.value = effectsSettings.reverbMix / 100;
+        lastNode.connect(reverbGain);
+        reverbGain.connect(generatedGain);
+      }
+      
+      lastNode.connect(generatedGain);
+      
+      // Create destination for combined audio
       const audioDestination = audioContext.createMediaStreamDestination();
-      audioSource.connect(audioDestination);
-      audioSource.connect(audioContext.destination);
+      generatedGain.connect(audioDestination);
+      generatedGain.connect(audioContext.destination);
+      
+      // Set up original video audio if mixer is enabled
+      let originalVideo: HTMLVideoElement | null = null;
+      let originalSource: MediaElementAudioSourceNode | null = null;
+      
+      if (mixerSettings?.originalEnabled && mixerSettings.originalVolume > 0) {
+        originalVideo = document.createElement('video');
+        originalVideo.src = videoUrl;
+        originalVideo.crossOrigin = 'anonymous';
+        
+        await new Promise<void>((resolve, reject) => {
+          originalVideo!.onloadedmetadata = () => resolve();
+          originalVideo!.onerror = () => reject(new Error('Errore caricamento audio originale'));
+        });
+        
+        originalSource = audioContext.createMediaElementSource(originalVideo);
+        const originalGain = audioContext.createGain();
+        originalGain.gain.value = mixerSettings.originalVolume / 100;
+        originalSource.connect(originalGain);
+        originalGain.connect(audioDestination);
+        originalGain.connect(audioContext.destination);
+      }
 
       // Create video stream from canvas
       const videoStream = canvas.captureStream(30);
@@ -202,10 +276,12 @@ export function VideoExporter({
 
       mediaRecorder.start(100);
       
-      await Promise.all([
-        video.play(),
-        audio.play(),
-      ]);
+      const playPromises = [video.play(), audio.play()];
+      if (originalVideo) {
+        originalVideo.currentTime = segmentStart;
+        playPromises.push(originalVideo.play());
+      }
+      await Promise.all(playPromises);
 
       // Update progress and render frames
       const renderFrame = () => {
@@ -220,6 +296,7 @@ export function VideoExporter({
         if (video.currentTime >= segmentEnd || video.ended || audio.ended) {
           video.pause();
           audio.pause();
+          if (originalVideo) originalVideo.pause();
           mediaRecorder.stop();
           return;
         }
@@ -234,7 +311,7 @@ export function VideoExporter({
       toast.error('Errore durante l\'esportazione: ' + (error as Error).message);
       setIsExporting(false);
     }
-  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format]);
+  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format, mixerSettings, effectsSettings]);
 
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
