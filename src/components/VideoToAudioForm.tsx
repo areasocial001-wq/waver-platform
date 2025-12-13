@@ -8,6 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { AudioWaveform } from "./AudioWaveform";
 
 // Constants for optimal speed calculation
 // Baseline: ~15 characters per second at 1.0x speed for comfortable speech
@@ -46,6 +47,8 @@ export function VideoToAudioForm() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
   
   // Segment selection
   const [segmentStart, setSegmentStart] = useState(0);
@@ -253,6 +256,28 @@ export function VideoToAudioForm() {
       }
     };
   }, []);
+
+  // Track audio playback time for waveform
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => {
+      setAudioCurrentTime(audio.currentTime);
+    };
+
+    const handleLoadedMetadata = () => {
+      setAudioDuration(audio.duration);
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, [generatedAudioUrl]);
 
   return (
     <div className="space-y-6">
@@ -514,6 +539,14 @@ export function VideoToAudioForm() {
               <Label>{videoUrl ? "5" : "4"}. Anteprima e Download</Label>
               
               <audio ref={audioRef} src={generatedAudioUrl} className="hidden" />
+              
+              {/* Audio Waveform Visualization */}
+              <AudioWaveform 
+                audioUrl={generatedAudioUrl}
+                isPlaying={isPlaying}
+                currentTime={audioCurrentTime}
+                duration={audioDuration}
+              />
               
               <div className="flex gap-2 flex-wrap">
                 {videoUrl && (
