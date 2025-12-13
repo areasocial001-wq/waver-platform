@@ -9,6 +9,8 @@ import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors, Z
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AudioWaveform } from "./AudioWaveform";
+import { AudioEqualizer, EqualizerSettings, DEFAULT_EQUALIZER_SETTINGS } from "./AudioEqualizer";
+import { VideoExporter } from "./VideoExporter";
 
 // Constants for optimal speed calculation
 // Baseline: ~15 characters per second at 1.0x speed for comfortable speech
@@ -49,6 +51,7 @@ export function VideoToAudioForm() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [equalizerSettings, setEqualizerSettings] = useState<EqualizerSettings>(DEFAULT_EQUALIZER_SETTINGS);
   
   // Segment selection
   const [segmentStart, setSegmentStart] = useState(0);
@@ -547,6 +550,13 @@ export function VideoToAudioForm() {
                 currentTime={audioCurrentTime}
                 duration={audioDuration}
               />
+
+              {/* Audio Equalizer */}
+              <AudioEqualizer
+                audioElement={audioRef.current}
+                settings={equalizerSettings}
+                onSettingsChange={setEqualizerSettings}
+              />
               
               <div className="flex gap-2 flex-wrap">
                 {videoUrl && (
@@ -585,8 +595,18 @@ export function VideoToAudioForm() {
                 </Button>
               </div>
 
+              {/* Video Export */}
+              {videoUrl && (
+                <VideoExporter
+                  videoUrl={videoUrl}
+                  audioUrl={generatedAudioUrl}
+                  segmentStart={segmentStart}
+                  segmentEnd={segmentEnd}
+                />
+              )}
+
               <p className="text-sm text-muted-foreground">
-                💡 Suggerimento: Scarica l'audio e usa un editor video (es. CapCut, DaVinci Resolve) per sostituire l'audio originale del tuo video.
+                💡 Suggerimento: Usa l'equalizzatore per regolare le frequenze audio, poi esporta il video con il nuovo audio integrato.
               </p>
             </div>
           )}
