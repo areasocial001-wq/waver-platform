@@ -1,10 +1,24 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Clock, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import { useEffect, useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface VideoGenerationCardProps {
   generation: {
@@ -18,14 +32,36 @@ interface VideoGenerationCardProps {
     duration: number;
     image_url?: string;
   };
+  onDelete?: () => void;
 }
 
-export const VideoGenerationCard = ({ generation }: VideoGenerationCardProps) => {
+export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCardProps) => {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("video_generations")
+        .delete()
+        .eq("id", generation.id);
+
+      if (error) throw error;
+      
+      toast.success("Video eliminato con successo");
+      onDelete?.();
+    } catch (error) {
+      console.error("Error deleting video:", error);
+      toast.error("Errore nell'eliminazione del video");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Lazy loading: only load video when card is visible
   useEffect(() => {
@@ -209,7 +245,39 @@ export const VideoGenerationCard = ({ generation }: VideoGenerationCardProps) =>
                 locale: it,
               })}
             </span>
-            <span className="capitalize">{generation.type.replace("_", " ")}</span>
+            <div className="flex items-center gap-2">
+              <span className="capitalize">{generation.type.replace("_", " ")}</span>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-3 h-3" />
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminare questo video?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Questa azione non può essere annullata. Il video verrà eliminato permanentemente.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Elimina
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
       </CardContent>

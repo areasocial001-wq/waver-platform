@@ -147,7 +147,11 @@ export default function History() {
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {standaloneVideos.map((generation) => (
-                            <VideoGenerationCard key={generation.id} generation={generation} />
+                            <VideoGenerationCard 
+                              key={generation.id} 
+                              generation={generation}
+                              onDelete={fetchGenerations}
+                            />
                           ))}
                         </div>
                       </>
