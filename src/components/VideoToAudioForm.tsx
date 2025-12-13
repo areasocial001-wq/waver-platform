@@ -5,9 +5,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors } from "lucide-react";
+import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+
+// Constants for optimal speed calculation
+// Baseline: ~15 characters per second at 1.0x speed for comfortable speech
+const CHARS_PER_SECOND_BASELINE = 15;
 
 interface VoiceOption {
   id: string;
@@ -38,6 +42,7 @@ export function VideoToAudioForm() {
   const [text, setText] = useState("");
   const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
   const [speed, setSpeed] = useState(1.0);
+  const [isAutoSpeed, setIsAutoSpeed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -106,6 +111,30 @@ export function VideoToAudioForm() {
   };
 
   const segmentDuration = segmentEnd - segmentStart;
+
+  // Calculate optimal speed based on text length and segment duration
+  const calculateOptimalSpeed = useCallback(() => {
+    if (segmentDuration <= 0 || text.length === 0) return 1.0;
+    
+    // Expected duration at 1.0x speed
+    const expectedDuration = text.length / CHARS_PER_SECOND_BASELINE;
+    
+    // Calculate speed needed to fit the segment
+    let optimalSpeed = expectedDuration / segmentDuration;
+    
+    // Clamp to ElevenLabs supported range (0.7 - 1.2)
+    optimalSpeed = Math.max(0.7, Math.min(1.2, optimalSpeed));
+    
+    return Number(optimalSpeed.toFixed(2));
+  }, [text, segmentDuration]);
+
+  // Auto-update speed when text or segment changes
+  useEffect(() => {
+    if (isAutoSpeed && segmentDuration > 0 && text.length > 0) {
+      const optimal = calculateOptimalSpeed();
+      setSpeed(optimal);
+    }
+  }, [text, segmentDuration, isAutoSpeed, calculateOptimalSpeed]);
 
   const handleGenerateAudio = async () => {
     if (!text.trim()) {
@@ -285,18 +314,53 @@ export function VideoToAudioForm() {
                 </span>
               </div>
               
+              {/* Timeline with visual segment indicator */}
               <div className="space-y-2">
-                <Slider
-                  value={[segmentStart, segmentEnd]}
-                  min={0}
-                  max={videoDuration}
-                  step={0.01}
-                  onValueChange={handleSegmentChange}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Inizio: {formatTime(segmentStart)}</span>
-                  <span>Fine: {formatTime(segmentEnd)}</span>
+                <div className="relative h-8">
+                  {/* Timeline background */}
+                  <div className="absolute inset-0 h-2 top-3 bg-muted rounded-full overflow-hidden">
+                    {/* Unselected area before segment */}
+                    <div 
+                      className="absolute h-full bg-muted-foreground/20"
+                      style={{ 
+                        left: 0, 
+                        width: `${(segmentStart / videoDuration) * 100}%` 
+                      }}
+                    />
+                    {/* Selected segment */}
+                    <div 
+                      className="absolute h-full bg-primary"
+                      style={{ 
+                        left: `${(segmentStart / videoDuration) * 100}%`,
+                        width: `${((segmentEnd - segmentStart) / videoDuration) * 100}%`
+                      }}
+                    />
+                    {/* Unselected area after segment */}
+                    <div 
+                      className="absolute h-full bg-muted-foreground/20"
+                      style={{ 
+                        left: `${(segmentEnd / videoDuration) * 100}%`,
+                        width: `${((videoDuration - segmentEnd) / videoDuration) * 100}%`
+                      }}
+                    />
+                  </div>
+                  
+                  {/* Slider overlay */}
+                  <Slider
+                    value={[segmentStart, segmentEnd]}
+                    min={0}
+                    max={videoDuration}
+                    step={0.01}
+                    onValueChange={handleSegmentChange}
+                    className="absolute inset-0 w-full [&_.relative]:bg-transparent [&_[data-orientation=horizontal]>.bg-primary]:bg-transparent"
+                  />
+                </div>
+                
+                {/* Time markers */}
+                <div className="flex justify-between text-xs">
+                  <span className="text-primary font-medium">Inizio: {formatTime(segmentStart)}</span>
+                  <span className="text-muted-foreground">Durata: {formatTime(segmentDuration)}</span>
+                  <span className="text-primary font-medium">Fine: {formatTime(segmentEnd)}</span>
                 </div>
               </div>
 
@@ -371,13 +435,33 @@ export function VideoToAudioForm() {
             </div>
 
             <div className="space-y-2">
-              <Label>Velocità parlato: {speed.toFixed(1)}x</Label>
+              <div className="flex items-center justify-between">
+                <Label>Velocità parlato: {speed.toFixed(2)}x</Label>
+                <Button
+                  type="button"
+                  variant={isAutoSpeed ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setIsAutoSpeed(!isAutoSpeed);
+                    if (!isAutoSpeed && segmentDuration > 0 && text.length > 0) {
+                      setSpeed(calculateOptimalSpeed());
+                    }
+                  }}
+                  className="h-7 text-xs"
+                >
+                  <Zap className="w-3 h-3 mr-1" />
+                  {isAutoSpeed ? "Auto" : "Manuale"}
+                </Button>
+              </div>
               <Slider
                 value={[speed]}
                 min={0.7}
                 max={1.2}
-                step={0.05}
-                onValueChange={(values) => setSpeed(values[0])}
+                step={0.01}
+                onValueChange={(values) => {
+                  setSpeed(values[0]);
+                  setIsAutoSpeed(false);
+                }}
                 className="w-full"
               />
               <div className="flex justify-between text-xs text-muted-foreground">
@@ -385,10 +469,22 @@ export function VideoToAudioForm() {
                 <span>Normale (1.0x)</span>
                 <span>Veloce (1.2x)</span>
               </div>
-              {segmentDuration > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  💡 Regola la velocità per adattare l'audio alla durata del segmento ({formatTime(segmentDuration)})
-                </p>
+              {segmentDuration > 0 && text.length > 0 && (
+                <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Durata stimata audio:</span>
+                    <span className="font-medium">{formatTime(text.length / CHARS_PER_SECOND_BASELINE / speed)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Durata segmento:</span>
+                    <span className="font-medium">{formatTime(segmentDuration)}</span>
+                  </div>
+                  {isAutoSpeed && (
+                    <p className="text-primary/80 mt-1">
+                      ⚡ Velocità calcolata automaticamente
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
