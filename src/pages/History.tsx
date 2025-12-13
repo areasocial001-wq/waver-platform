@@ -5,11 +5,22 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -46,6 +57,37 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  const handleDeleteAll = async () => {
+    setIsDeletingAll(true);
+    try {
+      // Delete all video generations first
+      const { error: videosError } = await supabase
+        .from("video_generations")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000"); // Workaround to delete all
+
+      if (videosError) throw videosError;
+
+      // Delete all batches
+      const { error: batchesError } = await supabase
+        .from("storyboard_video_batches")
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+
+      if (batchesError) throw batchesError;
+
+      toast.success("Storico eliminato con successo");
+      setCurrentPage(1);
+      fetchGenerations();
+    } catch (error) {
+      console.error("Error deleting all:", error);
+      toast.error("Errore nell'eliminazione dello storico");
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   const fetchGenerations = async () => {
     try {
@@ -115,12 +157,49 @@ export default function History() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="container mx-auto px-4 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">Storico Generazioni</h1>
-            <p className="text-muted-foreground">
-              Tutte le tue richieste di generazione video salvate
-              {totalCount > 0 && ` (${totalCount} totali)`}
-            </p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Storico Generazioni</h1>
+              <p className="text-muted-foreground">
+                Tutte le tue richieste di generazione video salvate
+                {totalCount > 0 && ` (${totalCount} totali)`}
+              </p>
+            </div>
+            {totalCount > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button 
+                    variant="destructive" 
+                    disabled={isDeletingAll}
+                  >
+                    {isDeletingAll ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Elimina tutto
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminare tutto lo storico?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Questa azione eliminerà permanentemente tutti i {totalCount} video dallo storico. 
+                      L'operazione non può essere annullata.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
+                    <AlertDialogAction 
+                      onClick={handleDeleteAll}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Elimina tutto
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
 
           {loading ? (
