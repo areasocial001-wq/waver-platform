@@ -1,9 +1,9 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Film, Download, AlertCircle } from "lucide-react";
+import { Loader2, Film, Download, AlertCircle, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 interface VideoExporterProps {
@@ -15,11 +15,38 @@ interface VideoExporterProps {
 }
 
 type ExportQuality = 'low' | 'medium' | 'high';
+type ExportFormat = 'webm' | 'mp4';
 
 const QUALITY_CONFIG: Record<ExportQuality, { bitrate: number; label: string }> = {
   low: { bitrate: 1000000, label: 'Bassa (1 Mbps)' },
   medium: { bitrate: 2500000, label: 'Media (2.5 Mbps)' },
   high: { bitrate: 5000000, label: 'Alta (5 Mbps)' },
+};
+
+const FORMAT_CONFIG: Record<ExportFormat, { 
+  mimeType: string; 
+  extension: string; 
+  label: string;
+  fallbackMimeType?: string;
+}> = {
+  webm: { 
+    mimeType: 'video/webm;codecs=vp9,opus', 
+    extension: 'webm', 
+    label: 'WebM (VP9)' 
+  },
+  mp4: { 
+    mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 
+    extension: 'mp4', 
+    label: 'MP4 (H.264)',
+    fallbackMimeType: 'video/mp4'
+  },
+};
+
+// Check if format is supported
+const isFormatSupported = (format: ExportFormat): boolean => {
+  const config = FORMAT_CONFIG[format];
+  return MediaRecorder.isTypeSupported(config.mimeType) || 
+         (config.fallbackMimeType ? MediaRecorder.isTypeSupported(config.fallbackMimeType) : false);
 };
 
 export function VideoExporter({ 
@@ -31,10 +58,37 @@ export function VideoExporter({
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [quality, setQuality] = useState<ExportQuality>('medium');
+  const [format, setFormat] = useState<ExportFormat>('webm');
+  const [supportedFormats, setSupportedFormats] = useState<ExportFormat[]>([]);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Check supported formats on mount
+  useEffect(() => {
+    const formats: ExportFormat[] = [];
+    if (isFormatSupported('webm')) formats.push('webm');
+    if (isFormatSupported('mp4')) formats.push('mp4');
+    setSupportedFormats(formats);
+    
+    // Default to first supported format
+    if (formats.length > 0 && !formats.includes(format)) {
+      setFormat(formats[0]);
+    }
+  }, []);
+
+  const getMimeType = (fmt: ExportFormat): string => {
+    const config = FORMAT_CONFIG[fmt];
+    if (MediaRecorder.isTypeSupported(config.mimeType)) {
+      return config.mimeType;
+    }
+    if (config.fallbackMimeType && MediaRecorder.isTypeSupported(config.fallbackMimeType)) {
+      return config.fallbackMimeType;
+    }
+    // Ultimate fallback
+    return 'video/webm';
+  };
 
   const handleExport = useCallback(async () => {
     if (!videoUrl || !audioUrl) {
@@ -94,9 +148,14 @@ export function VideoExporter({
         ...audioDestination.stream.getAudioTracks(),
       ]);
 
+      // Get actual mime type to use
+      const mimeType = getMimeType(format);
+      const actualFormat = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const extension = FORMAT_CONFIG[actualFormat].extension;
+
       // Set up MediaRecorder
       const mediaRecorder = new MediaRecorder(combinedStream, {
-        mimeType: 'video/webm;codecs=vp9,opus',
+        mimeType,
         videoBitsPerSecond: QUALITY_CONFIG[quality].bitrate,
       });
 
@@ -112,13 +171,14 @@ export function VideoExporter({
 
       mediaRecorder.onstop = () => {
         recordingComplete = true;
-        const blob = new Blob(chunks, { type: 'video/webm' });
+        const blobType = actualFormat === 'mp4' ? 'video/mp4' : 'video/webm';
+        const blob = new Blob(chunks, { type: blobType });
         const url = URL.createObjectURL(blob);
         
         // Download the file
         const link = document.createElement('a');
         link.href = url;
-        link.download = `video_con_nuovo_audio_${Date.now()}.webm`;
+        link.download = `video_con_nuovo_audio_${Date.now()}.${extension}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -126,7 +186,7 @@ export function VideoExporter({
         URL.revokeObjectURL(url);
         setIsExporting(false);
         setExportProgress(100);
-        toast.success('Video esportato con successo!');
+        toast.success(`Video esportato con successo in formato ${extension.toUpperCase()}!`);
         
         // Cleanup
         audioContext.close();
@@ -174,7 +234,7 @@ export function VideoExporter({
       toast.error('Errore durante l\'esportazione: ' + (error as Error).message);
       setIsExporting(false);
     }
-  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality]);
+  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format]);
 
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
@@ -184,20 +244,52 @@ export function VideoExporter({
       </div>
 
       <div className="space-y-3">
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Qualità esportazione</Label>
-          <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(QUALITY_CONFIG).map(([key, config]) => (
-                <SelectItem key={key} value={key}>
-                  {config.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Formato</Label>
+            <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(FORMAT_CONFIG).map(([key, config]) => {
+                  const isSupported = supportedFormats.includes(key as ExportFormat);
+                  return (
+                    <SelectItem 
+                      key={key} 
+                      value={key}
+                      disabled={!isSupported}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{config.label}</span>
+                        {isSupported ? (
+                          <CheckCircle className="w-3 h-3 text-green-500" />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">(non supportato)</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs text-muted-foreground">Qualità</Label>
+            <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(QUALITY_CONFIG).map(([key, config]) => (
+                  <SelectItem key={key} value={key}>
+                    {config.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {isExporting ? (
@@ -218,15 +310,16 @@ export function VideoExporter({
             variant="default"
           >
             <Download className="w-4 h-4 mr-2" />
-            Esporta Video (.webm)
+            Esporta Video (.{FORMAT_CONFIG[format].extension})
           </Button>
         )}
 
         <div className="flex items-start gap-2 p-2 bg-muted/50 rounded text-xs">
           <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-muted-foreground">
-            L'esportazione crea un nuovo video combinando il video originale (segmento selezionato) con l'audio generato. 
-            Il formato di output è WebM, compatibile con la maggior parte dei browser e player.
+            {format === 'mp4' 
+              ? "MP4 offre la massima compatibilità con dispositivi e player. Richiede browser recenti (Chrome 107+, Edge 107+)."
+              : "WebM è supportato da tutti i browser moderni. Per massima compatibilità, considera MP4 se disponibile."}
           </p>
         </div>
       </div>
