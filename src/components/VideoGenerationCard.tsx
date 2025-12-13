@@ -245,20 +245,23 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                 locale: it,
               })}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span className="capitalize">{generation.type.replace("_", " ")}</span>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 px-3 text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground"
                     disabled={isDeleting}
                   >
                     {isDeleting ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <Trash2 className="w-3 h-3" />
+                      <>
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Elimina
+                      </>
                     )}
                   </Button>
                 </AlertDialogTrigger>
