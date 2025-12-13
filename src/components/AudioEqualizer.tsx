@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RotateCcw, Music2 } from "lucide-react";
 
 export interface EqualizerSettings {
@@ -25,6 +26,56 @@ const DEFAULT_SETTINGS: EqualizerSettings = {
   mid: 0,
   highMid: 0,
   treble: 0,
+};
+
+// Preset configurations for different use cases
+interface PresetConfig {
+  name: string;
+  description: string;
+  settings: EqualizerSettings;
+}
+
+const PRESETS: Record<string, PresetConfig> = {
+  flat: {
+    name: 'Flat',
+    description: 'Nessuna modifica',
+    settings: { bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0 },
+  },
+  voice: {
+    name: 'Voce',
+    description: 'Ottimizzato per dialoghi e narrazioni',
+    settings: { bass: -2, lowMid: 0, mid: 4, highMid: 3, treble: 1 },
+  },
+  podcast: {
+    name: 'Podcast',
+    description: 'Chiarezza vocale con bassi caldi',
+    settings: { bass: 2, lowMid: -1, mid: 3, highMid: 4, treble: 2 },
+  },
+  music: {
+    name: 'Musica',
+    description: 'Bilanciato per sottofondo musicale',
+    settings: { bass: 4, lowMid: 2, mid: 0, highMid: 2, treble: 3 },
+  },
+  cinema: {
+    name: 'Cinema',
+    description: 'Drammatico con bassi profondi',
+    settings: { bass: 6, lowMid: 3, mid: -1, highMid: 2, treble: 4 },
+  },
+  bright: {
+    name: 'Brillante',
+    description: 'Alti enfatizzati per chiarezza',
+    settings: { bass: -1, lowMid: 0, mid: 2, highMid: 4, treble: 6 },
+  },
+  warm: {
+    name: 'Caldo',
+    description: 'Bassi ricchi e morbidi',
+    settings: { bass: 5, lowMid: 3, mid: 0, highMid: -1, treble: -2 },
+  },
+  presence: {
+    name: 'Presenza',
+    description: 'Voce in primo piano',
+    settings: { bass: -3, lowMid: 1, mid: 5, highMid: 6, treble: 2 },
+  },
 };
 
 const BAND_CONFIG = [
@@ -147,6 +198,26 @@ export function AudioEqualizer({
     onSettingsChange(DEFAULT_SETTINGS);
   };
 
+  const handlePresetChange = (presetKey: string) => {
+    const preset = PRESETS[presetKey];
+    if (preset) {
+      onSettingsChange(preset.settings);
+    }
+  };
+
+  // Determine current preset (if any matches)
+  const getCurrentPreset = (): string => {
+    for (const [key, preset] of Object.entries(PRESETS)) {
+      const matches = Object.keys(preset.settings).every(
+        (k) => preset.settings[k as keyof EqualizerSettings] === settings[k as keyof EqualizerSettings]
+      );
+      if (matches) return key;
+    }
+    return 'custom';
+  };
+
+  const currentPreset = getCurrentPreset();
+
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
       <div className="flex items-center justify-between">
@@ -163,6 +234,31 @@ export function AudioEqualizer({
           <RotateCcw className="w-3 h-3 mr-1" />
           Reset
         </Button>
+      </div>
+
+      {/* Preset Selector */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Preset</Label>
+        <Select value={currentPreset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Seleziona preset" />
+          </SelectTrigger>
+          <SelectContent>
+            {Object.entries(PRESETS).map(([key, preset]) => (
+              <SelectItem key={key} value={key}>
+                <div className="flex flex-col">
+                  <span className="font-medium">{preset.name}</span>
+                  <span className="text-xs text-muted-foreground">{preset.description}</span>
+                </div>
+              </SelectItem>
+            ))}
+            {currentPreset === 'custom' && (
+              <SelectItem value="custom" disabled>
+                <span className="text-muted-foreground">Personalizzato</span>
+              </SelectItem>
+            )}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="grid grid-cols-5 gap-3">
