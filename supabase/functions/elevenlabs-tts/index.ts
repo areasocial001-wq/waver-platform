@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId } = await req.json();
+    const { text, voiceId, speed } = await req.json();
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 
     if (!ELEVENLABS_API_KEY) {
@@ -27,6 +27,7 @@ serve(async (req) => {
 
     console.log('Generating TTS for text:', text.substring(0, 100) + '...');
     console.log('Using voice ID:', selectedVoiceId);
+    console.log('Speed:', speed || 1.0);
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
@@ -45,7 +46,7 @@ serve(async (req) => {
             similarity_boost: 0.75,
             style: 0.5,
             use_speaker_boost: true,
-            speed: 1.0,
+            speed: Math.max(0.7, Math.min(1.2, speed || 1.0)), // Clamp between 0.7 and 1.2
           },
         }),
       }
