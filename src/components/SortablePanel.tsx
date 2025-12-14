@@ -3,8 +3,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
+import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -52,12 +52,14 @@ export const SortablePanel = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleUpscale = async (scale: "2x" | "4x" | "8x") => {
+  const handleUpscale = async (scale: "2x" | "4x" | "8x", preset?: "standard" | "portraits") => {
     if (!imageUrl) return;
     
     setSelectedScale(scale);
     setIsUpscaling(true);
-    toast.info(`Upscaling ${scale} con Magnific...`);
+    
+    const presetLabel = preset === "portraits" ? " (Ritratti)" : "";
+    toast.info(`Upscaling ${scale}${presetLabel} con Magnific...`);
 
     try {
       // Convert image URL to base64
@@ -79,15 +81,27 @@ export const SortablePanel = ({
         });
       }
 
+      // Preset configurations
+      const presetConfig = preset === "portraits" 
+        ? {
+            optimizedFor: "soft_portraits",
+            creativity: -2,
+            hdr: 0,
+            resemblance: 8,
+          }
+        : {
+            optimizedFor: "standard",
+            creativity: 2,
+            hdr: 1,
+            resemblance: 3,
+          };
+
       const { data, error } = await supabase.functions.invoke("freepik-upscale", {
         body: {
           image: base64Image,
           scaleFactor: scale,
           mode: "creative",
-          optimizedFor: "standard",
-          creativity: 2,
-          hdr: 1,
-          resemblance: 3,
+          ...presetConfig,
         },
       });
 
@@ -197,7 +211,8 @@ export const SortablePanel = ({
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuLabel>Standard</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleUpscale("2x")}>
                   Upscale 2x
                 </DropdownMenuItem>
@@ -206,6 +221,20 @@ export const SortablePanel = ({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleUpscale("8x")}>
                   Upscale 8x
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Ritratti
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => handleUpscale("2x", "portraits")}>
+                  Ritratti 2x
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleUpscale("4x", "portraits")}>
+                  Ritratti 4x
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleUpscale("8x", "portraits")}>
+                  Ritratti 8x
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -35,6 +35,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
   const [transitionPrompt, setTransitionPrompt] = useState("");
   const [transitionStyle, setTransitionStyle] = useState("smooth");
   const [transitionSpeed, setTransitionSpeed] = useState<"fast" | "normal" | "slow">("normal");
+  const [videoProvider, setVideoProvider] = useState<"auto" | "freepik">("auto");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
@@ -144,6 +145,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
             endImage: endPanel.imageUrl, // Use end frame for transition
             prompt: fullPrompt,
             generationId: generation.id,
+            preferredProvider: videoProvider === "freepik" ? "freepik" : undefined,
           },
         });
 
@@ -296,6 +298,25 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
                 Verranno generati {transitionCount} video di transizione tra {selectedPanels.length} pannelli selezionati.
               </AlertDescription>
             </Alert>
+          </div>
+
+          {/* Video Provider */}
+          <div className="space-y-2">
+            <Label>Provider Video</Label>
+            <Select value={videoProvider} onValueChange={(v) => setVideoProvider(v as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">🤖 Automatico (Kling/Veo)</SelectItem>
+                <SelectItem value="freepik">🎨 Freepik (MiniMax)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {videoProvider === "freepik" 
+                ? "Usa Freepik MiniMax per la generazione video. Ottimo per transizioni fluide."
+                : "Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole)."}
+            </p>
           </div>
 
           {/* Duration */}
