@@ -23,6 +23,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Switch } from "@/components/ui/switch";
 import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
 import { StockLibraryDialog } from "./StockLibraryDialog";
+import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
 
 interface StoryboardPanel {
   id: string;
@@ -144,6 +145,8 @@ export const StoryboardEditor = () => {
   const [tagInput, setTagInput] = useState("");
   const [sharePassword, setSharePassword] = useState("");
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
+  const [mysticDialogOpen, setMysticDialogOpen] = useState(false);
+  const [mysticTargetPanelId, setMysticTargetPanelId] = useState<string | null>(null);
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
@@ -268,6 +271,19 @@ export const StoryboardEditor = () => {
       panel.id === panelId ? { ...panel, imageUrl } : panel
     ));
     toast.success("Immagine stock aggiunta!");
+  };
+
+  const handleOpenMysticGenerator = (panelId: string) => {
+    setMysticTargetPanelId(panelId);
+    setMysticDialogOpen(true);
+  };
+
+  const handleMysticImageGenerated = (imageUrl: string) => {
+    if (mysticTargetPanelId) {
+      setPanels(prev => prev.map(panel => 
+        panel.id === mysticTargetPanelId ? { ...panel, imageUrl } : panel
+      ));
+    }
   };
 
   const handleDragStart = (imageUrl: string) => {
@@ -848,6 +864,7 @@ export const StoryboardEditor = () => {
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, panel.id)}
                         onImageUpdate={(newUrl) => handleImageUpdate(panel.id, newUrl)}
+                        onGenerateMystic={() => handleOpenMysticGenerator(panel.id)}
                       />
                       {!panel.imageUrl && (
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
@@ -868,6 +885,16 @@ export const StoryboardEditor = () => {
               </SortableContext>
             </DndContext>
           </Card>
+
+          <MysticGeneratorDialog
+            isOpen={mysticDialogOpen}
+            onClose={() => {
+              setMysticDialogOpen(false);
+              setMysticTargetPanelId(null);
+            }}
+            onImageGenerated={handleMysticImageGenerated}
+            panelIndex={panels.findIndex(p => p.id === mysticTargetPanelId)}
+          />
         </div>
       </div>
 

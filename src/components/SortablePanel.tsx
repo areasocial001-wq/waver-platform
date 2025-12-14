@@ -3,7 +3,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -17,6 +18,7 @@ interface SortablePanelProps {
   onDragOver: (e: DragEvent) => void;
   onDrop: (e: DragEvent) => void;
   onImageUpdate?: (newImageUrl: string) => void;
+  onGenerateMystic?: () => void;
 }
 
 export const SortablePanel = ({
@@ -29,9 +31,11 @@ export const SortablePanel = ({
   onDragOver,
   onDrop,
   onImageUpdate,
+  onGenerateMystic,
 }: SortablePanelProps) => {
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaleTaskId, setUpscaleTaskId] = useState<string | null>(null);
+  const [selectedScale, setSelectedScale] = useState<"2x" | "4x" | "8x">("2x");
 
   const {
     attributes,
@@ -48,11 +52,12 @@ export const SortablePanel = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleUpscale = async () => {
+  const handleUpscale = async (scale: "2x" | "4x" | "8x") => {
     if (!imageUrl) return;
     
+    setSelectedScale(scale);
     setIsUpscaling(true);
-    toast.info("Upscaling con Magnific...");
+    toast.info(`Upscaling ${scale} con Magnific...`);
 
     try {
       // Convert image URL to base64
@@ -77,7 +82,7 @@ export const SortablePanel = ({
       const { data, error } = await supabase.functions.invoke("freepik-upscale", {
         body: {
           image: base64Image,
-          scaleFactor: "2x",
+          scaleFactor: scale,
           mode: "creative",
           optimizedFor: "standard",
           creativity: 2,
@@ -173,20 +178,37 @@ export const SortablePanel = ({
             className="w-full h-full object-cover"
           />
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8"
-              onClick={handleUpscale}
-              disabled={isUpscaling}
-              title="Upscala con Magnific"
-            >
-              {isUpscaling ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ZoomIn className="h-4 w-4" />
-              )}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="h-8 px-2"
+                  disabled={isUpscaling}
+                  title="Upscala con Magnific"
+                >
+                  {isUpscaling ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <ZoomIn className="h-4 w-4 mr-1" />
+                      <ChevronDown className="h-3 w-3" />
+                    </>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleUpscale("2x")}>
+                  Upscale 2x
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleUpscale("4x")}>
+                  Upscale 4x
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleUpscale("8x")}>
+                  Upscale 8x
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="icon"
               variant="destructive"
@@ -211,24 +233,37 @@ export const SortablePanel = ({
           )}
         </>
       ) : (
-        <label
-          className="flex flex-col items-center justify-center h-full cursor-pointer hover:bg-accent/10 transition-colors"
+        <div
+          className="flex flex-col items-center justify-center h-full hover:bg-accent/10 transition-colors"
           onDragOver={onDragOver}
           onDrop={onDrop}
         >
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onImageUpload(file);
-            }}
-          />
-          <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
-          <span className="text-sm text-muted-foreground">Trascina o clicca</span>
-          <span className="text-xs text-muted-foreground">Pannello {index + 1}</span>
-        </label>
+          <label className="flex flex-col items-center justify-center cursor-pointer flex-1 w-full">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onImageUpload(file);
+              }}
+            />
+            <ImageIcon className="h-10 w-10 text-muted-foreground mb-2" />
+            <span className="text-sm text-muted-foreground">Trascina o clicca</span>
+            <span className="text-xs text-muted-foreground mb-2">Pannello {index + 1}</span>
+          </label>
+          {onGenerateMystic && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onGenerateMystic}
+              className="mb-2"
+            >
+              <Sparkles className="h-4 w-4 mr-1" />
+              Genera Mystic
+            </Button>
+          )}
+        </div>
       )}
     </Card>
   );

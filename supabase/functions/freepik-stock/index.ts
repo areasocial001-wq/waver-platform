@@ -5,6 +5,26 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const getDateFilterValue = (dateFilter: string): string | null => {
+  const now = new Date();
+  switch (dateFilter) {
+    case "last_week":
+      now.setDate(now.getDate() - 7);
+      return now.toISOString().split("T")[0];
+    case "last_month":
+      now.setMonth(now.getMonth() - 1);
+      return now.toISOString().split("T")[0];
+    case "last_3_months":
+      now.setMonth(now.getMonth() - 3);
+      return now.toISOString().split("T")[0];
+    case "last_year":
+      now.setFullYear(now.getFullYear() - 1);
+      return now.toISOString().split("T")[0];
+    default:
+      return null;
+  }
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,7 +37,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { action, term, contentType, order, page, limit, orientation, license, aiGenerated, resourceId } = body;
+    const { action, term, contentType, order, page, limit, orientation, license, excludeAI, dateFilter, resourceId } = body;
 
     // Get resource details
     if (action === "details" && resourceId) {
@@ -83,10 +103,25 @@ serve(async (req) => {
         break;
       default:
         endpoint = "https://api.freepik.com/v1/resources";
-        // Additional filters for resources
-        if (orientation) params.append("filters[orientation]", orientation);
-        if (license) params.append("filters[license]", license);
-        if (aiGenerated) params.append("filters[ai-generated]", aiGenerated);
+        // Orientation filter
+        if (orientation && orientation !== "all") {
+          params.append("filters[orientation]", orientation);
+        }
+        // License filter
+        if (license && license !== "all") {
+          params.append("filters[license]", license);
+        }
+        // Exclude AI-generated content
+        if (excludeAI) {
+          params.append("filters[ai-generated]", "excluded");
+        }
+        // Date filter
+        if (dateFilter && dateFilter !== "all") {
+          const dateValue = getDateFilterValue(dateFilter);
+          if (dateValue) {
+            params.append("filters[added-from]", dateValue);
+          }
+        }
         break;
     }
 
