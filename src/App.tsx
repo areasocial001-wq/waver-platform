@@ -10,6 +10,7 @@ import History from "./pages/History";
 import MyStoryboards from "./pages/MyStoryboards";
 import ViewStoryboard from "./pages/ViewStoryboard";
 import ContentGenerator from "./pages/ContentGenerator";
+import FreepikPage from "./pages/FreepikPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/my-storyboards" element={<MyStoryboards />} />
             <Route path="/storyboard/:id" element={<ViewStoryboard />} />
             <Route path="/content-generator" element={<ContentGenerator />} />
+            <Route path="/freepik" element={<FreepikPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

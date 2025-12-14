@@ -17,3 +17,15 @@ verify_jwt = false
 
 [functions.elevenlabs-tts]
 verify_jwt = false
+
+[functions.freepik-image]
+verify_jwt = false
+
+[functions.freepik-video]
+verify_jwt = false
+
+[functions.freepik-upscale]
+verify_jwt = false
+
+[functions.freepik-stock]
+verify_jwt = false
