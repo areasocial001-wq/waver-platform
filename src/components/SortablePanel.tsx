@@ -36,6 +36,10 @@ export const SortablePanel = ({
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaleTaskId, setUpscaleTaskId] = useState<string | null>(null);
   const [selectedScale, setSelectedScale] = useState<"2x" | "4x" | "8x">("2x");
+  const [showComparison, setShowComparison] = useState(false);
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
+  const [comparisonPosition, setComparisonPosition] = useState(50);
 
   const {
     attributes,
@@ -57,6 +61,7 @@ export const SortablePanel = ({
     
     setSelectedScale(scale);
     setIsUpscaling(true);
+    setOriginalImage(imageUrl); // Store original for comparison
     
     const presetLabel = preset === "portraits" ? " (Ritratti)" : "";
     toast.info(`Upscaling ${scale}${presetLabel} con Magnific...`);
@@ -162,11 +167,33 @@ export const SortablePanel = ({
   const handleUpscaleComplete = (newImageUrl: string) => {
     setIsUpscaling(false);
     setUpscaleTaskId(null);
-    toast.success("Immagine upscalata con successo!");
-    
-    if (onImageUpdate) {
-      onImageUpdate(newImageUrl);
+    setUpscaledImage(newImageUrl);
+    setShowComparison(true);
+    setComparisonPosition(50);
+    toast.success("Upscaling completato! Confronta prima/dopo.");
+  };
+
+  const handleAcceptUpscale = () => {
+    if (upscaledImage && onImageUpdate) {
+      onImageUpdate(upscaledImage);
     }
+    setShowComparison(false);
+    setOriginalImage(null);
+    setUpscaledImage(null);
+  };
+
+  const handleRejectUpscale = () => {
+    setShowComparison(false);
+    setOriginalImage(null);
+    setUpscaledImage(null);
+    toast.info("Upscaling annullato");
+  };
+
+  const handleComparisonDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setComparisonPosition(percentage);
   };
 
   return (
@@ -177,7 +204,64 @@ export const SortablePanel = ({
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
-      {imageUrl ? (
+      {/* Comparison Overlay */}
+      {showComparison && originalImage && upscaledImage && (
+        <div className="absolute inset-0 z-30 bg-background/95">
+          <div 
+            className="relative w-full h-full cursor-ew-resize"
+            onMouseMove={handleComparisonDrag}
+            onClick={handleComparisonDrag}
+          >
+            {/* Upscaled Image (full) */}
+            <img
+              src={upscaledImage}
+              alt="Upscaled"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            {/* Original Image (clipped) */}
+            <div
+              className="absolute inset-0 overflow-hidden"
+              style={{ width: `${comparisonPosition}%` }}
+            >
+              <img
+                src={originalImage}
+                alt="Original"
+                className="w-full h-full object-cover"
+                style={{ width: `${10000 / comparisonPosition}%`, maxWidth: 'none' }}
+              />
+            </div>
+            {/* Divider Line */}
+            <div
+              className="absolute top-0 bottom-0 w-0.5 bg-primary z-10"
+              style={{ left: `${comparisonPosition}%` }}
+            >
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground rounded-full p-1">
+                <GripVertical className="h-4 w-4" />
+              </div>
+            </div>
+            {/* Labels */}
+            <div className="absolute top-2 left-2 bg-background/80 text-foreground text-xs px-2 py-1 rounded">
+              Prima
+            </div>
+            <div className="absolute top-2 right-2 bg-background/80 text-foreground text-xs px-2 py-1 rounded">
+              Dopo ({selectedScale})
+            </div>
+          </div>
+          {/* Action Buttons */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+            <Button size="sm" variant="destructive" onClick={handleRejectUpscale}>
+              <X className="h-4 w-4 mr-1" />
+              Annulla
+            </Button>
+            <Button size="sm" variant="default" onClick={handleAcceptUpscale}>
+              <ZoomIn className="h-4 w-4 mr-1" />
+              Applica
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {imageUrl && !showComparison ? (
         <>
           <div
             {...attributes}
@@ -261,7 +345,7 @@ export const SortablePanel = ({
             </div>
           )}
         </>
-      ) : (
+      ) : !showComparison && (
         <div
           className="flex flex-col items-center justify-center h-full hover:bg-accent/10 transition-colors"
           onDragOver={onDragOver}
