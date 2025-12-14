@@ -1,10 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export const useVideoPolling = (
   generations: any[],
   onUpdate: () => void
 ) => {
+  // Track which videos we've already notified about
+  const notifiedVideos = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const processingGenerations = generations.filter(
       (g) => g.status === "processing" && g.prediction_id
@@ -35,6 +39,16 @@ export const useVideoPolling = (
               })
               .eq("id", gen.id);
             
+            // Show toast notification if we haven't already
+            if (!notifiedVideos.current.has(gen.id)) {
+              notifiedVideos.current.add(gen.id);
+              const promptPreview = gen.prompt?.slice(0, 50) || "Video";
+              toast.success("Video completato!", {
+                description: `${promptPreview}${gen.prompt?.length > 50 ? "..." : ""}`,
+                duration: 5000,
+              });
+            }
+            
             onUpdate();
           } else if (data.status === "failed") {
             await supabase
@@ -44,6 +58,15 @@ export const useVideoPolling = (
                 error_message: data.error || "Generation failed"
               })
               .eq("id", gen.id);
+            
+            // Show error toast
+            if (!notifiedVideos.current.has(gen.id)) {
+              notifiedVideos.current.add(gen.id);
+              toast.error("Generazione fallita", {
+                description: data.error || "Si è verificato un errore",
+                duration: 5000,
+              });
+            }
             
             onUpdate();
           }

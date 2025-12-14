@@ -81,18 +81,23 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     return () => observer.disconnect();
   }, []);
 
+  // Kling: 3-5 minuti, Veo: 60-120 secondi
+  const getEstimatedTotalSeconds = () => {
+    // Se il tempo trascorso supera 2 minuti, probabilmente è Kling
+    return elapsedTime > 120 ? 240 : 90; // 4 minuti per Kling, 90s per Veo
+  };
+
   useEffect(() => {
     if (generation.status === "processing") {
       const startTime = new Date(generation.created_at).getTime();
       
       const updateProgress = () => {
         const now = Date.now();
-        const elapsed = Math.floor((now - startTime) / 1000); // secondi
+        const elapsed = Math.floor((now - startTime) / 1000);
         setElapsedTime(elapsed);
         
-        // Stima: ~60-120 secondi per generazione
-        // Progresso stimato basato sul tempo trascorso
-        const estimatedTotal = 90; // 90 secondi stimati
+        // Stima dinamica basata sul tempo trascorso
+        const estimatedTotal = elapsed > 120 ? 240 : 90;
         const calculatedProgress = Math.min((elapsed / estimatedTotal) * 100, 95);
         setProgress(calculatedProgress);
       };
@@ -153,6 +158,18 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatRemainingTime = () => {
+    const estimatedTotal = elapsedTime > 120 ? 240 : 90;
+    const remaining = Math.max(0, estimatedTotal - elapsedTime);
+    if (remaining === 0) return "Quasi pronto...";
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    if (mins > 0) {
+      return `~${mins}m ${secs}s rimanenti`;
+    }
+    return `~${secs}s rimanenti`;
+  };
+
   return (
     <Card ref={cardRef} className="overflow-hidden hover:shadow-lg transition-all duration-300 border-border/50">
       <CardContent className="p-0">
@@ -196,6 +213,9 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                       </p>
                       <p className="text-xs text-muted-foreground">
                         Tempo trascorso: {formatElapsedTime(elapsedTime)}
+                      </p>
+                      <p className="text-xs text-accent font-medium">
+                        {formatRemainingTime()}
                       </p>
                     </div>
                     <Progress value={progress} className="w-48 h-2" />
