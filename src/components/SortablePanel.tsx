@@ -5,9 +5,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown, User, Download, Maximize2, ZoomInIcon, ZoomOutIcon } from "lucide-react";
+import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown, User, Download, Maximize2, ZoomInIcon, ZoomOutIcon, RotateCw, FlipHorizontal, FlipVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+export interface ImageTransform {
+  rotation: number;
+  flipH: boolean;
+  flipV: boolean;
+}
+
 interface SortablePanelProps {
   id: string;
   imageUrl: string | null;
@@ -19,6 +26,8 @@ interface SortablePanelProps {
   onDrop: (e: DragEvent) => void;
   onImageUpdate?: (newImageUrl: string) => void;
   onGenerateMystic?: () => void;
+  imageTransform?: ImageTransform;
+  onTransformChange?: (transform: ImageTransform) => void;
 }
 
 export const SortablePanel = ({
@@ -32,6 +41,8 @@ export const SortablePanel = ({
   onDrop,
   onImageUpdate,
   onGenerateMystic,
+  imageTransform = { rotation: 0, flipH: false, flipV: false },
+  onTransformChange,
 }: SortablePanelProps) => {
   const [isUpscaling, setIsUpscaling] = useState(false);
   const [upscaleTaskId, setUpscaleTaskId] = useState<string | null>(null);
@@ -48,15 +59,36 @@ export const SortablePanel = ({
     attributes,
     listeners,
     setNodeRef,
-    transform,
+    transform: dndTransform,
     transition,
     isDragging,
   } = useSortable({ id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Transform.toString(dndTransform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleRotate = () => {
+    const newRotation = (imageTransform.rotation + 90) % 360;
+    onTransformChange?.({ ...imageTransform, rotation: newRotation });
+  };
+
+  const handleFlipH = () => {
+    onTransformChange?.({ ...imageTransform, flipH: !imageTransform.flipH });
+  };
+
+  const handleFlipV = () => {
+    onTransformChange?.({ ...imageTransform, flipV: !imageTransform.flipV });
+  };
+
+  const getImageStyle = () => {
+    const scaleX = imageTransform.flipH ? -1 : 1;
+    const scaleY = imageTransform.flipV ? -1 : 1;
+    return {
+      transform: `rotate(${imageTransform.rotation}deg) scaleX(${scaleX}) scaleY(${scaleY})`,
+    };
   };
 
   const handleUpscale = async (scale: "2x" | "4x" | "8x", preset?: "standard" | "portraits") => {
@@ -480,11 +512,14 @@ export const SortablePanel = ({
           >
             <GripVertical className="h-4 w-4 text-foreground" />
           </div>
-          <img
-            src={imageUrl}
-            alt={`Panel ${index + 1}`}
-            className="w-full h-full object-cover"
-          />
+          <div className="w-full h-full overflow-hidden">
+            <img
+              src={imageUrl}
+              alt={`Panel ${index + 1}`}
+              className="w-full h-full object-cover transition-transform duration-200"
+              style={getImageStyle()}
+            />
+          </div>
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -532,6 +567,34 @@ export const SortablePanel = ({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* Transform controls */}
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8"
+              onClick={handleRotate}
+              title="Ruota 90°"
+            >
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8"
+              onClick={handleFlipH}
+              title="Capovolgi orizzontale"
+            >
+              <FlipHorizontal className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-8 w-8"
+              onClick={handleFlipV}
+              title="Capovolgi verticale"
+            >
+              <FlipVertical className="h-4 w-4" />
+            </Button>
             <Button
               size="icon"
               variant="destructive"
