@@ -3,11 +3,11 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from "@/components/ui/dropdown-menu";
-import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown, User } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Image as ImageIcon, X, GripVertical, ZoomIn, Loader2, Sparkles, ChevronDown, User, Download, Maximize2, ZoomInIcon, ZoomOutIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-
 interface SortablePanelProps {
   id: string;
   imageUrl: string | null;
@@ -40,6 +40,9 @@ export const SortablePanel = ({
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
   const [comparisonPosition, setComparisonPosition] = useState(50);
+  const [showFullscreen, setShowFullscreen] = useState(false);
+  const [fullscreenZoom, setFullscreenZoom] = useState(1);
+  const [fullscreenPosition, setFullscreenPosition] = useState(50);
 
   const {
     attributes,
@@ -196,6 +199,77 @@ export const SortablePanel = ({
     setComparisonPosition(percentage);
   };
 
+  const handleFullscreenDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    setFullscreenPosition(percentage);
+  };
+
+  const handleExportImage = async (format: "png" | "jpg" | "webp") => {
+    if (!upscaledImage) return;
+    
+    try {
+      toast.info(`Esportazione in ${format.toUpperCase()}...`);
+      
+      // Fetch the image
+      const response = await fetch(upscaledImage);
+      const blob = await response.blob();
+      
+      // Create canvas for conversion
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = upscaledImage;
+      });
+      
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not get canvas context");
+      
+      ctx.drawImage(img, 0, 0);
+      
+      const mimeTypes = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        webp: "image/webp",
+      };
+      
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          toast.error("Errore durante l'esportazione");
+          return;
+        }
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `upscaled-${selectedScale}-${Date.now()}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        toast.success(`Immagine esportata come ${format.toUpperCase()}`);
+      }, mimeTypes[format], format === "jpg" ? 0.95 : undefined);
+      
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Errore durante l'esportazione");
+    }
+  };
+
+  const handleOpenFullscreen = () => {
+    setFullscreenPosition(comparisonPosition);
+    setFullscreenZoom(1);
+    setShowFullscreen(true);
+  };
+
   return (
     <Card
       ref={setNodeRef}
@@ -248,11 +322,35 @@ export const SortablePanel = ({
             </div>
           </div>
           {/* Action Buttons */}
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-wrap gap-2 z-20 justify-center">
             <Button size="sm" variant="destructive" onClick={handleRejectUpscale}>
               <X className="h-4 w-4 mr-1" />
               Annulla
             </Button>
+            <Button size="sm" variant="secondary" onClick={handleOpenFullscreen}>
+              <Maximize2 className="h-4 w-4 mr-1" />
+              Fullscreen
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline">
+                  <Download className="h-4 w-4 mr-1" />
+                  Esporta
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => handleExportImage("png")}>
+                  PNG (lossless)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportImage("jpg")}>
+                  JPG (compresso)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExportImage("webp")}>
+                  WebP (moderno)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button size="sm" variant="default" onClick={handleAcceptUpscale}>
               <ZoomIn className="h-4 w-4 mr-1" />
               Applica
@@ -260,6 +358,118 @@ export const SortablePanel = ({
           </div>
         </div>
       )}
+
+      {/* Fullscreen Comparison Dialog */}
+      <Dialog open={showFullscreen} onOpenChange={setShowFullscreen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 overflow-hidden">
+          <DialogTitle className="sr-only">Confronto Fullscreen</DialogTitle>
+          <div className="relative w-full h-full flex flex-col">
+            {/* Zoom Controls */}
+            <div className="absolute top-4 right-4 z-30 flex gap-2 bg-background/80 rounded-lg p-2">
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                onClick={() => setFullscreenZoom(z => Math.max(0.5, z - 0.25))}
+                disabled={fullscreenZoom <= 0.5}
+              >
+                <ZoomOutIcon className="h-4 w-4" />
+              </Button>
+              <span className="flex items-center px-2 text-sm font-medium">
+                {Math.round(fullscreenZoom * 100)}%
+              </span>
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                onClick={() => setFullscreenZoom(z => Math.min(4, z + 0.25))}
+                disabled={fullscreenZoom >= 4}
+              >
+                <ZoomInIcon className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Comparison Area */}
+            <div 
+              className="flex-1 overflow-auto cursor-ew-resize"
+              onMouseMove={handleFullscreenDrag}
+              onClick={handleFullscreenDrag}
+            >
+              <div 
+                className="relative min-w-full min-h-full"
+                style={{ 
+                  width: `${100 * fullscreenZoom}%`, 
+                  height: `${100 * fullscreenZoom}%` 
+                }}
+              >
+                {/* Upscaled Image (full) */}
+                <img
+                  src={upscaledImage || ""}
+                  alt="Upscaled"
+                  className="absolute inset-0 w-full h-full object-contain"
+                  draggable={false}
+                />
+                {/* Original Image (clipped) */}
+                <div
+                  className="absolute inset-0 overflow-hidden"
+                  style={{ width: `${fullscreenPosition}%` }}
+                >
+                  <img
+                    src={originalImage || ""}
+                    alt="Original"
+                    className="h-full object-contain"
+                    style={{ width: `${10000 / fullscreenPosition}%`, maxWidth: 'none' }}
+                    draggable={false}
+                  />
+                </div>
+                {/* Divider Line */}
+                <div
+                  className="absolute top-0 bottom-0 w-1 bg-primary z-10"
+                  style={{ left: `${fullscreenPosition}%` }}
+                >
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground rounded-full p-2">
+                    <GripVertical className="h-5 w-5" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Labels */}
+            <div className="absolute top-4 left-4 bg-background/80 text-foreground text-sm px-3 py-1.5 rounded z-20">
+              Prima (Originale)
+            </div>
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-background/80 text-foreground text-sm px-3 py-1.5 rounded z-20">
+              Dopo ({selectedScale})
+            </div>
+            
+            {/* Bottom Actions */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="secondary">
+                    <Download className="h-4 w-4 mr-1" />
+                    Esporta
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => handleExportImage("png")}>
+                    PNG (lossless)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportImage("jpg")}>
+                    JPG (compresso)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportImage("webp")}>
+                    WebP (moderno)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm" variant="default" onClick={() => { handleAcceptUpscale(); setShowFullscreen(false); }}>
+                <ZoomIn className="h-4 w-4 mr-1" />
+                Applica e chiudi
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {imageUrl && !showComparison ? (
         <>
