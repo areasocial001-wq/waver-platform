@@ -390,7 +390,7 @@ serve(async (req) => {
     }
 
     // Start new video generation
-    const { type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId } = body;
+    const { type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId, preferredProvider } = body;
 
     if (!type) {
       return new Response(
@@ -428,6 +428,87 @@ serve(async (req) => {
           status: 400,
         }
       );
+    }
+
+    // Use Freepik if explicitly requested as preferred provider
+    if (preferredProvider === "freepik" && type === "image_to_video" && end_image) {
+      const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
+      if (!FREEPIK_API_KEY) {
+        console.log("Freepik API key not set, falling back to other providers");
+      } else {
+        console.log("Starting video generation with Freepik (preferred provider)");
+        
+        const startImageData = start_image || image || image_url;
+        
+        if (!startImageData) {
+          throw new Error("Start image is required for Freepik image-to-video generation");
+        }
+        
+        // Extract base64 data from data URLs
+        const extractBase64 = (data: string): string => {
+          if (!data) return "";
+          if (data.includes(',')) {
+            return data.split(',')[1];
+          }
+          return data;
+        };
+        
+        const startBase64 = extractBase64(startImageData);
+        const endBase64 = extractBase64(end_image);
+        
+        // Use minimax endpoint for start/end frame transitions
+        const freepikPayload = {
+          image: startBase64,
+          end_image: endBase64,
+          prompt: prompt || "Smooth cinematic transition between scenes",
+        };
+        
+        console.log("Calling Freepik MiniMax API for image-to-video with start/end frames");
+        
+        const freepikResponse = await fetch("https://api.freepik.com/v1/ai/image-to-video/minimax", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-freepik-api-key": FREEPIK_API_KEY,
+          },
+          body: JSON.stringify(freepikPayload),
+        });
+
+        if (!freepikResponse.ok) {
+          const error = await freepikResponse.text();
+          console.error("Freepik API error:", error);
+          // Don't throw, fall back to other providers
+          console.log("Freepik failed, falling back to Kling/Veo");
+        } else {
+          const freepikData = await freepikResponse.json();
+          console.log("Freepik task started:", freepikData);
+
+          // Save Freepik task ID to database
+          if (generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'processing',
+                prediction_id: `freepik:minimax:${freepikData.data.task_id}`,
+              })
+              .eq('id', generationId);
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "starting",
+            operationId: `freepik:minimax:${freepikData.data.task_id}`,
+            provider: "freepik"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
     }
 
     // Use Kling API if end_image is provided (it supports start/end frames)

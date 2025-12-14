@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, ImagePlus } from "lucide-react";
+import { useImageGallery } from "@/contexts/ImageGalleryContext";
 
 interface MysticGeneratorDialogProps {
   isOpen: boolean;
@@ -23,10 +24,12 @@ export const MysticGeneratorDialog = ({
   onImageGenerated,
   panelIndex,
 }: MysticGeneratorDialogProps) => {
+  const { addImage } = useImageGallery();
   const [prompt, setPrompt] = useState("");
   const [resolution, setResolution] = useState("1k");
   const [aspectRatio, setAspectRatio] = useState("square_1_1");
   const [model, setModel] = useState("realism");
+  const [saveToGallery, setSaveToGallery] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
@@ -43,11 +46,20 @@ export const MysticGeneratorDialog = ({
         if (error) throw error;
 
         if (data?.data?.status === "COMPLETED" && data?.data?.generated?.[0]?.url) {
-          onImageGenerated(data.data.generated[0].url);
+          const imageUrl = data.data.generated[0].url;
+          onImageGenerated(imageUrl);
+          
+          // Save to gallery if enabled
+          if (saveToGallery) {
+            addImage({ url: imageUrl, prompt, aspectRatio, model: `freepik-mystic-${model}` });
+            toast.success(`Immagine Mystic generata e salvata in galleria!`);
+          } else {
+            toast.success(`Immagine Mystic generata per il Pannello ${panelIndex + 1}!`);
+          }
+          
           setTaskId(null);
           setIsLoading(false);
           setProgress(100);
-          toast.success(`Immagine Mystic generata per il Pannello ${panelIndex + 1}!`);
           onClose();
           resetForm();
         } else if (data?.data?.status === "FAILED") {
@@ -64,7 +76,7 @@ export const MysticGeneratorDialog = ({
 
     const interval = setInterval(pollStatus, 3000);
     return () => clearInterval(interval);
-  }, [taskId, panelIndex, onImageGenerated, onClose]);
+  }, [taskId, panelIndex, onImageGenerated, onClose, saveToGallery, prompt, aspectRatio, model, addImage]);
 
   const resetForm = () => {
     setPrompt("");
@@ -91,8 +103,17 @@ export const MysticGeneratorDialog = ({
         setTaskId(data.data.task_id);
         toast.info("Generazione Mystic avviata...");
       } else if (data?.data?.generated?.[0]?.url) {
-        onImageGenerated(data.data.generated[0].url);
-        toast.success(`Immagine generata per il Pannello ${panelIndex + 1}!`);
+        const imageUrl = data.data.generated[0].url;
+        onImageGenerated(imageUrl);
+        
+        // Save to gallery if enabled
+        if (saveToGallery) {
+          addImage({ url: imageUrl, prompt, aspectRatio, model: `freepik-mystic-${model}` });
+          toast.success(`Immagine generata e salvata in galleria!`);
+        } else {
+          toast.success(`Immagine generata per il Pannello ${panelIndex + 1}!`);
+        }
+        
         onClose();
         resetForm();
         setIsLoading(false);
@@ -175,6 +196,21 @@ export const MysticGeneratorDialog = ({
           </div>
 
           {isLoading && <Progress value={progress} className="h-2" />}
+
+          <div className="flex items-center justify-between py-2 px-1 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-2">
+              <ImagePlus className="h-4 w-4 text-muted-foreground" />
+              <Label htmlFor="saveToGallery" className="text-sm cursor-pointer">
+                Salva anche in galleria
+              </Label>
+            </div>
+            <Switch
+              id="saveToGallery"
+              checked={saveToGallery}
+              onCheckedChange={setSaveToGallery}
+              disabled={isLoading}
+            />
+          </div>
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={isLoading} className="flex-1">
