@@ -1,0 +1,173 @@
+import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Search, Loader2, Library, Plus } from "lucide-react";
+
+interface StockLibraryDialogProps {
+  onSelectImage: (imageUrl: string) => void;
+  trigger?: React.ReactNode;
+}
+
+export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialogProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [contentType, setContentType] = useState("resources");
+  const [results, setResults] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      toast.error("Inserisci un termine di ricerca");
+      return;
+    }
+
+    setIsLoading(true);
+    setResults([]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("freepik-stock", {
+        body: { term: searchTerm, contentType, limit: 24 },
+      });
+
+      if (error) throw error;
+
+      setResults(data?.data || []);
+      if ((data?.data?.length || 0) === 0) {
+        toast.info("Nessun risultato trovato");
+      }
+    } catch (err: any) {
+      console.error("Search error:", err);
+      toast.error(err.message || "Errore nella ricerca");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectImage = async (item: any) => {
+    const imageUrl = item.preview?.url || item.thumbnails?.[0]?.url || item.image?.url;
+    
+    if (!imageUrl) {
+      toast.error("URL immagine non disponibile");
+      return;
+    }
+
+    // Try to get high-res version via download endpoint
+    try {
+      const { data, error } = await supabase.functions.invoke("freepik-stock", {
+        body: { action: "download", resourceId: item.id },
+      });
+
+      if (!error && data?.data?.url) {
+        onSelectImage(data.data.url);
+        toast.success("Immagine HD aggiunta al pannello!");
+      } else {
+        // Fallback to preview URL
+        onSelectImage(imageUrl);
+        toast.success("Immagine aggiunta al pannello!");
+      }
+    } catch {
+      // Fallback to preview URL
+      onSelectImage(imageUrl);
+      toast.success("Immagine aggiunta al pannello!");
+    }
+
+    setIsOpen(false);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button variant="outline" size="sm">
+            <Library className="mr-2 h-4 w-4" />
+            Stock Library
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Library className="h-5 w-5 text-primary" />
+            Freepik Stock Library
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Cerca immagini, icone, video..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+              className="flex-1"
+            />
+            <Select value={contentType} onValueChange={setContentType}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="resources">Immagini</SelectItem>
+                <SelectItem value="icons">Icone</SelectItem>
+                <SelectItem value="videos">Video</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleSearch} disabled={isLoading}>
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          <ScrollArea className="h-[50vh]">
+            {results.length > 0 ? (
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+                {results.map((item: any) => (
+                  <Card
+                    key={item.id}
+                    className="overflow-hidden cursor-pointer group hover:border-primary/50 transition-colors"
+                    onClick={() => handleSelectImage(item)}
+                  >
+                    <div className="relative aspect-square">
+                      <img
+                        src={item.preview?.url || item.thumbnails?.[0]?.url || item.image?.url}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Button size="sm" variant="secondary">
+                          <Plus className="h-4 w-4 mr-1" />
+                          Usa
+                        </Button>
+                      </div>
+                    </div>
+                    <CardContent className="p-2">
+                      <p className="text-xs truncate text-muted-foreground">{item.title}</p>
+                      {item.licenses?.includes("premium") && (
+                        <Badge variant="secondary" className="text-xs mt-1">Premium</Badge>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-12 text-muted-foreground">
+                <Search className="h-12 w-12 mb-4 opacity-50" />
+                <p>Cerca immagini nella libreria Freepik</p>
+                <p className="text-sm">100+ milioni di asset disponibili</p>
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

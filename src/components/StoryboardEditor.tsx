@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,6 +22,7 @@ import { SortablePanel } from "./SortablePanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
+import { StockLibraryDialog } from "./StockLibraryDialog";
 
 interface StoryboardPanel {
   id: string;
@@ -254,6 +255,19 @@ export const StoryboardEditor = () => {
     setPanels(prev => prev.map(panel => 
       panel.id === panelId ? { ...panel, imageUrl: null } : panel
     ));
+  };
+
+  const handleImageUpdate = (panelId: string, newImageUrl: string) => {
+    setPanels(prev => prev.map(panel => 
+      panel.id === panelId ? { ...panel, imageUrl: newImageUrl } : panel
+    ));
+  };
+
+  const handleStockImageSelect = (panelId: string, imageUrl: string) => {
+    setPanels(prev => prev.map(panel => 
+      panel.id === panelId ? { ...panel, imageUrl } : panel
+    ));
+    toast.success("Immagine stock aggiunta!");
   };
 
   const handleDragStart = (imageUrl: string) => {
@@ -823,17 +837,32 @@ export const StoryboardEditor = () => {
                   }}
                 >
                   {panels.map((panel, index) => (
-                    <SortablePanel
-                      key={panel.id}
-                      id={panel.id}
-                      imageUrl={panel.imageUrl}
-                      caption={panel.caption}
-                      index={index}
-                      onImageUpload={(file) => handleImageUpload(panel.id, file)}
-                      onRemoveImage={() => handleRemoveImage(panel.id)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, panel.id)}
-                    />
+                    <div key={panel.id} className="relative">
+                      <SortablePanel
+                        id={panel.id}
+                        imageUrl={panel.imageUrl}
+                        caption={panel.caption}
+                        index={index}
+                        onImageUpload={(file) => handleImageUpload(panel.id, file)}
+                        onRemoveImage={() => handleRemoveImage(panel.id)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, panel.id)}
+                        onImageUpdate={(newUrl) => handleImageUpdate(panel.id, newUrl)}
+                      />
+                      {!panel.imageUrl && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
+                          <StockLibraryDialog
+                            onSelectImage={(url) => handleStockImageSelect(panel.id, url)}
+                            trigger={
+                              <Button size="sm" variant="secondary" className="text-xs">
+                                <Library className="h-3 w-3 mr-1" />
+                                Stock
+                              </Button>
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </SortableContext>

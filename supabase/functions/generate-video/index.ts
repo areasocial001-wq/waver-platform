@@ -139,7 +139,78 @@ serve(async (req) => {
         }
       }
       
-      // Check if it's a Replicate prediction (format: replicate:prediction_id)
+      // Check if it's a Freepik task (format: freepik:model:task_id)
+      if (body.operationId.startsWith('freepik:')) {
+        const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
+        if (!FREEPIK_API_KEY) {
+          throw new Error("FREEPIK_API_KEY is not set");
+        }
+        
+        const parts = body.operationId.split(':');
+        const modelEndpoint = parts[1];
+        const taskId = parts[2];
+        console.log("Polling Freepik task:", taskId, "model:", modelEndpoint);
+        
+        const freepikResponse = await fetch(`https://api.freepik.com/v1/ai/image-to-video/${modelEndpoint}/${taskId}`, {
+          headers: {
+            "x-freepik-api-key": FREEPIK_API_KEY,
+          },
+        });
+
+        if (!freepikResponse.ok) {
+          const error = await freepikResponse.text();
+          throw new Error(`Freepik API error: ${freepikResponse.status} - ${error}`);
+        }
+
+        const freepikData = await freepikResponse.json();
+        console.log("Freepik task status:", freepikData);
+        
+        if (freepikData.data?.status === "COMPLETED" && freepikData.data?.video?.url) {
+          const videoUrl = freepikData.data.video.url;
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+
+            return new Response(JSON.stringify({ 
+              status: "succeeded",
+              output: videoUrl 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (freepikData.data?.status === "FAILED") {
+          throw new Error(`Freepik generation failed: ${freepikData.data?.error || "Unknown error"}`);
+        } else {
+          // Still processing
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
+      
       if (body.operationId.startsWith('replicate:')) {
         const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
         if (!REPLICATE_API_KEY) {
@@ -536,11 +607,84 @@ serve(async (req) => {
       }
     );
 
-    // Check if Google API returned quota error (429), fallback to Replicate
+    // Check if Google API returned quota error (429), fallback to Freepik or Replicate
     if (!response.ok && response.status === 429) {
-      console.log("Google quota exceeded, falling back to Replicate");
+      console.log("Google quota exceeded, trying Freepik then Replicate");
       
+      const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
       const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
+      
+      // Try Freepik first if API key is available
+      if (FREEPIK_API_KEY) {
+        try {
+          console.log("Attempting Freepik video generation");
+          
+          const freepikPayload: any = {
+            prompt: prompt || "A video based on the provided image",
+            prompt_optimizer: true,
+            duration: duration && duration >= 8 ? 10 : 6,
+          };
+          
+          // For image-to-video, add the image(s)
+          if (type === "image_to_video") {
+            const startImageData = start_image || image || image_url;
+            if (startImageData) {
+              freepikPayload.first_frame_image = startImageData;
+            }
+            if (end_image) {
+              freepikPayload.last_frame_image = end_image;
+            }
+          }
+          
+          // Use MiniMax for start/end frame support, Kling for single image
+          const modelEndpoint = end_image ? "minimax-hailuo-02-768p" : "kling-v2-5-pro";
+          
+          const freepikResponse = await fetch(`https://api.freepik.com/v1/ai/image-to-video/${modelEndpoint}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-freepik-api-key": FREEPIK_API_KEY,
+            },
+            body: JSON.stringify(freepikPayload),
+          });
+          
+          if (freepikResponse.ok) {
+            const freepikData = await freepikResponse.json();
+            console.log("Freepik video task started:", freepikData);
+            
+            // Save Freepik task ID to database
+            if (generationId) {
+              const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+              const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const supabaseClient = createClient(supabaseUrl, supabaseKey);
+              
+              await supabaseClient
+                .from('video_generations')
+                .update({
+                  status: 'processing',
+                  prediction_id: `freepik:${modelEndpoint}:${freepikData.data.task_id}`,
+                })
+                .eq('id', generationId);
+            }
+            
+            return new Response(JSON.stringify({ 
+              status: "starting",
+              operationId: `freepik:${modelEndpoint}:${freepikData.data.task_id}`,
+              provider: "freepik"
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          } else {
+            console.log("Freepik failed, falling back to Replicate");
+          }
+        } catch (freepikError) {
+          console.error("Freepik error, falling back to Replicate:", freepikError);
+        }
+      }
+      
+      // Fallback to Replicate
       if (!REPLICATE_API_KEY) {
         const error = await response.text();
         throw new Error(`Google AI API error: ${response.status} - ${error}`);
