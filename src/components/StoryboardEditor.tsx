@@ -1,4 +1,4 @@
-import { useState, useRef, DragEvent, useEffect } from "react";
+import { useState, useRef, DragEvent, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -18,18 +18,20 @@ import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, rectSortingStrategy } from '@dnd-kit/sortable';
-import { SortablePanel } from "./SortablePanel";
+import { SortablePanel, ImageTransform } from "./SortablePanel";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
 import { StockLibraryDialog } from "./StockLibraryDialog";
 import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
+import { useStoryboardHistory } from "@/hooks/useStoryboardHistory";
 
 interface StoryboardPanel {
   id: string;
   imageUrl: string | null;
   caption: string;
   note?: string;
+  transform?: ImageTransform;
 }
 
 type LayoutType = "2x2" | "3x2" | "4x2" | "2x3" | "3x3";
@@ -134,7 +136,15 @@ export const StoryboardEditor = () => {
   const [searchParams] = useSearchParams();
   const [layout, setLayout] = useState<LayoutType>("3x2");
   const [title, setTitle] = useState("Il Mio Storyboard");
-  const [panels, setPanels] = useState<StoryboardPanel[]>([]);
+  const {
+    state: panels,
+    set: setPanels,
+    undo,
+    redo,
+    reset: resetPanels,
+    canUndo,
+    canRedo,
+  } = useStoryboardHistory<StoryboardPanel[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("custom");
@@ -161,6 +171,23 @@ export const StoryboardEditor = () => {
     })
   );
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, undo, redo]);
+
   useEffect(() => {
     const storyboardId = searchParams.get('storyboardId');
     if (storyboardId) {
@@ -186,7 +213,7 @@ export const StoryboardEditor = () => {
       setTitle(data.title);
       setLayout(data.layout as LayoutType);
       setSelectedTemplate(data.template_type as TemplateType);
-      setPanels((data.panels as unknown as StoryboardPanel[]) || []);
+      resetPanels((data.panels as unknown as StoryboardPanel[]) || []);
       setTags((data.tags as string[]) || []);
       setIsPasswordProtected(!!data.share_password);
       setSharePassword(data.share_password || "");
@@ -205,8 +232,9 @@ export const StoryboardEditor = () => {
       imageUrl: null,
       caption: captions[i] || "",
       note: "",
+      transform: { rotation: 0, flipH: false, flipV: false },
     }));
-    setPanels(newPanels);
+    resetPanels(newPanels);
   };
 
   const handleTemplateSelect = (templateId: TemplateType) => {
@@ -271,6 +299,12 @@ export const StoryboardEditor = () => {
       panel.id === panelId ? { ...panel, imageUrl } : panel
     ));
     toast.success("Immagine stock aggiunta!");
+  };
+
+  const handleTransformChange = (panelId: string, transform: ImageTransform) => {
+    setPanels(prev => prev.map(panel => 
+      panel.id === panelId ? { ...panel, transform } : panel
+    ));
   };
 
   const handleOpenMysticGenerator = (panelId: string) => {
@@ -705,6 +739,26 @@ export const StoryboardEditor = () => {
       </div>
         
         <div className="flex gap-2">
+          {/* Undo/Redo buttons */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={undo}
+            disabled={!canUndo}
+            title="Annulla (Ctrl+Z)"
+          >
+            <Undo2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={redo}
+            disabled={!canRedo}
+            title="Ripeti (Ctrl+Y)"
+          >
+            <Redo2 className="h-4 w-4" />
+          </Button>
+
           <Button
             variant="outline"
             onClick={() => setShowGallery(!showGallery)}
@@ -865,6 +919,8 @@ export const StoryboardEditor = () => {
                         onDrop={(e) => handleDrop(e, panel.id)}
                         onImageUpdate={(newUrl) => handleImageUpdate(panel.id, newUrl)}
                         onGenerateMystic={() => handleOpenMysticGenerator(panel.id)}
+                        imageTransform={panel.transform}
+                        onTransformChange={(transform) => handleTransformChange(panel.id, transform)}
                       />
                       {!panel.imageUrl && (
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
