@@ -25,10 +25,41 @@ import {
   Wand2,
   RefreshCw,
   ExternalLink,
-  Filter
+  Filter,
+  Info
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
+
+// Freepik API Disclaimer Component
+const FreepikDisclaimer = () => (
+  <div className="flex items-start gap-2 p-3 rounded-lg border border-border/50 bg-muted/30 text-sm text-muted-foreground">
+    <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+    <p>
+      Le funzionalità di questa sezione sono fornite tramite{" "}
+      <a 
+        href="https://www.freepik.com/api" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-primary hover:underline inline-flex items-center gap-1"
+      >
+        Freepik API
+        <ExternalLink className="h-3 w-3" />
+      </a>
+      . Utilizzando questi servizi accetti i{" "}
+      <a 
+        href="https://www.freepik.com/api/terms-of-use" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-primary hover:underline inline-flex items-center gap-1"
+      >
+        Termini di Utilizzo
+        <ExternalLink className="h-3 w-3" />
+      </a>
+      .
+    </p>
+  </div>
+);
 
 // Mystic Image Generation Component
 const MysticImageGenerator = () => {
@@ -656,6 +687,8 @@ export const FreepikTools = () => {
           Genera immagini, upscala e cerca contenuti stock
         </p>
       </div>
+
+      <FreepikDisclaimer />
 
       <Tabs defaultValue="mystic" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
