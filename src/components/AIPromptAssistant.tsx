@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Wand2, Copy, Check, Sparkles, Video, Camera, Music, Save, BookMarked, Trash2, Pencil } from 'lucide-react';
+import { Loader2, Wand2, Copy, Check, Sparkles, Video, Camera, Music, Save, BookMarked, Trash2, Pencil, CopyPlus } from 'lucide-react';
 
 interface AIPromptAssistantProps {
   open: boolean;
@@ -211,6 +211,21 @@ export const AIPromptAssistant = ({
     setEditingTemplate(null);
   };
 
+  const duplicateTemplate = (template: PromptTemplate) => {
+    setOptimizedPrompts({
+      mainPrompt: template.mainPrompt,
+      cameraMovement: template.cameraMovement,
+      audioSuggestion: template.audioSuggestion,
+      style: template.style,
+      duration: template.duration,
+      keywords: template.keywords,
+    });
+    setTemplateName(`${template.name} (copia)`);
+    setTemplateCategory(template.category);
+    setShowSaveDialog(true);
+    toast.info('Modifica il nome e salva la variante');
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -252,6 +267,20 @@ export const AIPromptAssistant = ({
                           </Badge>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          {onSaveTemplate && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-muted-foreground hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicateTemplate(template);
+                              }}
+                              title="Duplica template"
+                            >
+                              <CopyPlus className="h-4 w-4" />
+                            </Button>
+                          )}
                           {onUpdateTemplate && (
                             <Button
                               variant="ghost"
@@ -261,6 +290,7 @@ export const AIPromptAssistant = ({
                                 e.stopPropagation();
                                 openEditDialog(template);
                               }}
+                              title="Modifica template"
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -277,6 +307,7 @@ export const AIPromptAssistant = ({
                                   setSelectedTemplate(null);
                                 }
                               }}
+                              title="Elimina template"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
