@@ -1,9 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schemas
+const statusSchema = z.object({
+  action: z.literal('status'),
+  taskId: z.string().min(1).max(100),
+});
+
+const generateSchema = z.object({
+  action: z.literal('generate').optional(),
+  prompt: z.string().min(1, 'Prompt obbligatorio').max(2000, 'Prompt troppo lungo'),
+  resolution: z.enum(['1k', '2k', '4k']).optional(),
+  aspectRatio: z.enum(['square_1_1', 'landscape_4_3', 'landscape_16_9', 'portrait_3_4', 'portrait_9_16']).optional(),
+  model: z.string().max(50).optional(),
+  engine: z.string().max(50).optional(),
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,6 +37,14 @@ serve(async (req) => {
 
     // Check status of existing task
     if (action === "status" && taskId) {
+      const parseResult = statusSchema.safeParse(body);
+      if (!parseResult.success) {
+        return new Response(
+          JSON.stringify({ error: parseResult.error.errors[0].message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       console.log("Checking Mystic task status:", taskId);
       const response = await fetch(`https://api.freepik.com/v1/ai/mystic/${taskId}`, {
         headers: {
@@ -41,7 +65,15 @@ serve(async (req) => {
       });
     }
 
-    // Generate new image
+    // Generate new image - validate input
+    const parseResult = generateSchema.safeParse(body);
+    if (!parseResult.success) {
+      return new Response(
+        JSON.stringify({ error: parseResult.error.errors[0].message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     if (!prompt) {
       throw new Error("Prompt is required");
     }

@@ -1,34 +1,37 @@
 project_id = "gqzxlwzcxrokzforwgeu"
 
 [functions.generate-video]
-verify_jwt = false
+verify_jwt = true
 
 [functions.video-proxy]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.generate-content]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cleanup-old-videos]
 verify_jwt = false
 
 [functions.elevenlabs-tts]
-verify_jwt = false
+verify_jwt = true
 
 [functions.freepik-image]
-verify_jwt = false
+verify_jwt = true
 
 [functions.freepik-video]
-verify_jwt = false
+verify_jwt = true
 
 [functions.freepik-upscale]
-verify_jwt = false
+verify_jwt = true
 
 [functions.freepik-stock]
-verify_jwt = false
+verify_jwt = true
 
 [functions.optimize-video-prompt]
+verify_jwt = true
+
+[functions.verify-storyboard-access]
 verify_jwt = false

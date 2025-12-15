@@ -56,46 +56,52 @@ export default function ViewStoryboard() {
 
   const fetchStoryboard = async (attemptPassword?: string) => {
     try {
-      const { data, error } = await supabase
-        .from('storyboards')
-        .select('*')
-        .eq('id', id)
-        .eq('is_public', true)
-        .maybeSingle();
+      // Use server-side verification for password-protected storyboards
+      const { data: responseData, error: functionError } = await supabase.functions.invoke(
+        'verify-storyboard-access',
+        {
+          body: { storyboardId: id, password: attemptPassword }
+        }
+      );
 
-      if (error) throw error;
-      
-      if (!data) {
-        toast.error("Storyboard non trovato o non pubblico");
-        navigate("/");
-        return;
+      if (functionError) {
+        throw functionError;
       }
 
       // Check if password is required
-      if (data.share_password) {
-        if (!attemptPassword) {
-          setShowPasswordPrompt(true);
-          setLoading(false);
-          return;
-        }
+      if (responseData?.requiresPassword) {
+        setShowPasswordPrompt(true);
+        setLoading(false);
+        return;
+      }
 
-        if (attemptPassword !== data.share_password) {
+      // Handle error responses
+      if (responseData?.error) {
+        if (responseData.error === 'Invalid password') {
           setPasswordError("Password errata");
           setLoading(false);
           return;
         }
+        throw new Error(responseData.error);
       }
 
-      setStoryboard({
-        id: data.id,
-        title: data.title,
-        layout: data.layout,
-        created_at: data.created_at,
-        tags: (data.tags as string[]) || [],
-        panels: (data.panels as unknown as StoryboardPanel[]) || [],
-        share_password: data.share_password,
-      });
-      setShowPasswordPrompt(false);
+      // Success - storyboard data received
+      if (responseData?.success && responseData?.storyboard) {
+        const data = responseData.storyboard;
+        setStoryboard({
+          id: data.id,
+          title: data.title,
+          layout: data.layout,
+          created_at: data.created_at || new Date().toISOString(),
+          tags: (data.tags as string[]) || [],
+          panels: (data.panels as unknown as StoryboardPanel[]) || [],
+          share_password: null, // Never expose password to client
+        });
+        setShowPasswordPrompt(false);
+      } else {
+        toast.error("Storyboard non trovato o non pubblico");
+        navigate("/");
+      }
     } catch (error: any) {
       console.error("Error fetching storyboard:", error);
       toast.error("Errore nel caricamento dello storyboard");

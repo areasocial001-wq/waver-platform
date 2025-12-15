@@ -1,9 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schemas
+const statusSchema = z.object({
+  action: z.literal('status'),
+  taskId: z.string().min(1).max(100),
+  mode: z.enum(['precision', 'creative']).optional(),
+});
+
+const upscaleSchema = z.object({
+  action: z.literal('upscale').optional(),
+  image: z.string().min(1).max(10000000), // base64 image, max ~7.5MB
+  scaleFactor: z.enum(['2x', '4x', '8x']).optional(),
+  optimizedFor: z.string().max(50).optional(),
+  mode: z.enum(['precision', 'creative']).optional(),
+  prompt: z.string().max(500).optional(),
+  creativity: z.number().min(-10).max(10).optional(),
+  hdr: z.number().min(0).max(1).optional(),
+  resemblance: z.number().min(-10).max(10).optional(),
+  fractality: z.number().optional(),
+  engine: z.string().max(50).optional(),
+  sharpen: z.boolean().optional(),
+  smartGrain: z.boolean().optional(),
+  ultraDetail: z.boolean().optional(),
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -21,6 +46,14 @@ serve(async (req) => {
 
     // Check status of existing task
     if (action === "status" && taskId) {
+      const parseResult = statusSchema.safeParse(body);
+      if (!parseResult.success) {
+        return new Response(
+          JSON.stringify({ error: parseResult.error.errors[0].message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       console.log("Checking upscale task status:", taskId);
       
       const endpoint = mode === "precision" 
@@ -46,7 +79,15 @@ serve(async (req) => {
       });
     }
 
-    // Upscale image
+    // Upscale image - validate input
+    const parseResult = upscaleSchema.safeParse(body);
+    if (!parseResult.success) {
+      return new Response(
+        JSON.stringify({ error: parseResult.error.errors[0].message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     if (!image) {
       throw new Error("Image is required");
     }

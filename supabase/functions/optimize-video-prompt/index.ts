@@ -1,9 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schema
+const requestSchema = z.object({
+  imageUrl: z.string().url('URL immagine non valido').max(2000, 'URL troppo lungo'),
+  caption: z.string().max(500, 'Didascalia troppo lunga').optional(),
+  customContext: z.string().max(1000, 'Contesto troppo lungo').optional(),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,14 +19,18 @@ serve(async (req) => {
   }
 
   try {
-    const { imageUrl, caption, customContext } = await req.json();
-
-    if (!imageUrl) {
+    const body = await req.json();
+    
+    // Validate input
+    const parseResult = requestSchema.safeParse(body);
+    if (!parseResult.success) {
       return new Response(
-        JSON.stringify({ error: 'Image URL is required' }),
+        JSON.stringify({ error: parseResult.error.errors[0].message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    const { imageUrl, caption, customContext } = parseResult.data;
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
