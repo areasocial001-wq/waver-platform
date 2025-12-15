@@ -80,30 +80,40 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
       return;
     }
 
+    const isPremium = item?.premium === 1 || item?.premium === true || item?.licenses?.some((l: any) => l?.type === "premium");
+    if (isPremium) {
+      toast.warning("Questo asset è Premium: uso l'anteprima (non scaricabile via API).");
+      onSelectImage(imageUrl);
+      setIsOpen(false);
+      return;
+    }
+
     // Try to get high-res version via download endpoint
     try {
       const { data, error } = await supabase.functions.invoke("freepik-stock", {
-        body: { action: "download", resourceId: item.id },
+        body: { action: "download", resourceId: item.id, contentType },
       });
 
       if (error) {
         const msg = (error as any)?.message || "";
         if (msg.includes("403")) {
           toast.warning("Download HD non autorizzato per questo asset: uso anteprima.");
+        } else if (msg.includes("404")) {
+          toast.warning("Download HD non disponibile per questo tipo: uso anteprima.");
         } else {
           toast.warning("Impossibile scaricare la versione HD: uso anteprima.");
         }
         onSelectImage(imageUrl);
       } else if (data?.data?.url) {
         onSelectImage(data.data.url);
-        toast.success("Immagine HD aggiunta al pannello!");
+        toast.success("Asset HD aggiunto al pannello!");
       } else {
         onSelectImage(imageUrl);
-        toast.success("Immagine aggiunta al pannello!");
+        toast.success("Asset aggiunto al pannello!");
       }
     } catch {
       onSelectImage(imageUrl);
-      toast.success("Immagine aggiunta al pannello!");
+      toast.success("Asset aggiunto al pannello!");
     }
 
     setIsOpen(false);
