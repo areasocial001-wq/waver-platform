@@ -657,15 +657,58 @@ serve(async (req) => {
       const startImageData = start_image || image || image_url;
       
       if (startImageData) {
-        const base64Data = startImageData.split(',')[1]; // Remove data:image/...;base64, prefix
-        const mimeType = startImageData.startsWith('data:image/png') ? 'image/png' : 
-                        startImageData.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg';
+        let base64Data: string;
+        let mimeType: string;
+        
+        // Check if it's a data URL with base64 content
+        if (startImageData.startsWith('data:')) {
+          // Extract MIME type from data URL
+          const mimeMatch = startImageData.match(/^data:(image\/[^;]+);base64,/);
+          if (mimeMatch) {
+            mimeType = mimeMatch[1];
+            base64Data = startImageData.split(',')[1];
+          } else {
+            console.error("Invalid data URL format:", startImageData.substring(0, 50));
+            throw new Error("Invalid image data URL format. Expected data:image/...;base64,...");
+          }
+        } else if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
+          // It's a URL - need to download and convert to base64
+          console.log("Downloading image from URL:", startImageData.substring(0, 100));
+          const imageResponse = await fetch(startImageData);
+          if (!imageResponse.ok) {
+            throw new Error(`Failed to download image from URL: ${imageResponse.status}`);
+          }
+          const imageBlob = await imageResponse.blob();
+          const arrayBuffer = await imageBlob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          base64Data = btoa(String.fromCharCode(...uint8Array));
+          
+          // Determine MIME type from content-type header or URL extension
+          const contentType = imageResponse.headers.get('content-type');
+          if (contentType && contentType.startsWith('image/')) {
+            mimeType = contentType.split(';')[0]; // Remove charset if present
+          } else if (startImageData.toLowerCase().includes('.png')) {
+            mimeType = 'image/png';
+          } else if (startImageData.toLowerCase().includes('.webp')) {
+            mimeType = 'image/webp';
+          } else {
+            mimeType = 'image/jpeg';
+          }
+        } else {
+          // Assume it's raw base64 without prefix, default to JPEG
+          base64Data = startImageData;
+          mimeType = 'image/jpeg';
+        }
+        
+        if (!base64Data) {
+          throw new Error("Failed to extract base64 data from image");
+        }
         
         requestBody.instances[0].image = {
           bytesBase64Encoded: base64Data,
           mimeType: mimeType
         };
-        console.log("Added start image for image-to-video generation");
+        console.log("Added start image for image-to-video generation, mimeType:", mimeType);
       }
     }
 
