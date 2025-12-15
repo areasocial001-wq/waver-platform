@@ -74,7 +74,7 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
 
   const handleSelectImage = async (item: any) => {
     const imageUrl = item.preview?.url || item.thumbnails?.[0]?.url || item.image?.url;
-    
+
     if (!imageUrl) {
       toast.error("URL immagine non disponibile");
       return;
@@ -86,16 +86,22 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
         body: { action: "download", resourceId: item.id },
       });
 
-      if (!error && data?.data?.url) {
+      if (error) {
+        const msg = (error as any)?.message || "";
+        if (msg.includes("403")) {
+          toast.warning("Download HD non autorizzato per questo asset: uso anteprima.");
+        } else {
+          toast.warning("Impossibile scaricare la versione HD: uso anteprima.");
+        }
+        onSelectImage(imageUrl);
+      } else if (data?.data?.url) {
         onSelectImage(data.data.url);
         toast.success("Immagine HD aggiunta al pannello!");
       } else {
-        // Fallback to preview URL
         onSelectImage(imageUrl);
         toast.success("Immagine aggiunta al pannello!");
       }
     } catch {
-      // Fallback to preview URL
       onSelectImage(imageUrl);
       toast.success("Immagine aggiunta al pannello!");
     }
@@ -235,6 +241,7 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
                       <img
                         src={item.preview?.url || item.thumbnails?.[0]?.url || item.image?.url}
                         alt={item.title}
+                        loading="lazy"
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -246,7 +253,7 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
                     </div>
                     <CardContent className="p-2">
                       <p className="text-xs truncate text-muted-foreground">{item.title}</p>
-                      {item.licenses?.includes("premium") && (
+                      {item.licenses?.some((l: any) => l?.type === "premium") && (
                         <Badge variant="secondary" className="text-xs mt-1">Premium</Badge>
                       )}
                     </CardContent>
