@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.freepik-stock]
 verify_jwt = false
+
+[functions.optimize-video-prompt]
+verify_jwt = false
