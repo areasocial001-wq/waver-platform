@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      prompt_templates: {
+        Row: {
+          audio_suggestion: string | null
+          camera_movement: string | null
+          category: string
+          created_at: string
+          duration: number | null
+          id: string
+          keywords: string[] | null
+          main_prompt: string
+          name: string
+          style: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_suggestion?: string | null
+          camera_movement?: string | null
+          category?: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          keywords?: string[] | null
+          main_prompt: string
+          name: string
+          style?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_suggestion?: string | null
+          camera_movement?: string | null
+          category?: string
+          created_at?: string
+          duration?: number | null
+          id?: string
+          keywords?: string[] | null
+          main_prompt?: string
+          name?: string
+          style?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       storyboard_video_batches: {
         Row: {
           audio_prompt: string | null

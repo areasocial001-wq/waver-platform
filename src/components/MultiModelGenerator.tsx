@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Play, Pause, RotateCcw, Video, Check, X, Clock, Sparkles, Download } from 'lucide-react';
+import { Loader2, Play, Pause, RotateCcw, Video, Check, X, Clock, Sparkles, Download, FileText } from 'lucide-react';
 
 interface MultiModelGeneratorProps {
   open: boolean;
@@ -18,6 +18,17 @@ interface MultiModelGeneratorProps {
   imageUrl: string | null;
   panelCaption?: string;
   optimizedPrompt?: string;
+  onResultsUpdate?: (results: GenerationResult[]) => void;
+  onOpenReport?: () => void;
+}
+
+interface GenerationResult {
+  provider: string;
+  providerName: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  videoUrl?: string;
+  error?: string;
+  generationId?: string;
 }
 
 type Provider = 'veo' | 'kling' | 'freepik';
@@ -54,20 +65,14 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-interface GenerationResult {
-  provider: Provider;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-  videoUrl?: string;
-  error?: string;
-  generationId?: string;
-}
-
 export const MultiModelGenerator = ({
   open,
   onOpenChange,
   imageUrl,
   panelCaption,
   optimizedPrompt,
+  onResultsUpdate,
+  onOpenReport,
 }: MultiModelGeneratorProps) => {
   const [selectedProviders, setSelectedProviders] = useState<Provider[]>(['veo', 'kling']);
   const [prompt, setPrompt] = useState(optimizedPrompt || panelCaption || '');
@@ -100,18 +105,29 @@ export const MultiModelGenerator = ({
     }
 
     setIsGenerating(true);
-    setResults(selectedProviders.map(provider => ({
-      provider,
-      status: 'pending',
-    })));
+    const initialResults = selectedProviders.map(provider => {
+      const providerInfo = PROVIDERS.find(p => p.id === provider);
+      return {
+        provider,
+        providerName: providerInfo?.name || provider,
+        status: 'pending' as const,
+      };
+    });
+    setResults(initialResults);
+    onResultsUpdate?.(initialResults);
 
     // Start all generations in parallel
     const generationPromises = selectedProviders.map(async (provider) => {
+      const providerInfo = PROVIDERS.find(p => p.id === provider);
       try {
         // Update status to processing
-        setResults(prev => prev.map(r =>
-          r.provider === provider ? { ...r, status: 'processing' as const } : r
-        ));
+        setResults(prev => {
+          const updated = prev.map(r =>
+            r.provider === provider ? { ...r, status: 'processing' as const } : r
+          );
+          onResultsUpdate?.(updated);
+          return updated;
+        });
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Non autenticato');
@@ -147,34 +163,46 @@ export const MultiModelGenerator = ({
         if (error) throw error;
 
         if (data.status === 'succeeded' && data.output) {
-          setResults(prev => prev.map(r =>
-            r.provider === provider ? {
-              ...r,
-              status: 'completed' as const,
-              videoUrl: Array.isArray(data.output) ? data.output[0] : data.output,
-              generationId: genRecord.id,
-            } : r
-          ));
+          setResults(prev => {
+            const updated = prev.map(r =>
+              r.provider === provider ? {
+                ...r,
+                status: 'completed' as const,
+                videoUrl: Array.isArray(data.output) ? data.output[0] : data.output,
+                generationId: genRecord.id,
+              } : r
+            );
+            onResultsUpdate?.(updated);
+            return updated;
+          });
         } else if (data.status === 'processing' || data.status === 'starting') {
-          setResults(prev => prev.map(r =>
-            r.provider === provider ? {
-              ...r,
-              status: 'processing' as const,
-              generationId: genRecord.id,
-            } : r
-          ));
+          setResults(prev => {
+            const updated = prev.map(r =>
+              r.provider === provider ? {
+                ...r,
+                status: 'processing' as const,
+                generationId: genRecord.id,
+              } : r
+            );
+            onResultsUpdate?.(updated);
+            return updated;
+          });
         } else {
           throw new Error(data.error || 'Generazione fallita');
         }
       } catch (error: any) {
         console.error(`Error with ${provider}:`, error);
-        setResults(prev => prev.map(r =>
-          r.provider === provider ? {
-            ...r,
-            status: 'failed' as const,
-            error: error.message,
-          } : r
-        ));
+        setResults(prev => {
+          const updated = prev.map(r =>
+            r.provider === provider ? {
+              ...r,
+              status: 'failed' as const,
+              error: error.message,
+            } : r
+          );
+          onResultsUpdate?.(updated);
+          return updated;
+        });
       }
     });
 
@@ -183,7 +211,7 @@ export const MultiModelGenerator = ({
     toast.success('Generazione avviata! Controlla lo storico per i risultati.');
   };
 
-  const getProviderInfo = (providerId: Provider) => {
+  const getProviderInfo = (providerId: string) => {
     return PROVIDERS.find(p => p.id === providerId);
   };
 
@@ -327,7 +355,19 @@ export const MultiModelGenerator = ({
             {/* Results with Comparison Panel */}
             {results.length > 0 && (
               <div className="space-y-4">
-                <Label>Risultati</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Risultati</Label>
+                  {onOpenReport && results.some(r => r.status === 'completed') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onOpenReport}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      Crea Report
+                    </Button>
+                  )}
+                </div>
                 
                 {/* Synchronized Playback Controls */}
                 {results.filter(r => r.status === 'completed' && r.videoUrl).length > 1 && (

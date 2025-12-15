@@ -25,9 +25,11 @@ import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
 import { StockLibraryDialog } from "./StockLibraryDialog";
 import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
 import { useStoryboardHistory } from "@/hooks/useStoryboardHistory";
+import { usePromptTemplates } from "@/hooks/usePromptTemplates";
 import { WorkflowView } from "./WorkflowView";
-import { AIPromptAssistant } from "./AIPromptAssistant";
+import { AIPromptAssistant, PromptTemplate } from "./AIPromptAssistant";
 import { MultiModelGenerator } from "./MultiModelGenerator";
+import { VideoComparisonReport } from "./VideoComparisonReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StoryboardPanel {
@@ -170,8 +172,11 @@ export const StoryboardEditor = () => {
   const [multiModelImageUrl, setMultiModelImageUrl] = useState<string | null>(null);
   const [multiModelCaption, setMultiModelCaption] = useState<string>('');
   const [optimizedPrompt, setOptimizedPrompt] = useState<string>('');
+  const [comparisonReportOpen, setComparisonReportOpen] = useState(false);
+  const [comparisonResults, setComparisonResults] = useState<any[]>([]);
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
+  const { templates: savedTemplates, saveTemplate } = usePromptTemplates();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1065,6 +1070,8 @@ export const StoryboardEditor = () => {
         imageUrl={aiAssistantImageUrl}
         panelCaption={panels.find(p => p.id === aiAssistantPanelId)?.caption}
         onPromptGenerated={handlePromptGenerated}
+        savedTemplates={savedTemplates}
+        onSaveTemplate={saveTemplate}
       />
 
       {/* Multi-Model Generator Dialog */}
@@ -1074,6 +1081,17 @@ export const StoryboardEditor = () => {
         imageUrl={multiModelImageUrl}
         panelCaption={multiModelCaption}
         optimizedPrompt={optimizedPrompt}
+        onResultsUpdate={(results) => setComparisonResults(results)}
+        onOpenReport={() => setComparisonReportOpen(true)}
+      />
+
+      {/* Video Comparison Report Dialog */}
+      <VideoComparisonReport
+        open={comparisonReportOpen}
+        onOpenChange={setComparisonReportOpen}
+        results={comparisonResults}
+        prompt={optimizedPrompt || multiModelCaption}
+        sourceImageUrl={multiModelImageUrl || undefined}
       />
     </div>
   );
