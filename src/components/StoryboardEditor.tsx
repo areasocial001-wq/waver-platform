@@ -176,7 +176,7 @@ export const StoryboardEditor = () => {
   const [comparisonResults, setComparisonResults] = useState<any[]>([]);
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
-  const { templates: savedTemplates, saveTemplate } = usePromptTemplates();
+  const { templates: savedTemplates, saveTemplate, deleteTemplate } = usePromptTemplates();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1072,6 +1072,7 @@ export const StoryboardEditor = () => {
         onPromptGenerated={handlePromptGenerated}
         savedTemplates={savedTemplates}
         onSaveTemplate={saveTemplate}
+        onDeleteTemplate={deleteTemplate}
       />
 
       {/* Multi-Model Generator Dialog */}
