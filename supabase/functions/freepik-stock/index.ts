@@ -39,11 +39,18 @@ serve(async (req) => {
     const body = await req.json();
     const { action, term, contentType, order, page, limit, orientation, license, excludeAI, dateFilter, resourceId } = body;
 
-    // Get resource details
+    // Get item details
     if (action === "details" && resourceId) {
-      console.log("Getting resource details:", resourceId);
+      console.log("Getting resource details:", { resourceId, contentType });
 
-      const response = await fetch(`https://api.freepik.com/v1/resources/${resourceId}`, {
+      const basePath =
+        contentType === "videos"
+          ? "videos"
+          : contentType === "icons"
+            ? "icons"
+            : "resources";
+
+      const response = await fetch(`https://api.freepik.com/v1/${basePath}/${resourceId}`, {
         headers: {
           "x-freepik-api-key": FREEPIK_API_KEY,
         },
@@ -72,11 +79,27 @@ serve(async (req) => {
       });
     }
 
-    // Download resource
+    // Download item
     if (action === "download" && resourceId) {
-      console.log("Downloading resource:", resourceId);
+      console.log("Downloading resource:", { resourceId, contentType });
 
-      const response = await fetch(`https://api.freepik.com/v1/resources/${resourceId}/download`, {
+      const basePath =
+        contentType === "videos"
+          ? "videos"
+          : contentType === "icons"
+            ? "icons"
+            : "resources";
+
+      const dlParams = new URLSearchParams();
+      // Optional icon download params
+      if (basePath === "icons") {
+        if (body?.format) dlParams.append("format", String(body.format));
+        if (body?.png_size) dlParams.append("png_size", String(body.png_size));
+      }
+
+      const url = `https://api.freepik.com/v1/${basePath}/${resourceId}/download${dlParams.toString() ? `?${dlParams.toString()}` : ""}`;
+
+      const response = await fetch(url, {
         headers: {
           "x-freepik-api-key": FREEPIK_API_KEY,
         },

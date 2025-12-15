@@ -511,9 +511,16 @@ const StockLibrary = () => {
   };
 
   const handleDownload = async (item: any) => {
+    const isPremium = item?.premium === 1 || item?.premium === true || item?.licenses?.some((l: any) => l?.type === "premium");
+    if (isPremium) {
+      toast.warning("Asset Premium: download via API non disponibile. Apro la pagina dell'asset.");
+      if (item?.url) window.open(item.url, "_blank");
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke("freepik-stock", {
-        body: { action: "download", resourceId: item.id },
+        body: { action: "download", resourceId: item.id, contentType },
       });
 
       if (error) {
@@ -521,6 +528,10 @@ const StockLibrary = () => {
         if (msg.includes("403")) {
           toast.warning("Download HD non autorizzato per questo asset. Apro la pagina dell'asset.");
           if (item?.url) window.open(item.url, "_blank");
+          return;
+        }
+        if (msg.includes("404")) {
+          toast.warning("Download non disponibile per questo tipo di asset.");
           return;
         }
         throw error;
