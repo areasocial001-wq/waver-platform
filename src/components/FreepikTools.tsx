@@ -23,7 +23,8 @@ import {
   Image as ImageIcon,
   ArrowUpRight,
   Wand2,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from "lucide-react";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 
@@ -588,6 +589,16 @@ const StockLibrary = () => {
                   <Button size="sm" variant="secondary" onClick={() => handleDownload(item)}>
                     <Download className="h-4 w-4" />
                   </Button>
+                  {item.licenses?.some((l: any) => l?.type === "premium") && item.url && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="bg-background/80"
+                      onClick={() => window.open(item.url, "_blank")}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
               <CardContent className="p-2">

@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Search, Loader2, Library, Plus, Filter, ChevronDown } from "lucide-react";
+import { Search, Loader2, Library, Plus, Filter, ChevronDown, ExternalLink } from "lucide-react";
 
 interface StockLibraryDialogProps {
   onSelectImage: (imageUrl: string) => void;
@@ -244,11 +244,24 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
                         loading="lazy"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <Button size="sm" variant="secondary">
                           <Plus className="h-4 w-4 mr-1" />
                           Usa
                         </Button>
+                        {item.licenses?.some((l: any) => l?.type === "premium") && item.url && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-background/80"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.url, "_blank");
+                            }}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <CardContent className="p-2">
