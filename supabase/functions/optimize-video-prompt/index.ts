@@ -6,9 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Input validation schema
+// Input validation schema - accepts both URLs and base64 data URLs
 const requestSchema = z.object({
-  imageUrl: z.string().url('URL immagine non valido').max(2000, 'URL troppo lungo'),
+  imageUrl: z.string().refine(
+    (val) => val.startsWith('data:image/') || val.startsWith('http://') || val.startsWith('https://'),
+    'URL immagine non valido (deve essere un URL http/https o un data URL base64)'
+  ),
   caption: z.string().max(500, 'Didascalia troppo lunga').optional(),
   customContext: z.string().max(1000, 'Contesto troppo lungo').optional(),
 });
