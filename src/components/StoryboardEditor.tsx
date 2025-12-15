@@ -1008,8 +1008,11 @@ export const StoryboardEditor = () => {
             }}
             onImageGenerated={handleMysticImageGenerated}
             panelIndex={panels.findIndex(p => p.id === mysticTargetPanelId)}
+          />
         </div>
       </div>
+
+      <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Type className="h-5 w-5 text-primary" />
           Didascalie e Note
