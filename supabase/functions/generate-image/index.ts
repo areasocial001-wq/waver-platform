@@ -1,10 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Replicate from "https://esm.sh/replicate@0.25.2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema
+const requestSchema = z.object({
+  prompt: z.string().min(1, 'Prompt obbligatorio').max(2000, 'Prompt troppo lungo'),
+  width: z.number().int().min(256).max(2048).optional(),
+  height: z.number().int().min(256).max(2048).optional(),
+  aspectRatio: z.string().max(20).optional(),
+  outputFormat: z.enum(['webp', 'png', 'jpg']).optional(),
+  outputQuality: z.number().int().min(1).max(100).optional(),
+  numInferenceSteps: z.number().int().min(1).max(50).optional(),
+  model: z.string().max(100).optional(),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,15 +35,13 @@ serve(async (req) => {
     });
 
     const body = await req.json();
-
-    if (!body.prompt) {
+    
+    // Validate input
+    const parseResult = requestSchema.safeParse(body);
+    if (!parseResult.success) {
       return new Response(
-        JSON.stringify({ 
-          error: "Missing required field: prompt is required" 
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
-        }
+        JSON.stringify({ error: parseResult.error.errors[0].message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -43,7 +54,7 @@ serve(async (req) => {
       outputQuality = 90,
       numInferenceSteps = 4,
       model = "black-forest-labs/flux-schnell"
-    } = body;
+    } = parseResult.data;
 
     console.log("Generating image with Replicate Flux:", { 
       prompt, 
