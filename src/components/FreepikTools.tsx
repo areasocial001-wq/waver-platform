@@ -24,8 +24,10 @@ import {
   ArrowUpRight,
   Wand2,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Filter
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 
 // Mystic Image Generation Component
@@ -472,6 +474,7 @@ const MagnificUpscaler = () => {
 const StockLibrary = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [contentType, setContentType] = useState("resources");
+  const [freeOnly, setFreeOnly] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { addImage } = useImageGallery();
@@ -486,8 +489,13 @@ const StockLibrary = () => {
     setResults([]);
 
     try {
+      const body: any = { term: searchTerm, contentType, limit: 20 };
+      if (freeOnly) {
+        body.license = "free";
+      }
+      
       const { data, error } = await supabase.functions.invoke("freepik-stock", {
-        body: { term: searchTerm, contentType, limit: 20 },
+        body,
       });
 
       if (error) throw error;
@@ -550,13 +558,13 @@ const StockLibrary = () => {
         </AlertDescription>
       </Alert>
 
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         <Input 
           placeholder="Cerca immagini, icone, video..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          className="flex-1"
+          className="flex-1 min-w-[200px]"
         />
         <Select value={contentType} onValueChange={setContentType}>
           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
@@ -566,6 +574,16 @@ const StockLibrary = () => {
             <SelectItem value="videos">Video</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-input bg-background">
+          <Switch
+            id="free-only"
+            checked={freeOnly}
+            onCheckedChange={setFreeOnly}
+          />
+          <Label htmlFor="free-only" className="text-xs cursor-pointer whitespace-nowrap">
+            Solo gratuiti
+          </Label>
+        </div>
         <Button onClick={handleSearch} disabled={isLoading}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
         </Button>
