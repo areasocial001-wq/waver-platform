@@ -337,13 +337,10 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">🤖 Automatico (Kling/Veo)</SelectItem>
-                <SelectItem value="freepik">🎨 Freepik (MiniMax)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {videoProvider === "freepik" 
-                ? "Usa Freepik MiniMax per la generazione video. Ottimo per transizioni fluide."
-                : "Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole)."}
+              Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole).
             </p>
           </div>
 
