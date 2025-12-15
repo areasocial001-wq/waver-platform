@@ -86,6 +86,15 @@ export const AIPromptAssistant = ({
   const [editStyle, setEditStyle] = useState('');
   const [editDuration, setEditDuration] = useState(6);
   const [editKeywords, setEditKeywords] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  // Filter templates by category
+  const filteredTemplates = categoryFilter === 'all' 
+    ? savedTemplates 
+    : savedTemplates.filter(t => t.category === categoryFilter);
+
+  // Get unique categories from saved templates
+  const availableCategories = Array.from(new Set(savedTemplates.map(t => t.category)));
 
   const analyzeAndOptimize = async () => {
     if (!imageUrl) {
@@ -244,13 +253,35 @@ export const AIPromptAssistant = ({
             <div className="space-y-6 pr-4">
               {/* Saved Templates */}
               {savedTemplates.length > 0 && (
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <BookMarked className="h-4 w-4" />
-                    Template Salvati
-                  </Label>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2">
+                      <BookMarked className="h-4 w-4" />
+                      Template Salvati ({filteredTemplates.length})
+                    </Label>
+                    {availableCategories.length > 1 && (
+                      <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                        <SelectTrigger className="w-[140px] h-8">
+                          <SelectValue placeholder="Filtra..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutte le categorie</SelectItem>
+                          {availableCategories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {TEMPLATE_CATEGORIES.find(c => c.value === cat)?.label || cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
                   <div className="space-y-2">
-                    {savedTemplates.map((template) => (
+                    {filteredTemplates.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-2">
+                        Nessun template in questa categoria
+                      </p>
+                    ) : (
+                    filteredTemplates.map((template) => (
                       <div
                         key={template.id}
                         className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -314,7 +345,8 @@ export const AIPromptAssistant = ({
                           )}
                         </div>
                       </div>
-                    ))}
+                    ))
+                    )}
                   </div>
                 </div>
               )}
