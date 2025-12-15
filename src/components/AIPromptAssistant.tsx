@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Wand2, Copy, Check, Sparkles, Video, Camera, Music, Save, BookMarked } from 'lucide-react';
+import { Loader2, Wand2, Copy, Check, Sparkles, Video, Camera, Music, Save, BookMarked, Trash2 } from 'lucide-react';
 
 interface AIPromptAssistantProps {
   open: boolean;
@@ -19,6 +19,7 @@ interface AIPromptAssistantProps {
   onPromptGenerated: (prompt: string) => void;
   savedTemplates?: PromptTemplate[];
   onSaveTemplate?: (template: PromptTemplate) => void;
+  onDeleteTemplate?: (templateId: string) => void;
 }
 
 interface OptimizedPrompts {
@@ -61,6 +62,7 @@ export const AIPromptAssistant = ({
   onPromptGenerated,
   savedTemplates = [],
   onSaveTemplate,
+  onDeleteTemplate,
 }: AIPromptAssistantProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [optimizedPrompts, setOptimizedPrompts] = useState<OptimizedPrompts | null>(null);
@@ -182,23 +184,42 @@ export const AIPromptAssistant = ({
                     <BookMarked className="h-4 w-4" />
                     Template Salvati
                   </Label>
-                  <Select value={selectedTemplate || ''} onValueChange={loadTemplate}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Carica un template salvato..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {savedTemplates.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{template.name}</span>
-                            <Badge variant="outline" className="text-xs">
-                              {TEMPLATE_CATEGORIES.find(c => c.value === template.category)?.label || template.category}
-                            </Badge>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    {savedTemplates.map((template) => (
+                      <div
+                        key={template.id}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedTemplate === template.id
+                            ? 'bg-primary/10 border-primary'
+                            : 'bg-muted/50 border-border hover:bg-muted'
+                        }`}
+                        onClick={() => loadTemplate(template.id)}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="truncate font-medium">{template.name}</span>
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {TEMPLATE_CATEGORIES.find(c => c.value === template.category)?.label || template.category}
+                          </Badge>
+                        </div>
+                        {onDeleteTemplate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteTemplate(template.id);
+                              if (selectedTemplate === template.id) {
+                                setSelectedTemplate(null);
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
