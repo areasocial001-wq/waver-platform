@@ -96,6 +96,50 @@ export const AIPromptAssistant = ({
   // Get unique categories from saved templates
   const availableCategories = Array.from(new Set(savedTemplates.map(t => t.category)));
 
+  // Compress image to reduce data size before sending to AI
+  const compressImageForAI = async (imgUrl: string): Promise<string> => {
+    // If it's not a data URL, return as-is (HTTP URLs are small)
+    if (!imgUrl.startsWith('data:image/')) {
+      return imgUrl;
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        // Max dimensions for AI analysis (smaller = faster, less data)
+        const MAX_SIZE = 800;
+        let { width, height } = img;
+
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          } else {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress as JPEG with 0.7 quality
+        const compressedUrl = canvas.toDataURL('image/jpeg', 0.7);
+        resolve(compressedUrl);
+      };
+      img.onerror = () => reject(new Error('Failed to load image for compression'));
+      img.src = imgUrl;
+    });
+  };
+
   const analyzeAndOptimize = async () => {
     if (!imageUrl) {
       toast.error('Nessuna immagine da analizzare');
@@ -104,9 +148,12 @@ export const AIPromptAssistant = ({
 
     setIsAnalyzing(true);
     try {
+      // Compress image before sending
+      const compressedImageUrl = await compressImageForAI(imageUrl);
+      
       const { data, error } = await supabase.functions.invoke('optimize-video-prompt', {
         body: {
-          imageUrl,
+          imageUrl: compressedImageUrl,
           caption: panelCaption,
           customContext,
         },
