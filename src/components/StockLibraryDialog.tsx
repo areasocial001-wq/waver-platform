@@ -31,6 +31,7 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
   const [license, setLicense] = useState<string>("all");
   const [excludeAI, setExcludeAI] = useState(false);
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [freeOnly, setFreeOnly] = useState(true); // Default ON for storyboard usage
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
@@ -50,7 +51,8 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
       
       // Add advanced filters
       if (orientation !== "all") filters.orientation = orientation;
-      if (license !== "all") filters.license = license;
+      if (freeOnly) filters.license = "free";
+      else if (license !== "all") filters.license = license;
       if (excludeAI) filters.excludeAI = true;
       if (dateFilter !== "all") filters.dateFilter = dateFilter;
 
@@ -234,6 +236,17 @@ export const StockLibraryDialog = ({ onSelectImage, trigger }: StockLibraryDialo
                     </span>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Switch
+                  checked={freeOnly}
+                  onCheckedChange={setFreeOnly}
+                />
+                <Label className="text-sm font-medium">Solo gratuiti</Label>
+                <span className="text-xs text-muted-foreground">
+                  (scaricabili via API)
+                </span>
               </div>
             </CollapsibleContent>
           </Collapsible>
