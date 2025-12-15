@@ -56,13 +56,6 @@ const PROVIDERS: ProviderConfig[] = [
     estimatedTime: '~4min',
     supportedDurations: [5, 10],
   },
-  {
-    id: 'freepik',
-    name: 'Freepik MiniMax',
-    description: 'Veloce, buon rapporto qualità/prezzo',
-    estimatedTime: '~2min',
-    supportedDurations: [5],
-  },
 ];
 
 export const MultiModelGenerator = ({
