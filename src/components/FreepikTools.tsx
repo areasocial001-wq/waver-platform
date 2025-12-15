@@ -501,13 +501,21 @@ const StockLibrary = () => {
     }
   };
 
-  const handleDownload = async (resourceId: string) => {
+  const handleDownload = async (item: any) => {
     try {
       const { data, error } = await supabase.functions.invoke("freepik-stock", {
-        body: { action: "download", resourceId },
+        body: { action: "download", resourceId: item.id },
       });
 
-      if (error) throw error;
+      if (error) {
+        const msg = (error as any)?.message || "";
+        if (msg.includes("403")) {
+          toast.warning("Download HD non autorizzato per questo asset. Apro la pagina dell'asset.");
+          if (item?.url) window.open(item.url, "_blank");
+          return;
+        }
+        throw error;
+      }
 
       if (data?.data?.url) {
         window.open(data.data.url, "_blank");
@@ -570,20 +578,21 @@ const StockLibrary = () => {
                 <img 
                   src={item.preview?.url || item.thumbnails?.[0]?.url || item.image?.url}
                   alt={item.title}
+                  loading="lazy"
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <Button size="sm" variant="secondary" onClick={() => handleAddToGallery(item)}>
                     <ImageIcon className="h-4 w-4" />
                   </Button>
-                  <Button size="sm" variant="secondary" onClick={() => handleDownload(item.id)}>
+                  <Button size="sm" variant="secondary" onClick={() => handleDownload(item)}>
                     <Download className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               <CardContent className="p-2">
                 <p className="text-xs truncate text-muted-foreground">{item.title}</p>
-                {item.licenses?.includes("premium") && (
+                {item.licenses?.some((l: any) => l?.type === "premium") && (
                   <Badge variant="secondary" className="text-xs mt-1">Premium</Badge>
                 )}
               </CardContent>

@@ -42,7 +42,7 @@ serve(async (req) => {
     // Get resource details
     if (action === "details" && resourceId) {
       console.log("Getting resource details:", resourceId);
-      
+
       const response = await fetch(`https://api.freepik.com/v1/resources/${resourceId}`, {
         headers: {
           "x-freepik-api-key": FREEPIK_API_KEY,
@@ -52,7 +52,17 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Freepik details error:", response.status, errorText);
-        throw new Error(`Freepik API error: ${response.status}`);
+        return new Response(
+          JSON.stringify({
+            error: "Freepik API error",
+            status: response.status,
+            details: errorText,
+          }),
+          {
+            status: response.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const data = await response.json();
@@ -65,7 +75,7 @@ serve(async (req) => {
     // Download resource
     if (action === "download" && resourceId) {
       console.log("Downloading resource:", resourceId);
-      
+
       const response = await fetch(`https://api.freepik.com/v1/resources/${resourceId}/download`, {
         headers: {
           "x-freepik-api-key": FREEPIK_API_KEY,
@@ -75,7 +85,17 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Freepik download error:", response.status, errorText);
-        throw new Error(`Freepik API error: ${response.status}`);
+        return new Response(
+          JSON.stringify({
+            error: "Freepik API error",
+            status: response.status,
+            details: errorText,
+          }),
+          {
+            status: response.status,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
       }
 
       const data = await response.json();
@@ -136,7 +156,17 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Freepik search error:", response.status, errorText);
-      throw new Error(`Freepik API error: ${response.status}`);
+      return new Response(
+        JSON.stringify({
+          error: "Freepik API error",
+          status: response.status,
+          details: errorText,
+        }),
+        {
+          status: response.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const data = await response.json();
