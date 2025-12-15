@@ -67,6 +67,7 @@ export const AIPromptAssistant = ({
   onUpdateTemplate,
 }: AIPromptAssistantProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [optimizedPrompts, setOptimizedPrompts] = useState<OptimizedPrompts | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [customContext, setCustomContext] = useState('');
@@ -149,7 +150,9 @@ export const AIPromptAssistant = ({
     setIsAnalyzing(true);
     try {
       // Compress image before sending
+      setIsCompressing(true);
       const compressedImageUrl = await compressImageForAI(imageUrl);
+      setIsCompressing(false);
       
       const { data, error } = await supabase.functions.invoke('optimize-video-prompt', {
         body: {
@@ -172,6 +175,7 @@ export const AIPromptAssistant = ({
       toast.error(error.message || 'Errore durante l\'analisi');
     } finally {
       setIsAnalyzing(false);
+      setIsCompressing(false);
     }
   };
 
@@ -429,7 +433,7 @@ export const AIPromptAssistant = ({
                 {isAnalyzing ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analisi in corso...
+                    {isCompressing ? 'Compressione immagine...' : 'Analisi in corso...'}
                   </>
                 ) : (
                   <>
