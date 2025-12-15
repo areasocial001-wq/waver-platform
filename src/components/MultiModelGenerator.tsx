@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Play, Video, Check, X, Clock, Sparkles } from 'lucide-react';
+import { Loader2, Play, Pause, RotateCcw, Video, Check, X, Clock, Sparkles, Download } from 'lucide-react';
 
 interface MultiModelGeneratorProps {
   open: boolean;
@@ -324,39 +324,147 @@ export const MultiModelGenerator = ({
               )}
             </Button>
 
-            {/* Results */}
+            {/* Results with Comparison Panel */}
             {results.length > 0 && (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Label>Risultati</Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                
+                {/* Synchronized Playback Controls */}
+                {results.filter(r => r.status === 'completed' && r.videoUrl).length > 1 && (
+                  <div className="flex gap-2 p-3 bg-muted/50 rounded-lg">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        results.forEach(r => {
+                          if (r.status === 'completed') {
+                            const video = document.getElementById(`multi-video-${r.provider}`) as HTMLVideoElement;
+                            if (video) {
+                              video.currentTime = 0;
+                              video.play();
+                            }
+                          }
+                        });
+                      }}
+                    >
+                      <Play className="h-4 w-4 mr-1" />
+                      Riproduci Tutti
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        results.forEach(r => {
+                          const video = document.getElementById(`multi-video-${r.provider}`) as HTMLVideoElement;
+                          if (video) video.pause();
+                        });
+                      }}
+                    >
+                      <Pause className="h-4 w-4 mr-1" />
+                      Pausa
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        results.forEach(r => {
+                          const video = document.getElementById(`multi-video-${r.provider}`) as HTMLVideoElement;
+                          if (video) {
+                            video.currentTime = 0;
+                            video.pause();
+                          }
+                        });
+                      }}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Reset
+                    </Button>
+                  </div>
+                )}
+
+                {/* Side-by-Side Comparison Grid */}
+                <div className={`grid gap-4 ${
+                  results.length === 1 ? 'grid-cols-1' :
+                  results.length === 2 ? 'grid-cols-2' :
+                  'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                }`}>
                   {results.map((result) => {
                     const provider = getProviderInfo(result.provider);
                     return (
-                      <Card key={result.provider} className="p-4">
+                      <Card key={result.provider} className="p-4 flex flex-col">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="font-medium text-sm">{provider?.name}</p>
-                          {getStatusIcon(result.status)}
-                        </div>
-                        <Badge
-                          variant={
-                            result.status === 'completed' ? 'default' :
-                            result.status === 'failed' ? 'destructive' :
-                            'secondary'
-                          }
-                        >
-                          {getStatusLabel(result.status)}
-                        </Badge>
-                        {result.error && (
-                          <p className="text-xs text-destructive mt-2">{result.error}</p>
-                        )}
-                        {result.videoUrl && (
-                          <div className="mt-3">
-                            <video
-                              src={result.videoUrl}
-                              controls
-                              className="w-full rounded"
-                            />
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{provider?.name}</p>
+                            {getStatusIcon(result.status)}
                           </div>
+                          <Badge
+                            variant={
+                              result.status === 'completed' ? 'default' :
+                              result.status === 'failed' ? 'destructive' :
+                              'secondary'
+                            }
+                          >
+                            {getStatusLabel(result.status)}
+                          </Badge>
+                        </div>
+                        
+                        {result.error && (
+                          <p className="text-xs text-destructive mb-2">{result.error}</p>
+                        )}
+                        
+                        <div className="flex-1 min-h-[150px]">
+                          {result.status === 'completed' && result.videoUrl ? (
+                            <div className="aspect-video bg-black rounded overflow-hidden">
+                              <video
+                                id={`multi-video-${result.provider}`}
+                                src={result.videoUrl}
+                                controls
+                                className="w-full h-full object-contain"
+                              />
+                            </div>
+                          ) : result.status === 'processing' ? (
+                            <div className="aspect-video bg-muted rounded flex items-center justify-center">
+                              <div className="text-center">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+                                <p className="text-sm text-muted-foreground">In elaborazione...</p>
+                                <p className="text-xs text-muted-foreground">{provider?.estimatedTime}</p>
+                              </div>
+                            </div>
+                          ) : result.status === 'failed' ? (
+                            <div className="aspect-video bg-destructive/10 rounded flex items-center justify-center">
+                              <X className="h-8 w-8 text-destructive" />
+                            </div>
+                          ) : (
+                            <div className="aspect-video bg-muted rounded flex items-center justify-center">
+                              <Clock className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Download button for completed videos */}
+                        {result.status === 'completed' && result.videoUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(result.videoUrl!);
+                                const blob = await response.blob();
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `video-${result.provider}-${Date.now()}.mp4`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch (error) {
+                                toast.error('Errore durante il download');
+                              }
+                            }}
+                          >
+                            <Download className="h-4 w-4 mr-1" />
+                            Scarica
+                          </Button>
                         )}
                       </Card>
                     );
