@@ -114,6 +114,11 @@ serve(async (req) => {
     if (page) params.append("page", page.toString());
     if (limit) params.append("limit", (limit || 20).toString());
 
+    // License filter (supported across endpoints; also used for post-filter fallback)
+    if (license && license !== "all") {
+      params.append("filters[license]", license);
+    }
+
     switch (contentType) {
       case "icons":
         endpoint = "https://api.freepik.com/v1/icons";
@@ -126,10 +131,6 @@ serve(async (req) => {
         // Orientation filter
         if (orientation && orientation !== "all") {
           params.append("filters[orientation]", orientation);
-        }
-        // License filter
-        if (license && license !== "all") {
-          params.append("filters[license]", license);
         }
         // Exclude AI-generated content
         if (excludeAI) {
@@ -170,6 +171,19 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+
+    // Fallback: if the API doesn't honor license filters on some endpoints,
+    // enforce "free" client-side by removing premium items.
+    if (license === "free" && Array.isArray(data?.data)) {
+      data.data = data.data.filter((item: any) => {
+        const isPremiumFlag = item?.premium === 1 || item?.premium === true;
+        const hasPremiumLicense = Array.isArray(item?.licenses)
+          ? item.licenses.some((l: any) => l?.type === "premium")
+          : false;
+        return !isPremiumFlag && !hasPremiumLicense;
+      });
+    }
+
     console.log("Search response - found", data.data?.length || 0, "items");
 
     return new Response(JSON.stringify(data), {
