@@ -102,11 +102,40 @@ export const usePromptTemplates = () => {
     }
   };
 
+  const updateTemplate = async (templateId: string, updates: Partial<PromptTemplate>) => {
+    try {
+      const { error } = await supabase
+        .from('prompt_templates')
+        .update({
+          name: updates.name,
+          category: updates.category,
+          main_prompt: updates.mainPrompt,
+          camera_movement: updates.cameraMovement,
+          audio_suggestion: updates.audioSuggestion,
+          style: updates.style,
+          duration: updates.duration,
+          keywords: updates.keywords,
+        })
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      await fetchTemplates();
+      toast.success('Template aggiornato');
+      return true;
+    } catch (error: any) {
+      console.error('Error updating template:', error);
+      toast.error('Errore nell\'aggiornamento del template');
+      return false;
+    }
+  };
+
   return {
     templates,
     isLoading,
     saveTemplate,
     deleteTemplate,
+    updateTemplate,
     refetch: fetchTemplates,
   };
 };
