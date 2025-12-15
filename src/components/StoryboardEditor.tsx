@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2 } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,6 +25,10 @@ import { StoryboardToVideoDialog } from "./StoryboardToVideoDialog";
 import { StockLibraryDialog } from "./StockLibraryDialog";
 import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
 import { useStoryboardHistory } from "@/hooks/useStoryboardHistory";
+import { WorkflowView } from "./WorkflowView";
+import { AIPromptAssistant } from "./AIPromptAssistant";
+import { MultiModelGenerator } from "./MultiModelGenerator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StoryboardPanel {
   id: string;
@@ -157,6 +161,15 @@ export const StoryboardEditor = () => {
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [mysticDialogOpen, setMysticDialogOpen] = useState(false);
   const [mysticTargetPanelId, setMysticTargetPanelId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'workflow'>('grid');
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
+  const [aiAssistantPanelId, setAiAssistantPanelId] = useState<string | null>(null);
+  const [aiAssistantImageUrl, setAiAssistantImageUrl] = useState<string | null>(null);
+  const [isOptimizingPrompt, setIsOptimizingPrompt] = useState<string | null>(null);
+  const [multiModelOpen, setMultiModelOpen] = useState(false);
+  const [multiModelImageUrl, setMultiModelImageUrl] = useState<string | null>(null);
+  const [multiModelCaption, setMultiModelCaption] = useState<string>('');
+  const [optimizedPrompt, setOptimizedPrompt] = useState<string>('');
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
 
@@ -318,6 +331,25 @@ export const StoryboardEditor = () => {
         panel.id === mysticTargetPanelId ? { ...panel, imageUrl } : panel
       ));
     }
+  };
+
+  const handleOptimizePrompt = (panelId: string, imageUrl: string) => {
+    const panel = panels.find(p => p.id === panelId);
+    setAiAssistantPanelId(panelId);
+    setAiAssistantImageUrl(imageUrl);
+    setAiAssistantOpen(true);
+  };
+
+  const handlePromptGenerated = (prompt: string) => {
+    setOptimizedPrompt(prompt);
+    toast.success("Prompt ottimizzato salvato!");
+  };
+
+  const handleGenerateMultiModel = (panelId: string, imageUrl: string) => {
+    const panel = panels.find(p => p.id === panelId);
+    setMultiModelImageUrl(imageUrl);
+    setMultiModelCaption(panel?.caption || '');
+    setMultiModelOpen(true);
   };
 
   const handleDragStart = (imageUrl: string) => {
@@ -840,6 +872,32 @@ export const StoryboardEditor = () => {
         </div>
       </div>
 
+      {/* View Mode Tabs */}
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'workflow')} className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="grid" className="flex items-center gap-2">
+            <Grid3x3 className="h-4 w-4" />
+            Vista Griglia
+          </TabsTrigger>
+          <TabsTrigger value="workflow" className="flex items-center gap-2">
+            <Workflow className="h-4 w-4" />
+            Vista Workflow
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="workflow" className="mt-4">
+          <WorkflowView
+            panels={panels}
+            onOptimizePrompt={handleOptimizePrompt}
+            onGenerateVideo={(panelId, imageUrl) => {
+              toast.info("Usa il pulsante Multi per generare video");
+            }}
+            onGenerateMultiModel={handleGenerateMultiModel}
+            isOptimizing={isOptimizingPrompt}
+          />
+        </TabsContent>
+
+        <TabsContent value="grid" className="mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {showGallery && images.length > 0 && (
           <Card className="lg:col-span-1 p-4 bg-card/50 border-accent/20">
@@ -950,11 +1008,8 @@ export const StoryboardEditor = () => {
             }}
             onImageGenerated={handleMysticImageGenerated}
             panelIndex={panels.findIndex(p => p.id === mysticTargetPanelId)}
-          />
         </div>
       </div>
-
-      <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <Type className="h-5 w-5 text-primary" />
           Didascalie e Note
@@ -997,6 +1052,26 @@ export const StoryboardEditor = () => {
           ))}
         </div>
       </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* AI Prompt Assistant Dialog */}
+      <AIPromptAssistant
+        open={aiAssistantOpen}
+        onOpenChange={setAiAssistantOpen}
+        imageUrl={aiAssistantImageUrl}
+        panelCaption={panels.find(p => p.id === aiAssistantPanelId)?.caption}
+        onPromptGenerated={handlePromptGenerated}
+      />
+
+      {/* Multi-Model Generator Dialog */}
+      <MultiModelGenerator
+        open={multiModelOpen}
+        onOpenChange={setMultiModelOpen}
+        imageUrl={multiModelImageUrl}
+        panelCaption={multiModelCaption}
+        optimizedPrompt={optimizedPrompt}
+      />
     </div>
   );
 };
