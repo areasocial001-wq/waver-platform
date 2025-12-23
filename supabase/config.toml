@@ -4,7 +4,7 @@ project_id = "gqzxlwzcxrokzforwgeu"
 verify_jwt = true
 
 [functions.video-proxy]
-verify_jwt = true
+verify_jwt = false
 
 [functions.generate-image]
 verify_jwt = true
