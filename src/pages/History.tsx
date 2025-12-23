@@ -114,9 +114,22 @@ export default function History() {
         .range(from, to);
 
       console.log("Generations result:", { data, error, dataLength: data?.length });
+      console.log("First generation:", data?.[0]);
+      console.log("Batch IDs:", data?.map(g => g.batch_id));
 
       if (error) throw error;
-      setGenerations(data || []);
+      
+      // Normalize data - handle potential malformed image_url
+      const normalizedData = (data || []).map(gen => ({
+        ...gen,
+        image_url: typeof gen.image_url === 'object' && gen.image_url !== null 
+          ? (gen.image_url as any).value || null 
+          : gen.image_url,
+        status: gen.status || 'pending'
+      }));
+      
+      console.log("Normalized data:", normalizedData);
+      setGenerations(normalizedData);
 
       // Fetch batch info for videos that belong to batches
       const batchIds = [...new Set(data?.filter(g => g.batch_id).map(g => g.batch_id))];
