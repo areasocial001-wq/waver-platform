@@ -5,9 +5,10 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle, Bell, BellOff } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,6 +63,8 @@ export default function History() {
   const [isRepairing, setIsRepairing] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [failedCount, setFailedCount] = useState(0);
+  
+  const { isSupported: pushSupported, isEnabled: pushEnabled, requestPermission } = usePushNotifications();
 
   const handleDeleteAll = async () => {
     setIsDeletingAll(true);
@@ -361,6 +364,25 @@ export default function History() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {pushSupported && (
+                <Button
+                  variant={pushEnabled ? "secondary" : "outline"}
+                  onClick={requestPermission}
+                  disabled={pushEnabled}
+                >
+                  {pushEnabled ? (
+                    <>
+                      <Bell className="w-4 h-4 mr-2" />
+                      Notifiche attive
+                    </>
+                  ) : (
+                    <>
+                      <BellOff className="w-4 h-4 mr-2" />
+                      Abilita notifiche
+                    </>
+                  )}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleRepairLinks}
