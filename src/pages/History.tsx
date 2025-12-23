@@ -97,7 +97,7 @@ export default function History() {
   const handleRepairLinks = async () => {
     setIsRepairing(true);
     try {
-      // Fetch all completed videos with non-proxy URLs
+      // Fetch all completed videos that might need repair
       const { data: videosToRepair, error: fetchError } = await supabase
         .from("video_generations")
         .select("id, video_url, prediction_id")
@@ -106,27 +106,27 @@ export default function History() {
 
       if (fetchError) throw fetchError;
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       let repairedCount = 0;
 
       for (const video of videosToRepair || []) {
-        // Skip if already a proxy URL
-        if (video.video_url?.includes("/functions/v1/video-proxy")) continue;
+        // Check if the video URL is broken (points to non-existent storage)
+        const isBrokenStorageUrl = video.video_url?.includes("/storage/v1/object/") || 
+          (video.video_url?.includes("video-proxy") && video.video_url?.includes("storage%2Fv1"));
         
-        // Try to extract original URI from the video URL
-        // This handles replicate.delivery URLs and other formats
-        let originalUri = video.video_url;
+        if (!isBrokenStorageUrl) continue;
         
-        // If it's not a direct replicate URI, we'll use the existing URL as the target
-        const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(originalUri)}`;
-        
-        const { error: updateError } = await supabase
-          .from("video_generations")
-          .update({ video_url: proxyUrl })
-          .eq("id", video.id);
+        // If we have a prediction_id, try to re-fetch the video URL from the API
+        if (video.prediction_id && !video.prediction_id.startsWith('kling:') && 
+            !video.prediction_id.startsWith('freepik:') && !video.prediction_id.startsWith('replicate:')) {
+          
+          // Call generate-video to re-poll and update the URL
+          const { data, error } = await supabase.functions.invoke("generate-video", {
+            body: { operationId: video.prediction_id, generationId: video.id }
+          });
 
-        if (!updateError) {
-          repairedCount++;
+          if (!error && data?.status === "succeeded") {
+            repairedCount++;
+          }
         }
       }
 
@@ -134,7 +134,7 @@ export default function History() {
         toast.success(`${repairedCount} link video riparati con successo`);
         fetchGenerations();
       } else {
-        toast.info("Nessun link da riparare trovato");
+        toast.info("Nessun link da riparare trovato (o i video erano già validi)");
       }
     } catch (error) {
       console.error("Error repairing links:", error);
