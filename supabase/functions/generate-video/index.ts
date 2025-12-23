@@ -318,62 +318,38 @@ serve(async (req) => {
         const videoBlob = await videoResponse.blob();
         console.log("Video downloaded, size:", videoBlob.size, "bytes");
 
-        // Upload to Supabase Storage
-        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        // Instead of uploading to Storage (bucket may not exist in some environments),
+        // store a proxy URL that streams the video through our backend function.
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+        const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(videoUri)}`;
+        console.log("Using proxy URL:", proxyUrl);
 
-        // Generate unique filename
-        const timestamp = Date.now();
-        const randomId = crypto.randomUUID().slice(0, 8);
-        const fileName = `videos/${body.generationId || timestamp}-${randomId}.mp4`;
-
-        // Upload to storage bucket
-        const { data: uploadData, error: uploadError } = await supabaseClient
-          .storage
-          .from('generated-videos')
-          .upload(fileName, videoBlob, {
-            contentType: 'video/mp4',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error("Upload error:", uploadError);
-          throw new Error(`Failed to upload video: ${uploadError.message}`);
-        }
-
-        // Get public URL
-        const { data: publicUrlData } = supabaseClient
-          .storage
-          .from('generated-videos')
-          .getPublicUrl(fileName);
-
-        const permanentVideoUrl = publicUrlData.publicUrl;
-        console.log("Video uploaded to storage:", permanentVideoUrl);
-
-        // Update database with permanent URL
+        // Update database with proxy URL
         if (body.generationId) {
+          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
           await supabaseClient
             .from('video_generations')
             .update({
               status: 'completed',
-              video_url: permanentVideoUrl,
+              video_url: proxyUrl,
             })
             .eq('id', body.generationId);
 
-          return new Response(JSON.stringify({ 
+          return new Response(JSON.stringify({
             status: "succeeded",
-            output: permanentVideoUrl 
+            output: proxyUrl,
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 200,
           });
         }
 
-        return new Response(JSON.stringify({ 
+        return new Response(JSON.stringify({
           status: "succeeded",
-          output: permanentVideoUrl 
+          output: proxyUrl,
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
