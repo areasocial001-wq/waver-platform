@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2 } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import { useEffect, useState, useRef } from "react";
@@ -41,6 +41,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const [isVisible, setIsVisible] = useState(false);
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleDelete = async () => {
@@ -60,6 +61,33 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
       toast.error("Errore nell'eliminazione del video");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!generation.video_url) return;
+    
+    setIsDownloading(true);
+    try {
+      const response = await fetch(generation.video_url);
+      if (!response.ok) throw new Error("Impossibile scaricare il video");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `video-${generation.id.slice(0, 8)}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast.success("Download avviato!");
+    } catch (error) {
+      console.error("Error downloading video:", error);
+      toast.error("Errore nel download del video");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -265,8 +293,28 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                 locale: it,
               })}
             </span>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <span className="capitalize">{generation.type.replace("_", " ")}</span>
+              
+              {generation.status === "completed" && generation.video_url && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-3 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-1" />
+                      Scarica
+                    </>
+                  )}
+                </Button>
+              )}
+              
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button 

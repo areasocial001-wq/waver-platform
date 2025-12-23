@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { usePushNotifications } from "./usePushNotifications";
 
 export const useVideoPolling = (
   generations: any[],
@@ -8,6 +9,7 @@ export const useVideoPolling = (
 ) => {
   // Track which videos we've already notified about
   const notifiedVideos = useRef<Set<string>>(new Set());
+  const { isEnabled: pushEnabled, showNotification } = usePushNotifications();
   // Track videos with broken links
   const brokenLinkVideos = useRef<Set<string>>(new Set());
 
@@ -112,10 +114,21 @@ export const useVideoPolling = (
             if (!notifiedVideos.current.has(gen.id)) {
               notifiedVideos.current.add(gen.id);
               const promptPreview = gen.prompt?.slice(0, 50) || "Video";
+              
+              // In-app toast
               toast.success("Video completato!", {
                 description: `${promptPreview}${gen.prompt?.length > 50 ? "..." : ""}`,
                 duration: 5000,
               });
+              
+              // Push notification (works even if page is in background)
+              if (pushEnabled && document.hidden) {
+                showNotification(
+                  "Video Completato! 🎬",
+                  `${promptPreview}${gen.prompt?.length > 50 ? "..." : ""}`,
+                  { videoId: gen.id }
+                );
+              }
             }
             
             onUpdate();
