@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -35,6 +35,57 @@ interface VideoGenerationCardProps {
   onDelete?: () => void;
 }
 
+// Genera miniatura dal primo frame del video
+const generateThumbnail = (videoUrl: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    
+    video.onloadeddata = () => {
+      video.currentTime = 0.1; // Primo frame
+    };
+    
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(thumbnail);
+        } else {
+          reject(new Error('Canvas context not available'));
+        }
+      } catch (error) {
+        reject(error);
+      }
+    };
+    
+    video.onerror = () => reject(new Error('Video load error'));
+    video.src = videoUrl;
+  });
+};
+
+// Cache per le miniature in localStorage
+const getThumbnailFromCache = (videoId: string): string | null => {
+  try {
+    return localStorage.getItem(`thumb_${videoId}`);
+  } catch {
+    return null;
+  }
+};
+
+const saveThumbnailToCache = (videoId: string, thumbnail: string) => {
+  try {
+    localStorage.setItem(`thumb_${videoId}`, thumbnail);
+  } catch {
+    // localStorage pieno, ignora
+  }
+};
+
 export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCardProps) => {
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -42,6 +93,8 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const [shouldLoadVideo, setShouldLoadVideo] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleDelete = async () => {
@@ -108,6 +161,34 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
 
     return () => observer.disconnect();
   }, []);
+
+  // Genera miniatura quando il card è visibile
+  useEffect(() => {
+    if (!isVisible || !generation.video_url || generation.status !== "completed") return;
+    
+    // Prima controlla la cache
+    const cached = getThumbnailFromCache(generation.id);
+    if (cached) {
+      setThumbnail(cached);
+      return;
+    }
+    
+    // Genera la miniatura
+    setIsLoadingThumbnail(true);
+    generateThumbnail(generation.video_url)
+      .then((thumb) => {
+        setThumbnail(thumb);
+        saveThumbnailToCache(generation.id, thumb);
+      })
+      .catch((err) => {
+        console.log('Thumbnail generation failed:', err);
+        // Fallback: usa image_url se disponibile
+        if (generation.image_url) {
+          setThumbnail(generation.image_url);
+        }
+      })
+      .finally(() => setIsLoadingThumbnail(false));
+  }, [isVisible, generation.video_url, generation.status, generation.id, generation.image_url]);
 
   // Kling: 3-5 minuti, Veo: 60-120 secondi
   const getEstimatedTotalSeconds = () => {
@@ -207,19 +288,36 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
               <video
                 src={generation.video_url}
                 controls
+                autoPlay
                 className="w-full h-full object-cover"
                 preload="metadata"
               />
             ) : (
               <div 
-                className="w-full h-full flex items-center justify-center cursor-pointer bg-muted hover:bg-muted/80 transition-colors"
+                className="w-full h-full flex items-center justify-center cursor-pointer bg-muted hover:bg-muted/80 transition-colors relative group"
                 onClick={() => setShouldLoadVideo(true)}
               >
-                <div className="text-center space-y-2">
-                  <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto">
-                    <Play className="w-8 h-8 text-primary" />
+                {/* Miniatura del video */}
+                {thumbnail ? (
+                  <img 
+                    src={thumbnail} 
+                    alt="Anteprima video"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : isLoadingThumbnail ? (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
-                  <p className="text-xs text-muted-foreground">Clicca per caricare</p>
+                ) : null}
+                
+                {/* Overlay con pulsante play */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center mx-auto shadow-lg group-hover:scale-110 transition-transform">
+                      <Play className="w-8 h-8 text-primary-foreground ml-1" />
+                    </div>
+                    <p className="text-xs text-white font-medium drop-shadow-md">Clicca per riprodurre</p>
+                  </div>
                 </div>
               </div>
             )
