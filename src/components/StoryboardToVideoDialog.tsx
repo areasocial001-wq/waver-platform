@@ -35,7 +35,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
   const [transitionPrompt, setTransitionPrompt] = useState("");
   const [transitionStyle, setTransitionStyle] = useState("smooth");
   const [transitionSpeed, setTransitionSpeed] = useState<"fast" | "normal" | "slow">("normal");
-  const [videoProvider, setVideoProvider] = useState<"auto" | "freepik">("auto");
+  const [videoProvider, setVideoProvider] = useState<"auto" | "kling" | "veo">("auto");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
@@ -145,7 +145,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
             endImage: endPanel.imageUrl, // Use end frame for transition
             prompt: fullPrompt,
             generationId: generation.id,
-            preferredProvider: videoProvider === "freepik" ? "freepik" : undefined,
+            preferredProvider: videoProvider !== "auto" ? videoProvider : undefined,
           },
         });
 
@@ -331,16 +331,22 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
           {/* Video Provider */}
           <div className="space-y-2">
             <Label>Provider Video</Label>
-            <Select value={videoProvider} onValueChange={(v) => setVideoProvider(v as any)}>
+            <Select value={videoProvider} onValueChange={(v) => setVideoProvider(v as "auto" | "kling" | "veo")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">🤖 Automatico (Kling/Veo)</SelectItem>
+                <SelectItem value="kling">🎬 Kling 2.1 - Transizioni fluide, end-frame</SelectItem>
+                <SelectItem value="veo">🌟 Google Veo 3.1 - Alta qualità, incluso</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole).
+              {videoProvider === "auto" 
+                ? "Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole)."
+                : videoProvider === "kling" 
+                  ? "Kling 2.1: Ottimo per transizioni con supporto end-frame. Richiede API key separata."
+                  : "Google Veo 3.1: Alta qualità, incluso con Lovable AI. Nessun costo extra."}
             </p>
           </div>
 
