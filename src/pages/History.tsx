@@ -98,6 +98,8 @@ export default function History() {
         .from("video_generations")
         .select("*", { count: "exact", head: true });
 
+      console.log("Count result:", { count, countError });
+
       if (countError) throw countError;
       setTotalCount(count || 0);
 
@@ -110,6 +112,8 @@ export default function History() {
         .select("*")
         .order("created_at", { ascending: false })
         .range(from, to);
+
+      console.log("Generations result:", { data, error, dataLength: data?.length });
 
       if (error) throw error;
       setGenerations(data || []);
