@@ -92,47 +92,41 @@ export default function History() {
   const fetchGenerations = async () => {
     try {
       setLoading(true);
-      
+
       // Get total count first
       const { count, error: countError } = await supabase
         .from("video_generations")
         .select("*", { count: "exact", head: true });
 
-      console.log("Count result:", { count, countError });
-
       if (countError) throw countError;
       setTotalCount(count || 0);
 
-      // Fetch paginated data
+      // Fetch paginated data (avoid selecting image_url because it can be very large)
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
       const { data, error } = await supabase
         .from("video_generations")
-        .select("*")
+        .select(
+          "id, type, prompt, duration, resolution, motion_intensity, image_name, status, created_at, prediction_id, video_url, error_message, batch_id, sequence_order"
+        )
         .order("created_at", { ascending: false })
         .range(from, to);
 
-      console.log("Generations result:", { data, error, dataLength: data?.length });
-      console.log("First generation:", data?.[0]);
-      console.log("Batch IDs:", data?.map(g => g.batch_id));
-
       if (error) throw error;
-      
-      // Normalize data - handle potential malformed image_url
-      const normalizedData = (data || []).map(gen => ({
+
+      // Normalize data
+      const normalizedData: VideoGeneration[] = (data || []).map((gen: any) => ({
         ...gen,
-        image_url: typeof gen.image_url === 'object' && gen.image_url !== null 
-          ? (gen.image_url as any).value || null 
-          : gen.image_url,
-        status: gen.status || 'pending'
+        // don't load large previews in History list
+        image_url: null,
+        status: gen.status || "pending",
       }));
-      
-      console.log("Normalized data:", normalizedData);
+
       setGenerations(normalizedData);
 
       // Fetch batch info for videos that belong to batches
-      const batchIds = [...new Set(data?.filter(g => g.batch_id).map(g => g.batch_id))];
+      const batchIds = [...new Set((data || []).filter((g: any) => g.batch_id).map((g: any) => g.batch_id))];
       if (batchIds.length > 0) {
         const { data: batchData, error: batchError } = await supabase
           .from("storyboard_video_batches")
@@ -140,9 +134,9 @@ export default function History() {
           .in("id", batchIds);
 
         if (batchError) throw batchError;
-        
+
         const batchMap = new Map<string, VideoBatch>();
-        batchData?.forEach(batch => {
+        batchData?.forEach((batch) => {
           batchMap.set(batch.id, batch as VideoBatch);
         });
         setBatches(batchMap);
