@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -8,6 +8,75 @@ export const useVideoPolling = (
 ) => {
   // Track which videos we've already notified about
   const notifiedVideos = useRef<Set<string>>(new Set());
+  // Track videos with broken links
+  const brokenLinkVideos = useRef<Set<string>>(new Set());
+
+  const repairVideoLink = useCallback(async (videoId: string, currentUrl: string) => {
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(currentUrl)}`;
+      
+      const { error } = await supabase
+        .from("video_generations")
+        .update({ video_url: proxyUrl })
+        .eq("id", videoId);
+
+      if (!error) {
+        toast.success("Link video riparato automaticamente");
+        onUpdate();
+        return true;
+      }
+    } catch (error) {
+      console.error("Error repairing link:", error);
+    }
+    return false;
+  }, [onUpdate]);
+
+  // Check if a video URL is broken (returns 404)
+  const checkVideoUrl = useCallback(async (videoId: string, videoUrl: string) => {
+    // Skip if already checked or already a proxy URL
+    if (brokenLinkVideos.current.has(videoId)) return;
+    if (videoUrl.includes("/functions/v1/video-proxy")) return;
+
+    try {
+      const response = await fetch(videoUrl, { method: "HEAD" });
+      if (!response.ok) {
+        brokenLinkVideos.current.add(videoId);
+        
+        toast.error("Video non raggiungibile", {
+          description: "Il link del video non è più valido",
+          duration: 10000,
+          action: {
+            label: "Ripara",
+            onClick: () => repairVideoLink(videoId, videoUrl),
+          },
+        });
+      }
+    } catch (error) {
+      // Network error - likely CORS or unreachable
+      brokenLinkVideos.current.add(videoId);
+      
+      toast.error("Video non raggiungibile", {
+        description: "Impossibile accedere al video",
+        duration: 10000,
+        action: {
+          label: "Ripara",
+          onClick: () => repairVideoLink(videoId, videoUrl),
+        },
+      });
+    }
+  }, [repairVideoLink]);
+
+  useEffect(() => {
+    // Check completed videos for broken links
+    const completedVideos = generations.filter(
+      (g) => g.status === "completed" && g.video_url
+    );
+
+    completedVideos.forEach((video) => {
+      checkVideoUrl(video.id, video.video_url);
+    });
+  }, [generations, checkVideoUrl]);
 
   useEffect(() => {
     const processingGenerations = generations.filter(
