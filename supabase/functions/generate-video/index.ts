@@ -292,7 +292,31 @@ serve(async (req) => {
       // Check if operation is complete
       if (operation.done) {
         if (operation.error) {
-          throw new Error(`Video generation failed: ${operation.error.message}`);
+          // Check if it's a temporary overload error (code 14)
+          const isOverloaded = operation.error.code === 14 || 
+            (operation.error.message && operation.error.message.includes("overloaded"));
+          
+          if (isOverloaded) {
+            // Return as failed with specific error so frontend can show retry option
+            return new Response(JSON.stringify({
+              status: "failed",
+              error: "Il modello AI è temporaneamente sovraccarico. Riprova tra qualche minuto.",
+              retryable: true
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200, // Return 200 so frontend can handle gracefully
+            });
+          }
+          
+          // For other errors, return as failed
+          return new Response(JSON.stringify({
+            status: "failed",
+            error: operation.error.message || "Errore sconosciuto durante la generazione",
+            retryable: false
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
         }
 
         // Get video URL from response (REST API format)

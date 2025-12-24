@@ -141,13 +141,29 @@ export const useVideoPolling = (
               })
               .eq("id", gen.id);
             
-            // Show error toast
+            // Show error toast with retry option if applicable
             if (!notifiedVideos.current.has(gen.id)) {
               notifiedVideos.current.add(gen.id);
-              toast.error("Generazione fallita", {
-                description: data.error || "Si è verificato un errore",
-                duration: 5000,
-              });
+              
+              if (data.retryable) {
+                toast.error("Modello AI sovraccarico", {
+                  description: data.error || "Riprova tra qualche minuto",
+                  duration: 10000,
+                  action: {
+                    label: "Riprova",
+                    onClick: () => {
+                      // Remove from notified so user can get notified again
+                      notifiedVideos.current.delete(gen.id);
+                      window.location.reload();
+                    },
+                  },
+                });
+              } else {
+                toast.error("Generazione fallita", {
+                  description: data.error || "Si è verificato un errore",
+                  duration: 5000,
+                });
+              }
             }
             
             onUpdate();
