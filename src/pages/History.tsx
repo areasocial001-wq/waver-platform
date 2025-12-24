@@ -11,6 +11,7 @@ import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
+import { VideoQueueMonitor } from "@/components/VideoQueueMonitor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -431,6 +432,11 @@ export default function History() {
                 </AlertDialog>
               )}
             </div>
+          </div>
+
+          {/* Video Queue Monitor */}
+          <div className="mb-6">
+            <VideoQueueMonitor />
           </div>
 
           <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1); }} className="mb-6">
