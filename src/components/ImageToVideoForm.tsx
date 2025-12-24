@@ -23,6 +23,7 @@ export const ImageToVideoForm = () => {
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [isLoading, setIsLoading] = useState(false);
+  const [preferredProvider, setPreferredProvider] = useState<string>("auto");
 
   // Reset duration to valid value when switching between modes
   useEffect(() => {
@@ -246,7 +247,8 @@ export const ImageToVideoForm = () => {
         prompt: cinematicPrompt,
         start_image: startImagePreview,
         duration: parseInt(duration),
-        generationId: generationData.id
+        generationId: generationData.id,
+        preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
       };
 
       // Add end image if provided
@@ -315,32 +317,82 @@ export const ImageToVideoForm = () => {
         </AlertDescription>
       </Alert>
 
+      {/* Provider Selection */}
+      <div className="space-y-2">
+        <Label>Provider AI</Label>
+        <Select value={preferredProvider} onValueChange={setPreferredProvider}>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleziona provider" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-accent" />
+                <span>Auto (migliore disponibile)</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="veo">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>Google Veo 3.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="kling">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-purple-500" />
+                <span>Kling 2.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="freepik">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span>Freepik MiniMax</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {preferredProvider === "auto" && "Seleziona automaticamente il provider migliore in base ai parametri"}
+          {preferredProvider === "veo" && "Google Veo 3.1 - Animazione singola con audio sincronizzato"}
+          {preferredProvider === "kling" && "Kling 2.1 - Ottimo per transizioni start/end frame"}
+          {preferredProvider === "freepik" && "Freepik MiniMax - Veloce per transizioni sequenziali"}
+        </p>
+      </div>
+
       {/* API Indicator */}
       <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-        endImage 
-          ? "bg-purple-500/10 border-purple-500/30" 
-          : "bg-emerald-500/10 border-emerald-500/30"
+        preferredProvider === "kling" ? "bg-purple-500/10 border-purple-500/30" :
+        preferredProvider === "freepik" ? "bg-blue-500/10 border-blue-500/30" :
+        preferredProvider === "veo" ? "bg-emerald-500/10 border-emerald-500/30" :
+        endImage ? "bg-purple-500/10 border-purple-500/30" : "bg-emerald-500/10 border-emerald-500/30"
       }`}>
         <div className={`w-3 h-3 rounded-full animate-pulse ${
+          preferredProvider === "kling" ? "bg-purple-500" :
+          preferredProvider === "freepik" ? "bg-blue-500" :
+          preferredProvider === "veo" ? "bg-emerald-500" :
           endImage ? "bg-purple-500" : "bg-emerald-500"
         }`} />
         <div className="flex-1">
           <p className="text-sm font-medium">
-            {endImage ? "Kling 2.1 API" : "Google Veo 3.1"}
+            {preferredProvider === "kling" ? "Kling 2.1 API" :
+             preferredProvider === "freepik" ? "Freepik MiniMax" :
+             preferredProvider === "veo" ? "Google Veo 3.1" :
+             endImage ? "Kling 2.1 API" : "Google Veo 3.1"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {endImage 
+            {preferredProvider === "kling" || (preferredProvider === "auto" && endImage)
               ? "Transizione sequenziale tra start e end frame" 
               : "Animazione singola con audio sincronizzato"
             }
           </p>
         </div>
         <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-          endImage 
-            ? "bg-purple-500/20 text-purple-300" 
-            : "bg-emerald-500/20 text-emerald-300"
+          preferredProvider === "kling" ? "bg-purple-500/20 text-purple-300" :
+          preferredProvider === "freepik" ? "bg-blue-500/20 text-blue-300" :
+          preferredProvider === "veo" ? "bg-emerald-500/20 text-emerald-300" :
+          endImage ? "bg-purple-500/20 text-purple-300" : "bg-emerald-500/20 text-emerald-300"
         }`}>
-          {endImage ? "Sequential" : "Standard"}
+          {preferredProvider !== "auto" ? preferredProvider.toUpperCase() : (endImage ? "Sequential" : "Standard")}
         </span>
       </div>
 

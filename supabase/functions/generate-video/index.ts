@@ -904,7 +904,15 @@ serve(async (req) => {
     console.error("Error in generate-video function:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to generate video";
     
-    // Update database with error
+    // Check if error is retryable (model overload, rate limits, etc.)
+    const isRetryable = errorMessage.includes("overloaded") || 
+                        errorMessage.includes("rate limit") ||
+                        errorMessage.includes("quota") ||
+                        errorMessage.includes("temporarily") ||
+                        errorMessage.includes("RESOURCE_EXHAUSTED") ||
+                        errorMessage.includes("429");
+    
+    // Update database with error and retry info
     if (body?.generationId) {
       try {
         const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
@@ -912,13 +920,57 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-        await supabaseClient
+        // Get current retry count
+        const { data: currentGen } = await supabaseClient
           .from('video_generations')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-          })
-          .eq('id', body.generationId);
+          .select('retry_count, max_retries')
+          .eq('id', body.generationId)
+          .single();
+
+        const retryCount = (currentGen?.retry_count || 0) + 1;
+        const maxRetries = currentGen?.max_retries || 3;
+        
+        if (isRetryable && retryCount <= maxRetries) {
+          // Calculate exponential backoff: 30s, 60s, 120s
+          const backoffSeconds = Math.pow(2, retryCount - 1) * 30;
+          const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
+          
+          await supabaseClient
+            .from('video_generations')
+            .update({
+              status: 'pending',
+              retry_count: retryCount,
+              next_retry_at: nextRetryAt,
+              error_message: `Tentativo ${retryCount}/${maxRetries} - ${errorMessage}`,
+            })
+            .eq('id', body.generationId);
+          
+          console.log(`Scheduled retry ${retryCount}/${maxRetries} in ${backoffSeconds}s`);
+          
+          return new Response(
+            JSON.stringify({ 
+              status: "retry_scheduled",
+              retryCount,
+              maxRetries,
+              nextRetryAt,
+              error: errorMessage
+            }), 
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            }
+          );
+        } else {
+          await supabaseClient
+            .from('video_generations')
+            .update({
+              status: 'failed',
+              error_message: retryCount > maxRetries 
+                ? `Fallito dopo ${maxRetries} tentativi: ${errorMessage}`
+                : errorMessage,
+            })
+            .eq('id', body.generationId);
+        }
       } catch (dbError) {
         console.error("Error updating database:", dbError);
       }
@@ -926,7 +978,8 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: errorMessage
+        error: errorMessage,
+        retryable: isRetryable
       }), 
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

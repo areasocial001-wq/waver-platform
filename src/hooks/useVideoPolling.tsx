@@ -3,8 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePushNotifications } from "./usePushNotifications";
 
+interface VideoGeneration {
+  id: string;
+  status: string;
+  prediction_id?: string;
+  video_url?: string;
+  prompt?: string;
+  retry_count?: number;
+  max_retries?: number;
+  next_retry_at?: string;
+  queue_position?: number;
+  priority?: number;
+}
+
 export const useVideoPolling = (
-  generations: any[],
+  generations: VideoGeneration[],
   onUpdate: () => void
 ) => {
   // Track which videos we've already notified about
@@ -12,6 +25,8 @@ export const useVideoPolling = (
   const { isEnabled: pushEnabled, showNotification } = usePushNotifications();
   // Track videos with broken links
   const brokenLinkVideos = useRef<Set<string>>(new Set());
+  // Track retry timers
+  const retryTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const repairVideoLink = useCallback(async (videoId: string, currentUrl: string) => {
     try {
@@ -80,6 +95,60 @@ export const useVideoPolling = (
     });
   }, [generations, checkVideoUrl]);
 
+  // Handle pending generations with scheduled retries
+  const retryPendingGeneration = useCallback(async (gen: VideoGeneration) => {
+    if (!gen.next_retry_at) return;
+    
+    const retryTime = new Date(gen.next_retry_at).getTime();
+    const now = Date.now();
+    
+    if (retryTime <= now) {
+      // Time to retry
+      console.log(`Retrying generation ${gen.id}, attempt ${(gen.retry_count || 0) + 1}`);
+      
+      try {
+        await supabase
+          .from("video_generations")
+          .update({ status: "processing", next_retry_at: null })
+          .eq("id", gen.id);
+        
+        toast.info("Nuovo tentativo in corso...", {
+          description: `Tentativo ${gen.retry_count || 1}/${gen.max_retries || 3}`,
+        });
+        
+        onUpdate();
+      } catch (error) {
+        console.error("Error retrying generation:", error);
+      }
+    } else {
+      // Schedule retry
+      const delay = retryTime - now;
+      
+      if (!retryTimers.current.has(gen.id)) {
+        const timer = setTimeout(() => {
+          retryTimers.current.delete(gen.id);
+          retryPendingGeneration(gen);
+        }, Math.min(delay, 60000)); // Check at least every minute
+        
+        retryTimers.current.set(gen.id, timer);
+      }
+    }
+  }, [onUpdate]);
+
+  // Check pending generations for retry
+  useEffect(() => {
+    const pendingWithRetry = generations.filter(
+      (g) => g.status === "pending" && g.next_retry_at
+    );
+    
+    pendingWithRetry.forEach(retryPendingGeneration);
+    
+    return () => {
+      retryTimers.current.forEach((timer) => clearTimeout(timer));
+      retryTimers.current.clear();
+    };
+  }, [generations, retryPendingGeneration]);
+
   useEffect(() => {
     const processingGenerations = generations.filter(
       (g) => g.status === "processing" && g.prediction_id
@@ -106,7 +175,9 @@ export const useVideoPolling = (
               .from("video_generations")
               .update({
                 status: "completed",
-                video_url: videoUrl
+                video_url: videoUrl,
+                retry_count: 0,
+                next_retry_at: null
               })
               .eq("id", gen.id);
             
@@ -132,6 +203,16 @@ export const useVideoPolling = (
             }
             
             onUpdate();
+          } else if (data.status === "retry_scheduled") {
+            // Retry was scheduled, show info toast
+            if (!notifiedVideos.current.has(`retry_${gen.id}_${data.retryCount}`)) {
+              notifiedVideos.current.add(`retry_${gen.id}_${data.retryCount}`);
+              toast.info("Retry automatico programmato", {
+                description: `Tentativo ${data.retryCount}/${data.maxRetries} tra poco...`,
+                duration: 5000,
+              });
+            }
+            onUpdate();
           } else if (data.status === "failed") {
             await supabase
               .from("video_generations")
@@ -152,7 +233,6 @@ export const useVideoPolling = (
                   action: {
                     label: "Riprova",
                     onClick: () => {
-                      // Remove from notified so user can get notified again
                       notifiedVideos.current.delete(gen.id);
                       window.location.reload();
                     },
@@ -178,5 +258,5 @@ export const useVideoPolling = (
     checkStatus();
 
     return () => clearInterval(interval);
-  }, [generations, onUpdate]);
+  }, [generations, onUpdate, pushEnabled, showNotification]);
 };
