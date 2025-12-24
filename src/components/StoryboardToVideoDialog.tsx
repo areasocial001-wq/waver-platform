@@ -141,8 +141,8 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
           body: {
             type: "image_to_video",
             duration,
-            image: startPanel.imageUrl,
-            endImage: endPanel.imageUrl, // Use end frame for transition
+            start_image: startPanel.imageUrl,
+            end_image: endPanel.imageUrl, // Use end frame for transition
             prompt: fullPrompt,
             generationId: generation.id,
             preferredProvider: videoProvider !== "auto" ? videoProvider : undefined,
