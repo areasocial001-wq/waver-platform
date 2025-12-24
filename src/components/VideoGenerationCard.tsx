@@ -31,6 +31,12 @@ interface VideoGenerationCardProps {
     created_at: string;
     duration: number;
     image_url?: string;
+    retry_count?: number;
+    max_retries?: number;
+    next_retry_at?: string;
+    queue_position?: number;
+    priority?: number;
+    provider?: string;
   };
   onDelete?: () => void;
 }
@@ -240,6 +246,23 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
           <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30">
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
             In elaborazione...
+          </Badge>
+        );
+      case "pending":
+        if (generation.next_retry_at) {
+          const retryTime = new Date(generation.next_retry_at);
+          const timeLeft = Math.max(0, Math.ceil((retryTime.getTime() - Date.now()) / 1000));
+          return (
+            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/30">
+              <Clock className="w-3 h-3 mr-1" />
+              Retry in {timeLeft}s ({generation.retry_count}/{generation.max_retries})
+            </Badge>
+          );
+        }
+        return (
+          <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/30">
+            <Clock className="w-3 h-3 mr-1" />
+            In coda {generation.queue_position ? `#${generation.queue_position}` : ""}
           </Badge>
         );
       case "completed":

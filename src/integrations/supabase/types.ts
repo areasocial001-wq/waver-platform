@@ -172,10 +172,16 @@ export type Database = {
           id: string
           image_name: string | null
           image_url: string | null
+          max_retries: number | null
           motion_intensity: string | null
+          next_retry_at: string | null
           prediction_id: string | null
+          priority: number | null
           prompt: string | null
+          provider: string | null
+          queue_position: number | null
           resolution: string | null
+          retry_count: number | null
           sequence_order: number | null
           status: string | null
           type: Database["public"]["Enums"]["generation_type"]
@@ -191,10 +197,16 @@ export type Database = {
           id?: string
           image_name?: string | null
           image_url?: string | null
+          max_retries?: number | null
           motion_intensity?: string | null
+          next_retry_at?: string | null
           prediction_id?: string | null
+          priority?: number | null
           prompt?: string | null
+          provider?: string | null
+          queue_position?: number | null
           resolution?: string | null
+          retry_count?: number | null
           sequence_order?: number | null
           status?: string | null
           type: Database["public"]["Enums"]["generation_type"]
@@ -210,10 +222,16 @@ export type Database = {
           id?: string
           image_name?: string | null
           image_url?: string | null
+          max_retries?: number | null
           motion_intensity?: string | null
+          next_retry_at?: string | null
           prediction_id?: string | null
+          priority?: number | null
           prompt?: string | null
+          provider?: string | null
+          queue_position?: number | null
           resolution?: string | null
+          retry_count?: number | null
           sequence_order?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["generation_type"]
