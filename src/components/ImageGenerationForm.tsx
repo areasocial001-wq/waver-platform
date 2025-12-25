@@ -27,16 +27,33 @@ interface FilterState {
 }
 
 const imageFilters = [
+  // Classic Filters
   { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors", cssFilter: "sepia(0.4) contrast(1.1) brightness(0.95) saturate(0.9)" },
   { id: "hdr", name: "HDR", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details", cssFilter: "contrast(1.3) saturate(1.4) brightness(1.05)" },
   { id: "bw", name: "Bianco e Nero", prompt: "Convert to high contrast black and white with dramatic shadows", cssFilter: "grayscale(1) contrast(1.2)" },
   { id: "cinematic", name: "Cinematico", prompt: "Apply cinematic color grading with film-like tones and letterbox feel", cssFilter: "contrast(1.15) saturate(0.85) brightness(0.9) sepia(0.15)" },
+  
+  // Artistic Filters
   { id: "watercolor", name: "Acquerello", prompt: "Transform into watercolor painting style with soft edges and flowing colors", cssFilter: "saturate(1.3) brightness(1.1) blur(0.5px)" },
   { id: "oil-painting", name: "Pittura a Olio", prompt: "Transform into oil painting style with visible brush strokes and rich textures", cssFilter: "saturate(1.5) contrast(1.2)" },
   { id: "pop-art", name: "Pop Art", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look", cssFilter: "saturate(2) contrast(1.5) brightness(1.1)" },
-  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails", cssFilter: "saturate(1.8) brightness(1.2) contrast(1.3) hue-rotate(15deg)" },
   { id: "sketch", name: "Schizzo", prompt: "Convert to pencil sketch style with detailed line work", cssFilter: "grayscale(0.8) contrast(1.4) brightness(1.1)" },
   { id: "anime", name: "Anime", prompt: "Transform into anime/manga art style with cel shading", cssFilter: "saturate(1.4) contrast(1.2) brightness(1.05)" },
+  
+  // Creative/Digital Filters
+  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails", cssFilter: "saturate(1.8) brightness(1.2) contrast(1.3) hue-rotate(15deg)" },
+  { id: "glitch", name: "Glitch", prompt: "Apply digital glitch effect with chromatic aberration, scan lines, and distortion artifacts", cssFilter: "contrast(1.2) saturate(1.3) hue-rotate(5deg)" },
+  { id: "vaporwave", name: "Vaporwave", prompt: "Apply vaporwave aesthetic with pink and cyan tones, retro 80s/90s feel, and dreamy atmosphere", cssFilter: "saturate(1.6) brightness(1.1) contrast(1.1) hue-rotate(-20deg)" },
+  { id: "retrowave", name: "Retrowave", prompt: "Apply synthwave/retrowave style with neon purple and pink gradients, 80s futuristic aesthetic", cssFilter: "saturate(1.7) contrast(1.25) brightness(0.95) hue-rotate(-30deg)" },
+  { id: "cyberpunk", name: "Cyberpunk", prompt: "Apply cyberpunk aesthetic with high contrast neon colors, futuristic urban feel, and electric atmosphere", cssFilter: "saturate(1.9) contrast(1.4) brightness(0.9) hue-rotate(10deg)" },
+  { id: "lofi", name: "Lo-Fi", prompt: "Apply lo-fi aesthetic with muted colors, soft grain, and relaxed nostalgic atmosphere", cssFilter: "saturate(0.7) contrast(0.9) brightness(1.05) sepia(0.2)" },
+  { id: "duotone", name: "Duotone", prompt: "Apply duotone effect with two contrasting colors creating a striking graphic look", cssFilter: "grayscale(1) contrast(1.3) sepia(0.6) hue-rotate(180deg) saturate(2)" },
+  { id: "infrared", name: "Infrared", prompt: "Apply infrared photography effect with surreal colors and otherworldly atmosphere", cssFilter: "hue-rotate(180deg) saturate(1.5) contrast(1.2) brightness(1.1)" },
+  { id: "polaroid", name: "Polaroid", prompt: "Apply instant polaroid camera look with faded colors, warm tones, and slight vignette", cssFilter: "sepia(0.3) contrast(1.1) saturate(0.85) brightness(1.05)" },
+  { id: "x-ray", name: "X-Ray", prompt: "Apply X-ray or negative effect with inverted colors and ethereal look", cssFilter: "invert(1) contrast(1.1) brightness(1.1)" },
+  { id: "thermal", name: "Thermal", prompt: "Apply thermal camera effect with heat map colors from cool blues to hot oranges", cssFilter: "saturate(2) contrast(1.5) hue-rotate(60deg) brightness(1.1)" },
+  { id: "sunset", name: "Golden Hour", prompt: "Apply warm golden hour sunset lighting with orange and amber tones", cssFilter: "sepia(0.25) saturate(1.3) brightness(1.1) contrast(1.05) hue-rotate(-10deg)" },
+  { id: "cool-blue", name: "Cool Blue", prompt: "Apply cool blue tones with moonlight atmosphere and calm feeling", cssFilter: "saturate(0.9) brightness(1.05) contrast(1.1) hue-rotate(20deg) sepia(0.1)" },
 ];
 
 export const ImageGenerationForm = () => {
