@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2 } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -26,34 +26,54 @@ interface FilterState {
   intensity: number;
 }
 
-const imageFilters = [
+type FilterCategory = "all" | "classic" | "artistic" | "creative" | "atmospheric";
+
+interface ImageFilter {
+  id: string;
+  name: string;
+  prompt: string;
+  cssFilter: string;
+  category: FilterCategory;
+}
+
+const imageFilters: ImageFilter[] = [
   // Classic Filters
-  { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors", cssFilter: "sepia(0.4) contrast(1.1) brightness(0.95) saturate(0.9)" },
-  { id: "hdr", name: "HDR", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details", cssFilter: "contrast(1.3) saturate(1.4) brightness(1.05)" },
-  { id: "bw", name: "Bianco e Nero", prompt: "Convert to high contrast black and white with dramatic shadows", cssFilter: "grayscale(1) contrast(1.2)" },
-  { id: "cinematic", name: "Cinematico", prompt: "Apply cinematic color grading with film-like tones and letterbox feel", cssFilter: "contrast(1.15) saturate(0.85) brightness(0.9) sepia(0.15)" },
+  { id: "vintage", name: "Vintage", category: "classic", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors", cssFilter: "sepia(0.4) contrast(1.1) brightness(0.95) saturate(0.9)" },
+  { id: "hdr", name: "HDR", category: "classic", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details", cssFilter: "contrast(1.3) saturate(1.4) brightness(1.05)" },
+  { id: "bw", name: "Bianco e Nero", category: "classic", prompt: "Convert to high contrast black and white with dramatic shadows", cssFilter: "grayscale(1) contrast(1.2)" },
+  { id: "cinematic", name: "Cinematico", category: "classic", prompt: "Apply cinematic color grading with film-like tones and letterbox feel", cssFilter: "contrast(1.15) saturate(0.85) brightness(0.9) sepia(0.15)" },
+  { id: "polaroid", name: "Polaroid", category: "classic", prompt: "Apply instant polaroid camera look with faded colors, warm tones, and slight vignette", cssFilter: "sepia(0.3) contrast(1.1) saturate(0.85) brightness(1.05)" },
   
   // Artistic Filters
-  { id: "watercolor", name: "Acquerello", prompt: "Transform into watercolor painting style with soft edges and flowing colors", cssFilter: "saturate(1.3) brightness(1.1) blur(0.5px)" },
-  { id: "oil-painting", name: "Pittura a Olio", prompt: "Transform into oil painting style with visible brush strokes and rich textures", cssFilter: "saturate(1.5) contrast(1.2)" },
-  { id: "pop-art", name: "Pop Art", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look", cssFilter: "saturate(2) contrast(1.5) brightness(1.1)" },
-  { id: "sketch", name: "Schizzo", prompt: "Convert to pencil sketch style with detailed line work", cssFilter: "grayscale(0.8) contrast(1.4) brightness(1.1)" },
-  { id: "anime", name: "Anime", prompt: "Transform into anime/manga art style with cel shading", cssFilter: "saturate(1.4) contrast(1.2) brightness(1.05)" },
+  { id: "watercolor", name: "Acquerello", category: "artistic", prompt: "Transform into watercolor painting style with soft edges and flowing colors", cssFilter: "saturate(1.3) brightness(1.1) blur(0.5px)" },
+  { id: "oil-painting", name: "Pittura a Olio", category: "artistic", prompt: "Transform into oil painting style with visible brush strokes and rich textures", cssFilter: "saturate(1.5) contrast(1.2)" },
+  { id: "pop-art", name: "Pop Art", category: "artistic", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look", cssFilter: "saturate(2) contrast(1.5) brightness(1.1)" },
+  { id: "sketch", name: "Schizzo", category: "artistic", prompt: "Convert to pencil sketch style with detailed line work", cssFilter: "grayscale(0.8) contrast(1.4) brightness(1.1)" },
+  { id: "anime", name: "Anime", category: "artistic", prompt: "Transform into anime/manga art style with cel shading", cssFilter: "saturate(1.4) contrast(1.2) brightness(1.05)" },
+  { id: "duotone", name: "Duotone", category: "artistic", prompt: "Apply duotone effect with two contrasting colors creating a striking graphic look", cssFilter: "grayscale(1) contrast(1.3) sepia(0.6) hue-rotate(180deg) saturate(2)" },
   
   // Creative/Digital Filters
-  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails", cssFilter: "saturate(1.8) brightness(1.2) contrast(1.3) hue-rotate(15deg)" },
-  { id: "glitch", name: "Glitch", prompt: "Apply digital glitch effect with chromatic aberration, scan lines, and distortion artifacts", cssFilter: "contrast(1.2) saturate(1.3) hue-rotate(5deg)" },
-  { id: "vaporwave", name: "Vaporwave", prompt: "Apply vaporwave aesthetic with pink and cyan tones, retro 80s/90s feel, and dreamy atmosphere", cssFilter: "saturate(1.6) brightness(1.1) contrast(1.1) hue-rotate(-20deg)" },
-  { id: "retrowave", name: "Retrowave", prompt: "Apply synthwave/retrowave style with neon purple and pink gradients, 80s futuristic aesthetic", cssFilter: "saturate(1.7) contrast(1.25) brightness(0.95) hue-rotate(-30deg)" },
-  { id: "cyberpunk", name: "Cyberpunk", prompt: "Apply cyberpunk aesthetic with high contrast neon colors, futuristic urban feel, and electric atmosphere", cssFilter: "saturate(1.9) contrast(1.4) brightness(0.9) hue-rotate(10deg)" },
-  { id: "lofi", name: "Lo-Fi", prompt: "Apply lo-fi aesthetic with muted colors, soft grain, and relaxed nostalgic atmosphere", cssFilter: "saturate(0.7) contrast(0.9) brightness(1.05) sepia(0.2)" },
-  { id: "duotone", name: "Duotone", prompt: "Apply duotone effect with two contrasting colors creating a striking graphic look", cssFilter: "grayscale(1) contrast(1.3) sepia(0.6) hue-rotate(180deg) saturate(2)" },
-  { id: "infrared", name: "Infrared", prompt: "Apply infrared photography effect with surreal colors and otherworldly atmosphere", cssFilter: "hue-rotate(180deg) saturate(1.5) contrast(1.2) brightness(1.1)" },
-  { id: "polaroid", name: "Polaroid", prompt: "Apply instant polaroid camera look with faded colors, warm tones, and slight vignette", cssFilter: "sepia(0.3) contrast(1.1) saturate(0.85) brightness(1.05)" },
-  { id: "x-ray", name: "X-Ray", prompt: "Apply X-ray or negative effect with inverted colors and ethereal look", cssFilter: "invert(1) contrast(1.1) brightness(1.1)" },
-  { id: "thermal", name: "Thermal", prompt: "Apply thermal camera effect with heat map colors from cool blues to hot oranges", cssFilter: "saturate(2) contrast(1.5) hue-rotate(60deg) brightness(1.1)" },
-  { id: "sunset", name: "Golden Hour", prompt: "Apply warm golden hour sunset lighting with orange and amber tones", cssFilter: "sepia(0.25) saturate(1.3) brightness(1.1) contrast(1.05) hue-rotate(-10deg)" },
-  { id: "cool-blue", name: "Cool Blue", prompt: "Apply cool blue tones with moonlight atmosphere and calm feeling", cssFilter: "saturate(0.9) brightness(1.05) contrast(1.1) hue-rotate(20deg) sepia(0.1)" },
+  { id: "neon", name: "Neon Glow", category: "creative", prompt: "Add neon glow effects with vibrant electric colors and light trails", cssFilter: "saturate(1.8) brightness(1.2) contrast(1.3) hue-rotate(15deg)" },
+  { id: "glitch", name: "Glitch", category: "creative", prompt: "Apply digital glitch effect with chromatic aberration, scan lines, and distortion artifacts", cssFilter: "contrast(1.2) saturate(1.3) hue-rotate(5deg)" },
+  { id: "vaporwave", name: "Vaporwave", category: "creative", prompt: "Apply vaporwave aesthetic with pink and cyan tones, retro 80s/90s feel, and dreamy atmosphere", cssFilter: "saturate(1.6) brightness(1.1) contrast(1.1) hue-rotate(-20deg)" },
+  { id: "retrowave", name: "Retrowave", category: "creative", prompt: "Apply synthwave/retrowave style with neon purple and pink gradients, 80s futuristic aesthetic", cssFilter: "saturate(1.7) contrast(1.25) brightness(0.95) hue-rotate(-30deg)" },
+  { id: "cyberpunk", name: "Cyberpunk", category: "creative", prompt: "Apply cyberpunk aesthetic with high contrast neon colors, futuristic urban feel, and electric atmosphere", cssFilter: "saturate(1.9) contrast(1.4) brightness(0.9) hue-rotate(10deg)" },
+  { id: "lofi", name: "Lo-Fi", category: "creative", prompt: "Apply lo-fi aesthetic with muted colors, soft grain, and relaxed nostalgic atmosphere", cssFilter: "saturate(0.7) contrast(0.9) brightness(1.05) sepia(0.2)" },
+  { id: "x-ray", name: "X-Ray", category: "creative", prompt: "Apply X-ray or negative effect with inverted colors and ethereal look", cssFilter: "invert(1) contrast(1.1) brightness(1.1)" },
+  
+  // Atmospheric Filters
+  { id: "sunset", name: "Golden Hour", category: "atmospheric", prompt: "Apply warm golden hour sunset lighting with orange and amber tones", cssFilter: "sepia(0.25) saturate(1.3) brightness(1.1) contrast(1.05) hue-rotate(-10deg)" },
+  { id: "cool-blue", name: "Cool Blue", category: "atmospheric", prompt: "Apply cool blue tones with moonlight atmosphere and calm feeling", cssFilter: "saturate(0.9) brightness(1.05) contrast(1.1) hue-rotate(20deg) sepia(0.1)" },
+  { id: "infrared", name: "Infrared", category: "atmospheric", prompt: "Apply infrared photography effect with surreal colors and otherworldly atmosphere", cssFilter: "hue-rotate(180deg) saturate(1.5) contrast(1.2) brightness(1.1)" },
+  { id: "thermal", name: "Thermal", category: "atmospheric", prompt: "Apply thermal camera effect with heat map colors from cool blues to hot oranges", cssFilter: "saturate(2) contrast(1.5) hue-rotate(60deg) brightness(1.1)" },
+];
+
+const filterCategories = [
+  { id: "all" as FilterCategory, name: "Tutti", icon: "🎨" },
+  { id: "classic" as FilterCategory, name: "Classici", icon: "📷" },
+  { id: "artistic" as FilterCategory, name: "Artistici", icon: "🖌️" },
+  { id: "creative" as FilterCategory, name: "Creativi", icon: "✨" },
+  { id: "atmospheric" as FilterCategory, name: "Atmosferici", icon: "🌅" },
 ];
 
 export const ImageGenerationForm = () => {
@@ -73,9 +93,18 @@ export const ImageGenerationForm = () => {
   const [showComparison, setShowComparison] = useState(false);
   const [filterHistory, setFilterHistory] = useState<FilterState[]>([{ filters: [], intensity: 100 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [filterSearch, setFilterSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<FilterCategory>("all");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
+
+  // Filter filters by search and category
+  const filteredFilters = imageFilters.filter(filter => {
+    const matchesSearch = filter.name.toLowerCase().includes(filterSearch.toLowerCase());
+    const matchesCategory = activeCategory === "all" || filter.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < filterHistory.length - 1;
@@ -717,7 +746,7 @@ export const ImageGenerationForm = () => {
           )}
 
           {/* Filter Buttons */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Seleziona Filtri (puoi combinarne più di uno)</Label>
               {/* Undo/Redo Buttons */}
@@ -744,21 +773,73 @@ export const ImageGenerationForm = () => {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {imageFilters.map((filter) => (
+
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cerca filtri..."
+                value={filterSearch}
+                onChange={(e) => setFilterSearch(e.target.value)}
+                className="pl-9 h-9"
+              />
+              {filterSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFilterSearch("")}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+
+            {/* Category Tabs */}
+            <div className="flex flex-wrap gap-1">
+              {filterCategories.map((category) => (
                 <button
-                  key={filter.id}
-                  onClick={() => toggleFilter(filter.id)}
-                  className={`text-xs px-3 py-1.5 rounded-full transition-all duration-200 ${
-                    selectedFilters.includes(filter.id)
-                      ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
-                      : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                  key={category.id}
+                  onClick={() => setActiveCategory(category.id)}
+                  className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                    activeCategory === category.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {filter.name}
-                  {selectedFilters.includes(filter.id) && " ✓"}
+                  <span>{category.icon}</span>
+                  <span>{category.name}</span>
+                  {category.id !== "all" && (
+                    <span className="text-[10px] opacity-70">
+                      ({imageFilters.filter(f => f.category === category.id).length})
+                    </span>
+                  )}
                 </button>
               ))}
+            </div>
+
+            {/* Filter Grid */}
+            <div className="flex flex-wrap gap-2">
+              {filteredFilters.length > 0 ? (
+                filteredFilters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => toggleFilter(filter.id)}
+                    className={`text-xs px-3 py-1.5 rounded-full transition-all duration-200 ${
+                      selectedFilters.includes(filter.id)
+                        ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
+                        : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {filter.name}
+                    {selectedFilters.includes(filter.id) && " ✓"}
+                  </button>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">
+                  Nessun filtro trovato per "{filterSearch}"
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2 items-center">
               {selectedFilters.length > 0 && (
