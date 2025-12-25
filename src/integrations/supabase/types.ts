@@ -186,7 +186,7 @@ export type Database = {
           status: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at: string | null
-          user_id: string | null
+          user_id: string
           video_url: string | null
         }
         Insert: {
@@ -211,7 +211,7 @@ export type Database = {
           status?: string | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
           video_url?: string | null
         }
         Update: {
@@ -236,7 +236,7 @@ export type Database = {
           status?: string | null
           type?: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
           video_url?: string | null
         }
         Relationships: [
