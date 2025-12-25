@@ -5,6 +5,17 @@ import { User } from "@supabase/supabase-js";
 import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export const Navbar = () => {
   const navigate = useNavigate();
@@ -104,15 +115,37 @@ export const Navbar = () => {
               </Button>
             </>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSignOut}
-            className="bg-card hover:bg-accent text-foreground border-border"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Esci
-          </Button>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30 hover:border-destructive/50 transition-colors"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Esci
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Conferma Logout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Sei sicuro di voler uscire dall'applicazione? Dovrai effettuare nuovamente l'accesso per continuare a utilizzare la piattaforma.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleSignOut}
+                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Esci
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
     </nav>
