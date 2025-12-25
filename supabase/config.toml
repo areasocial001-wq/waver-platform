@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.verify-storyboard-access]
 verify_jwt = false
+
+[functions.hash-storyboard-password]
+verify_jwt = true
