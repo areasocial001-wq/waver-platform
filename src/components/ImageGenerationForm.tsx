@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search, ArrowUpDown, Grid3X3, List } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -76,6 +76,11 @@ const filterCategories = [
   { id: "atmospheric" as FilterCategory, name: "Atmosferici", icon: "🌅" },
 ];
 
+type SortOption = "name" | "popularity" | "category";
+
+// Sample image for filter previews (gradient placeholder)
+const PREVIEW_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40' viewBox='0 0 60 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ff6b6b'/%3E%3Cstop offset='33%25' stop-color='%23feca57'/%3E%3Cstop offset='66%25' stop-color='%2354a0ff'/%3E%3Cstop offset='100%25' stop-color='%235f27cd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='60' height='40'/%3E%3Ccircle cx='20' cy='15' r='6' fill='%23fff' opacity='0.8'/%3E%3Cpath d='M5 35 L20 20 L30 28 L45 15 L55 25 L55 40 L5 40 Z' fill='%23228B22' opacity='0.7'/%3E%3C/svg%3E";
+
 export const ImageGenerationForm = () => {
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
@@ -95,16 +100,50 @@ export const ImageGenerationForm = () => {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [filterSearch, setFilterSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<FilterCategory>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("category");
+  const [filterUsage, setFilterUsage] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
 
-  // Filter filters by search and category
-  const filteredFilters = imageFilters.filter(filter => {
-    const matchesSearch = filter.name.toLowerCase().includes(filterSearch.toLowerCase());
-    const matchesCategory = activeCategory === "all" || filter.category === activeCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Load filter usage from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('filterUsage');
+    if (saved) {
+      try {
+        setFilterUsage(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading filter usage:', e);
+      }
+    }
+  }, []);
+
+  // Track filter usage
+  const trackFilterUsage = (filterId: string) => {
+    const newUsage = { ...filterUsage, [filterId]: (filterUsage[filterId] || 0) + 1 };
+    setFilterUsage(newUsage);
+    localStorage.setItem('filterUsage', JSON.stringify(newUsage));
+  };
+
+  // Filter and sort filters
+  const filteredFilters = imageFilters
+    .filter(filter => {
+      const matchesSearch = filter.name.toLowerCase().includes(filterSearch.toLowerCase());
+      const matchesCategory = activeCategory === "all" || filter.category === activeCategory;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "popularity":
+          return (filterUsage[b.id] || 0) - (filterUsage[a.id] || 0);
+        case "category":
+        default:
+          return 0; // Keep original order
+      }
+    });
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < filterHistory.length - 1;
@@ -352,6 +391,11 @@ export const ImageGenerationForm = () => {
     const newFilters = isSelected 
       ? selectedFilters.filter(f => f !== filterId)
       : [...selectedFilters, filterId];
+    
+    // Track usage when adding a filter
+    if (!isSelected) {
+      trackFilterUsage(filterId);
+    }
     
     setSelectedFilters(newFilters);
     updatePromptFromFilters(newFilters, filterIntensity);
@@ -795,52 +839,148 @@ export const ImageGenerationForm = () => {
               )}
             </div>
 
-            {/* Category Tabs */}
-            <div className="flex flex-wrap gap-1">
-              {filterCategories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
-                    activeCategory === category.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span>{category.icon}</span>
-                  <span>{category.name}</span>
-                  {category.id !== "all" && (
-                    <span className="text-[10px] opacity-70">
-                      ({imageFilters.filter(f => f.category === category.id).length})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Filter Grid */}
-            <div className="flex flex-wrap gap-2">
-              {filteredFilters.length > 0 ? (
-                filteredFilters.map((filter) => (
+            {/* Category Tabs and Sort/View Options */}
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap gap-1">
+                {filterCategories.map((category) => (
                   <button
-                    key={filter.id}
-                    onClick={() => toggleFilter(filter.id)}
-                    className={`text-xs px-3 py-1.5 rounded-full transition-all duration-200 ${
-                      selectedFilters.includes(filter.id)
-                        ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
-                        : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                    key={category.id}
+                    onClick={() => setActiveCategory(category.id)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1.5 ${
+                      activeCategory === category.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {filter.name}
-                    {selectedFilters.includes(filter.id) && " ✓"}
+                    <span>{category.icon}</span>
+                    <span>{category.name}</span>
+                    {category.id !== "all" && (
+                      <span className="text-[10px] opacity-70">
+                        ({imageFilters.filter(f => f.category === category.id).length})
+                      </span>
+                    )}
                   </button>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground py-2">
-                  Nessun filtro trovato per "{filterSearch}"
-                </p>
-              )}
+                ))}
+              </div>
+              
+              {/* Sort and View Options */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                    <SelectTrigger className="h-7 text-xs w-32">
+                      <SelectValue placeholder="Ordina per" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="category">Categoria</SelectItem>
+                      <SelectItem value="name">Nome A-Z</SelectItem>
+                      <SelectItem value="popularity">Più usati</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("grid")}
+                    className="h-7 w-7 p-0"
+                    title="Vista griglia"
+                  >
+                    <Grid3X3 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    onClick={() => setViewMode("list")}
+                    className="h-7 w-7 p-0"
+                    title="Vista lista"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
             </div>
+
+            {/* Filter Grid with Thumbnails */}
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                {filteredFilters.length > 0 ? (
+                  filteredFilters.map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => toggleFilter(filter.id)}
+                      className={`group relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${
+                        selectedFilters.includes(filter.id)
+                          ? "bg-accent/20 ring-2 ring-accent"
+                          : "bg-muted/30 hover:bg-muted/50"
+                      }`}
+                    >
+                      {/* Thumbnail Preview */}
+                      <div className="relative w-full aspect-[3/2] rounded overflow-hidden mb-1.5">
+                        <img 
+                          src={PREVIEW_IMAGE}
+                          alt={filter.name}
+                          className="w-full h-full object-cover transition-all duration-300"
+                          style={{ filter: filter.cssFilter }}
+                        />
+                        {selectedFilters.includes(filter.id) && (
+                          <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
+                            <span className="text-accent-foreground text-lg">✓</span>
+                          </div>
+                        )}
+                        {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                          <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground text-[8px] px-1 rounded">
+                            {filterUsage[filter.id]}×
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-center leading-tight line-clamp-1">
+                        {filter.name}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-2 col-span-full">
+                    Nessun filtro trovato per "{filterSearch}"
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {filteredFilters.length > 0 ? (
+                  filteredFilters.map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => toggleFilter(filter.id)}
+                      className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-full transition-all duration-200 ${
+                        selectedFilters.includes(filter.id)
+                          ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
+                          : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {/* Mini Thumbnail */}
+                      <div className="w-5 h-4 rounded overflow-hidden flex-shrink-0">
+                        <img 
+                          src={PREVIEW_IMAGE}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          style={{ filter: filter.cssFilter }}
+                        />
+                      </div>
+                      <span>{filter.name}</span>
+                      {selectedFilters.includes(filter.id) && <span>✓</span>}
+                      {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                        <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
+                      )}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground py-2">
+                    Nessun filtro trovato per "{filterSearch}"
+                  </p>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 items-center">
               {selectedFilters.length > 0 && (
                 <>
