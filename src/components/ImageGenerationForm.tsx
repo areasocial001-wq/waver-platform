@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -17,6 +17,11 @@ import { Input } from "@/components/ui/input";
 interface CustomPreset {
   id: string;
   name: string;
+  filters: string[];
+  intensity: number;
+}
+
+interface FilterState {
   filters: string[];
   intensity: number;
 }
@@ -49,9 +54,65 @@ export const ImageGenerationForm = () => {
   const [newPresetName, setNewPresetName] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
+  const [filterHistory, setFilterHistory] = useState<FilterState[]>([{ filters: [], intensity: 100 }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < filterHistory.length - 1;
+
+  // Push new state to history
+  const pushToHistory = (filters: string[], intensity: number) => {
+    const newState: FilterState = { filters: [...filters], intensity };
+    // Remove any future states if we're not at the end
+    const newHistory = filterHistory.slice(0, historyIndex + 1);
+    newHistory.push(newState);
+    // Keep only last 50 states
+    if (newHistory.length > 50) {
+      newHistory.shift();
+      setFilterHistory(newHistory);
+    } else {
+      setFilterHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  };
+
+  const undo = () => {
+    if (!canUndo) return;
+    const newIndex = historyIndex - 1;
+    const prevState = filterHistory[newIndex];
+    setSelectedFilters(prevState.filters);
+    setFilterIntensity(prevState.intensity);
+    setHistoryIndex(newIndex);
+    updatePromptFromFilters(prevState.filters, prevState.intensity);
+  };
+
+  const redo = () => {
+    if (!canRedo) return;
+    const newIndex = historyIndex + 1;
+    const nextState = filterHistory[newIndex];
+    setSelectedFilters(nextState.filters);
+    setFilterIntensity(nextState.intensity);
+    setHistoryIndex(newIndex);
+    updatePromptFromFilters(nextState.filters, nextState.intensity);
+  };
+
+  const updatePromptFromFilters = (filters: string[], intensity: number) => {
+    const selectedFilterObjects = filters.map(id => 
+      imageFilters.find(f => f.id === id)
+    ).filter(Boolean);
+    
+    if (selectedFilterObjects.length > 0) {
+      const combinedPrompt = selectedFilterObjects
+        .map(f => f?.prompt)
+        .join(". Also ");
+      setPrompt(combinedPrompt + (intensity !== 100 ? ` (intensity: ${intensity}%)` : ""));
+    } else {
+      setPrompt("");
+    }
+  };
 
   // Load custom presets from localStorage
   useEffect(() => {
@@ -241,28 +302,28 @@ export const ImageGenerationForm = () => {
   };
 
   const toggleFilter = (filterId: string) => {
-    setSelectedFilters(prev => {
-      const isSelected = prev.includes(filterId);
-      const newFilters = isSelected 
-        ? prev.filter(f => f !== filterId)
-        : [...prev, filterId];
-      
-      // Update prompt with combined filter descriptions
-      const selectedFilterObjects = newFilters.map(id => 
-        imageFilters.find(f => f.id === id)
-      ).filter(Boolean);
-      
-      if (selectedFilterObjects.length > 0) {
-        const combinedPrompt = selectedFilterObjects
-          .map(f => f?.prompt)
-          .join(". Also ");
-        setPrompt(combinedPrompt);
-      } else {
-        setPrompt("");
-      }
-      
-      return newFilters;
-    });
+    const isSelected = selectedFilters.includes(filterId);
+    const newFilters = isSelected 
+      ? selectedFilters.filter(f => f !== filterId)
+      : [...selectedFilters, filterId];
+    
+    setSelectedFilters(newFilters);
+    updatePromptFromFilters(newFilters, filterIntensity);
+    pushToHistory(newFilters, filterIntensity);
+  };
+
+  const handleIntensityChange = (value: number[]) => {
+    const newIntensity = value[0];
+    setFilterIntensity(newIntensity);
+    // Debounce history push for intensity changes
+    pushToHistory(selectedFilters, newIntensity);
+  };
+
+  const clearAllFilters = () => {
+    setSelectedFilters([]);
+    setFilterIntensity(100);
+    setPrompt("");
+    pushToHistory([], 100);
   };
 
   // Calculate combined CSS filter for preview with intensity
@@ -624,7 +685,7 @@ export const ImageGenerationForm = () => {
               </Label>
               <Slider
                 value={[filterIntensity]}
-                onValueChange={(value) => setFilterIntensity(value[0])}
+                onValueChange={handleIntensityChange}
                 min={0}
                 max={150}
                 step={5}
@@ -640,7 +701,32 @@ export const ImageGenerationForm = () => {
 
           {/* Filter Buttons */}
           <div className="space-y-2">
-            <Label className="text-sm">Seleziona Filtri (puoi combinarne più di uno)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Seleziona Filtri (puoi combinarne più di uno)</Label>
+              {/* Undo/Redo Buttons */}
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={undo}
+                  disabled={!canUndo}
+                  className="h-7 w-7 p-0"
+                  title="Annulla (Undo)"
+                >
+                  <Undo2 className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={redo}
+                  disabled={!canRedo}
+                  className="h-7 w-7 p-0"
+                  title="Ripristina (Redo)"
+                >
+                  <Redo2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
             <div className="flex flex-wrap gap-2">
               {imageFilters.map((filter) => (
                 <button
@@ -663,11 +749,7 @@ export const ImageGenerationForm = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      setSelectedFilters([]);
-                      setFilterIntensity(100);
-                      setPrompt("");
-                    }}
+                    onClick={clearAllFilters}
                     className="text-xs text-muted-foreground"
                   >
                     <X className="mr-1 h-3 w-3" />
