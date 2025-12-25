@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -6,11 +6,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2 } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+
+interface CustomPreset {
+  id: string;
+  name: string;
+  filters: string[];
+  intensity: number;
+}
 
 const imageFilters = [
   { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors", cssFilter: "sepia(0.4) contrast(1.1) brightness(0.95) saturate(0.9)" },
@@ -35,8 +44,78 @@ export const ImageGenerationForm = () => {
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
   const [showGalleryPicker, setShowGalleryPicker] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [filterIntensity, setFilterIntensity] = useState(100);
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [showSavePreset, setShowSavePreset] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
+
+  // Load custom presets from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('customFilterPresets');
+    if (saved) {
+      try {
+        setCustomPresets(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading presets:', e);
+      }
+    }
+  }, []);
+
+  // Save presets to localStorage
+  const savePresetsToStorage = (presets: CustomPreset[]) => {
+    localStorage.setItem('customFilterPresets', JSON.stringify(presets));
+    setCustomPresets(presets);
+  };
+
+  const saveCurrentAsPreset = () => {
+    if (!newPresetName.trim()) {
+      toast.error("Inserisci un nome per il preset");
+      return;
+    }
+    if (selectedFilters.length === 0) {
+      toast.error("Seleziona almeno un filtro");
+      return;
+    }
+
+    const newPreset: CustomPreset = {
+      id: Date.now().toString(),
+      name: newPresetName.trim(),
+      filters: [...selectedFilters],
+      intensity: filterIntensity
+    };
+
+    savePresetsToStorage([...customPresets, newPreset]);
+    setNewPresetName("");
+    setShowSavePreset(false);
+    toast.success(`Preset "${newPreset.name}" salvato!`);
+  };
+
+  const loadPreset = (preset: CustomPreset) => {
+    setSelectedFilters(preset.filters);
+    setFilterIntensity(preset.intensity);
+    
+    // Update prompt
+    const selectedFilterObjects = preset.filters.map(id => 
+      imageFilters.find(f => f.id === id)
+    ).filter(Boolean);
+    
+    if (selectedFilterObjects.length > 0) {
+      const combinedPrompt = selectedFilterObjects
+        .map(f => f?.prompt)
+        .join(". Also ");
+      setPrompt(combinedPrompt + ` (intensity: ${preset.intensity}%)`);
+    }
+    
+    toast.success(`Preset "${preset.name}" caricato!`);
+  };
+
+  const deletePreset = (presetId: string) => {
+    const updated = customPresets.filter(p => p.id !== presetId);
+    savePresetsToStorage(updated);
+    toast.success("Preset eliminato");
+  };
 
   const examplePrompts = [
     "A futuristic cityscape at sunset with flying cars",
@@ -120,9 +199,11 @@ export const ImageGenerationForm = () => {
     });
   };
 
-  // Calculate combined CSS filter for preview
+  // Calculate combined CSS filter for preview with intensity
   const getPreviewFilter = () => {
     if (selectedFilters.length === 0) return "none";
+    
+    const intensity = filterIntensity / 100;
     
     const filterValues: { [key: string]: number } = {
       sepia: 0,
@@ -170,14 +251,19 @@ export const ImageGenerationForm = () => {
       }
     });
     
+    // Apply intensity to filter values (lerp towards neutral)
+    const applyIntensity = (value: number, neutral: number) => {
+      return neutral + (value - neutral) * intensity;
+    };
+    
     const parts = [];
-    if (filterValues.sepia > 0) parts.push(`sepia(${filterValues.sepia})`);
-    if (filterValues.grayscale > 0) parts.push(`grayscale(${filterValues.grayscale})`);
-    if (filterValues.contrast !== 1) parts.push(`contrast(${filterValues.contrast.toFixed(2)})`);
-    if (filterValues.brightness !== 1) parts.push(`brightness(${filterValues.brightness.toFixed(2)})`);
-    if (filterValues.saturate !== 1) parts.push(`saturate(${filterValues.saturate.toFixed(2)})`);
-    if (filterValues.blur > 0) parts.push(`blur(${filterValues.blur}px)`);
-    if (filterValues.hueRotate !== 0) parts.push(`hue-rotate(${filterValues.hueRotate}deg)`);
+    if (filterValues.sepia > 0) parts.push(`sepia(${applyIntensity(filterValues.sepia, 0).toFixed(2)})`);
+    if (filterValues.grayscale > 0) parts.push(`grayscale(${applyIntensity(filterValues.grayscale, 0).toFixed(2)})`);
+    if (filterValues.contrast !== 1) parts.push(`contrast(${applyIntensity(filterValues.contrast, 1).toFixed(2)})`);
+    if (filterValues.brightness !== 1) parts.push(`brightness(${applyIntensity(filterValues.brightness, 1).toFixed(2)})`);
+    if (filterValues.saturate !== 1) parts.push(`saturate(${applyIntensity(filterValues.saturate, 1).toFixed(2)})`);
+    if (filterValues.blur > 0) parts.push(`blur(${(filterValues.blur * intensity).toFixed(1)}px)`);
+    if (filterValues.hueRotate !== 0) parts.push(`hue-rotate(${(filterValues.hueRotate * intensity).toFixed(0)}deg)`);
     
     return parts.length > 0 ? parts.join(' ') : 'none';
   };
@@ -419,6 +505,29 @@ export const ImageGenerationForm = () => {
             </div>
           </div>
           
+          {/* Intensity Slider */}
+          {selectedFilters.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm flex items-center justify-between">
+                <span>Intensità Filtri</span>
+                <span className="text-accent font-medium">{filterIntensity}%</span>
+              </Label>
+              <Slider
+                value={[filterIntensity]}
+                onValueChange={(value) => setFilterIntensity(value[0])}
+                min={0}
+                max={150}
+                step={5}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Leggero</span>
+                <span>Normale</span>
+                <span>Intenso</span>
+              </div>
+            </div>
+          )}
+
           {/* Filter Buttons */}
           <div className="space-y-2">
             <Label className="text-sm">Seleziona Filtri (puoi combinarne più di uno)</Label>
@@ -438,21 +547,92 @@ export const ImageGenerationForm = () => {
                 </button>
               ))}
             </div>
-            {selectedFilters.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedFilters([]);
-                  setPrompt("");
-                }}
-                className="text-xs text-muted-foreground"
-              >
-                <X className="mr-1 h-3 w-3" />
-                Rimuovi tutti i filtri
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2 items-center">
+              {selectedFilters.length > 0 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedFilters([]);
+                      setFilterIntensity(100);
+                      setPrompt("");
+                    }}
+                    className="text-xs text-muted-foreground"
+                  >
+                    <X className="mr-1 h-3 w-3" />
+                    Rimuovi tutti
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSavePreset(true)}
+                    className="text-xs"
+                  >
+                    <Heart className="mr-1 h-3 w-3" />
+                    Salva Preset
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Save Preset Dialog */}
+          {showSavePreset && (
+            <Card className="p-4 space-y-3 border-accent/30 bg-accent/5">
+              <Label className="text-sm font-medium">Salva come Preset Personalizzato</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Nome del preset..."
+                  value={newPresetName}
+                  onChange={(e) => setNewPresetName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={saveCurrentAsPreset} size="sm">
+                  <Save className="mr-1 h-3 w-3" />
+                  Salva
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowSavePreset(false)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Filtri: {selectedFilters.map(id => imageFilters.find(f => f.id === id)?.name).join(", ")} | 
+                Intensità: {filterIntensity}%
+              </p>
+            </Card>
+          )}
+
+          {/* Custom Presets */}
+          {customPresets.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm flex items-center gap-2">
+                <Heart className="h-4 w-4 text-red-400" />
+                I Tuoi Preset Salvati
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {customPresets.map((preset) => (
+                  <div
+                    key={preset.id}
+                    className="group flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 hover:border-primary/50 transition-all"
+                  >
+                    <button
+                      onClick={() => loadPreset(preset)}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {preset.name}
+                    </button>
+                    <button
+                      onClick={() => deletePreset(preset.id)}
+                      className="opacity-0 group-hover:opacity-100 ml-1 text-destructive hover:text-destructive/80 transition-all"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
