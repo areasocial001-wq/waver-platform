@@ -6,9 +6,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const imageFilters = [
+  { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors" },
+  { id: "hdr", name: "HDR", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details" },
+  { id: "bw", name: "Bianco e Nero", prompt: "Convert to high contrast black and white with dramatic shadows" },
+  { id: "cinematic", name: "Cinematico", prompt: "Apply cinematic color grading with film-like tones and letterbox feel" },
+  { id: "watercolor", name: "Acquerello", prompt: "Transform into watercolor painting style with soft edges and flowing colors" },
+  { id: "oil-painting", name: "Pittura a Olio", prompt: "Transform into oil painting style with visible brush strokes and rich textures" },
+  { id: "pop-art", name: "Pop Art", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look" },
+  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails" },
+  { id: "sketch", name: "Schizzo", prompt: "Convert to pencil sketch style with detailed line work" },
+  { id: "anime", name: "Anime", prompt: "Transform into anime/manga art style with cel shading" },
+];
 
 export const ImageGenerationForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -18,8 +33,10 @@ export const ImageGenerationForm = () => {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { addImage } = useImageGallery();
+  const { images, addImage } = useImageGallery();
 
   const examplePrompts = [
     "A futuristic cityscape at sunset with flying cars",
@@ -65,8 +82,25 @@ export const ImageGenerationForm = () => {
   const removeReferenceImage = () => {
     setReferenceImage(null);
     setReferenceFileName(null);
+    setSelectedFilter(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const selectFromGallery = (imageUrl: string, imagePrompt: string) => {
+    setReferenceImage(imageUrl);
+    setReferenceFileName(`Dalla galleria: ${imagePrompt.substring(0, 30)}...`);
+    setShowGalleryPicker(false);
+    toast.success("Immagine dalla galleria selezionata!");
+  };
+
+  const applyFilter = (filterId: string) => {
+    const filter = imageFilters.find(f => f.id === filterId);
+    if (filter) {
+      setSelectedFilter(filterId);
+      setPrompt(filter.prompt);
+      toast.success(`Filtro "${filter.name}" applicato!`);
     }
   };
 
@@ -201,16 +235,69 @@ export const ImageGenerationForm = () => {
               </p>
             </div>
           ) : (
-            <div 
-              className="flex flex-col items-center justify-center py-4 cursor-pointer"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <div className="p-3 rounded-full bg-muted mb-2">
+            <div className="flex flex-col items-center justify-center py-4 gap-3">
+              <div className="p-3 rounded-full bg-muted">
                 <ImageIcon className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm font-medium">Carica immagine di riferimento</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Clicca per caricare o trascinare un'immagine da modificare
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Carica File
+                </Button>
+                <Dialog open={showGalleryPicker} onOpenChange={setShowGalleryPicker}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={images.length === 0}
+                    >
+                      <Images className="mr-2 h-4 w-4" />
+                      Dalla Galleria ({images.length})
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Seleziona dalla Galleria</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="h-[400px] pr-4">
+                      {images.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                          <ImageIcon className="h-12 w-12 mb-2" />
+                          <p>Nessuna immagine nella galleria</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {images.map((img) => (
+                            <div
+                              key={img.id}
+                              className="relative group cursor-pointer rounded-lg overflow-hidden border border-border hover:border-accent transition-colors"
+                              onClick={() => selectFromGallery(img.url, img.prompt)}
+                            >
+                              <img
+                                src={img.url}
+                                alt={img.prompt}
+                                className="w-full h-32 object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <p className="text-white text-xs px-2 text-center line-clamp-2">
+                                  {img.prompt}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Seleziona un'immagine da modificare
               </p>
             </div>
           )}
@@ -223,6 +310,31 @@ export const ImageGenerationForm = () => {
           />
         </div>
       </div>
+
+      {/* Preset Filters Section */}
+      {referenceImage && (
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            Filtri Predefiniti
+          </Label>
+          <div className="flex flex-wrap gap-2">
+            {imageFilters.map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => applyFilter(filter.id)}
+                className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                  selectedFilter === filter.id
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="space-y-2">
