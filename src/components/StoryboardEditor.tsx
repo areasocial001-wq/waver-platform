@@ -410,13 +410,29 @@ export const StoryboardEditor = () => {
         return;
       }
 
+      // Hash password if password protection is enabled
+      let hashedPassword: string | null = null;
+      if (isPasswordProtected && sharePassword.trim()) {
+        const { data: hashResponse, error: hashError } = await supabase.functions.invoke(
+          'hash-storyboard-password',
+          { body: { password: sharePassword.trim() } }
+        );
+        
+        if (hashError || !hashResponse?.success) {
+          console.error('Error hashing password:', hashError || hashResponse?.error);
+          toast.error("Errore nella protezione con password");
+          return;
+        }
+        hashedPassword = hashResponse.hashedPassword;
+      }
+
       const storyboardData = {
         title,
         layout,
         template_type: selectedTemplate,
         panels: panels as any,
         tags,
-        share_password: isPasswordProtected && sharePassword.trim() ? sharePassword.trim() : null,
+        share_password: hashedPassword,
         user_id: user.id,
       };
 
