@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CustomPreset {
   id: string;
@@ -903,83 +904,101 @@ export const ImageGenerationForm = () => {
 
             {/* Filter Grid with Thumbnails */}
             {viewMode === "grid" ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {filteredFilters.length > 0 ? (
-                  filteredFilters.map((filter) => (
-                    <button
-                      key={filter.id}
-                      onClick={() => toggleFilter(filter.id)}
-                      className={`group relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${
-                        selectedFilters.includes(filter.id)
-                          ? "bg-accent/20 ring-2 ring-accent"
-                          : "bg-muted/30 hover:bg-muted/50"
-                      }`}
-                    >
-                      {/* Thumbnail Preview */}
-                      <div className="relative w-full aspect-[3/2] rounded overflow-hidden mb-1.5">
-                        <img 
-                          src={PREVIEW_IMAGE}
-                          alt={filter.name}
-                          className="w-full h-full object-cover transition-all duration-300"
-                          style={{ filter: filter.cssFilter }}
-                        />
-                        {selectedFilters.includes(filter.id) && (
-                          <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
-                            <span className="text-accent-foreground text-lg">✓</span>
-                          </div>
-                        )}
-                        {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
-                          <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground text-[8px] px-1 rounded">
-                            {filterUsage[filter.id]}×
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-center leading-tight line-clamp-1">
-                        {filter.name}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground py-2 col-span-full">
-                    Nessun filtro trovato per "{filterSearch}"
-                  </p>
-                )}
-              </div>
+              <TooltipProvider delayDuration={300}>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {filteredFilters.length > 0 ? (
+                    filteredFilters.map((filter) => (
+                      <Tooltip key={filter.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleFilter(filter.id)}
+                            className={`group relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${
+                              selectedFilters.includes(filter.id)
+                                ? "bg-accent/20 ring-2 ring-accent"
+                                : "bg-muted/30 hover:bg-muted/50"
+                            }`}
+                          >
+                            {/* Thumbnail Preview - Use reference image if available */}
+                            <div className="relative w-full aspect-[3/2] rounded overflow-hidden mb-1.5">
+                              <img 
+                                src={referenceImage || PREVIEW_IMAGE}
+                                alt={filter.name}
+                                className="w-full h-full object-cover transition-all duration-300"
+                                style={{ filter: filter.cssFilter }}
+                              />
+                              {selectedFilters.includes(filter.id) && (
+                                <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
+                                  <span className="text-accent-foreground text-lg">✓</span>
+                                </div>
+                              )}
+                              {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                                <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground text-[8px] px-1 rounded">
+                                  {filterUsage[filter.id]}×
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-center leading-tight line-clamp-1">
+                              {filter.name}
+                            </span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[200px] text-center">
+                          <p className="font-medium">{filter.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{filter.prompt}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-2 col-span-full">
+                      Nessun filtro trovato per "{filterSearch}"
+                    </p>
+                  )}
+                </div>
+              </TooltipProvider>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {filteredFilters.length > 0 ? (
-                  filteredFilters.map((filter) => (
-                    <button
-                      key={filter.id}
-                      onClick={() => toggleFilter(filter.id)}
-                      className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-full transition-all duration-200 ${
-                        selectedFilters.includes(filter.id)
-                          ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
-                          : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {/* Mini Thumbnail */}
-                      <div className="w-5 h-4 rounded overflow-hidden flex-shrink-0">
-                        <img 
-                          src={PREVIEW_IMAGE}
-                          alt=""
-                          className="w-full h-full object-cover"
-                          style={{ filter: filter.cssFilter }}
-                        />
-                      </div>
-                      <span>{filter.name}</span>
-                      {selectedFilters.includes(filter.id) && <span>✓</span>}
-                      {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
-                        <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
-                      )}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground py-2">
-                    Nessun filtro trovato per "{filterSearch}"
-                  </p>
-                )}
-              </div>
+              <TooltipProvider delayDuration={300}>
+                <div className="flex flex-wrap gap-2">
+                  {filteredFilters.length > 0 ? (
+                    filteredFilters.map((filter) => (
+                      <Tooltip key={filter.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleFilter(filter.id)}
+                            className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-full transition-all duration-200 ${
+                              selectedFilters.includes(filter.id)
+                                ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
+                                : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {/* Mini Thumbnail - Use reference image if available */}
+                            <div className="w-5 h-4 rounded overflow-hidden flex-shrink-0">
+                              <img 
+                                src={referenceImage || PREVIEW_IMAGE}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                style={{ filter: filter.cssFilter }}
+                              />
+                            </div>
+                            <span>{filter.name}</span>
+                            {selectedFilters.includes(filter.id) && <span>✓</span>}
+                            {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                              <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-[220px]">
+                          <p className="font-medium">{filter.name}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{filter.prompt}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground py-2">
+                      Nessun filtro trovato per "{filterSearch}"
+                    </p>
+                  )}
+                </div>
+              </TooltipProvider>
             )}
             <div className="flex flex-wrap gap-2 items-center">
               {selectedFilters.length > 0 && (
