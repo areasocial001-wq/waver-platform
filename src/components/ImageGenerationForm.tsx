@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2 } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -48,7 +48,9 @@ export const ImageGenerationForm = () => {
   const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState("");
   const [showSavePreset, setShowSavePreset] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
 
   // Load custom presets from localStorage
@@ -115,6 +117,70 @@ export const ImageGenerationForm = () => {
     const updated = customPresets.filter(p => p.id !== presetId);
     savePresetsToStorage(updated);
     toast.success("Preset eliminato");
+  };
+
+  const exportPresets = () => {
+    if (customPresets.length === 0) {
+      toast.error("Nessun preset da esportare");
+      return;
+    }
+    
+    const dataStr = JSON.stringify(customPresets, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `filter-presets-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success(`${customPresets.length} preset esportati!`);
+  };
+
+  const handleImportPresets = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string) as CustomPreset[];
+        
+        if (!Array.isArray(imported)) {
+          throw new Error("Formato non valido");
+        }
+        
+        // Validate structure
+        const valid = imported.every(p => 
+          p.id && p.name && Array.isArray(p.filters) && typeof p.intensity === 'number'
+        );
+        
+        if (!valid) {
+          throw new Error("Struttura preset non valida");
+        }
+        
+        // Merge with existing presets, avoiding duplicates by name
+        const existingNames = customPresets.map(p => p.name.toLowerCase());
+        const newPresets = imported.filter(p => !existingNames.includes(p.name.toLowerCase()));
+        const merged = [...customPresets, ...newPresets.map(p => ({ ...p, id: Date.now().toString() + Math.random() }))];
+        
+        savePresetsToStorage(merged);
+        toast.success(`${newPresets.length} nuovi preset importati!`);
+        
+      } catch (error) {
+        console.error('Import error:', error);
+        toast.error("Errore nell'importazione del file");
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (importInputRef.current) {
+      importInputRef.current.value = "";
+    }
   };
 
   const examplePrompts = [
@@ -479,31 +545,75 @@ export const ImageGenerationForm = () => {
       {referenceImage && (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Wand2 className="h-4 w-4" />
-              Anteprima Live con Filtri
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4" />
+                Anteprima Live con Filtri
+              </Label>
+              {selectedFilters.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowComparison(!showComparison)}
+                  className="text-xs"
+                >
+                  <Columns className="mr-1 h-3 w-3" />
+                  {showComparison ? "Vista Singola" : "Confronta"}
+                </Button>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               Clicca sui filtri per combinarli. L'anteprima mostra l'effetto in tempo reale.
             </p>
           </div>
           
-          {/* Live Preview Image */}
-          <div className="flex justify-center">
-            <div className="relative rounded-lg overflow-hidden border border-border bg-muted/20 p-2">
-              <img 
-                src={referenceImage} 
-                alt="Preview" 
-                className="max-h-64 rounded-lg object-contain transition-all duration-300"
-                style={{ filter: getPreviewFilter() }}
-              />
-              {selectedFilters.length > 0 && (
-                <div className="absolute top-3 right-3 bg-accent text-accent-foreground text-xs px-2 py-1 rounded-full">
-                  {selectedFilters.length} filtri attivi
+          {/* Comparison View or Single Preview */}
+          {showComparison && selectedFilters.length > 0 ? (
+            <div className="grid grid-cols-2 gap-4">
+              {/* Original Image */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-center text-muted-foreground">Originale</p>
+                <div className="relative rounded-lg overflow-hidden border border-border bg-muted/20 p-2">
+                  <img 
+                    src={referenceImage} 
+                    alt="Original" 
+                    className="w-full h-48 rounded-lg object-contain"
+                  />
                 </div>
-              )}
+              </div>
+              {/* Filtered Image */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-center text-accent">Con Filtri ({filterIntensity}%)</p>
+                <div className="relative rounded-lg overflow-hidden border border-accent/30 bg-accent/5 p-2">
+                  <img 
+                    src={referenceImage} 
+                    alt="Filtered" 
+                    className="w-full h-48 rounded-lg object-contain transition-all duration-300"
+                    style={{ filter: getPreviewFilter() }}
+                  />
+                  <div className="absolute top-2 right-2 bg-accent text-accent-foreground text-xs px-2 py-0.5 rounded-full">
+                    {selectedFilters.length} filtri
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex justify-center">
+              <div className="relative rounded-lg overflow-hidden border border-border bg-muted/20 p-2">
+                <img 
+                  src={referenceImage} 
+                  alt="Preview" 
+                  className="max-h-64 rounded-lg object-contain transition-all duration-300"
+                  style={{ filter: getPreviewFilter() }}
+                />
+                {selectedFilters.length > 0 && (
+                  <div className="absolute top-3 right-3 bg-accent text-accent-foreground text-xs px-2 py-1 rounded-full">
+                    {selectedFilters.length} filtri attivi
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* Intensity Slider */}
           {selectedFilters.length > 0 && (
@@ -604,12 +714,36 @@ export const ImageGenerationForm = () => {
           )}
 
           {/* Custom Presets */}
-          {customPresets.length > 0 && (
-            <div className="space-y-2">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
               <Label className="text-sm flex items-center gap-2">
                 <Heart className="h-4 w-4 text-red-400" />
-                I Tuoi Preset Salvati
+                I Tuoi Preset Salvati ({customPresets.length})
               </Label>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => importInputRef.current?.click()}
+                  className="text-xs h-7 px-2"
+                  title="Importa preset"
+                >
+                  <FileUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={exportPresets}
+                  disabled={customPresets.length === 0}
+                  className="text-xs h-7 px-2"
+                  title="Esporta preset"
+                >
+                  <FileDown className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            
+            {customPresets.length > 0 ? (
               <div className="flex flex-wrap gap-2">
                 {customPresets.map((preset) => (
                   <div
@@ -631,8 +765,21 @@ export const ImageGenerationForm = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Nessun preset salvato. Seleziona filtri e clicca "Salva Preset" per crearne uno.
+              </p>
+            )}
+            
+            {/* Hidden import input */}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportPresets}
+              className="hidden"
+            />
+          </div>
         </div>
       )}
 
