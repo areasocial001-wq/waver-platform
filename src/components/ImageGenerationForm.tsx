@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search, ArrowUpDown, Grid3X3, List, Plus, Settings2 } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search, ArrowUpDown, Grid3X3, List, Plus, Settings2, Copy, Zap } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -123,6 +123,56 @@ const buildPromptFromParams = (params: CustomFilterParams): string => {
   return effects.length > 0 ? `Apply ${effects.join(', ')} effect` : 'Custom filter';
 };
 
+// Quick presets for custom filters
+interface QuickPreset {
+  name: string;
+  icon: string;
+  params: CustomFilterParams;
+}
+
+const quickFilterPresets: QuickPreset[] = [
+  { 
+    name: "Vintage", 
+    icon: "📷", 
+    params: { brightness: 95, contrast: 110, saturate: 85, sepia: 35, hueRotate: 0, blur: 0, grayscale: 0 } 
+  },
+  { 
+    name: "Cinema", 
+    icon: "🎬", 
+    params: { brightness: 90, contrast: 120, saturate: 90, sepia: 15, hueRotate: 0, blur: 0, grayscale: 0 } 
+  },
+  { 
+    name: "Drammatico", 
+    icon: "🎭", 
+    params: { brightness: 85, contrast: 140, saturate: 110, sepia: 0, hueRotate: 0, blur: 0, grayscale: 0 } 
+  },
+  { 
+    name: "Sogno", 
+    icon: "💫", 
+    params: { brightness: 110, contrast: 90, saturate: 120, sepia: 10, hueRotate: 15, blur: 1, grayscale: 0 } 
+  },
+  { 
+    name: "Noir", 
+    icon: "🖤", 
+    params: { brightness: 95, contrast: 130, saturate: 0, sepia: 0, hueRotate: 0, blur: 0, grayscale: 100 } 
+  },
+  { 
+    name: "Caldo", 
+    icon: "🌅", 
+    params: { brightness: 105, contrast: 105, saturate: 130, sepia: 25, hueRotate: -10, blur: 0, grayscale: 0 } 
+  },
+  { 
+    name: "Freddo", 
+    icon: "❄️", 
+    params: { brightness: 100, contrast: 110, saturate: 90, sepia: 0, hueRotate: 20, blur: 0, grayscale: 10 } 
+  },
+  { 
+    name: "Soft", 
+    icon: "☁️", 
+    params: { brightness: 105, contrast: 85, saturate: 95, sepia: 5, hueRotate: 0, blur: 0.5, grayscale: 0 } 
+  },
+];
+
 type SortOption = "name" | "popularity" | "category";
 
 // Sample image for filter previews (gradient placeholder)
@@ -157,6 +207,7 @@ export const ImageGenerationForm = () => {
   const [editingCustomFilter, setEditingCustomFilter] = useState<ImageFilter | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const customFilterImportRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
 
   // Load custom filters from localStorage
@@ -287,6 +338,130 @@ export const ImageGenerationForm = () => {
     setCustomFilterName("");
     setCustomFilterParams(defaultCustomFilterParams);
     setEditingCustomFilter(null);
+  };
+
+  // Duplicate an existing filter as base for new custom filter
+  const duplicateFilter = (filter: ImageFilter) => {
+    setEditingCustomFilter(null);
+    setCustomFilterName(`${filter.name} (copia)`);
+    
+    // Parse CSS filter to params
+    const params = { ...defaultCustomFilterParams };
+    const matches = filter.cssFilter.matchAll(/(\w+-?\w*)\(([^)]+)\)/g);
+    for (const match of matches) {
+      const [, prop, val] = match;
+      const numVal = parseFloat(val);
+      switch (prop) {
+        case 'brightness': params.brightness = numVal * 100; break;
+        case 'contrast': params.contrast = numVal * 100; break;
+        case 'saturate': params.saturate = numVal * 100; break;
+        case 'sepia': params.sepia = numVal * 100; break;
+        case 'hue-rotate': params.hueRotate = numVal; break;
+        case 'blur': params.blur = numVal; break;
+        case 'grayscale': params.grayscale = numVal * 100; break;
+      }
+    }
+    setCustomFilterParams(params);
+    setShowCustomFilterDialog(true);
+    toast.info(`Filtro "${filter.name}" duplicato. Modifica e salva!`);
+  };
+
+  // Apply a quick preset
+  const applyQuickPreset = (preset: QuickPreset) => {
+    setCustomFilterParams(preset.params);
+    if (!customFilterName) {
+      setCustomFilterName(preset.name);
+    }
+    toast.success(`Preset "${preset.name}" applicato`);
+  };
+
+  // Export custom filters as JSON
+  const exportCustomFilters = () => {
+    if (customFilters.length === 0) {
+      toast.error("Nessun filtro personalizzato da esportare");
+      return;
+    }
+    
+    const exportData = customFilters.map(f => ({
+      name: f.name,
+      cssFilter: f.cssFilter,
+      prompt: f.prompt,
+    }));
+    
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `custom-filters-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast.success(`${customFilters.length} filtri esportati!`);
+  };
+
+  // Import custom filters from JSON
+  const handleImportCustomFilters = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string) as Array<{
+          name: string;
+          cssFilter: string;
+          prompt?: string;
+        }>;
+        
+        if (!Array.isArray(imported)) {
+          throw new Error("Formato non valido");
+        }
+        
+        // Validate structure
+        const valid = imported.every(f => f.name && f.cssFilter);
+        
+        if (!valid) {
+          throw new Error("Struttura filtro non valida");
+        }
+        
+        // Avoid duplicates by name
+        const existingNames = customFilters.map(f => f.name.toLowerCase());
+        const newFilters: ImageFilter[] = imported
+          .filter(f => !existingNames.includes(f.name.toLowerCase()))
+          .map(f => ({
+            id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: f.name,
+            cssFilter: f.cssFilter,
+            prompt: f.prompt || buildPromptFromParams(defaultCustomFilterParams),
+            category: "custom" as FilterCategory,
+            isCustom: true,
+          }));
+        
+        if (newFilters.length === 0) {
+          toast.info("Tutti i filtri importati esistono già");
+          return;
+        }
+        
+        const updated = [...customFilters, ...newFilters];
+        setCustomFilters(updated);
+        localStorage.setItem('customFilters', JSON.stringify(updated));
+        toast.success(`${newFilters.length} nuovi filtri importati!`);
+        
+      } catch (error) {
+        console.error('Import error:', error);
+        toast.error("Errore nell'importazione del file");
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset input
+    if (customFilterImportRef.current) {
+      customFilterImportRef.current.value = "";
+    }
   };
 
   const canUndo = historyIndex > 0;
@@ -1100,25 +1275,36 @@ export const ImageGenerationForm = () => {
                                 {filter.name}
                               </span>
                             </button>
-                            {/* Edit/Delete buttons for custom filters */}
-                            {filter.isCustom && (
-                              <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
-                                  className="p-1 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                                  title="Modifica filtro"
-                                >
-                                  <Settings2 className="h-3 w-3" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
-                                  className="p-1 rounded-full bg-muted hover:bg-destructive text-muted-foreground hover:text-destructive-foreground transition-colors"
-                                  title="Elimina filtro"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            )}
+                            {/* Action buttons */}
+                            <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Duplicate button for all filters */}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); duplicateFilter(filter); }}
+                                className="p-1 rounded-full bg-muted hover:bg-primary text-muted-foreground hover:text-primary-foreground transition-colors"
+                                title="Duplica come nuovo filtro"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </button>
+                              {/* Edit/Delete only for custom filters */}
+                              {filter.isCustom && (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
+                                    className="p-1 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+                                    title="Modifica filtro"
+                                  >
+                                    <Settings2 className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
+                                    className="p-1 rounded-full bg-muted hover:bg-destructive text-muted-foreground hover:text-destructive-foreground transition-colors"
+                                    title="Elimina filtro"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-[200px] text-center">
@@ -1175,25 +1361,34 @@ export const ImageGenerationForm = () => {
                                 <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
                               )}
                             </button>
-                            {/* Edit/Delete for custom filters */}
-                            {filter.isCustom && (
-                              <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
-                                  className="p-0.5 rounded-full bg-accent text-accent-foreground"
-                                  title="Modifica"
-                                >
-                                  <Settings2 className="h-2.5 w-2.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
-                                  className="p-0.5 rounded-full bg-destructive text-destructive-foreground"
-                                  title="Elimina"
-                                >
-                                  <Trash2 className="h-2.5 w-2.5" />
-                                </button>
-                              </div>
-                            )}
+                            {/* Action buttons */}
+                            <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); duplicateFilter(filter); }}
+                                className="p-0.5 rounded-full bg-primary text-primary-foreground"
+                                title="Duplica"
+                              >
+                                <Copy className="h-2.5 w-2.5" />
+                              </button>
+                              {filter.isCustom && (
+                                <>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
+                                    className="p-0.5 rounded-full bg-accent text-accent-foreground"
+                                    title="Modifica"
+                                  >
+                                    <Settings2 className="h-2.5 w-2.5" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
+                                    className="p-0.5 rounded-full bg-destructive text-destructive-foreground"
+                                    title="Elimina"
+                                  >
+                                    <Trash2 className="h-2.5 w-2.5" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-[220px]">
@@ -1276,7 +1471,28 @@ export const ImageGenerationForm = () => {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-6 py-4">
+              <ScrollArea className="max-h-[60vh]">
+              <div className="space-y-6 py-4 pr-4">
+                {/* Quick Presets */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-yellow-500" />
+                    Preset Rapidi
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickFilterPresets.map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => applyQuickPreset(preset)}
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-muted/50 hover:bg-accent/20 hover:text-accent border border-transparent hover:border-accent/30 transition-all duration-200"
+                      >
+                        <span>{preset.icon}</span>
+                        <span>{preset.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Filter Name */}
                 <div className="space-y-2">
                   <Label htmlFor="customFilterName">Nome del Filtro</Label>
@@ -1417,8 +1633,89 @@ export const ImageGenerationForm = () => {
                   </Button>
                 </div>
               </div>
+              </ScrollArea>
             </DialogContent>
           </Dialog>
+
+          {/* Custom Filters Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm flex items-center gap-2">
+                <Settings2 className="h-4 w-4 text-accent" />
+                I Tuoi Filtri Personalizzati ({customFilters.length})
+              </Label>
+              <div className="flex gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => customFilterImportRef.current?.click()}
+                  className="text-xs h-7 px-2"
+                  title="Importa filtri personalizzati"
+                >
+                  <FileUp className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={exportCustomFilters}
+                  disabled={customFilters.length === 0}
+                  className="text-xs h-7 px-2"
+                  title="Esporta filtri personalizzati"
+                >
+                  <FileDown className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            
+            {customFilters.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {customFilters.map((filter) => (
+                  <div
+                    key={filter.id}
+                    className="group flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-accent/10 border border-accent/30 hover:border-accent/60 transition-all"
+                  >
+                    {/* Mini preview */}
+                    <div className="w-4 h-3 rounded overflow-hidden">
+                      <img 
+                        src={referenceImage || PREVIEW_IMAGE}
+                        alt=""
+                        className="w-full h-full object-cover"
+                        style={{ filter: filter.cssFilter }}
+                      />
+                    </div>
+                    <span className="text-accent-foreground">{filter.name}</span>
+                    <button
+                      onClick={() => editCustomFilter(filter)}
+                      className="opacity-60 hover:opacity-100 transition-opacity"
+                      title="Modifica"
+                    >
+                      <Settings2 className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => deleteCustomFilter(filter.id)}
+                      className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive/80 transition-all"
+                      title="Elimina"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Nessun filtro personalizzato. Clicca "Crea Filtro" o duplica un filtro esistente.
+              </p>
+            )}
+            
+            {/* Hidden import input for custom filters */}
+            <input
+              ref={customFilterImportRef}
+              type="file"
+              accept=".json"
+              onChange={handleImportCustomFilters}
+              className="hidden"
+            />
+          </div>
 
           {/* Custom Presets */}
           <div className="space-y-2">
