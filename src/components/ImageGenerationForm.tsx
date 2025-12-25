@@ -6,10 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search, ArrowUpDown, Grid3X3, List } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon, Images, Wand2, Heart, Trash2, FileDown, FileUp, Columns, Undo2, Redo2, Search, ArrowUpDown, Grid3X3, List, Plus, Settings2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,7 @@ interface FilterState {
   intensity: number;
 }
 
-type FilterCategory = "all" | "classic" | "artistic" | "creative" | "atmospheric";
+type FilterCategory = "all" | "classic" | "artistic" | "creative" | "atmospheric" | "custom";
 
 interface ImageFilter {
   id: string;
@@ -35,6 +35,17 @@ interface ImageFilter {
   prompt: string;
   cssFilter: string;
   category: FilterCategory;
+  isCustom?: boolean;
+}
+
+interface CustomFilterParams {
+  brightness: number;
+  contrast: number;
+  saturate: number;
+  sepia: number;
+  hueRotate: number;
+  blur: number;
+  grayscale: number;
 }
 
 const imageFilters: ImageFilter[] = [
@@ -75,7 +86,42 @@ const filterCategories = [
   { id: "artistic" as FilterCategory, name: "Artistici", icon: "🖌️" },
   { id: "creative" as FilterCategory, name: "Creativi", icon: "✨" },
   { id: "atmospheric" as FilterCategory, name: "Atmosferici", icon: "🌅" },
+  { id: "custom" as FilterCategory, name: "Personalizzati", icon: "⚙️" },
 ];
+
+const defaultCustomFilterParams: CustomFilterParams = {
+  brightness: 100,
+  contrast: 100,
+  saturate: 100,
+  sepia: 0,
+  hueRotate: 0,
+  blur: 0,
+  grayscale: 0,
+};
+
+const buildCssFilterFromParams = (params: CustomFilterParams): string => {
+  const parts: string[] = [];
+  if (params.brightness !== 100) parts.push(`brightness(${params.brightness / 100})`);
+  if (params.contrast !== 100) parts.push(`contrast(${params.contrast / 100})`);
+  if (params.saturate !== 100) parts.push(`saturate(${params.saturate / 100})`);
+  if (params.sepia > 0) parts.push(`sepia(${params.sepia / 100})`);
+  if (params.hueRotate !== 0) parts.push(`hue-rotate(${params.hueRotate}deg)`);
+  if (params.blur > 0) parts.push(`blur(${params.blur}px)`);
+  if (params.grayscale > 0) parts.push(`grayscale(${params.grayscale / 100})`);
+  return parts.length > 0 ? parts.join(' ') : 'none';
+};
+
+const buildPromptFromParams = (params: CustomFilterParams): string => {
+  const effects: string[] = [];
+  if (params.brightness !== 100) effects.push(params.brightness > 100 ? 'brighter' : 'darker');
+  if (params.contrast !== 100) effects.push(params.contrast > 100 ? 'high contrast' : 'low contrast');
+  if (params.saturate !== 100) effects.push(params.saturate > 100 ? 'vibrant colors' : 'muted colors');
+  if (params.sepia > 0) effects.push('sepia tones');
+  if (params.hueRotate !== 0) effects.push('shifted colors');
+  if (params.blur > 0) effects.push('soft blur');
+  if (params.grayscale > 0) effects.push('desaturated');
+  return effects.length > 0 ? `Apply ${effects.join(', ')} effect` : 'Custom filter';
+};
 
 type SortOption = "name" | "popularity" | "category";
 
@@ -104,9 +150,26 @@ export const ImageGenerationForm = () => {
   const [sortBy, setSortBy] = useState<SortOption>("category");
   const [filterUsage, setFilterUsage] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [customFilters, setCustomFilters] = useState<ImageFilter[]>([]);
+  const [showCustomFilterDialog, setShowCustomFilterDialog] = useState(false);
+  const [customFilterParams, setCustomFilterParams] = useState<CustomFilterParams>(defaultCustomFilterParams);
+  const [customFilterName, setCustomFilterName] = useState("");
+  const [editingCustomFilter, setEditingCustomFilter] = useState<ImageFilter | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
+
+  // Load custom filters from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('customFilters');
+    if (saved) {
+      try {
+        setCustomFilters(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error loading custom filters:', e);
+      }
+    }
+  }, []);
 
   // Load filter usage from localStorage
   useEffect(() => {
@@ -127,8 +190,11 @@ export const ImageGenerationForm = () => {
     localStorage.setItem('filterUsage', JSON.stringify(newUsage));
   };
 
+  // Combine built-in and custom filters
+  const allFilters = [...imageFilters, ...customFilters];
+
   // Filter and sort filters
-  const filteredFilters = imageFilters
+  const filteredFilters = allFilters
     .filter(filter => {
       const matchesSearch = filter.name.toLowerCase().includes(filterSearch.toLowerCase());
       const matchesCategory = activeCategory === "all" || filter.category === activeCategory;
@@ -145,6 +211,83 @@ export const ImageGenerationForm = () => {
           return 0; // Keep original order
       }
     });
+
+  // Save custom filter
+  const saveCustomFilter = () => {
+    if (!customFilterName.trim()) {
+      toast.error("Inserisci un nome per il filtro");
+      return;
+    }
+
+    const cssFilter = buildCssFilterFromParams(customFilterParams);
+    const prompt = buildPromptFromParams(customFilterParams);
+
+    if (editingCustomFilter) {
+      // Update existing filter
+      const updated = customFilters.map(f => 
+        f.id === editingCustomFilter.id 
+          ? { ...f, name: customFilterName.trim(), cssFilter, prompt }
+          : f
+      );
+      setCustomFilters(updated);
+      localStorage.setItem('customFilters', JSON.stringify(updated));
+      toast.success(`Filtro "${customFilterName}" aggiornato!`);
+    } else {
+      // Create new filter
+      const newFilter: ImageFilter = {
+        id: `custom-${Date.now()}`,
+        name: customFilterName.trim(),
+        prompt,
+        cssFilter,
+        category: "custom",
+        isCustom: true,
+      };
+      const updated = [...customFilters, newFilter];
+      setCustomFilters(updated);
+      localStorage.setItem('customFilters', JSON.stringify(updated));
+      toast.success(`Filtro "${customFilterName}" creato!`);
+    }
+
+    resetCustomFilterDialog();
+  };
+
+  const deleteCustomFilter = (filterId: string) => {
+    const updated = customFilters.filter(f => f.id !== filterId);
+    setCustomFilters(updated);
+    localStorage.setItem('customFilters', JSON.stringify(updated));
+    setSelectedFilters(prev => prev.filter(id => id !== filterId));
+    toast.success("Filtro personalizzato eliminato");
+  };
+
+  const editCustomFilter = (filter: ImageFilter) => {
+    setEditingCustomFilter(filter);
+    setCustomFilterName(filter.name);
+    // Parse CSS filter back to params (approximate)
+    const params = { ...defaultCustomFilterParams };
+    const matches = filter.cssFilter.matchAll(/(\w+-?\w*)\(([^)]+)\)/g);
+    for (const match of matches) {
+      const [, prop, val] = match;
+      const numVal = parseFloat(val);
+      switch (prop) {
+        case 'brightness': params.brightness = numVal * 100; break;
+        case 'contrast': params.contrast = numVal * 100; break;
+        case 'saturate': params.saturate = numVal * 100; break;
+        case 'sepia': params.sepia = numVal * 100; break;
+        case 'hue-rotate': params.hueRotate = numVal; break;
+        case 'blur': params.blur = numVal; break;
+        case 'grayscale': params.grayscale = numVal * 100; break;
+      }
+    }
+    setCustomFilterParams(params);
+    setShowCustomFilterDialog(true);
+  };
+
+  const resetCustomFilterDialog = () => {
+    setShowCustomFilterDialog(false);
+    setCustomFilterName("");
+    setCustomFilterParams(defaultCustomFilterParams);
+    setEditingCustomFilter(null);
+  };
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < filterHistory.length - 1;
@@ -187,7 +330,7 @@ export const ImageGenerationForm = () => {
 
   const updatePromptFromFilters = (filters: string[], intensity: number) => {
     const selectedFilterObjects = filters.map(id => 
-      imageFilters.find(f => f.id === id)
+      allFilters.find(f => f.id === id)
     ).filter(Boolean);
     
     if (selectedFilterObjects.length > 0) {
@@ -247,7 +390,7 @@ export const ImageGenerationForm = () => {
     
     // Update prompt
     const selectedFilterObjects = preset.filters.map(id => 
-      imageFilters.find(f => f.id === id)
+      allFilters.find(f => f.id === id)
     ).filter(Boolean);
     
     if (selectedFilterObjects.length > 0) {
@@ -434,7 +577,7 @@ export const ImageGenerationForm = () => {
     };
     
     selectedFilters.forEach(filterId => {
-      const filter = imageFilters.find(f => f.id === filterId);
+      const filter = allFilters.find(f => f.id === filterId);
       if (filter?.cssFilter) {
         // Parse and combine CSS filter values
         const matches = filter.cssFilter.matchAll(/(\w+)\(([^)]+)\)/g);
@@ -857,7 +1000,7 @@ export const ImageGenerationForm = () => {
                     <span>{category.name}</span>
                     {category.id !== "all" && (
                       <span className="text-[10px] opacity-70">
-                        ({imageFilters.filter(f => f.category === category.id).length})
+                        ({allFilters.filter(f => f.category === category.id).length})
                       </span>
                     )}
                   </button>
@@ -906,45 +1049,82 @@ export const ImageGenerationForm = () => {
             {viewMode === "grid" ? (
               <TooltipProvider delayDuration={300}>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {/* Add Custom Filter Button */}
+                  <button
+                    onClick={() => setShowCustomFilterDialog(true)}
+                    className="group relative flex flex-col items-center justify-center p-2 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-accent/50 hover:bg-accent/10 transition-all duration-300"
+                  >
+                    <div className="w-full aspect-[3/2] flex items-center justify-center mb-1.5">
+                      <Plus className="h-6 w-6 text-muted-foreground group-hover:text-accent group-hover:scale-110 transition-all duration-300" />
+                    </div>
+                    <span className="text-[10px] text-center text-muted-foreground group-hover:text-accent transition-colors">
+                      Crea Filtro
+                    </span>
+                  </button>
+                  
                   {filteredFilters.length > 0 ? (
                     filteredFilters.map((filter) => (
                       <Tooltip key={filter.id}>
                         <TooltipTrigger asChild>
-                          <button
-                            onClick={() => toggleFilter(filter.id)}
-                            className={`group relative flex flex-col items-center p-2 rounded-lg transition-all duration-200 ${
-                              selectedFilters.includes(filter.id)
-                                ? "bg-accent/20 ring-2 ring-accent"
-                                : "bg-muted/30 hover:bg-muted/50"
-                            }`}
-                          >
-                            {/* Thumbnail Preview - Use reference image if available */}
-                            <div className="relative w-full aspect-[3/2] rounded overflow-hidden mb-1.5">
-                              <img 
-                                src={referenceImage || PREVIEW_IMAGE}
-                                alt={filter.name}
-                                className="w-full h-full object-cover transition-all duration-300"
-                                style={{ filter: filter.cssFilter }}
-                              />
-                              {selectedFilters.includes(filter.id) && (
-                                <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
-                                  <span className="text-accent-foreground text-lg">✓</span>
-                                </div>
-                              )}
-                              {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
-                                <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground text-[8px] px-1 rounded">
-                                  {filterUsage[filter.id]}×
-                                </div>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-center leading-tight line-clamp-1">
-                              {filter.name}
-                            </span>
-                          </button>
+                          <div className="group relative">
+                            <button
+                              onClick={() => toggleFilter(filter.id)}
+                              className={`w-full relative flex flex-col items-center p-2 rounded-lg transition-all duration-300 ${
+                                selectedFilters.includes(filter.id)
+                                  ? "bg-accent/20 ring-2 ring-accent scale-[1.02]"
+                                  : "bg-muted/30 hover:bg-muted/50 hover:scale-105 hover:shadow-lg hover:shadow-accent/10"
+                              }`}
+                            >
+                              {/* Thumbnail Preview - Use reference image if available */}
+                              <div className="relative w-full aspect-[3/2] rounded overflow-hidden mb-1.5">
+                                <img 
+                                  src={referenceImage || PREVIEW_IMAGE}
+                                  alt={filter.name}
+                                  className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
+                                  style={{ filter: filter.cssFilter }}
+                                />
+                                {/* Hover overlay with glow */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                {selectedFilters.includes(filter.id) && (
+                                  <div className="absolute inset-0 bg-accent/30 flex items-center justify-center">
+                                    <span className="text-accent-foreground text-lg drop-shadow-md">✓</span>
+                                  </div>
+                                )}
+                                {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                                  <div className="absolute top-0.5 right-0.5 bg-primary text-primary-foreground text-[8px] px-1 rounded">
+                                    {filterUsage[filter.id]}×
+                                  </div>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-center leading-tight line-clamp-1 transition-colors duration-300 group-hover:text-accent">
+                                {filter.name}
+                              </span>
+                            </button>
+                            {/* Edit/Delete buttons for custom filters */}
+                            {filter.isCustom && (
+                              <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
+                                  className="p-1 rounded-full bg-muted hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+                                  title="Modifica filtro"
+                                >
+                                  <Settings2 className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
+                                  className="p-1 rounded-full bg-muted hover:bg-destructive text-muted-foreground hover:text-destructive-foreground transition-colors"
+                                  title="Elimina filtro"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-[200px] text-center">
                           <p className="font-medium">{filter.name}</p>
                           <p className="text-xs text-muted-foreground mt-1">{filter.prompt}</p>
+                          {filter.isCustom && <p className="text-xs text-accent mt-1">Filtro personalizzato</p>}
                         </TooltipContent>
                       </Tooltip>
                     ))
@@ -958,37 +1138,68 @@ export const ImageGenerationForm = () => {
             ) : (
               <TooltipProvider delayDuration={300}>
                 <div className="flex flex-wrap gap-2">
+                  {/* Add Custom Filter Button */}
+                  <button
+                    onClick={() => setShowCustomFilterDialog(true)}
+                    className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-full border-2 border-dashed border-muted-foreground/30 hover:border-accent/50 hover:bg-accent/10 transition-all duration-300"
+                  >
+                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Crea Filtro</span>
+                  </button>
+                  
                   {filteredFilters.length > 0 ? (
                     filteredFilters.map((filter) => (
                       <Tooltip key={filter.id}>
                         <TooltipTrigger asChild>
-                          <button
-                            onClick={() => toggleFilter(filter.id)}
-                            className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-full transition-all duration-200 ${
-                              selectedFilters.includes(filter.id)
-                                ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
-                                : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {/* Mini Thumbnail - Use reference image if available */}
-                            <div className="w-5 h-4 rounded overflow-hidden flex-shrink-0">
-                              <img 
-                                src={referenceImage || PREVIEW_IMAGE}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                style={{ filter: filter.cssFilter }}
-                              />
-                            </div>
-                            <span>{filter.name}</span>
-                            {selectedFilters.includes(filter.id) && <span>✓</span>}
-                            {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
-                              <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
+                          <div className="group relative">
+                            <button
+                              onClick={() => toggleFilter(filter.id)}
+                              className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-full transition-all duration-300 ${
+                                selectedFilters.includes(filter.id)
+                                  ? "bg-accent text-accent-foreground ring-2 ring-accent/50 scale-105"
+                                  : "bg-muted hover:bg-muted/80 hover:scale-105 hover:shadow-md text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {/* Mini Thumbnail - Use reference image if available */}
+                              <div className="w-5 h-4 rounded overflow-hidden flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
+                                <img 
+                                  src={referenceImage || PREVIEW_IMAGE}
+                                  alt=""
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-125"
+                                  style={{ filter: filter.cssFilter }}
+                                />
+                              </div>
+                              <span className="transition-colors">{filter.name}</span>
+                              {selectedFilters.includes(filter.id) && <span>✓</span>}
+                              {filterUsage[filter.id] > 0 && sortBy === "popularity" && (
+                                <span className="text-[9px] opacity-60">({filterUsage[filter.id]})</span>
+                              )}
+                            </button>
+                            {/* Edit/Delete for custom filters */}
+                            {filter.isCustom && (
+                              <div className="absolute -top-1 -right-1 flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); editCustomFilter(filter); }}
+                                  className="p-0.5 rounded-full bg-accent text-accent-foreground"
+                                  title="Modifica"
+                                >
+                                  <Settings2 className="h-2.5 w-2.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteCustomFilter(filter.id); }}
+                                  className="p-0.5 rounded-full bg-destructive text-destructive-foreground"
+                                  title="Elimina"
+                                >
+                                  <Trash2 className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
                             )}
-                          </button>
+                          </div>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="max-w-[220px]">
                           <p className="font-medium">{filter.name}</p>
                           <p className="text-xs text-muted-foreground mt-1">{filter.prompt}</p>
+                          {filter.isCustom && <p className="text-xs text-accent mt-1">Filtro personalizzato</p>}
                         </TooltipContent>
                       </Tooltip>
                     ))
@@ -1046,11 +1257,168 @@ export const ImageGenerationForm = () => {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Filtri: {selectedFilters.map(id => imageFilters.find(f => f.id === id)?.name).join(", ")} | 
+                Filtri: {selectedFilters.map(id => allFilters.find(f => f.id === id)?.name).join(", ")} | 
                 Intensità: {filterIntensity}%
               </p>
             </Card>
           )}
+
+          {/* Custom Filter Creator Dialog */}
+          <Dialog open={showCustomFilterDialog} onOpenChange={(open) => !open && resetCustomFilterDialog()}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5 text-accent" />
+                  {editingCustomFilter ? "Modifica Filtro" : "Crea Filtro Personalizzato"}
+                </DialogTitle>
+                <DialogDescription>
+                  Regola i parametri per creare il tuo filtro unico
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-6 py-4">
+                {/* Filter Name */}
+                <div className="space-y-2">
+                  <Label htmlFor="customFilterName">Nome del Filtro</Label>
+                  <Input
+                    id="customFilterName"
+                    placeholder="Es. Tramonto Dorato"
+                    value={customFilterName}
+                    onChange={(e) => setCustomFilterName(e.target.value)}
+                  />
+                </div>
+
+                {/* Live Preview */}
+                <div className="space-y-2">
+                  <Label>Anteprima Live</Label>
+                  <div className="rounded-lg overflow-hidden border border-border">
+                    <img 
+                      src={referenceImage || PREVIEW_IMAGE}
+                      alt="Preview"
+                      className="w-full h-32 object-cover transition-all duration-300"
+                      style={{ filter: buildCssFilterFromParams(customFilterParams) }}
+                    />
+                  </div>
+                </div>
+
+                {/* Parameter Sliders */}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Luminosità</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.brightness}%</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.brightness]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, brightness: v }))}
+                      min={50}
+                      max={150}
+                      step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Contrasto</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.contrast}%</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.contrast]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, contrast: v }))}
+                      min={50}
+                      max={150}
+                      step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Saturazione</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.saturate}%</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.saturate]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, saturate: v }))}
+                      min={0}
+                      max={200}
+                      step={10}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Seppia</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.sepia}%</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.sepia]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, sepia: v }))}
+                      min={0}
+                      max={100}
+                      step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Rotazione Tonalità</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.hueRotate}°</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.hueRotate]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, hueRotate: v }))}
+                      min={-180}
+                      max={180}
+                      step={15}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Sfocatura</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.blur}px</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.blur]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, blur: v }))}
+                      min={0}
+                      max={10}
+                      step={0.5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Scala di Grigi</Label>
+                      <span className="text-xs text-muted-foreground">{customFilterParams.grayscale}%</span>
+                    </div>
+                    <Slider
+                      value={[customFilterParams.grayscale]}
+                      onValueChange={([v]) => setCustomFilterParams(p => ({ ...p, grayscale: v }))}
+                      min={0}
+                      max={100}
+                      step={5}
+                    />
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCustomFilterParams(defaultCustomFilterParams)}
+                    className="flex-1"
+                  >
+                    Reset
+                  </Button>
+                  <Button onClick={saveCustomFilter} className="flex-1">
+                    <Save className="mr-2 h-4 w-4" />
+                    {editingCustomFilter ? "Aggiorna" : "Salva Filtro"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Custom Presets */}
           <div className="space-y-2">
