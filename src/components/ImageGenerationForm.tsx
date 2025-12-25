@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Sparkles, Download, Save } from "lucide-react";
+import { Loader2, Sparkles, Download, Save, Upload, X, ImageIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 
@@ -16,6 +16,9 @@ export const ImageGenerationForm = () => {
   const [model, setModel] = useState("black-forest-labs/flux-schnell");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { addImage } = useImageGallery();
 
   const examplePrompts = [
@@ -24,6 +27,48 @@ export const ImageGenerationForm = () => {
     "Professional studio portrait photography setup",
     "Cyberpunk street scene with neon lights and rain"
   ];
+
+  const editPrompts = [
+    "Make it look like sunset",
+    "Add dramatic lighting",
+    "Convert to watercolor style",
+    "Make it more vibrant and colorful"
+  ];
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error("Per favore seleziona un file immagine");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("L'immagine deve essere inferiore a 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setReferenceImage(result);
+      setReferenceFileName(file.name);
+      toast.success("Immagine di riferimento caricata!");
+    };
+    reader.onerror = () => {
+      toast.error("Errore nel caricamento dell'immagine");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeReferenceImage = () => {
+    setReferenceImage(null);
+    setReferenceFileName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -35,36 +80,65 @@ export const ImageGenerationForm = () => {
     setGeneratedImage(null);
 
     try {
-      console.log("Calling generate-image function with:", { prompt, aspectRatio, model });
+      if (referenceImage) {
+        // Use Lovable AI for image editing
+        console.log("Editing image with Lovable AI...");
+        
+        const { data, error } = await supabase.functions.invoke('edit-image', {
+          body: { 
+            prompt,
+            referenceImage
+          }
+        });
 
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: { 
-          prompt,
-          aspectRatio,
-          model,
-          outputFormat: "webp",
-          outputQuality: 90
+        if (error) {
+          console.error("Edge function error:", error);
+          throw error;
         }
-      });
 
-      if (error) {
-        console.error("Edge function error:", error);
-        throw error;
-      }
+        if (data?.error) {
+          throw new Error(data.error);
+        }
 
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      if (data?.imageUrl) {
-        setGeneratedImage(data.imageUrl);
-        toast.success("Immagine generata con successo!");
+        if (data?.imageUrl) {
+          setGeneratedImage(data.imageUrl);
+          toast.success("Immagine modificata con successo!");
+        } else {
+          throw new Error("Nessun URL immagine ricevuto");
+        }
       } else {
-        throw new Error("Nessun URL immagine ricevuto");
+        // Standard image generation
+        console.log("Calling generate-image function with:", { prompt, aspectRatio, model });
+
+        const { data, error } = await supabase.functions.invoke('generate-image', {
+          body: { 
+            prompt,
+            aspectRatio,
+            model,
+            outputFormat: "webp",
+            outputQuality: 90
+          }
+        });
+
+        if (error) {
+          console.error("Edge function error:", error);
+          throw error;
+        }
+
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+
+        if (data?.imageUrl) {
+          setGeneratedImage(data.imageUrl);
+          toast.success("Immagine generata con successo!");
+        } else {
+          throw new Error("Nessun URL immagine ricevuto");
+        }
       }
 
     } catch (error: any) {
-      console.error("Error generating image:", error);
+      console.error("Error generating/editing image:", error);
       toast.error(error.message || "Errore nella generazione dell'immagine");
     } finally {
       setIsLoading(false);
@@ -83,7 +157,7 @@ export const ImageGenerationForm = () => {
         url: generatedImage,
         prompt,
         aspectRatio,
-        model,
+        model: referenceImage ? "lovable-ai-edit" : model,
       });
       toast.success("Immagine salvata nella galleria!");
     }
@@ -94,23 +168,80 @@ export const ImageGenerationForm = () => {
       <Alert className="border-accent/50 bg-accent/10">
         <Sparkles className="h-4 w-4 text-accent" />
         <AlertDescription>
-          Genera immagini professionali per scenografie e storyboard usando Replicate Flux AI
+          {referenceImage 
+            ? "Modifica l'immagine caricata descrivendo le modifiche desiderate"
+            : "Genera immagini professionali per scenografie e storyboard usando Replicate Flux AI"
+          }
         </AlertDescription>
       </Alert>
 
+      {/* Reference Image Upload Section */}
+      <div className="space-y-2">
+        <Label>Immagine di Riferimento (Opzionale)</Label>
+        <div className="border-2 border-dashed border-border rounded-lg p-4 transition-colors hover:border-accent/50">
+          {referenceImage ? (
+            <div className="space-y-3">
+              <div className="relative inline-block">
+                <img 
+                  src={referenceImage} 
+                  alt="Reference" 
+                  className="max-h-40 rounded-lg object-contain"
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-2 -right-2 h-6 w-6"
+                  onClick={removeReferenceImage}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {referenceFileName}
+              </p>
+            </div>
+          ) : (
+            <div 
+              className="flex flex-col items-center justify-center py-4 cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="p-3 rounded-full bg-muted mb-2">
+                <ImageIcon className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium">Carica immagine di riferimento</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Clicca per caricare o trascinare un'immagine da modificare
+              </p>
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="prompt">Descrizione Immagine *</Label>
+          <Label htmlFor="prompt">
+            {referenceImage ? "Descrivi le modifiche *" : "Descrizione Immagine *"}
+          </Label>
           <Textarea
             id="prompt"
-            placeholder="Descrivi l'immagine che vuoi creare in dettaglio..."
+            placeholder={referenceImage 
+              ? "Descrivi come vuoi modificare l'immagine..." 
+              : "Descrivi l'immagine che vuoi creare in dettaglio..."
+            }
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             rows={4}
             className="resize-none bg-background/50 border-border"
           />
           <div className="flex flex-wrap gap-2 mt-2">
-            {examplePrompts.map((example, idx) => (
+            {(referenceImage ? editPrompts : examplePrompts).map((example, idx) => (
               <button
                 key={idx}
                 onClick={() => setPrompt(example)}
@@ -122,36 +253,38 @@ export const ImageGenerationForm = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="aspectRatio">Aspect Ratio</Label>
-            <Select value={aspectRatio} onValueChange={setAspectRatio}>
-              <SelectTrigger id="aspectRatio" className="bg-background/50 border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1:1">Quadrato (1:1)</SelectItem>
-                <SelectItem value="16:9">Panoramico (16:9)</SelectItem>
-                <SelectItem value="9:16">Verticale (9:16)</SelectItem>
-                <SelectItem value="4:3">Standard (4:3)</SelectItem>
-                <SelectItem value="3:4">Ritratto (3:4)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {!referenceImage && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="aspectRatio">Aspect Ratio</Label>
+              <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                <SelectTrigger id="aspectRatio" className="bg-background/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1:1">Quadrato (1:1)</SelectItem>
+                  <SelectItem value="16:9">Panoramico (16:9)</SelectItem>
+                  <SelectItem value="9:16">Verticale (9:16)</SelectItem>
+                  <SelectItem value="4:3">Standard (4:3)</SelectItem>
+                  <SelectItem value="3:4">Ritratto (3:4)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="model">Modello</Label>
-            <Select value={model} onValueChange={setModel}>
-              <SelectTrigger id="model" className="bg-background/50 border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="black-forest-labs/flux-schnell">Flux Schnell (Veloce)</SelectItem>
-                <SelectItem value="black-forest-labs/flux-dev">Flux Dev (Qualità Alta)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label htmlFor="model">Modello</Label>
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger id="model" className="bg-background/50 border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="black-forest-labs/flux-schnell">Flux Schnell (Veloce)</SelectItem>
+                  <SelectItem value="black-forest-labs/flux-dev">Flux Dev (Qualità Alta)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
+        )}
 
         <Button 
           onClick={handleGenerate}
@@ -162,12 +295,12 @@ export const ImageGenerationForm = () => {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Generazione in corso...
+              {referenceImage ? "Modifica in corso..." : "Generazione in corso..."}
             </>
           ) : (
             <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Genera Immagine
+              {referenceImage ? <Upload className="mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4" />}
+              {referenceImage ? "Modifica Immagine" : "Genera Immagine"}
             </>
           )}
         </Button>
@@ -202,7 +335,7 @@ export const ImageGenerationForm = () => {
           </Card>
         )}
 
-        {!generatedImage && !isLoading && (
+        {!generatedImage && !isLoading && !referenceImage && (
           <p className="text-sm text-muted-foreground text-center">
             Aspect Ratio: <span className="font-medium text-foreground">{aspectRatio}</span> • 
             Modello: <span className="font-medium text-foreground">
