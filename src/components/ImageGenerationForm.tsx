@@ -13,16 +13,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const imageFilters = [
-  { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors" },
-  { id: "hdr", name: "HDR", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details" },
-  { id: "bw", name: "Bianco e Nero", prompt: "Convert to high contrast black and white with dramatic shadows" },
-  { id: "cinematic", name: "Cinematico", prompt: "Apply cinematic color grading with film-like tones and letterbox feel" },
-  { id: "watercolor", name: "Acquerello", prompt: "Transform into watercolor painting style with soft edges and flowing colors" },
-  { id: "oil-painting", name: "Pittura a Olio", prompt: "Transform into oil painting style with visible brush strokes and rich textures" },
-  { id: "pop-art", name: "Pop Art", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look" },
-  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails" },
-  { id: "sketch", name: "Schizzo", prompt: "Convert to pencil sketch style with detailed line work" },
-  { id: "anime", name: "Anime", prompt: "Transform into anime/manga art style with cel shading" },
+  { id: "vintage", name: "Vintage", prompt: "Apply vintage film photography style with warm tones, grain, and faded colors", cssFilter: "sepia(0.4) contrast(1.1) brightness(0.95) saturate(0.9)" },
+  { id: "hdr", name: "HDR", prompt: "Apply HDR effect with enhanced dynamic range, vivid colors and sharp details", cssFilter: "contrast(1.3) saturate(1.4) brightness(1.05)" },
+  { id: "bw", name: "Bianco e Nero", prompt: "Convert to high contrast black and white with dramatic shadows", cssFilter: "grayscale(1) contrast(1.2)" },
+  { id: "cinematic", name: "Cinematico", prompt: "Apply cinematic color grading with film-like tones and letterbox feel", cssFilter: "contrast(1.15) saturate(0.85) brightness(0.9) sepia(0.15)" },
+  { id: "watercolor", name: "Acquerello", prompt: "Transform into watercolor painting style with soft edges and flowing colors", cssFilter: "saturate(1.3) brightness(1.1) blur(0.5px)" },
+  { id: "oil-painting", name: "Pittura a Olio", prompt: "Transform into oil painting style with visible brush strokes and rich textures", cssFilter: "saturate(1.5) contrast(1.2)" },
+  { id: "pop-art", name: "Pop Art", prompt: "Apply pop art style with bold colors, halftone patterns and graphic look", cssFilter: "saturate(2) contrast(1.5) brightness(1.1)" },
+  { id: "neon", name: "Neon Glow", prompt: "Add neon glow effects with vibrant electric colors and light trails", cssFilter: "saturate(1.8) brightness(1.2) contrast(1.3) hue-rotate(15deg)" },
+  { id: "sketch", name: "Schizzo", prompt: "Convert to pencil sketch style with detailed line work", cssFilter: "grayscale(0.8) contrast(1.4) brightness(1.1)" },
+  { id: "anime", name: "Anime", prompt: "Transform into anime/manga art style with cel shading", cssFilter: "saturate(1.4) contrast(1.2) brightness(1.05)" },
 ];
 
 export const ImageGenerationForm = () => {
@@ -34,7 +34,7 @@ export const ImageGenerationForm = () => {
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [referenceFileName, setReferenceFileName] = useState<string | null>(null);
   const [showGalleryPicker, setShowGalleryPicker] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { images, addImage } = useImageGallery();
 
@@ -82,7 +82,7 @@ export const ImageGenerationForm = () => {
   const removeReferenceImage = () => {
     setReferenceImage(null);
     setReferenceFileName(null);
-    setSelectedFilter(null);
+    setSelectedFilters([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -95,13 +95,91 @@ export const ImageGenerationForm = () => {
     toast.success("Immagine dalla galleria selezionata!");
   };
 
-  const applyFilter = (filterId: string) => {
-    const filter = imageFilters.find(f => f.id === filterId);
-    if (filter) {
-      setSelectedFilter(filterId);
-      setPrompt(filter.prompt);
-      toast.success(`Filtro "${filter.name}" applicato!`);
-    }
+  const toggleFilter = (filterId: string) => {
+    setSelectedFilters(prev => {
+      const isSelected = prev.includes(filterId);
+      const newFilters = isSelected 
+        ? prev.filter(f => f !== filterId)
+        : [...prev, filterId];
+      
+      // Update prompt with combined filter descriptions
+      const selectedFilterObjects = newFilters.map(id => 
+        imageFilters.find(f => f.id === id)
+      ).filter(Boolean);
+      
+      if (selectedFilterObjects.length > 0) {
+        const combinedPrompt = selectedFilterObjects
+          .map(f => f?.prompt)
+          .join(". Also ");
+        setPrompt(combinedPrompt);
+      } else {
+        setPrompt("");
+      }
+      
+      return newFilters;
+    });
+  };
+
+  // Calculate combined CSS filter for preview
+  const getPreviewFilter = () => {
+    if (selectedFilters.length === 0) return "none";
+    
+    const filterValues: { [key: string]: number } = {
+      sepia: 0,
+      contrast: 1,
+      brightness: 1,
+      saturate: 1,
+      grayscale: 0,
+      blur: 0,
+      hueRotate: 0
+    };
+    
+    selectedFilters.forEach(filterId => {
+      const filter = imageFilters.find(f => f.id === filterId);
+      if (filter?.cssFilter) {
+        // Parse and combine CSS filter values
+        const matches = filter.cssFilter.matchAll(/(\w+)\(([^)]+)\)/g);
+        for (const match of matches) {
+          const [, prop, val] = match;
+          const numVal = parseFloat(val);
+          
+          switch (prop) {
+            case 'sepia':
+              filterValues.sepia = Math.min(1, filterValues.sepia + numVal);
+              break;
+            case 'contrast':
+              filterValues.contrast *= numVal;
+              break;
+            case 'brightness':
+              filterValues.brightness *= numVal;
+              break;
+            case 'saturate':
+              filterValues.saturate *= numVal;
+              break;
+            case 'grayscale':
+              filterValues.grayscale = Math.min(1, filterValues.grayscale + numVal);
+              break;
+            case 'blur':
+              filterValues.blur += numVal;
+              break;
+            case 'hue-rotate':
+              filterValues.hueRotate += numVal;
+              break;
+          }
+        }
+      }
+    });
+    
+    const parts = [];
+    if (filterValues.sepia > 0) parts.push(`sepia(${filterValues.sepia})`);
+    if (filterValues.grayscale > 0) parts.push(`grayscale(${filterValues.grayscale})`);
+    if (filterValues.contrast !== 1) parts.push(`contrast(${filterValues.contrast.toFixed(2)})`);
+    if (filterValues.brightness !== 1) parts.push(`brightness(${filterValues.brightness.toFixed(2)})`);
+    if (filterValues.saturate !== 1) parts.push(`saturate(${filterValues.saturate.toFixed(2)})`);
+    if (filterValues.blur > 0) parts.push(`blur(${filterValues.blur}px)`);
+    if (filterValues.hueRotate !== 0) parts.push(`hue-rotate(${filterValues.hueRotate}deg)`);
+    
+    return parts.length > 0 ? parts.join(' ') : 'none';
   };
 
   const handleGenerate = async () => {
@@ -311,27 +389,69 @@ export const ImageGenerationForm = () => {
         </div>
       </div>
 
-      {/* Preset Filters Section */}
+      {/* Live Preview with Filters */}
       {referenceImage && (
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2">
-            <Wand2 className="h-4 w-4" />
-            Filtri Predefiniti
-          </Label>
-          <div className="flex flex-wrap gap-2">
-            {imageFilters.map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => applyFilter(filter.id)}
-                className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
-                  selectedFilter === filter.id
-                    ? "bg-accent text-accent-foreground"
-                    : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                }`}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <Wand2 className="h-4 w-4" />
+              Anteprima Live con Filtri
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Clicca sui filtri per combinarli. L'anteprima mostra l'effetto in tempo reale.
+            </p>
+          </div>
+          
+          {/* Live Preview Image */}
+          <div className="flex justify-center">
+            <div className="relative rounded-lg overflow-hidden border border-border bg-muted/20 p-2">
+              <img 
+                src={referenceImage} 
+                alt="Preview" 
+                className="max-h-64 rounded-lg object-contain transition-all duration-300"
+                style={{ filter: getPreviewFilter() }}
+              />
+              {selectedFilters.length > 0 && (
+                <div className="absolute top-3 right-3 bg-accent text-accent-foreground text-xs px-2 py-1 rounded-full">
+                  {selectedFilters.length} filtri attivi
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Filter Buttons */}
+          <div className="space-y-2">
+            <Label className="text-sm">Seleziona Filtri (puoi combinarne più di uno)</Label>
+            <div className="flex flex-wrap gap-2">
+              {imageFilters.map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => toggleFilter(filter.id)}
+                  className={`text-xs px-3 py-1.5 rounded-full transition-all duration-200 ${
+                    selectedFilters.includes(filter.id)
+                      ? "bg-accent text-accent-foreground ring-2 ring-accent/50"
+                      : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {filter.name}
+                  {selectedFilters.includes(filter.id) && " ✓"}
+                </button>
+              ))}
+            </div>
+            {selectedFilters.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedFilters([]);
+                  setPrompt("");
+                }}
+                className="text-xs text-muted-foreground"
               >
-                {filter.name}
-              </button>
-            ))}
+                <X className="mr-1 h-3 w-3" />
+                Rimuovi tutti i filtri
+              </Button>
+            )}
           </div>
         </div>
       )}
