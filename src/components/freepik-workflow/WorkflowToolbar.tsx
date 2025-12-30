@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { NodeTypeKey } from "./types";
 
-export type TemplateType = "text-to-video" | "image-to-video";
+export type TemplateType = "text-to-video" | "image-to-video" | "video-with-music";
 
 interface WorkflowToolbarProps {
   onAddNode: (type: NodeTypeKey) => void;
@@ -165,6 +165,10 @@ export const WorkflowToolbar = ({
               <DropdownMenuItem onClick={() => onLoadTemplate("image-to-video")}>
                 <Image className="h-4 w-4 mr-2 text-primary" />
                 Image-to-Video
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onLoadTemplate("video-with-music")}>
+                <Music className="h-4 w-4 mr-2 text-orange-500" />
+                Video + Musica
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

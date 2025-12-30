@@ -411,9 +411,11 @@ const FreepikWorkflowInner = () => {
       
       let videoUrls: string[] = [];
       let audioUrl: string | undefined;
+      let concatData: VideoConcatNodeData | undefined;
       
       // Get videos from concat node
       if (concatNode) {
+        concatData = concatNode.data as unknown as VideoConcatNodeData;
         const connectedVideos = findConnectedVideoResults(concatNode.id);
         videoUrls = connectedVideos
           .filter((v) => v.videoUrl)
@@ -422,19 +424,48 @@ const FreepikWorkflowInner = () => {
       
       // Generate or get audio
       if (audioNode) {
-        toast.info("Generando audio...");
+        toast.info("Generando audio con AI...");
         audioUrl = await generateAudio(audioNode);
+        if (audioUrl) {
+          toast.success("Audio generato!");
+        }
       }
       
       if (videoUrls.length === 0 && !audioUrl) {
         throw new Error("Nessun video o audio collegato");
       }
       
-      // For now, we'll create a simple solution:
-      // - If single video with audio, we create a combined data URL
-      // - If multiple videos, we'll use the first one for now (browser-side video concat is complex)
-      
       let finalVideoUrl = videoUrls[0];
+      let allSegments: string[] = videoUrls;
+      
+      // If we have multiple videos, use the concat edge function
+      if (videoUrls.length > 1) {
+        toast.info("Concatenando video...");
+        
+        const audioNodeData = audioNode?.data as unknown as AudioNodeData | undefined;
+        
+        const { data: concatResult, error: concatError } = await supabase.functions.invoke("video-concat", {
+          body: {
+            videoUrls,
+            transition: concatData?.transition || "none",
+            transitionDuration: concatData?.transitionDuration || 0.5,
+            audioUrl: audioUrl,
+            audioVolume: audioNodeData?.volume || 100,
+          },
+        });
+        
+        if (concatError) {
+          console.error("Concat error:", concatError);
+          // Fall back to first video
+        } else if (concatResult?.success) {
+          finalVideoUrl = concatResult.videoUrl;
+          allSegments = concatResult.segments || videoUrls;
+          if (concatResult.audioUrl) {
+            audioUrl = concatResult.audioUrl;
+          }
+          toast.success(concatResult.message || "Video concatenati!");
+        }
+      }
       
       // Update the FinalVideo node
       setNodes((nds) =>
@@ -448,19 +479,20 @@ const FreepikWorkflowInner = () => {
                   videoUrl: finalVideoUrl,
                   hasAudio: !!audioUrl,
                   audioUrl: audioUrl,
+                  segments: allSegments,
                 } 
               }
             : n
         )
       );
       
-      if (videoUrls.length > 1) {
-        toast.success(`Video finale pronto! (${videoUrls.length} video disponibili per download)`);
+      if (allSegments.length > 1) {
+        toast.success(`Video finale pronto! (${allSegments.length} segmenti)`);
       } else {
         toast.success("Video finale pronto!");
       }
       
-      return { videoUrl: finalVideoUrl, audioUrl };
+      return { videoUrl: finalVideoUrl, audioUrl, segments: allSegments };
     } catch (err: any) {
       console.error("FinalVideo processing error:", err);
       setNodes((nds) =>
@@ -833,6 +865,69 @@ const FreepikWorkflowInner = () => {
       setCurrentWorkflowId(undefined);
       setCurrentWorkflowName(undefined);
       toast.success("Template Image-to-Video caricato");
+    } else if (template === "video-with-music") {
+      const templateNodes: WorkflowNode[] = [
+        // Video generation path
+        {
+          id: "freepik-video-1",
+          type: "freepikVideo",
+          position: { x: 50, y: 100 },
+          data: { label: "Video 1", prompt: "", model: "kling" as const, duration: 6 },
+        },
+        {
+          id: "video-result-1",
+          type: "videoResult",
+          position: { x: 350, y: 100 },
+          data: { label: "Video Result 1", status: "idle" as const },
+        },
+        // Second video (optional)
+        {
+          id: "freepik-video-2",
+          type: "freepikVideo",
+          position: { x: 50, y: 280 },
+          data: { label: "Video 2", prompt: "", model: "kling" as const, duration: 6 },
+        },
+        {
+          id: "video-result-2",
+          type: "videoResult",
+          position: { x: 350, y: 280 },
+          data: { label: "Video Result 2", status: "idle" as const },
+        },
+        // Video concat
+        {
+          id: "video-concat-1",
+          type: "videoConcat",
+          position: { x: 600, y: 150 },
+          data: { label: "Concatena Video", transition: "crossfade" as const, transitionDuration: 0.5, outputFormat: "mp4" as const },
+        },
+        // Audio generation
+        {
+          id: "audio-1",
+          type: "audio",
+          position: { x: 600, y: 350 },
+          data: { label: "Audio / Musica", audioType: "generate" as const, category: "music" as const, duration: 15, volume: 80, prompt: "" },
+        },
+        // Final output
+        {
+          id: "final-video-1",
+          type: "finalVideo",
+          position: { x: 900, y: 200 },
+          data: { label: "Video Finale", status: "idle" as const },
+        },
+      ];
+      const templateEdges: WorkflowEdge[] = [
+        { id: "e-fv1-vr1", source: "freepik-video-1", target: "video-result-1", animated: true, style: { stroke: "#06b6d4" } },
+        { id: "e-fv2-vr2", source: "freepik-video-2", target: "video-result-2", animated: true, style: { stroke: "#06b6d4" } },
+        { id: "e-vr1-vc", source: "video-result-1", target: "video-concat-1", animated: true, style: { stroke: "#a855f7" } },
+        { id: "e-vr2-vc", source: "video-result-2", target: "video-concat-1", animated: true, style: { stroke: "#a855f7" } },
+        { id: "e-vc-fv", source: "video-concat-1", target: "final-video-1", animated: true, style: { stroke: "#d946ef" } },
+        { id: "e-audio-fv", source: "audio-1", target: "final-video-1", animated: true, style: { stroke: "#f97316" } },
+      ];
+      setNodes(templateNodes);
+      setEdges(templateEdges);
+      setCurrentWorkflowId(undefined);
+      setCurrentWorkflowName(undefined);
+      toast.success("Template Video + Musica caricato");
     }
   }, [setNodes, setEdges]);
 
