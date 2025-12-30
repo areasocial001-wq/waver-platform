@@ -14,6 +14,7 @@ const requestSchema = z.object({
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
+  aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
 });
@@ -25,6 +26,28 @@ const mapResolution = (resolution: string): string => {
     case 'hd': return 'hd';
     case 'fhd': return '1080';
     default: return 'hd';
+  }
+};
+
+// Map aspect ratio to Shotstack size
+const getAspectRatioSize = (aspectRatio: string, resolution: string): { width: number; height: number } | null => {
+  const resMultiplier = resolution === 'fhd' ? 1 : resolution === 'hd' ? 0.67 : 0.45;
+  
+  switch (aspectRatio) {
+    case '16:9':
+      return null; // Use default
+    case '9:16':
+      return { 
+        width: Math.round(1080 * resMultiplier), 
+        height: Math.round(1920 * resMultiplier) 
+      };
+    case '1:1':
+      return { 
+        width: Math.round(1080 * resMultiplier), 
+        height: Math.round(1080 * resMultiplier) 
+      };
+    default:
+      return null;
   }
 };
 
@@ -55,7 +78,7 @@ serve(async (req) => {
       );
     }
     
-    const { videoUrls, clipDurations, transition, transitionDuration, resolution, audioUrl, audioVolume } = parseResult.data;
+    const { videoUrls, clipDurations, transition, transitionDuration, resolution, aspectRatio, audioUrl, audioVolume } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
@@ -64,6 +87,7 @@ serve(async (req) => {
       transition, 
       transitionDuration,
       resolution,
+      aspectRatio,
       hasAudio: !!audioUrl,
       useShotstack: !!SHOTSTACK_API_KEY
     });
@@ -152,13 +176,20 @@ serve(async (req) => {
           });
         }
 
-        // Build render request
+        // Build render request with aspect ratio
+        const aspectSize = getAspectRatioSize(aspectRatio, resolution);
+        const output: any = {
+          format: 'mp4',
+          resolution: mapResolution(resolution),
+        };
+        
+        if (aspectSize) {
+          output.size = aspectSize;
+        }
+
         const renderRequest = {
           timeline,
-          output: {
-            format: 'mp4',
-            resolution: mapResolution(resolution),
-          },
+          output,
         };
 
         console.log('Shotstack render request:', JSON.stringify(renderRequest, null, 2));

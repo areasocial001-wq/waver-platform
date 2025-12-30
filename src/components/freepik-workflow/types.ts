@@ -67,6 +67,7 @@ export interface VideoConcatNodeData extends Record<string, unknown> {
   transitionDuration: number;
   outputFormat: "mp4" | "webm";
   resolution: "sd" | "hd" | "fhd";
+  aspectRatio: "16:9" | "9:16" | "1:1";
   videoOrder?: string[];
   clipDurations?: Record<string, number>;
 }

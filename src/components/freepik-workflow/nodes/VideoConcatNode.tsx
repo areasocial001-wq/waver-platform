@@ -5,7 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Layers, Video, GripVertical, Loader2, Clock, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Layers, Video, GripVertical, Loader2, Clock, Play, Eye, X, SkipBack, SkipForward, Pause, RectangleHorizontal, Square, RectangleVertical } from "lucide-react";
 import { VideoConcatNodeData, VideoResultNodeData } from "../types";
 import {
   DndContext,
@@ -161,7 +163,219 @@ const VideoThumbnail = memo(({ url }: { url?: string }) => {
 
 VideoThumbnail.displayName = "VideoThumbnail";
 
-// Sortable video item component with duration control
+// Sequence Preview Dialog
+const SequencePreviewDialog = memo(({ 
+  isOpen, 
+  onClose, 
+  videos, 
+  clipDurations 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  videos: ConnectedVideo[]; 
+  clipDurations: Record<string, number>;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const currentVideo = videos[currentIndex];
+  const totalDuration = videos.reduce((sum, v) => sum + (clipDurations[v.id] || 5), 0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentIndex(0);
+      setIsPlaying(false);
+      setProgress(0);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !currentVideo?.url) return;
+
+    video.src = currentVideo.url;
+    video.currentTime = 0;
+    
+    if (isPlaying) {
+      video.play().catch(() => {});
+    }
+  }, [currentIndex, currentVideo?.url]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handleTimeUpdate = () => {
+      const clipDuration = clipDurations[currentVideo?.id] || 5;
+      const clipProgress = (video.currentTime / clipDuration) * 100;
+      
+      // Calculate overall progress
+      let prevDuration = 0;
+      for (let i = 0; i < currentIndex; i++) {
+        prevDuration += clipDurations[videos[i].id] || 5;
+      }
+      const overallProgress = ((prevDuration + video.currentTime) / totalDuration) * 100;
+      setProgress(Math.min(overallProgress, 100));
+
+      // Move to next clip when duration reached
+      if (video.currentTime >= clipDuration) {
+        if (currentIndex < videos.length - 1) {
+          setCurrentIndex(currentIndex + 1);
+        } else {
+          setIsPlaying(false);
+          setCurrentIndex(0);
+          setProgress(100);
+        }
+      }
+    };
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, [currentIndex, currentVideo?.id, clipDurations, videos, totalDuration]);
+
+  const handlePlayPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (isPlaying) {
+      video.pause();
+    } else {
+      if (currentIndex === videos.length - 1 && progress >= 100) {
+        setCurrentIndex(0);
+        setProgress(0);
+      }
+      video.play().catch(() => {});
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentIndex < videos.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
+
+  if (videos.length === 0) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-purple-500" />
+            Anteprima Sequenza
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Video player */}
+          <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+            <video
+              ref={videoRef}
+              className="w-full h-full object-contain"
+              playsInline
+              muted
+            />
+            
+            {/* Current clip indicator */}
+            <div className="absolute top-2 left-2 bg-black/70 px-2 py-1 rounded text-xs text-white">
+              Clip {currentIndex + 1} / {videos.length}
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="space-y-2">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-purple-500 transition-all duration-200"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            
+            {/* Clip markers */}
+            <div className="flex gap-1">
+              {videos.map((v, i) => {
+                const clipDur = clipDurations[v.id] || 5;
+                const width = (clipDur / totalDuration) * 100;
+                return (
+                  <button
+                    key={v.id}
+                    onClick={() => setCurrentIndex(i)}
+                    className={`h-1.5 rounded-full transition-colors ${
+                      i === currentIndex ? 'bg-purple-500' : 'bg-muted-foreground/30'
+                    }`}
+                    style={{ width: `${width}%` }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePrev}
+              disabled={currentIndex === 0}
+            >
+              <SkipBack className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="default"
+              size="icon"
+              className="h-12 w-12 rounded-full bg-purple-500 hover:bg-purple-600"
+              onClick={handlePlayPause}
+            >
+              {isPlaying ? (
+                <Pause className="h-5 w-5" />
+              ) : (
+                <Play className="h-5 w-5 ml-0.5" />
+              )}
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNext}
+              disabled={currentIndex === videos.length - 1}
+            >
+              <SkipForward className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Clip list */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {videos.map((v, i) => (
+              <button
+                key={v.id}
+                onClick={() => setCurrentIndex(i)}
+                className={`shrink-0 w-20 h-12 rounded border-2 overflow-hidden transition-all ${
+                  i === currentIndex 
+                    ? 'border-purple-500 ring-2 ring-purple-500/30' 
+                    : 'border-transparent opacity-60 hover:opacity-100'
+                }`}
+              >
+                <VideoThumbnail url={v.url} />
+              </button>
+            ))}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+SequencePreviewDialog.displayName = "SequencePreviewDialog";
 const SortableVideoItem = memo(({ 
   video, 
   index, 
@@ -234,6 +448,7 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
   const [connectedVideos, setConnectedVideos] = useState<ConnectedVideo[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
+  const [showPreview, setShowPreview] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -402,7 +617,19 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
           {orderedVideos.length > 0 && (
             <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
               <span>Durata totale:</span>
-              <span className="font-medium text-purple-400">{totalDuration}s</span>
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-purple-400">{totalDuration}s</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => setShowPreview(true)}
+                  disabled={orderedVideos.filter(v => v.url).length === 0}
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Anteprima
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -443,7 +670,33 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
           </Select>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Aspect Ratio</Label>
+          <div className="flex gap-1">
+            {[
+              { value: "16:9", icon: RectangleHorizontal, label: "16:9" },
+              { value: "9:16", icon: RectangleVertical, label: "9:16" },
+              { value: "1:1", icon: Square, label: "1:1" },
+            ].map(({ value, icon: Icon, label }) => (
+              <Button
+                key={value}
+                variant={nodeData.aspectRatio === value ? "default" : "outline"}
+                size="sm"
+                className={`flex-1 h-8 text-[10px] ${
+                  nodeData.aspectRatio === value 
+                    ? "bg-purple-500 hover:bg-purple-600" 
+                    : ""
+                }`}
+                onClick={() => handleChange("aspectRatio", value)}
+              >
+                <Icon className="h-3 w-3 mr-1" />
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
           <div className="space-y-1">
             <Label className="text-xs">Formato</Label>
             <Select
@@ -460,7 +713,7 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
             </Select>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 col-span-2">
             <Label className="text-xs">Risoluzione</Label>
             <Select
               value={nodeData.resolution || "hd"}
@@ -487,6 +740,14 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
         type="source"
         position={Position.Right}
         className="w-3 h-3 !bg-purple-500 border-2 border-background"
+      />
+      
+      {/* Sequence Preview Dialog */}
+      <SequencePreviewDialog
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        videos={orderedVideos.filter(v => v.url)}
+        clipDurations={clipDurations}
       />
     </Card>
   );
