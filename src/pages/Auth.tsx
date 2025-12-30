@@ -64,11 +64,11 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center gap-2 mb-4">
             <Sparkles className="w-8 h-8 text-primary" />
             <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              Waver Platform
+              AI Production Hub
             </h1>
           </div>
           <p className="text-muted-foreground">
-            Accesso riservato all'amministratore
+            Pannello di Controllo - Accesso Riservato
           </p>
         </div>
 

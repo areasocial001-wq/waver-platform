@@ -1,8 +1,7 @@
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
-import { Hero } from "@/components/Hero";
+import { Dashboard } from "@/components/Dashboard";
 import { GenerateSection } from "@/components/GenerateSection";
-import { HowItWorks } from "@/components/HowItWorks";
 import { Footer } from "@/components/Footer";
 
 const Index = () => {
@@ -10,9 +9,8 @@ const Index = () => {
     <AuthGuard>
       <div className="min-h-screen bg-background dark">
         <Navbar />
-        <Hero />
+        <Dashboard />
         <GenerateSection />
-        <HowItWorks />
         <Footer />
       </div>
     </AuthGuard>

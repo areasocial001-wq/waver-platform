@@ -57,7 +57,7 @@ export const Navbar = () => {
         >
           <Sparkles className="w-6 h-6 text-primary" />
           <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Waver Platform
+            AI Production Hub
           </h1>
         </button>
         
