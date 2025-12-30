@@ -1,14 +1,53 @@
-import { memo, useRef } from "react";
+import { memo, useRef, useEffect, useState } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Video, Download, Loader2, AlertCircle, Maximize2, Play } from "lucide-react";
+import { Video, Download, Loader2, AlertCircle, Maximize2, Play, Music, Volume2, VolumeX } from "lucide-react";
 import { FinalVideoNodeData } from "../types";
 import { toast } from "sonner";
 
+interface ExtendedFinalVideoNodeData extends FinalVideoNodeData {
+  audioUrl?: string;
+}
+
 const FinalVideoNode = memo(({ data }: NodeProps) => {
-  const nodeData = data as unknown as FinalVideoNodeData;
+  const nodeData = data as unknown as ExtendedFinalVideoNodeData;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+
+  // Sync audio with video
+  useEffect(() => {
+    if (videoRef.current && audioRef.current && nodeData.audioUrl) {
+      const video = videoRef.current;
+      const audio = audioRef.current;
+      
+      const handlePlay = () => {
+        audio.currentTime = video.currentTime;
+        audio.play();
+        setIsAudioPlaying(true);
+      };
+      
+      const handlePause = () => {
+        audio.pause();
+        setIsAudioPlaying(false);
+      };
+      
+      const handleSeek = () => {
+        audio.currentTime = video.currentTime;
+      };
+      
+      video.addEventListener("play", handlePlay);
+      video.addEventListener("pause", handlePause);
+      video.addEventListener("seeked", handleSeek);
+      
+      return () => {
+        video.removeEventListener("play", handlePlay);
+        video.removeEventListener("pause", handlePause);
+        video.removeEventListener("seeked", handleSeek);
+      };
+    }
+  }, [nodeData.audioUrl, nodeData.videoUrl]);
 
   const handleDownload = async () => {
     if (!nodeData.videoUrl) return;
@@ -30,10 +69,42 @@ const FinalVideoNode = memo(({ data }: NodeProps) => {
     }
   };
 
+  const handleDownloadAudio = async () => {
+    if (!nodeData.audioUrl) return;
+    
+    try {
+      const response = await fetch(nodeData.audioUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audio-${Date.now()}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Audio scaricato!");
+    } catch (error) {
+      toast.error("Errore durante il download audio");
+    }
+  };
+
   const handleFullscreen = () => {
     if (videoRef.current) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
+      }
+    }
+  };
+
+  const toggleAudio = () => {
+    if (audioRef.current) {
+      if (isAudioPlaying) {
+        audioRef.current.pause();
+        setIsAudioPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsAudioPlaying(true);
       }
     }
   };
@@ -45,8 +116,9 @@ const FinalVideoNode = memo(({ data }: NodeProps) => {
           <Video className="h-4 w-4 text-purple-500" />
           Video Finale
           {nodeData.hasAudio && (
-            <span className="text-[10px] bg-orange-500/20 text-orange-500 px-1.5 py-0.5 rounded">
-              + Audio
+            <span className="text-[10px] bg-orange-500/20 text-orange-500 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <Music className="h-3 w-3" />
+              Audio
             </span>
           )}
         </CardTitle>
@@ -69,28 +141,60 @@ const FinalVideoNode = memo(({ data }: NodeProps) => {
                 ref={videoRef}
                 src={nodeData.videoUrl}
                 controls
-                className="w-full h-44 object-contain rounded-md bg-black"
+                className="w-full h-36 object-contain rounded-md bg-black"
                 loop
                 playsInline
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-1 right-1 h-6 w-6 bg-black/50 hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleFullscreen}
-              >
-                <Maximize2 className="h-3 w-3 text-white" />
-              </Button>
+              {nodeData.audioUrl && (
+                <audio ref={audioRef} src={nodeData.audioUrl} loop />
+              )}
+              <div className="absolute top-1 right-1 flex gap-1">
+                {nodeData.audioUrl && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 bg-black/50 hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={toggleAudio}
+                  >
+                    {isAudioPlaying ? (
+                      <Volume2 className="h-3 w-3 text-orange-400" />
+                    ) : (
+                      <VolumeX className="h-3 w-3 text-white" />
+                    )}
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 bg-black/50 hover:bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={handleFullscreen}
+                >
+                  <Maximize2 className="h-3 w-3 text-white" />
+                </Button>
+              </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={handleDownload}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Scarica Video Finale
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={handleDownload}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Video
+              </Button>
+              {nodeData.audioUrl && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={handleDownloadAudio}
+                >
+                  <Music className="h-3 w-3 mr-1" />
+                  Audio
+                </Button>
+              )}
+            </div>
           </div>
         )}
         
