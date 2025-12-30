@@ -7,14 +7,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Generate JWT token for Kling API authentication
+// Generate JWT token for Kling API authentication (direct API)
 async function generateKlingJWT(accessKey: string, secretKey: string): Promise<string> {
   const header = { alg: "HS256" as const, typ: "JWT" };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     iss: accessKey,
-    exp: now + 1800, // 30 minutes expiration
-    nbf: now - 5,    // valid from 5 seconds ago
+    exp: now + 1800,
+    nbf: now - 5,
   };
   
   const encoder = new TextEncoder();
@@ -30,6 +30,23 @@ async function generateKlingJWT(accessKey: string, secretKey: string): Promise<s
   return await create(header, payload, key);
 }
 
+// PiAPI model configuration
+interface PiAPIModelConfig {
+  model: string;
+  model_name?: string;
+  mode?: string;
+}
+
+const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
+  "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std" },
+  "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std" },
+  "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std" },
+  "hailuo": { model: "hailuo" },
+  "luma": { model: "luma" },
+  "wan": { model: "wan" },
+  "hunyuan": { model: "hunyuan" },
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -41,21 +58,19 @@ serve(async (req) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const KLING_ACCESS_KEY = Deno.env.get("KLING_ACCESS_KEY");
     const KLING_SECRET_KEY = Deno.env.get("KLING_SECRET_KEY");
+    const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     
     if (!GOOGLE_AI_API_KEY) {
       throw new Error("GOOGLE_AI_API_KEY is not set");
     }
 
-    // Validate Kling credentials have actual values, not just empty strings
     const hasValidKlingCredentials = KLING_ACCESS_KEY && KLING_ACCESS_KEY.trim().length > 0 && 
                                      KLING_SECRET_KEY && KLING_SECRET_KEY.trim().length > 0;
+    const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     
-    console.log("Kling credentials check:", {
-      hasAccessKey: !!KLING_ACCESS_KEY,
-      hasSecretKey: !!KLING_SECRET_KEY,
-      accessKeyLength: KLING_ACCESS_KEY?.length || 0,
-      secretKeyLength: KLING_SECRET_KEY?.length || 0,
-      isValid: hasValidKlingCredentials
+    console.log("API credentials check:", {
+      hasKlingCredentials: hasValidKlingCredentials,
+      hasPiAPIKey: hasValidPiAPIKey
     });
 
     body = await req.json();
@@ -65,18 +80,90 @@ serve(async (req) => {
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
       
-      // Check if it's a Kling task (format: kling:task_id)
+      // PiAPI polling (format: piapi:model:task_id)
+      if (body.operationId.startsWith('piapi:')) {
+        if (!hasValidPiAPIKey) {
+          throw new Error("PIAPI_API_KEY is not configured");
+        }
+        
+        const parts = body.operationId.split(':');
+        const taskId = parts.slice(2).join(':'); // Handle task IDs with colons
+        console.log("Polling PiAPI task:", taskId);
+        
+        const piApiResponse = await fetch(`https://api.piapi.ai/api/v1/task/${taskId}`, {
+          method: "GET",
+          headers: {
+            "x-api-key": PIAPI_API_KEY,
+          },
+        });
+
+        if (!piApiResponse.ok) {
+          const error = await piApiResponse.text();
+          throw new Error(`PiAPI error: ${piApiResponse.status} - ${error}`);
+        }
+
+        const piApiData = await piApiResponse.json();
+        console.log("PiAPI task status:", piApiData);
+        
+        const taskStatus = piApiData.data?.status || piApiData.status;
+        
+        if (taskStatus === "completed" || taskStatus === "SUCCESS") {
+          const videoUrl = piApiData.data?.output?.video_url || 
+                          piApiData.data?.output?.video || 
+                          piApiData.data?.video_url ||
+                          piApiData.output?.video_url;
+          
+          if (!videoUrl) {
+            console.error("PiAPI completed but no video URL found:", piApiData);
+            throw new Error("Video completed but URL not found in response");
+          }
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (taskStatus === "failed" || taskStatus === "FAILED" || taskStatus === "error") {
+          const errorMsg = piApiData.data?.error || piApiData.error || "Unknown error";
+          throw new Error(`PiAPI generation failed: ${errorMsg}`);
+        } else {
+          // Still processing
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
+      
+      // Kling direct API polling (format: kling:task_id)
       if (body.operationId.startsWith('kling:')) {
         if (!hasValidKlingCredentials) {
-          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not properly configured. Please check your Lovable Cloud secrets.");
+          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not properly configured");
         }
         
         const taskId = body.operationId.replace('kling:', '');
         console.log("Polling Kling task:", taskId);
         
-        // Generate JWT token for Kling API
         const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
-        console.log("Generated Kling JWT for polling");
         
         const klingResponse = await fetch(`https://api.klingai.com/v1/videos/image2video/${taskId}`, {
           method: "GET",
@@ -109,14 +196,6 @@ serve(async (req) => {
                 video_url: videoUrl,
               })
               .eq('id', body.generationId);
-
-            return new Response(JSON.stringify({ 
-              status: "succeeded",
-              output: videoUrl 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            });
           }
 
           return new Response(JSON.stringify({ 
@@ -129,7 +208,6 @@ serve(async (req) => {
         } else if (klingData.data.task_status === "failed") {
           throw new Error(`Kling generation failed: ${klingData.data.task_status_msg || "Unknown error"}`);
         } else {
-          // Still processing
           return new Response(JSON.stringify({ 
             status: "processing"
           }), {
@@ -139,7 +217,7 @@ serve(async (req) => {
         }
       }
       
-      // Check if it's a Freepik task (format: freepik:model:task_id)
+      // Freepik polling (format: freepik:model:task_id)
       if (body.operationId.startsWith('freepik:')) {
         const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
         if (!FREEPIK_API_KEY) {
@@ -181,14 +259,6 @@ serve(async (req) => {
                 video_url: videoUrl,
               })
               .eq('id', body.generationId);
-
-            return new Response(JSON.stringify({ 
-              status: "succeeded",
-              output: videoUrl 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            });
           }
 
           return new Response(JSON.stringify({ 
@@ -201,7 +271,6 @@ serve(async (req) => {
         } else if (freepikData.data?.status === "FAILED") {
           throw new Error(`Freepik generation failed: ${freepikData.data?.error || "Unknown error"}`);
         } else {
-          // Still processing
           return new Response(JSON.stringify({ 
             status: "processing"
           }), {
@@ -211,6 +280,7 @@ serve(async (req) => {
         }
       }
       
+      // Replicate polling
       if (body.operationId.startsWith('replicate:')) {
         const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
         if (!REPLICATE_API_KEY) {
@@ -240,14 +310,6 @@ serve(async (req) => {
                 video_url: videoUrl,
               })
               .eq('id', body.generationId);
-
-            return new Response(JSON.stringify({ 
-              status: "succeeded",
-              output: videoUrl 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            });
           }
 
           return new Response(JSON.stringify({ 
@@ -260,7 +322,6 @@ serve(async (req) => {
         } else if (prediction.status === "failed") {
           throw new Error(`Replicate generation failed: ${prediction.error || "Unknown error"}`);
         } else {
-          // Still processing
           return new Response(JSON.stringify({ 
             status: "processing"
           }), {
@@ -270,6 +331,7 @@ serve(async (req) => {
         }
       }
       
+      // Google Veo polling
       const pollResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/${body.operationId}`,
         {
@@ -289,26 +351,22 @@ serve(async (req) => {
       const operation = await pollResponse.json();
       console.log("Operation status:", operation);
 
-      // Check if operation is complete
       if (operation.done) {
         if (operation.error) {
-          // Check if it's a temporary overload error (code 14)
           const isOverloaded = operation.error.code === 14 || 
             (operation.error.message && operation.error.message.includes("overloaded"));
           
           if (isOverloaded) {
-            // Return as failed with specific error so frontend can show retry option
             return new Response(JSON.stringify({
               status: "failed",
               error: "Il modello AI è temporaneamente sovraccarico. Riprova tra qualche minuto.",
               retryable: true
             }), {
               headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200, // Return 200 so frontend can handle gracefully
+              status: 200,
             });
           }
           
-          // For other errors, return as failed
           return new Response(JSON.stringify({
             status: "failed",
             error: operation.error.message || "Errore sconosciuto durante la generazione",
@@ -319,7 +377,6 @@ serve(async (req) => {
           });
         }
 
-        // Get video URL from response (REST API format)
         const videoUri = operation.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri;
         if (!videoUri) {
           throw new Error("No video URI in response");
@@ -327,7 +384,6 @@ serve(async (req) => {
 
         console.log("Video ready, downloading from Google:", videoUri);
 
-        // Download video from Google's API
         const videoResponse = await fetch(videoUri, {
           headers: {
             "x-goog-api-key": GOOGLE_AI_API_KEY,
@@ -338,17 +394,13 @@ serve(async (req) => {
           throw new Error(`Failed to download video: ${videoResponse.status}`);
         }
 
-        // Get video as blob
         const videoBlob = await videoResponse.blob();
         console.log("Video downloaded, size:", videoBlob.size, "bytes");
 
-        // Instead of uploading to Storage (bucket may not exist in some environments),
-        // store a proxy URL that streams the video through our backend function.
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(videoUri)}`;
         console.log("Using proxy URL:", proxyUrl);
 
-        // Update database with proxy URL
         if (body.generationId) {
           const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
           const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -361,14 +413,6 @@ serve(async (req) => {
               video_url: proxyUrl,
             })
             .eq('id', body.generationId);
-
-          return new Response(JSON.stringify({
-            status: "succeeded",
-            output: proxyUrl,
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          });
         }
 
         return new Response(JSON.stringify({
@@ -379,7 +423,6 @@ serve(async (req) => {
           status: 200,
         });
       } else {
-        // Still processing
         return new Response(JSON.stringify({ 
           status: "processing"
         }), {
@@ -394,43 +437,133 @@ serve(async (req) => {
 
     if (!type) {
       return new Response(
-        JSON.stringify({ 
-          error: "Missing required field: type is required" 
-        }), 
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
+        JSON.stringify({ error: "Missing required field: type is required" }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // For text-to-video, prompt is required
     if (type === "text_to_video" && !prompt) {
       return new Response(
-        JSON.stringify({ 
-          error: "Missing required field: prompt is required for text-to-video" 
-        }), 
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
+        JSON.stringify({ error: "Missing required field: prompt is required for text-to-video" }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // For image-to-video, at least start_image is required
     if (type === "image_to_video" && !image && !image_url && !start_image) {
       return new Response(
-        JSON.stringify({ 
-          error: "Missing required field: start_image is required for image-to-video" 
-        }), 
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400,
-        }
+        JSON.stringify({ error: "Missing required field: start_image is required for image-to-video" }), 
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
-    // Use Freepik if explicitly requested as preferred provider
+    // Helper to extract base64 from data URLs
+    const extractBase64 = (data: string): string => {
+      if (!data) return "";
+      if (data.includes(',')) {
+        return data.split(',')[1];
+      }
+      return data;
+    };
+
+    // ==================== PiAPI PROVIDERS ====================
+    // Use PiAPI for piapi-kling, piapi-hailuo, piapi-luma, piapi-wan, piapi-hunyuan
+    if (preferredProvider?.startsWith('piapi-') && hasValidPiAPIKey) {
+      const modelKey = preferredProvider.replace('piapi-', '') as keyof typeof PIAPI_MODELS;
+      const modelConfig = PIAPI_MODELS[modelKey] || PIAPI_MODELS["kling-2.1"];
+      
+      console.log(`Starting PiAPI generation with model: ${modelKey}`, modelConfig);
+      
+      const startImageData = start_image || image || image_url;
+      
+      // Build PiAPI request payload
+      const piApiPayload: any = {
+        model: modelConfig.model,
+        task_type: type === "image_to_video" ? "img2video" : "txt2video",
+        input: {
+          prompt: prompt || "Smooth cinematic video",
+          duration: duration || 5,
+        }
+      };
+      
+      // Add model-specific parameters
+      if (modelConfig.model_name) {
+        piApiPayload.input.model_name = modelConfig.model_name;
+      }
+      if (modelConfig.mode) {
+        piApiPayload.input.mode = modelConfig.mode;
+      }
+      
+      // Add images for image-to-video
+      if (type === "image_to_video" && startImageData) {
+        // PiAPI accepts base64 or URLs
+        if (startImageData.startsWith('data:')) {
+          piApiPayload.input.image = extractBase64(startImageData);
+        } else {
+          piApiPayload.input.image_url = startImageData;
+        }
+        
+        // Add end image if provided (for transitions)
+        if (end_image) {
+          if (end_image.startsWith('data:')) {
+            piApiPayload.input.tail_image = extractBase64(end_image);
+          } else {
+            piApiPayload.input.tail_image_url = end_image;
+          }
+        }
+      }
+      
+      console.log("Calling PiAPI for video generation:", { model: modelConfig.model, task_type: piApiPayload.task_type });
+      
+      const piApiResponse = await fetch("https://api.piapi.ai/api/v1/task", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": PIAPI_API_KEY,
+        },
+        body: JSON.stringify(piApiPayload),
+      });
+
+      if (!piApiResponse.ok) {
+        const error = await piApiResponse.text();
+        console.error("PiAPI error:", error);
+        throw new Error(`PiAPI error: ${piApiResponse.status} - ${error}`);
+      }
+
+      const piApiData = await piApiResponse.json();
+      console.log("PiAPI task started:", piApiData);
+      
+      const taskId = piApiData.data?.task_id || piApiData.task_id;
+      if (!taskId) {
+        throw new Error("PiAPI did not return a task ID");
+      }
+
+      // Save task ID to database
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `piapi:${modelKey}:${taskId}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `piapi:${modelKey}:${taskId}`,
+        provider: `piapi-${modelKey}`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // ==================== FREEPIK PROVIDER ====================
     if (preferredProvider === "freepik" && type === "image_to_video" && end_image) {
       const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
       if (!FREEPIK_API_KEY) {
@@ -444,19 +577,9 @@ serve(async (req) => {
           throw new Error("Start image is required for Freepik image-to-video generation");
         }
         
-        // Extract base64 data from data URLs
-        const extractBase64 = (data: string): string => {
-          if (!data) return "";
-          if (data.includes(',')) {
-            return data.split(',')[1];
-          }
-          return data;
-        };
-        
         const startBase64 = extractBase64(startImageData);
         const endBase64 = extractBase64(end_image);
         
-        // Use minimax endpoint for start/end frame transitions
         const freepikPayload = {
           image: startBase64,
           end_image: endBase64,
@@ -477,13 +600,11 @@ serve(async (req) => {
         if (!freepikResponse.ok) {
           const error = await freepikResponse.text();
           console.error("Freepik API error:", error);
-          // Don't throw, fall back to other providers
           console.log("Freepik failed, falling back to Kling/Veo");
         } else {
           const freepikData = await freepikResponse.json();
           console.log("Freepik task started:", freepikData);
 
-          // Save Freepik task ID to database
           if (generationId) {
             const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
             const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -511,45 +632,24 @@ serve(async (req) => {
       }
     }
 
-    // Use Kling API if end_image is provided (it supports start/end frames)
-    if (type === "image_to_video" && end_image && hasValidKlingCredentials) {
+    // ==================== KLING DIRECT API ====================
+    if (type === "image_to_video" && end_image && hasValidKlingCredentials && preferredProvider === "kling") {
       console.log("Starting video generation with Kling 2.1 (supports start/end frames)");
       
       const startImageData = start_image || image || image_url;
-      
-      console.log("DEBUG - start_image present:", !!start_image);
-      console.log("DEBUG - image present:", !!image);
-      console.log("DEBUG - image_url present:", !!image_url);
-      console.log("DEBUG - startImageData present:", !!startImageData);
-      console.log("DEBUG - end_image present:", !!end_image);
       
       if (!startImageData) {
         throw new Error("Start image is required for Kling image-to-video generation");
       }
       
-      // Extract base64 data from data URLs
-      const extractBase64 = (data: string): string => {
-        if (!data) return "";
-        if (data.includes(',')) {
-          return data.split(',')[1];
-        }
-        return data;
-      };
-      
       const startBase64 = extractBase64(startImageData);
       const endBase64 = extractBase64(end_image);
-      
-      console.log("DEBUG - startBase64 length:", startBase64?.length || 0);
-      console.log("DEBUG - endBase64 length:", endBase64?.length || 0);
       
       if (!startBase64 || startBase64.length < 100) {
         throw new Error("Invalid start image base64 data");
       }
       
-      // Prepare Kling API request
-      // For image_tail (start/end frame) support, use pro mode for better compatibility
       const requestedDuration = duration && duration >= 8 ? 10 : 5;
-      // Always use pro mode with image_tail for better compatibility
       const klingMode = "pro";
       const klingDuration = String(requestedDuration);
       
@@ -565,14 +665,7 @@ serve(async (req) => {
         image_tail: endBase64,
         duration: klingDuration
       };
-      
-      console.log("Kling payload keys:", Object.keys(klingPayload));
-      console.log("Kling image field length:", klingPayload.image?.length || 0);
-      console.log("Kling image_tail field length:", klingPayload.image_tail?.length || 0);
 
-      console.log("Calling Kling API for image-to-video with start/end frames");
-
-      // Generate JWT token for Kling API
       const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
       console.log("Generated Kling JWT for video generation");
 
@@ -594,7 +687,6 @@ serve(async (req) => {
       const klingData = await klingResponse.json();
       console.log("Kling task started:", klingData);
 
-      // Save Kling task ID to database
       if (generationId) {
         const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -620,13 +712,12 @@ serve(async (req) => {
       });
     }
 
+    // ==================== GOOGLE VEO 3.1 (DEFAULT) ====================
     console.log("Starting video generation with Google Veo 3.1");
     console.log("Received duration:", duration, "Type:", typeof duration);
 
-    // Prepare request body for Google AI
-    // Veo 3.1 only accepts exactly 4, 6, or 8 seconds (not values in between)
     const parsedDuration = typeof duration === 'string' ? parseInt(duration) : duration;
-    let validDuration = 6; // default to 6
+    let validDuration = 6;
     
     if (parsedDuration <= 5) {
       validDuration = 4;
@@ -646,33 +737,26 @@ serve(async (req) => {
       }
     };
 
-    // Add prompt if provided
     if (prompt) {
       requestBody.instances[0].prompt = prompt;
     }
 
-    // Add image for image-to-video generation
     if (type === "image_to_video") {
-      // Use start_image if provided, otherwise fallback to legacy image/image_url
       const startImageData = start_image || image || image_url;
       
       if (startImageData) {
         let base64Data: string;
         let mimeType: string;
         
-        // Check if it's a data URL with base64 content
         if (startImageData.startsWith('data:')) {
-          // Extract MIME type from data URL
           const mimeMatch = startImageData.match(/^data:(image\/[^;]+);base64,/);
           if (mimeMatch) {
             mimeType = mimeMatch[1];
             base64Data = startImageData.split(',')[1];
           } else {
-            console.error("Invalid data URL format:", startImageData.substring(0, 50));
-            throw new Error("Invalid image data URL format. Expected data:image/...;base64,...");
+            throw new Error("Invalid image data URL format");
           }
         } else if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
-          // It's a URL - need to download and convert to base64
           console.log("Downloading image from URL:", startImageData.substring(0, 100));
           const imageResponse = await fetch(startImageData);
           if (!imageResponse.ok) {
@@ -683,10 +767,9 @@ serve(async (req) => {
           const uint8Array = new Uint8Array(arrayBuffer);
           base64Data = btoa(String.fromCharCode(...uint8Array));
           
-          // Determine MIME type from content-type header or URL extension
           const contentType = imageResponse.headers.get('content-type');
           if (contentType && contentType.startsWith('image/')) {
-            mimeType = contentType.split(';')[0]; // Remove charset if present
+            mimeType = contentType.split(';')[0];
           } else if (startImageData.toLowerCase().includes('.png')) {
             mimeType = 'image/png';
           } else if (startImageData.toLowerCase().includes('.webp')) {
@@ -695,7 +778,6 @@ serve(async (req) => {
             mimeType = 'image/jpeg';
           }
         } else {
-          // Assume it's raw base64 without prefix, default to JPEG
           base64Data = startImageData;
           mimeType = 'image/jpeg';
         }
@@ -712,7 +794,6 @@ serve(async (req) => {
       }
     }
 
-    // Add resolution for text-to-video if provided
     if (type === "text_to_video" && resolution) {
       requestBody.parameters.resolution = resolution;
     }
@@ -731,14 +812,94 @@ serve(async (req) => {
       }
     );
 
-    // Check if Google API returned quota error (429), fallback to Freepik or Replicate
+    // Fallback to Freepik/Replicate if Google quota exceeded
     if (!response.ok && response.status === 429) {
-      console.log("Google quota exceeded, trying Freepik then Replicate");
+      console.log("Google quota exceeded, trying PiAPI/Freepik then Replicate");
       
       const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
       const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
       
-      // Try Freepik first if API key is available
+      // Try PiAPI first if available
+      if (hasValidPiAPIKey) {
+        try {
+          console.log("Attempting PiAPI Kling 2.1 generation as fallback");
+          
+          const startImageData = start_image || image || image_url;
+          
+          const piApiPayload: any = {
+            model: "kling",
+            task_type: type === "image_to_video" ? "img2video" : "txt2video",
+            input: {
+              prompt: prompt || "A video based on the provided image",
+              model_name: "kling-v2-1",
+              mode: "std",
+              duration: duration || 5,
+            }
+          };
+          
+          if (type === "image_to_video" && startImageData) {
+            if (startImageData.startsWith('data:')) {
+              piApiPayload.input.image = extractBase64(startImageData);
+            } else {
+              piApiPayload.input.image_url = startImageData;
+            }
+            
+            if (end_image) {
+              if (end_image.startsWith('data:')) {
+                piApiPayload.input.tail_image = extractBase64(end_image);
+              } else {
+                piApiPayload.input.tail_image_url = end_image;
+              }
+            }
+          }
+          
+          const piApiResponse = await fetch("https://api.piapi.ai/api/v1/task", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-api-key": PIAPI_API_KEY,
+            },
+            body: JSON.stringify(piApiPayload),
+          });
+          
+          if (piApiResponse.ok) {
+            const piApiData = await piApiResponse.json();
+            console.log("PiAPI fallback task started:", piApiData);
+            
+            const taskId = piApiData.data?.task_id || piApiData.task_id;
+            
+            if (generationId) {
+              const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+              const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const supabaseClient = createClient(supabaseUrl, supabaseKey);
+              
+              await supabaseClient
+                .from('video_generations')
+                .update({
+                  status: 'processing',
+                  prediction_id: `piapi:kling-2.1:${taskId}`,
+                })
+                .eq('id', generationId);
+            }
+            
+            return new Response(JSON.stringify({ 
+              status: "starting",
+              operationId: `piapi:kling-2.1:${taskId}`,
+              provider: "piapi-kling-2.1"
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 200,
+            });
+          } else {
+            console.log("PiAPI fallback failed, trying Freepik");
+          }
+        } catch (piApiError) {
+          console.error("PiAPI fallback error:", piApiError);
+        }
+      }
+      
+      // Try Freepik
       if (FREEPIK_API_KEY) {
         try {
           console.log("Attempting Freepik video generation");
@@ -749,7 +910,6 @@ serve(async (req) => {
             duration: duration && duration >= 8 ? 10 : 6,
           };
           
-          // For image-to-video, add the image(s)
           if (type === "image_to_video") {
             const startImageData = start_image || image || image_url;
             if (startImageData) {
@@ -760,7 +920,6 @@ serve(async (req) => {
             }
           }
           
-          // Use MiniMax for start/end frame support, Kling for single image
           const modelEndpoint = end_image ? "minimax-hailuo-02-768p" : "kling-v2-5-pro";
           
           const freepikResponse = await fetch(`https://api.freepik.com/v1/ai/image-to-video/${modelEndpoint}`, {
@@ -776,7 +935,6 @@ serve(async (req) => {
             const freepikData = await freepikResponse.json();
             console.log("Freepik video task started:", freepikData);
             
-            // Save Freepik task ID to database
             if (generationId) {
               const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
               const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -816,19 +974,15 @@ serve(async (req) => {
 
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
       
-      // Use minimax/video-01 model on Replicate
       const replicateInput: any = {
         prompt: prompt || "A video based on the provided image",
       };
 
-      // For image-to-video, add the image(s)
       if (type === "image_to_video") {
         const startImageData = start_image || image || image_url;
         if (startImageData) {
           replicateInput.first_frame_image = startImageData;
         }
-        // Note: Replicate minimax/video-01 may not support end_frame
-        // If end_image is provided, we just use the start frame for Replicate fallback
         if (end_image) {
           console.log("Warning: Replicate fallback may not support end_frame. Using start frame only.");
         }
@@ -842,7 +996,6 @@ serve(async (req) => {
 
       console.log("Replicate prediction started:", prediction);
 
-      // Save Replicate prediction ID to database
       if (generationId) {
         const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -877,7 +1030,6 @@ serve(async (req) => {
     const operation = await response.json();
     console.log("Operation started:", operation);
 
-    // Save operation ID to database for polling
     if (generationId) {
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -888,14 +1040,15 @@ serve(async (req) => {
         .from('video_generations')
         .update({
           status: 'processing',
-          prediction_id: operation.name, // Store operation ID
+          prediction_id: operation.name,
         })
         .eq('id', generationId);
     }
 
     return new Response(JSON.stringify({ 
       status: "starting",
-      operationId: operation.name 
+      operationId: operation.name,
+      provider: "veo"
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
@@ -904,7 +1057,6 @@ serve(async (req) => {
     console.error("Error in generate-video function:", error);
     const errorMessage = error instanceof Error ? error.message : "Failed to generate video";
     
-    // Check if error is retryable (model overload, rate limits, etc.)
     const isRetryable = errorMessage.includes("overloaded") || 
                         errorMessage.includes("rate limit") ||
                         errorMessage.includes("quota") ||
@@ -912,7 +1064,6 @@ serve(async (req) => {
                         errorMessage.includes("RESOURCE_EXHAUSTED") ||
                         errorMessage.includes("429");
     
-    // Update database with error and retry info
     if (body?.generationId) {
       try {
         const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
@@ -920,7 +1071,6 @@ serve(async (req) => {
         const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
-        // Get current retry count
         const { data: currentGen } = await supabaseClient
           .from('video_generations')
           .select('retry_count, max_retries')
@@ -931,55 +1081,46 @@ serve(async (req) => {
         const maxRetries = currentGen?.max_retries || 3;
         
         if (isRetryable && retryCount <= maxRetries) {
-          // Calculate exponential backoff: 30s, 60s, 120s
           const backoffSeconds = Math.pow(2, retryCount - 1) * 30;
           const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000).toISOString();
           
           await supabaseClient
             .from('video_generations')
             .update({
-              status: 'pending',
+              status: 'retry_scheduled',
+              error_message: errorMessage,
               retry_count: retryCount,
-              next_retry_at: nextRetryAt,
-              error_message: `Tentativo ${retryCount}/${maxRetries} - ${errorMessage}`,
+              next_retry_at: nextRetryAt
             })
             .eq('id', body.generationId);
-          
-          console.log(`Scheduled retry ${retryCount}/${maxRetries} in ${backoffSeconds}s`);
-          
-          return new Response(
-            JSON.stringify({ 
-              status: "retry_scheduled",
-              retryCount,
-              maxRetries,
-              nextRetryAt,
-              error: errorMessage
-            }), 
-            {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 200,
-            }
-          );
+
+          return new Response(JSON.stringify({
+            error: errorMessage,
+            retryable: true,
+            nextRetryAt: nextRetryAt,
+            retryCount: retryCount
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
         } else {
           await supabaseClient
             .from('video_generations')
             .update({
               status: 'failed',
-              error_message: retryCount > maxRetries 
-                ? `Fallito dopo ${maxRetries} tentativi: ${errorMessage}`
-                : errorMessage,
+              error_message: errorMessage
             })
             .eq('id', body.generationId);
         }
       } catch (dbError) {
-        console.error("Error updating database:", dbError);
+        console.error("Failed to update database with error:", dbError);
       }
     }
     
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
-        retryable: isRetryable
+        retryable: isRetryable 
       }), 
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

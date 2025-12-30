@@ -337,10 +337,28 @@ export const ImageToVideoForm = () => {
                 <span>Google Veo 3.1</span>
               </div>
             </SelectItem>
+            <SelectItem value="piapi-kling-2.1">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-500" />
+                <span>PiAPI Kling 2.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-hailuo">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-pink-500" />
+                <span>PiAPI Hailuo</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-luma">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                <span>PiAPI Luma</span>
+              </div>
+            </SelectItem>
             <SelectItem value="kling">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple-500" />
-                <span>Kling 2.1</span>
+                <span>Kling Direct API</span>
               </div>
             </SelectItem>
             <SelectItem value="freepik">
@@ -354,7 +372,10 @@ export const ImageToVideoForm = () => {
         <p className="text-xs text-muted-foreground">
           {preferredProvider === "auto" && "Seleziona automaticamente il provider migliore in base ai parametri"}
           {preferredProvider === "veo" && "Google Veo 3.1 - Animazione singola con audio sincronizzato"}
-          {preferredProvider === "kling" && "Kling 2.1 - Ottimo per transizioni start/end frame"}
+          {preferredProvider === "piapi-kling-2.1" && "PiAPI Kling 2.1 - Gateway unificato, ottimo rapporto qualità/prezzo"}
+          {preferredProvider === "piapi-hailuo" && "PiAPI Hailuo - Video fluidi e naturali"}
+          {preferredProvider === "piapi-luma" && "PiAPI Luma - Alta qualità cinematica"}
+          {preferredProvider === "kling" && "Kling Direct API - Connessione diretta (API key separata)"}
           {preferredProvider === "freepik" && "Freepik MiniMax - Veloce per transizioni sequenziali"}
         </p>
       </div>
