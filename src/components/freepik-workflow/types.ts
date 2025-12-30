@@ -67,6 +67,7 @@ export interface VideoConcatNodeData extends Record<string, unknown> {
   transitionDuration: number;
   outputFormat: "mp4" | "webm";
   resolution: "sd" | "hd" | "fhd";
+  videoOrder?: string[];
 }
 
 export interface FinalVideoNodeData extends Record<string, unknown> {
