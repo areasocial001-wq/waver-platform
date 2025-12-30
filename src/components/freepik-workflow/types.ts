@@ -50,6 +50,32 @@ export interface VideoResultNodeData extends Record<string, unknown> {
   error?: string;
 }
 
+export interface AudioNodeData extends Record<string, unknown> {
+  label: string;
+  audioType: "generate" | "file";
+  prompt?: string;
+  category?: "music" | "sfx" | "ambient";
+  duration?: number;
+  volume?: number;
+  audioUrl?: string;
+  audioFileName?: string;
+}
+
+export interface VideoConcatNodeData extends Record<string, unknown> {
+  label: string;
+  transition: "none" | "fade" | "crossfade" | "wipe";
+  transitionDuration: number;
+  outputFormat: "mp4" | "webm";
+}
+
+export interface FinalVideoNodeData extends Record<string, unknown> {
+  label: string;
+  videoUrl?: string;
+  hasAudio?: boolean;
+  status: "idle" | "processing" | "completed" | "error";
+  error?: string;
+}
+
 // Union type for all node data
 export type WorkflowNodeData = 
   | ImageInputNodeData 
@@ -58,7 +84,10 @@ export type WorkflowNodeData =
   | UpscalerNodeData
   | FreepikVideoNodeData
   | ImageResultNodeData
-  | VideoResultNodeData;
+  | VideoResultNodeData
+  | AudioNodeData
+  | VideoConcatNodeData
+  | FinalVideoNodeData;
 
 // Custom node types
 export type WorkflowNode = Node<WorkflowNodeData>;
@@ -73,6 +102,9 @@ export const NODE_TYPES = {
   freepikVideo: "freepikVideo",
   imageResult: "imageResult",
   videoResult: "videoResult",
+  audio: "audio",
+  videoConcat: "videoConcat",
+  finalVideo: "finalVideo",
 } as const;
 
 export type NodeTypeKey = keyof typeof NODE_TYPES;
