@@ -1,17 +1,46 @@
-import { memo, useCallback, useRef } from "react";
-import { Handle, Position, NodeProps, useReactFlow } from "@xyflow/react";
+import { memo, useCallback, useRef, useEffect, useState } from "react";
+import { Handle, Position, NodeProps, useReactFlow, useEdges, useNodes } from "@xyflow/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, Upload, X, ImageIcon } from "lucide-react";
-import { FreepikVideoNodeData } from "../types";
+import { Video, X, ImageIcon } from "lucide-react";
+import { FreepikVideoNodeData, ImageInputNodeData } from "../types";
 
 const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
   const nodeData = data as unknown as FreepikVideoNodeData;
   const { setNodes } = useReactFlow();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const edges = useEdges();
+  const nodes = useNodes();
+  const [connectedImageUrl, setConnectedImageUrl] = useState<string | undefined>();
+
+  // Find connected input image
+  useEffect(() => {
+    const visitedNodes = new Set<string>();
+    const queue = [id];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visitedNodes.has(currentId)) continue;
+      visitedNodes.add(currentId);
+      
+      const incomingEdges = edges.filter(e => e.target === currentId);
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        if (sourceNode?.type === "imageInput") {
+          const inputData = sourceNode.data as unknown as ImageInputNodeData;
+          if (inputData.imageUrl) {
+            setConnectedImageUrl(inputData.imageUrl);
+            return;
+          }
+        }
+        queue.push(edge.source);
+      }
+    }
+    setConnectedImageUrl(undefined);
+  }, [id, edges, nodes]);
 
   const updateNodeData = useCallback((field: string, value: string | number | undefined) => {
     setNodes((nds) =>
@@ -76,6 +105,26 @@ const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* First Frame Preview - from connected Input Image */}
+        {connectedImageUrl && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+              <ImageIcon className="h-3 w-3" />
+              First Frame (collegato)
+            </Label>
+            <div className="relative">
+              <img
+                src={connectedImageUrl}
+                alt="First frame preview"
+                className="w-full h-20 object-cover rounded-md border-2 border-primary/50"
+              />
+              <div className="absolute bottom-1 left-1 bg-background/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] text-primary font-medium">
+                Image-to-Video
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Prompt</Label>
           <Textarea
@@ -174,9 +223,11 @@ const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
           </div>
         )}
 
-        <p className="text-[10px] text-muted-foreground">
-          Collega un Input Image per image-to-video, o lascia vuoto per text-to-video.
-        </p>
+        {!connectedImageUrl && (
+          <p className="text-[10px] text-muted-foreground">
+            Collega un Input Image per image-to-video, o lascia vuoto per text-to-video.
+          </p>
+        )}
       </CardContent>
       <Handle
         type="target"

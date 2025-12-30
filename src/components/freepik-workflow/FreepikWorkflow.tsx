@@ -13,7 +13,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { WorkflowToolbar } from "./WorkflowToolbar";
+import { WorkflowToolbar, TemplateType } from "./WorkflowToolbar";
 import { SaveWorkflowDialog, LoadWorkflowDialog } from "./WorkflowDialogs";
 import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData, FreepikVideoNodeData } from "./types";
 import ImageInputNode from "./nodes/ImageInputNode";
@@ -603,6 +603,65 @@ const FreepikWorkflowInner = () => {
     }
   }, [nodes, edges, setNodes, findInputImage, findUpscalerNode, findFreepikVideoNode, pollImageStatus, pollVideoStatus, pollFreepikVideoStatus]);
 
+  const loadTemplate = useCallback((template: TemplateType) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    
+    if (template === "text-to-video") {
+      const templateNodes: WorkflowNode[] = [
+        {
+          id: "freepik-video-1",
+          type: "freepikVideo",
+          position: { x: 100, y: 150 },
+          data: { label: "Freepik Video", prompt: "", model: "kling" as const, duration: 6 },
+        },
+        {
+          id: "video-result-1",
+          type: "videoResult",
+          position: { x: 450, y: 150 },
+          data: { label: "Video Result", status: "idle" as const },
+        },
+      ];
+      const templateEdges: WorkflowEdge[] = [
+        { id: "e-video-1", source: "freepik-video-1", target: "video-result-1", animated: true, style: { stroke: "#06b6d4" } },
+      ];
+      setNodes(templateNodes);
+      setEdges(templateEdges);
+      setCurrentWorkflowId(undefined);
+      setCurrentWorkflowName(undefined);
+      toast.success("Template Text-to-Video caricato");
+    } else if (template === "image-to-video") {
+      const templateNodes: WorkflowNode[] = [
+        {
+          id: "input-1",
+          type: "imageInput",
+          position: { x: 50, y: 150 },
+          data: { label: "Input Image" },
+        },
+        {
+          id: "freepik-video-1",
+          type: "freepikVideo",
+          position: { x: 350, y: 150 },
+          data: { label: "Freepik Video", prompt: "", model: "kling" as const, duration: 6 },
+        },
+        {
+          id: "video-result-1",
+          type: "videoResult",
+          position: { x: 700, y: 150 },
+          data: { label: "Video Result", status: "idle" as const },
+        },
+      ];
+      const templateEdges: WorkflowEdge[] = [
+        { id: "e-input-1", source: "input-1", target: "freepik-video-1", animated: true, style: { stroke: "#6366f1" } },
+        { id: "e-video-1", source: "freepik-video-1", target: "video-result-1", animated: true, style: { stroke: "#06b6d4" } },
+      ];
+      setNodes(templateNodes);
+      setEdges(templateEdges);
+      setCurrentWorkflowId(undefined);
+      setCurrentWorkflowName(undefined);
+      toast.success("Template Image-to-Video caricato");
+    }
+  }, [setNodes, setEdges]);
+
   const clearCanvas = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current);
     setNodes([]);
@@ -650,6 +709,7 @@ const FreepikWorkflowInner = () => {
         onZoomIn={() => zoomIn()}
         onZoomOut={() => zoomOut()}
         onFitView={() => fitView()}
+        onLoadTemplate={loadTemplate}
         isRunning={isRunning}
         currentWorkflowName={currentWorkflowName}
       />

@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   Image, 
   StickyNote, 
@@ -17,9 +18,13 @@ import {
   Maximize2,
   Save,
   FolderOpen,
-  Loader2
+  Loader2,
+  LayoutTemplate,
+  FileVideo
 } from "lucide-react";
 import { NodeTypeKey } from "./types";
+
+export type TemplateType = "text-to-video" | "image-to-video";
 
 interface WorkflowToolbarProps {
   onAddNode: (type: NodeTypeKey) => void;
@@ -31,6 +36,7 @@ interface WorkflowToolbarProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
+  onLoadTemplate?: (template: TemplateType) => void;
   isRunning: boolean;
   currentWorkflowName?: string;
 }
@@ -45,6 +51,7 @@ export const WorkflowToolbar = ({
   onZoomIn,
   onZoomOut,
   onFitView,
+  onLoadTemplate,
   isRunning,
   currentWorkflowName,
 }: WorkflowToolbarProps) => {
@@ -128,6 +135,34 @@ export const WorkflowToolbar = ({
             <p>Carica Workflow</p>
           </TooltipContent>
         </Tooltip>
+
+        {/* Templates */}
+        {onLoadTemplate && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <LayoutTemplate className="h-4 w-4 text-cyan-500" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Template Rapidi</p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => onLoadTemplate("text-to-video")}>
+                <FileVideo className="h-4 w-4 mr-2 text-cyan-500" />
+                Text-to-Video
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onLoadTemplate("image-to-video")}>
+                <Image className="h-4 w-4 mr-2 text-primary" />
+                Image-to-Video
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <Separator orientation="vertical" className="h-6" />
 
