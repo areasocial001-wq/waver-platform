@@ -118,7 +118,7 @@ const FreepikWorkflowInner = () => {
         case "audio":
           return { label: "Audio / Musica", audioType: "generate" as const, category: "music" as const, duration: 10, volume: 100 };
         case "videoConcat":
-          return { label: "Concatena Video", transition: "none" as const, transitionDuration: 0.5, outputFormat: "mp4" as const, resolution: "hd" as const };
+          return { label: "Concatena Video", transition: "none" as const, transitionDuration: 0.5, outputFormat: "mp4" as const, resolution: "hd" as const, aspectRatio: "16:9" as const };
         case "finalVideo":
           return { label: "Video Finale", status: "idle" as const };
         default:
@@ -471,6 +471,7 @@ const FreepikWorkflowInner = () => {
             transition: concatData?.transition || "none",
             transitionDuration: concatData?.transitionDuration || 0.5,
             resolution: concatData?.resolution || "hd",
+            aspectRatio: concatData?.aspectRatio || "16:9",
             audioUrl: audioUrl,
             audioVolume: audioNodeData?.volume || 100,
           },
@@ -920,7 +921,7 @@ const FreepikWorkflowInner = () => {
           id: "video-concat-1",
           type: "videoConcat",
           position: { x: 600, y: 150 },
-          data: { label: "Concatena Video", transition: "crossfade" as const, transitionDuration: 0.5, outputFormat: "mp4" as const },
+          data: { label: "Concatena Video", transition: "crossfade" as const, transitionDuration: 0.5, outputFormat: "mp4" as const, resolution: "hd" as const, aspectRatio: "16:9" as const },
         },
         // Audio generation
         {
