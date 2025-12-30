@@ -40,8 +40,8 @@ export const ImageToVideoForm = () => {
     }
   }, [endImage]);
 
-  // Compress and resize image to prevent Out of Memory errors
-  const compressImage = (file: File, maxWidth: number = 1280, quality: number = 0.8): Promise<string> => {
+  // Compress and resize image to prevent Out of Memory errors and PiAPI size limits
+  const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.6): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       const reader = new FileReader();
