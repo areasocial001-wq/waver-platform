@@ -350,8 +350,12 @@ const FreepikWorkflowInner = () => {
     return undefined;
   }, [nodes, edges]);
 
-  // Find all VideoResult nodes connected to a VideoConcat node
+  // Find all VideoResult nodes connected to a VideoConcat node (respecting custom order)
   const findConnectedVideoResults = useCallback((concatNodeId: string): { id: string; videoUrl?: string }[] => {
+    const concatNode = nodes.find(n => n.id === concatNodeId);
+    const concatData = concatNode?.data as unknown as VideoConcatNodeData | undefined;
+    const customOrder = concatData?.videoOrder;
+    
     const incomingEdges = edges.filter(e => e.target === concatNodeId);
     const videos: { id: string; videoUrl?: string }[] = [];
     
@@ -365,6 +369,18 @@ const FreepikWorkflowInner = () => {
         });
       }
     }
+    
+    // Sort by custom order if available
+    if (customOrder && customOrder.length > 0) {
+      videos.sort((a, b) => {
+        const indexA = customOrder.indexOf(a.id);
+        const indexB = customOrder.indexOf(b.id);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      });
+    }
+    
     return videos;
   }, [nodes, edges]);
 
