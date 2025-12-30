@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
 import { 
   Image, 
   StickyNote, 
@@ -12,7 +13,10 @@ import {
   Download,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Save,
+  FolderOpen,
+  Loader2
 } from "lucide-react";
 import { NodeTypeKey } from "./types";
 
@@ -21,10 +25,13 @@ interface WorkflowToolbarProps {
   onRunWorkflow: () => void;
   onClearCanvas: () => void;
   onExport: () => void;
+  onSave: () => void;
+  onLoad: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
   isRunning: boolean;
+  currentWorkflowName?: string;
 }
 
 export const WorkflowToolbar = ({
@@ -32,10 +39,13 @@ export const WorkflowToolbar = ({
   onRunWorkflow,
   onClearCanvas,
   onExport,
+  onSave,
+  onLoad,
   onZoomIn,
   onZoomOut,
   onFitView,
   isRunning,
+  currentWorkflowName,
 }: WorkflowToolbarProps) => {
   const nodeButtons = [
     { type: "imageInput" as NodeTypeKey, icon: Image, label: "Input Image", color: "text-primary" },
@@ -69,7 +79,7 @@ export const WorkflowToolbar = ({
 
         <Separator orientation="vertical" className="h-6" />
 
-        {/* Actions */}
+        {/* Run */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -79,11 +89,40 @@ export const WorkflowToolbar = ({
               onClick={onRunWorkflow}
               disabled={isRunning}
             >
-              <Play className="h-5 w-5" />
+              {isRunning ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Play className="h-5 w-5" />
+              )}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
             <p>Esegui Workflow</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        {/* Save & Load */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onSave}>
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Salva Workflow</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onLoad}>
+              <FolderOpen className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Carica Workflow</p>
           </TooltipContent>
         </Tooltip>
 
@@ -133,7 +172,7 @@ export const WorkflowToolbar = ({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Esporta</p>
+            <p>Esporta JSON</p>
           </TooltipContent>
         </Tooltip>
 
@@ -148,6 +187,15 @@ export const WorkflowToolbar = ({
           </TooltipContent>
         </Tooltip>
       </div>
+
+      {/* Current workflow name badge */}
+      {currentWorkflowName && (
+        <div className="absolute top-4 right-4 z-10">
+          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
+            {currentWorkflowName}
+          </Badge>
+        </div>
+      )}
     </TooltipProvider>
   );
 };
