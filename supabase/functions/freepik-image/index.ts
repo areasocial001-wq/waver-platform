@@ -33,6 +33,15 @@ serve(async (req) => {
     }
 
     const body = await req.json();
+    
+    // Handle health check requests
+    if (body.healthCheck) {
+      return new Response(
+        JSON.stringify({ status: 'ok', service: 'freepik-image' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const { action, taskId, prompt, resolution, aspectRatio, model, engine } = body;
 
     // Check status of existing task
