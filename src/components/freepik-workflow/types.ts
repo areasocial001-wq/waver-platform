@@ -72,6 +72,8 @@ export interface FinalVideoNodeData extends Record<string, unknown> {
   label: string;
   videoUrl?: string;
   hasAudio?: boolean;
+  audioUrl?: string;
+  segments?: string[];
   status: "idle" | "processing" | "completed" | "error";
   error?: string;
 }
