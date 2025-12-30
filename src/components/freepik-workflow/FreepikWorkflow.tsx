@@ -15,7 +15,7 @@ import "@xyflow/react/dist/style.css";
 
 import { WorkflowToolbar, TemplateType } from "./WorkflowToolbar";
 import { SaveWorkflowDialog, LoadWorkflowDialog } from "./WorkflowDialogs";
-import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData, FreepikVideoNodeData } from "./types";
+import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData, FreepikVideoNodeData, AudioNodeData, VideoConcatNodeData, FinalVideoNodeData, VideoResultNodeData } from "./types";
 import ImageInputNode from "./nodes/ImageInputNode";
 import NoteNode from "./nodes/NoteNode";
 import InstructionsNode from "./nodes/InstructionsNode";
@@ -23,6 +23,9 @@ import UpscalerNode from "./nodes/UpscalerNode";
 import FreepikVideoNode from "./nodes/FreepikVideoNode";
 import ImageResultNode from "./nodes/ImageResultNode";
 import VideoResultNode from "./nodes/VideoResultNode";
+import AudioNode from "./nodes/AudioNode";
+import VideoConcatNode from "./nodes/VideoConcatNode";
+import FinalVideoNode from "./nodes/FinalVideoNode";
 import { SavedWorkflow } from "@/hooks/useWorkflows";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +38,9 @@ const nodeTypes = {
   freepikVideo: FreepikVideoNode,
   imageResult: ImageResultNode,
   videoResult: VideoResultNode,
+  audio: AudioNode,
+  videoConcat: VideoConcatNode,
+  finalVideo: FinalVideoNode,
 };
 
 // Initial nodes for demo
@@ -109,6 +115,12 @@ const FreepikWorkflowInner = () => {
           return { label: "Image Result", status: "idle" as const };
         case "videoResult":
           return { label: "Video Result", status: "idle" as const };
+        case "audio":
+          return { label: "Audio / Musica", audioType: "generate" as const, category: "music" as const, duration: 10, volume: 100 };
+        case "videoConcat":
+          return { label: "Concatena Video", transition: "none" as const, transitionDuration: 0.5, outputFormat: "mp4" as const };
+        case "finalVideo":
+          return { label: "Video Finale", status: "idle" as const };
         default:
           return { label: type };
       }
@@ -737,6 +749,9 @@ const FreepikWorkflowInner = () => {
               case "freepikVideo": return "#06b6d4";
               case "imageResult": return "#10b981";
               case "videoResult": return "#3b82f6";
+              case "audio": return "#f97316";
+              case "videoConcat": return "#a855f7";
+              case "finalVideo": return "#d946ef";
               default: return "hsl(var(--muted))";
             }
           }}

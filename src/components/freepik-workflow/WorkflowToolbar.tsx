@@ -20,7 +20,10 @@ import {
   FolderOpen,
   Loader2,
   LayoutTemplate,
-  FileVideo
+  FileVideo,
+  Music,
+  Layers,
+  Clapperboard
 } from "lucide-react";
 import { NodeTypeKey } from "./types";
 
@@ -63,6 +66,9 @@ export const WorkflowToolbar = ({
     { type: "freepikVideo" as NodeTypeKey, icon: Film, label: "Freepik Video", color: "text-cyan-500" },
     { type: "imageResult" as NodeTypeKey, icon: ImageIcon, label: "Image Result", color: "text-emerald-500" },
     { type: "videoResult" as NodeTypeKey, icon: Video, label: "Video Result", color: "text-blue-500" },
+    { type: "audio" as NodeTypeKey, icon: Music, label: "Audio / Musica", color: "text-orange-500" },
+    { type: "videoConcat" as NodeTypeKey, icon: Layers, label: "Concatena Video", color: "text-purple-500" },
+    { type: "finalVideo" as NodeTypeKey, icon: Clapperboard, label: "Video Finale", color: "text-fuchsia-500" },
   ];
 
   return (
