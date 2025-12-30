@@ -21,6 +21,9 @@ verify_jwt = true
 [functions.elevenlabs-music]
 verify_jwt = true
 
+[functions.video-concat]
+verify_jwt = true
+
 [functions.freepik-image]
 verify_jwt = true
 
