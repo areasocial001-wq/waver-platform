@@ -460,9 +460,14 @@ const FreepikWorkflowInner = () => {
         
         const audioNodeData = audioNode?.data as unknown as AudioNodeData | undefined;
         
+        // Get clip durations in the correct order
+        const connectedVideos = findConnectedVideoResults(concatNode!.id);
+        const clipDurations = connectedVideos.map(v => concatData?.clipDurations?.[v.id] || 5);
+        
         const { data: concatResult, error: concatError } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls,
+            clipDurations,
             transition: concatData?.transition || "none",
             transitionDuration: concatData?.transitionDuration || 0.5,
             resolution: concatData?.resolution || "hd",

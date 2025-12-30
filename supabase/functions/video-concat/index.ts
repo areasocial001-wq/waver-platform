@@ -10,6 +10,7 @@ const corsHeaders = {
 // Input validation schema
 const requestSchema = z.object({
   videoUrls: z.array(z.string().url()).min(1, 'Almeno un video richiesto'),
+  clipDurations: z.array(z.number().min(1).max(30)).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
@@ -54,11 +55,12 @@ serve(async (req) => {
       );
     }
     
-    const { videoUrls, transition, transitionDuration, resolution, audioUrl, audioVolume } = parseResult.data;
+    const { videoUrls, clipDurations, transition, transitionDuration, resolution, audioUrl, audioVolume } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
+      clipDurations,
       transition, 
       transitionDuration,
       resolution,
@@ -79,16 +81,18 @@ serve(async (req) => {
         // Build Shotstack timeline clips
         const clips: any[] = [];
         let currentStart = 0;
-        const defaultClipLength = 5; // seconds per clip
 
         for (let i = 0; i < videoUrls.length; i++) {
+          // Use custom duration or default to 5 seconds
+          const clipLength = clipDurations?.[i] || 5;
+          
           const clip: any = {
             asset: {
               type: 'video',
               src: videoUrls[i],
             },
             start: currentStart,
-            length: defaultClipLength,
+            length: clipLength,
           };
 
           // Add transition effect between clips
@@ -102,7 +106,7 @@ serve(async (req) => {
           }
 
           clips.push(clip);
-          currentStart += defaultClipLength;
+          currentStart += clipLength;
         }
 
         // Build timeline
@@ -112,7 +116,7 @@ serve(async (req) => {
 
         // Add audio track if provided
         if (audioUrl) {
-          const totalDuration = videoUrls.length * defaultClipLength;
+          const totalDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
           let audioSrc = audioUrl;
           
           // If audio is base64, we need to upload it first
