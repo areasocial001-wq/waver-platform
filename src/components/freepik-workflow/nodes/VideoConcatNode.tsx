@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Layers, Video, GripVertical, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Layers, Video, GripVertical, Loader2, Clock, Play } from "lucide-react";
 import { VideoConcatNodeData, VideoResultNodeData } from "../types";
 import {
   DndContext,
@@ -28,13 +29,16 @@ interface ConnectedVideo {
   id: string;
   url?: string;
   thumbnail?: string;
+  duration?: number;
 }
 
-// Component for video thumbnail with lazy loading
+// Component for video thumbnail with hover preview
 const VideoThumbnail = memo(({ url }: { url?: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
 
   useEffect(() => {
     if (!url) {
@@ -50,14 +54,14 @@ const VideoThumbnail = memo(({ url }: { url?: string }) => {
     video.preload = "metadata";
 
     video.onloadeddata = () => {
-      video.currentTime = 0.1; // Get frame slightly after start
+      video.currentTime = 0.1;
     };
 
     video.onseeked = () => {
       try {
         const canvas = document.createElement("canvas");
-        canvas.width = 64;
-        canvas.height = 36;
+        canvas.width = 80;
+        canvas.height = 45;
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -78,43 +82,97 @@ const VideoThumbnail = memo(({ url }: { url?: string }) => {
     };
   }, [url]);
 
+  const handleMouseEnter = () => {
+    if (url && videoRef.current) {
+      setIsHovering(true);
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (videoRef.current) {
+      setIsHovering(false);
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
+
   if (!url) {
     return (
-      <div className="w-12 h-7 bg-muted/50 rounded flex items-center justify-center">
-        <Video className="h-3 w-3 text-muted-foreground" />
+      <div className="w-16 h-9 bg-muted/50 rounded flex items-center justify-center">
+        <Video className="h-4 w-4 text-muted-foreground" />
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="w-12 h-7 bg-muted/50 rounded flex items-center justify-center">
-        <Loader2 className="h-3 w-3 animate-spin text-purple-500" />
+      <div className="w-16 h-9 bg-muted/50 rounded flex items-center justify-center">
+        <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
       </div>
     );
   }
 
-  if (thumbnail) {
-    return (
-      <img
-        src={thumbnail}
-        alt="Video thumbnail"
-        className="w-12 h-7 object-cover rounded border border-purple-500/30"
-      />
-    );
-  }
-
   return (
-    <div className="w-12 h-7 bg-purple-500/20 rounded flex items-center justify-center">
-      <Video className="h-3 w-3 text-purple-500" />
+    <div
+      ref={containerRef}
+      className="relative w-16 h-9 rounded overflow-hidden border border-purple-500/30 cursor-pointer group"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Thumbnail image */}
+      {thumbnail && !isHovering && (
+        <img
+          src={thumbnail}
+          alt="Video thumbnail"
+          className="w-full h-full object-cover"
+        />
+      )}
+      
+      {/* Video preview on hover */}
+      <video
+        ref={videoRef}
+        src={url}
+        muted
+        loop
+        playsInline
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity ${
+          isHovering ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      
+      {/* Play indicator */}
+      {!isHovering && thumbnail && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Play className="h-3 w-3 text-white fill-white" />
+        </div>
+      )}
+      
+      {/* Fallback if no thumbnail */}
+      {!thumbnail && !isHovering && (
+        <div className="w-full h-full bg-purple-500/20 flex items-center justify-center">
+          <Video className="h-4 w-4 text-purple-500" />
+        </div>
+      )}
     </div>
   );
 });
 
 VideoThumbnail.displayName = "VideoThumbnail";
 
-// Sortable video item component
-const SortableVideoItem = memo(({ video, index, totalCount }: { video: ConnectedVideo; index: number; totalCount: number }) => {
+// Sortable video item component with duration control
+const SortableVideoItem = memo(({ 
+  video, 
+  index, 
+  duration,
+  onDurationChange 
+}: { 
+  video: ConnectedVideo; 
+  index: number; 
+  duration: number;
+  onDurationChange: (videoId: string, duration: number) => void;
+}) => {
   const {
     attributes,
     listeners,
@@ -141,7 +199,7 @@ const SortableVideoItem = memo(({ video, index, totalCount }: { video: Connected
       <button
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted/50 rounded"
+        className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted/50 rounded shrink-0"
       >
         <GripVertical className="h-3 w-3 text-muted-foreground" />
       </button>
@@ -152,9 +210,18 @@ const SortableVideoItem = memo(({ video, index, totalCount }: { video: Connected
       
       <VideoThumbnail url={video.url} />
       
-      <span className="flex-1 truncate text-muted-foreground text-[10px]">
-        {video.url ? "Pronto" : "In attesa..."}
-      </span>
+      <div className="flex items-center gap-1 shrink-0">
+        <Clock className="h-3 w-3 text-muted-foreground" />
+        <Input
+          type="number"
+          min={1}
+          max={30}
+          value={duration}
+          onChange={(e) => onDurationChange(video.id, parseInt(e.target.value) || 5)}
+          className="w-12 h-6 text-[10px] px-1 text-center"
+        />
+        <span className="text-[10px] text-muted-foreground">s</span>
+      </div>
     </div>
   );
 });
@@ -166,6 +233,7 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
   const { getNodes, getEdges } = useReactFlow();
   const [connectedVideos, setConnectedVideos] = useState<ConnectedVideo[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -204,9 +272,25 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
       }
     });
     
+    // Initialize durations for new videos
+    const newDurations = { ...clipDurations };
+    videos.forEach(v => {
+      if (!(v.id in newDurations)) {
+        newDurations[v.id] = nodeData.clipDurations?.[v.id] || 5;
+      }
+    });
+    setClipDurations(newDurations);
+    
     setOrderedIds(newOrderedIds);
     setConnectedVideos(videos);
   }, [getNodes, getEdges, id]);
+
+  // Initialize clip durations from node data
+  useEffect(() => {
+    if (nodeData.clipDurations) {
+      setClipDurations(prev => ({ ...prev, ...nodeData.clipDurations }));
+    }
+  }, [nodeData.clipDurations]);
 
   // Get videos in the correct order
   const orderedVideos = orderedIds
@@ -236,6 +320,20 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
     }
   }, [id, nodeData]);
 
+  const handleDurationChange = useCallback((videoId: string, duration: number) => {
+    const newDurations = { ...clipDurations, [videoId]: duration };
+    setClipDurations(newDurations);
+    
+    // Emit duration change event
+    const event = new CustomEvent("nodeDataChange", {
+      detail: {
+        nodeId: id,
+        data: { ...nodeData, clipDurations: newDurations },
+      },
+    });
+    window.dispatchEvent(event);
+  }, [id, nodeData, clipDurations]);
+
   const handleChange = (field: string, value: any) => {
     const event = new CustomEvent("nodeDataChange", {
       detail: {
@@ -245,6 +343,9 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
     });
     window.dispatchEvent(event);
   };
+
+  // Calculate total duration
+  const totalDuration = orderedVideos.reduce((sum, v) => sum + (clipDurations[v.id] || 5), 0);
 
   return (
     <Card className="w-80 bg-purple-500/10 backdrop-blur border-purple-500/30 shadow-lg shadow-purple-500/10">
@@ -264,7 +365,7 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
           <div className="flex items-center justify-between">
             <Label className="text-xs">Video Collegati</Label>
             {connectedVideos.length > 1 && (
-              <span className="text-[10px] text-muted-foreground">Trascina per riordinare</span>
+              <span className="text-[10px] text-muted-foreground">Hover per preview</span>
             )}
           </div>
           
@@ -283,18 +384,26 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
                 items={orderedVideos.map(v => v.id)}
                 strategy={verticalListSortingStrategy}
               >
-                <div className="space-y-1 max-h-32 overflow-y-auto">
+                <div className="space-y-1 max-h-40 overflow-y-auto">
                   {orderedVideos.map((video, index) => (
                     <SortableVideoItem
                       key={video.id}
                       video={video}
                       index={index}
-                      totalCount={orderedVideos.length}
+                      duration={clipDurations[video.id] || 5}
+                      onDurationChange={handleDurationChange}
                     />
                   ))}
                 </div>
               </SortableContext>
             </DndContext>
+          )}
+          
+          {orderedVideos.length > 0 && (
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
+              <span>Durata totale:</span>
+              <span className="font-medium text-purple-400">{totalDuration}s</span>
+            </div>
           )}
         </div>
 
