@@ -1,8 +1,7 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useRef } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
   MiniMap,
   addEdge,
   useNodesState,
@@ -15,12 +14,15 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { WorkflowToolbar } from "./WorkflowToolbar";
-import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge } from "./types";
+import { SaveWorkflowDialog, LoadWorkflowDialog } from "./WorkflowDialogs";
+import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData } from "./types";
 import ImageInputNode from "./nodes/ImageInputNode";
 import NoteNode from "./nodes/NoteNode";
 import InstructionsNode from "./nodes/InstructionsNode";
 import ImageResultNode from "./nodes/ImageResultNode";
 import VideoResultNode from "./nodes/VideoResultNode";
+import { SavedWorkflow } from "@/hooks/useWorkflows";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 const nodeTypes = {
@@ -69,6 +71,11 @@ const FreepikWorkflowInner = () => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [isRunning, setIsRunning] = useState(false);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [loadDialogOpen, setLoadDialogOpen] = useState(false);
+  const [currentWorkflowId, setCurrentWorkflowId] = useState<string | undefined>();
+  const [currentWorkflowName, setCurrentWorkflowName] = useState<string | undefined>();
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   const onConnect = useCallback(
@@ -110,6 +117,107 @@ const FreepikWorkflowInner = () => {
     toast.success(`Nodo ${type} aggiunto`);
   }, [setNodes]);
 
+  // Find connected input image for instructions node
+  const findInputImage = useCallback((instructionsNodeId: string): string | undefined => {
+    // Traverse backwards through edges to find image input
+    const visitedNodes = new Set<string>();
+    const queue = [instructionsNodeId];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visitedNodes.has(currentId)) continue;
+      visitedNodes.add(currentId);
+      
+      // Find edges pointing to current node
+      const incomingEdges = edges.filter(e => e.target === currentId);
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        if (sourceNode?.type === "imageInput") {
+          const data = sourceNode.data as unknown as ImageInputNodeData;
+          if (data.imageUrl) return data.imageUrl;
+        }
+        queue.push(edge.source);
+      }
+    }
+    return undefined;
+  }, [nodes, edges]);
+
+  // Poll for image generation status
+  const pollImageStatus = useCallback(async (taskId: string, resultNodeId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("freepik-image", {
+        body: { action: "status", taskId },
+      });
+
+      if (error) throw error;
+
+      if (data?.data?.status === "COMPLETED" && data?.data?.generated?.[0]?.url) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "completed", imageUrl: data.data.generated[0].url } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.success("Immagine generata!");
+      } else if (data?.data?.status === "FAILED") {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "error", error: "Generazione fallita" } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.error("Generazione fallita");
+      }
+    } catch (err: any) {
+      console.error("Poll error:", err);
+    }
+  }, [setNodes]);
+
+  // Poll for video generation status
+  const pollVideoStatus = useCallback(async (generationId: string, resultNodeId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("video_generations")
+        .select("status, video_url, error_message")
+        .eq("id", generationId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.status === "completed" && data?.video_url) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "completed", videoUrl: data.video_url } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.success("Video generato!");
+      } else if (data?.status === "failed") {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "error", error: data.error_message || "Generazione fallita" } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.error("Generazione video fallita");
+      }
+    } catch (err: any) {
+      console.error("Poll video error:", err);
+    }
+  }, [setNodes]);
+
   const runWorkflow = useCallback(async () => {
     setIsRunning(true);
     toast.info("Esecuzione workflow in corso...");
@@ -122,10 +230,24 @@ const FreepikWorkflowInner = () => {
       return;
     }
 
+    const instructionsData = instructionsNode.data as unknown as InstructionsNodeData;
+    if (!instructionsData.prompt?.trim()) {
+      toast.error("Inserisci un prompt nel nodo Instructions");
+      setIsRunning(false);
+      return;
+    }
+
     // Find connected result nodes
     const connectedResultEdge = edges.find((e) => e.source === instructionsNode.id);
     if (!connectedResultEdge) {
       toast.error("Collega il nodo Instructions a un nodo Result");
+      setIsRunning(false);
+      return;
+    }
+
+    const resultNode = nodes.find((n) => n.id === connectedResultEdge.target);
+    if (!resultNode) {
+      toast.error("Nodo Result non trovato");
       setIsRunning(false);
       return;
     }
@@ -139,30 +261,102 @@ const FreepikWorkflowInner = () => {
       )
     );
 
-    // Simulate generation (in real implementation, call Freepik API)
-    setTimeout(() => {
+    const inputImageUrl = findInputImage(instructionsNode.id);
+    const isVideoResult = resultNode.type === "videoResult";
+    const model = instructionsData.model || "mystic";
+
+    try {
+      if (isVideoResult || model === "kling-video") {
+        // Video generation via PiAPI
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          toast.error("Devi essere autenticato");
+          setIsRunning(false);
+          return;
+        }
+
+        const videoPayload: any = {
+          type: inputImageUrl ? "image_to_video" : "text_to_video",
+          prompt: instructionsData.prompt,
+          duration: 5,
+          provider: "piapi-kling",
+        };
+
+        if (inputImageUrl) {
+          videoPayload.imageUrl = inputImageUrl;
+        }
+
+        const { data, error } = await supabase.functions.invoke("generate-video", {
+          body: videoPayload,
+        });
+
+        if (error) throw error;
+
+        if (data?.generationId) {
+          // Poll for video completion
+          pollingRef.current = setInterval(() => {
+            pollVideoStatus(data.generationId, resultNode.id);
+          }, 5000);
+        }
+      } else {
+        // Image generation via Freepik Mystic
+        const aspectRatioMap: Record<string, string> = {
+          "1:1": "square_1_1",
+          "16:9": "widescreen_16_9",
+          "9:16": "portrait_9_16",
+          "4:3": "classic_4_3",
+        };
+
+        const { data, error } = await supabase.functions.invoke("freepik-image", {
+          body: {
+            prompt: instructionsData.prompt,
+            resolution: "2k",
+            aspectRatio: aspectRatioMap[instructionsData.aspectRatio] || "square_1_1",
+            model: model === "flux" ? "flexible" : "realism",
+            engine: "automatic",
+          },
+        });
+
+        if (error) throw error;
+
+        if (data?.data?.task_id) {
+          // Poll for image completion
+          pollingRef.current = setInterval(() => {
+            pollImageStatus(data.data.task_id, resultNode.id);
+          }, 3000);
+        } else if (data?.data?.generated?.[0]?.url) {
+          // Immediate result
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === resultNode.id
+                ? { ...n, data: { ...n.data, status: "completed", imageUrl: data.data.generated[0].url } }
+                : n
+            )
+          );
+          setIsRunning(false);
+          toast.success("Immagine generata!");
+        }
+      }
+    } catch (err: any) {
+      console.error("Workflow error:", err);
       setNodes((nds) =>
         nds.map((n) =>
-          n.id === connectedResultEdge.target
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  status: "completed",
-                  imageUrl: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400",
-                },
-              }
+          n.id === resultNode.id
+            ? { ...n, data: { ...n.data, status: "error", error: err.message } }
             : n
         )
       );
       setIsRunning(false);
-      toast.success("Workflow completato!");
-    }, 3000);
-  }, [nodes, edges, setNodes]);
+      toast.error(err.message || "Errore nell'esecuzione del workflow");
+    }
+  }, [nodes, edges, setNodes, findInputImage, pollImageStatus, pollVideoStatus]);
 
   const clearCanvas = useCallback(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
     setNodes([]);
     setEdges([]);
+    setCurrentWorkflowId(undefined);
+    setCurrentWorkflowName(undefined);
     toast.info("Canvas pulito");
   }, [setNodes, setEdges]);
 
@@ -172,11 +366,25 @@ const FreepikWorkflowInner = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "freepik-workflow.json";
+    a.download = `${currentWorkflowName || "freepik-workflow"}.json`;
     a.click();
     URL.revokeObjectURL(url);
     toast.success("Workflow esportato");
-  }, [nodes, edges]);
+  }, [nodes, edges, currentWorkflowName]);
+
+  const handleLoadWorkflow = useCallback((workflow: SavedWorkflow) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    setNodes(workflow.nodes);
+    setEdges(workflow.edges);
+    setCurrentWorkflowId(workflow.id);
+    setCurrentWorkflowName(workflow.name);
+    toast.success(`Workflow "${workflow.name}" caricato`);
+  }, [setNodes, setEdges]);
+
+  const handleWorkflowSaved = useCallback((id: string, name: string) => {
+    setCurrentWorkflowId(id);
+    setCurrentWorkflowName(name);
+  }, []);
 
   return (
     <div className="w-full h-[600px] bg-background rounded-lg border border-border/50 overflow-hidden relative">
@@ -185,10 +393,13 @@ const FreepikWorkflowInner = () => {
         onRunWorkflow={runWorkflow}
         onClearCanvas={clearCanvas}
         onExport={exportWorkflow}
+        onSave={() => setSaveDialogOpen(true)}
+        onLoad={() => setLoadDialogOpen(true)}
         onZoomIn={() => zoomIn()}
         onZoomOut={() => zoomOut()}
         onFitView={() => fitView()}
         isRunning={isRunning}
+        currentWorkflowName={currentWorkflowName}
       />
       
       <ReactFlow
@@ -217,6 +428,22 @@ const FreepikWorkflowInner = () => {
           }}
         />
       </ReactFlow>
+
+      <SaveWorkflowDialog
+        open={saveDialogOpen}
+        onOpenChange={setSaveDialogOpen}
+        nodes={nodes as WorkflowNode[]}
+        edges={edges as WorkflowEdge[]}
+        currentWorkflowId={currentWorkflowId}
+        currentWorkflowName={currentWorkflowName}
+        onSaved={handleWorkflowSaved}
+      />
+
+      <LoadWorkflowDialog
+        open={loadDialogOpen}
+        onOpenChange={setLoadDialogOpen}
+        onLoad={handleLoadWorkflow}
+      />
     </div>
   );
 };
