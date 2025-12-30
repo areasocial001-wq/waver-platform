@@ -15,11 +15,12 @@ import "@xyflow/react/dist/style.css";
 
 import { WorkflowToolbar } from "./WorkflowToolbar";
 import { SaveWorkflowDialog, LoadWorkflowDialog } from "./WorkflowDialogs";
-import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData } from "./types";
+import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData, FreepikVideoNodeData } from "./types";
 import ImageInputNode from "./nodes/ImageInputNode";
 import NoteNode from "./nodes/NoteNode";
 import InstructionsNode from "./nodes/InstructionsNode";
 import UpscalerNode from "./nodes/UpscalerNode";
+import FreepikVideoNode from "./nodes/FreepikVideoNode";
 import ImageResultNode from "./nodes/ImageResultNode";
 import VideoResultNode from "./nodes/VideoResultNode";
 import { SavedWorkflow } from "@/hooks/useWorkflows";
@@ -31,6 +32,7 @@ const nodeTypes = {
   note: NoteNode,
   instructions: InstructionsNode,
   upscaler: UpscalerNode,
+  freepikVideo: FreepikVideoNode,
   imageResult: ImageResultNode,
   videoResult: VideoResultNode,
 };
@@ -101,6 +103,8 @@ const FreepikWorkflowInner = () => {
           return { label: "Instructions", prompt: "", model: "mystic", aspectRatio: "1:1" };
         case "upscaler":
           return { label: "Upscaler", mode: "creative" as const, scaleFactor: "2x", optimizedFor: "standard", creativity: 0 };
+        case "freepikVideo":
+          return { label: "Freepik Video", prompt: "", model: "kling" as const, duration: 6 };
         case "imageResult":
           return { label: "Image Result", status: "idle" as const };
         case "videoResult":
@@ -209,7 +213,7 @@ const FreepikWorkflowInner = () => {
     }
   }, [setNodes]);
 
-  // Poll for video generation status
+  // Poll for video generation status (via database)
   const pollVideoStatus = useCallback(async (generationId: string, resultNodeId: string) => {
     try {
       const { data, error } = await supabase
@@ -247,6 +251,68 @@ const FreepikWorkflowInner = () => {
       console.error("Poll video error:", err);
     }
   }, [setNodes]);
+
+  // Poll for Freepik video generation status
+  const pollFreepikVideoStatus = useCallback(async (taskId: string, resultNodeId: string, model: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("freepik-video", {
+        body: { action: "status", taskId, model },
+      });
+
+      if (error) throw error;
+
+      console.log("Freepik video status:", data);
+
+      if (data?.data?.status === "COMPLETED" && data?.data?.video?.url) {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "completed", videoUrl: data.data.video.url } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.success("Video Freepik generato!");
+      } else if (data?.data?.status === "FAILED") {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNodeId
+              ? { ...n, data: { ...n.data, status: "error", error: "Generazione fallita" } }
+              : n
+          )
+        );
+        setIsRunning(false);
+        toast.error("Generazione video fallita");
+      }
+    } catch (err: any) {
+      console.error("Poll Freepik video error:", err);
+    }
+  }, [setNodes]);
+
+  // Find FreepikVideo node connected to a result
+  const findFreepikVideoNode = useCallback((resultNodeId: string): { node: WorkflowNode; inputImageUrl?: string } | undefined => {
+    const visitedNodes = new Set<string>();
+    const queue = [resultNodeId];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visitedNodes.has(currentId)) continue;
+      visitedNodes.add(currentId);
+      
+      const incomingEdges = edges.filter(e => e.target === currentId);
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        if (sourceNode?.type === "freepikVideo") {
+          const inputImage = findInputImage(sourceNode.id);
+          return { node: sourceNode, inputImageUrl: inputImage };
+        }
+        queue.push(edge.source);
+      }
+    }
+    return undefined;
+  }, [nodes, edges, findInputImage]);
 
   const runWorkflow = useCallback(async () => {
     setIsRunning(true);
@@ -330,10 +396,79 @@ const FreepikWorkflowInner = () => {
       }
     }
 
+    // Check for Freepik Video workflow (Input -> FreepikVideo -> VideoResult)
+    for (const resultNode of resultNodes) {
+      if (resultNode.type !== "videoResult") continue;
+      
+      const freepikVideoInfo = findFreepikVideoNode(resultNode.id);
+      if (freepikVideoInfo) {
+        const videoData = freepikVideoInfo.node.data as unknown as FreepikVideoNodeData;
+        
+        if (!videoData.prompt?.trim()) {
+          toast.error("Inserisci un prompt nel nodo Freepik Video");
+          setIsRunning(false);
+          return;
+        }
+
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNode.id
+              ? { ...n, data: { ...n.data, status: "generating" } }
+              : n
+          )
+        );
+
+        try {
+          const body: any = {
+            prompt: videoData.prompt,
+            duration: videoData.duration || 6,
+            model: videoData.model || "kling",
+          };
+
+          // If there's an input image, convert to base64
+          if (freepikVideoInfo.inputImageUrl) {
+            const response = await fetch(freepikVideoInfo.inputImageUrl);
+            const blob = await response.blob();
+            const base64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+              reader.readAsDataURL(blob);
+            });
+            body.firstFrameImage = base64;
+          }
+
+          const { data, error } = await supabase.functions.invoke("freepik-video", { body });
+
+          if (error) throw error;
+
+          console.log("Freepik video response:", data);
+
+          if (data?.data?.task_id) {
+            pollingRef.current = setInterval(() => {
+              pollFreepikVideoStatus(data.data.task_id, resultNode.id, videoData.model || "kling");
+            }, 5000);
+          }
+          return; // Exit after starting Freepik video workflow
+        } catch (err: any) {
+          console.error("Freepik video error:", err);
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === resultNode.id
+                ? { ...n, data: { ...n.data, status: "error", error: err.message } }
+                : n
+            )
+          );
+          setIsRunning(false);
+          toast.error("Errore nella generazione video Freepik");
+          return;
+        }
+      }
+    }
+
     // Standard instructions workflow
     const instructionsNode = nodes.find((n) => n.type === "instructions");
     if (!instructionsNode) {
-      toast.error("Aggiungi un nodo Instructions o Upscaler per eseguire il workflow");
+      toast.error("Aggiungi un nodo Instructions, Upscaler o Freepik Video per eseguire il workflow");
       setIsRunning(false);
       return;
     }
@@ -457,7 +592,7 @@ const FreepikWorkflowInner = () => {
       setIsRunning(false);
       toast.error(err.message || "Errore nell'esecuzione del workflow");
     }
-  }, [nodes, edges, setNodes, findInputImage, pollImageStatus, pollVideoStatus]);
+  }, [nodes, edges, setNodes, findInputImage, findUpscalerNode, findFreepikVideoNode, pollImageStatus, pollVideoStatus, pollFreepikVideoStatus]);
 
   const clearCanvas = useCallback(() => {
     if (pollingRef.current) clearInterval(pollingRef.current);
@@ -529,6 +664,8 @@ const FreepikWorkflowInner = () => {
               case "imageInput": return "hsl(var(--primary))";
               case "note": return "#f59e0b";
               case "instructions": return "#8b5cf6";
+              case "upscaler": return "#ec4899";
+              case "freepikVideo": return "#06b6d4";
               case "imageResult": return "#10b981";
               case "videoResult": return "#3b82f6";
               default: return "hsl(var(--muted))";
