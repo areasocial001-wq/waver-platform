@@ -56,6 +56,42 @@ export type Database = {
         }
         Relationships: []
       }
+      api_logs: {
+        Row: {
+          api_name: string
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          id: string
+          message: string
+          operation: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          api_name: string
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          message: string
+          operation: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          api_name?: string
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          message?: string
+          operation?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       prompt_templates: {
         Row: {
           audio_suggestion: string | null

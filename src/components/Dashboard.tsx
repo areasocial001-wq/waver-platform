@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import { ApiStatusWidget } from "./ApiStatusWidget";
 import { UsageCharts } from "./UsageCharts";
+import { LogViewer } from "./LogViewer";
+import { NotificationSettings } from "./NotificationSettings";
 
 interface Stats {
   totalVideos: number;
@@ -258,6 +260,14 @@ export const Dashboard = () => {
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
           <UsageCharts />
           <ApiStatusWidget />
+        </div>
+
+        {/* Logs and Notifications */}
+        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <LogViewer />
+          </div>
+          <NotificationSettings />
         </div>
 
         {/* Recent Activity and System Info */}
