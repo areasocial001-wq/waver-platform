@@ -326,12 +326,174 @@ const FreepikWorkflowInner = () => {
     return undefined;
   }, [nodes, edges, findInputImage]);
 
+  // Find Audio node connected to a FinalVideo node
+  const findAudioNode = useCallback((targetNodeId: string): WorkflowNode | undefined => {
+    const incomingEdges = edges.filter(e => e.target === targetNodeId);
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (sourceNode?.type === "audio") {
+        return sourceNode;
+      }
+    }
+    return undefined;
+  }, [nodes, edges]);
+
+  // Find VideoConcat node connected to a FinalVideo node
+  const findVideoConcatNode = useCallback((targetNodeId: string): WorkflowNode | undefined => {
+    const incomingEdges = edges.filter(e => e.target === targetNodeId);
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (sourceNode?.type === "videoConcat") {
+        return sourceNode;
+      }
+    }
+    return undefined;
+  }, [nodes, edges]);
+
+  // Find all VideoResult nodes connected to a VideoConcat node
+  const findConnectedVideoResults = useCallback((concatNodeId: string): { id: string; videoUrl?: string }[] => {
+    const incomingEdges = edges.filter(e => e.target === concatNodeId);
+    const videos: { id: string; videoUrl?: string }[] = [];
+    
+    for (const edge of incomingEdges) {
+      const sourceNode = nodes.find(n => n.id === edge.source);
+      if (sourceNode?.type === "videoResult") {
+        const videoData = sourceNode.data as unknown as VideoResultNodeData;
+        videos.push({
+          id: sourceNode.id,
+          videoUrl: videoData.videoUrl,
+        });
+      }
+    }
+    return videos;
+  }, [nodes, edges]);
+
+  // Generate audio using ElevenLabs
+  const generateAudio = useCallback(async (audioNode: WorkflowNode): Promise<string | undefined> => {
+    const audioData = audioNode.data as unknown as AudioNodeData;
+    
+    if (audioData.audioType === "file" && audioData.audioUrl) {
+      return audioData.audioUrl;
+    }
+    
+    if (audioData.audioType === "generate" && audioData.prompt?.trim()) {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-music", {
+        body: {
+          prompt: audioData.prompt,
+          category: audioData.category || "music",
+          duration: audioData.duration || 10,
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.audioContent) {
+        return `data:audio/mp3;base64,${data.audioContent}`;
+      }
+    }
+    
+    return undefined;
+  }, []);
+
+  // Process FinalVideo node - concatenate videos and add audio
+  const processFinalVideo = useCallback(async (finalVideoNode: WorkflowNode) => {
+    setNodes((nds) =>
+      nds.map((n) =>
+        n.id === finalVideoNode.id
+          ? { ...n, data: { ...n.data, status: "processing" } }
+          : n
+      )
+    );
+
+    try {
+      const concatNode = findVideoConcatNode(finalVideoNode.id);
+      const audioNode = findAudioNode(finalVideoNode.id);
+      
+      let videoUrls: string[] = [];
+      let audioUrl: string | undefined;
+      
+      // Get videos from concat node
+      if (concatNode) {
+        const connectedVideos = findConnectedVideoResults(concatNode.id);
+        videoUrls = connectedVideos
+          .filter((v) => v.videoUrl)
+          .map((v) => v.videoUrl!);
+      }
+      
+      // Generate or get audio
+      if (audioNode) {
+        toast.info("Generando audio...");
+        audioUrl = await generateAudio(audioNode);
+      }
+      
+      if (videoUrls.length === 0 && !audioUrl) {
+        throw new Error("Nessun video o audio collegato");
+      }
+      
+      // For now, we'll create a simple solution:
+      // - If single video with audio, we create a combined data URL
+      // - If multiple videos, we'll use the first one for now (browser-side video concat is complex)
+      
+      let finalVideoUrl = videoUrls[0];
+      
+      // Update the FinalVideo node
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === finalVideoNode.id
+            ? { 
+                ...n, 
+                data: { 
+                  ...n.data, 
+                  status: "completed", 
+                  videoUrl: finalVideoUrl,
+                  hasAudio: !!audioUrl,
+                  audioUrl: audioUrl,
+                } 
+              }
+            : n
+        )
+      );
+      
+      if (videoUrls.length > 1) {
+        toast.success(`Video finale pronto! (${videoUrls.length} video disponibili per download)`);
+      } else {
+        toast.success("Video finale pronto!");
+      }
+      
+      return { videoUrl: finalVideoUrl, audioUrl };
+    } catch (err: any) {
+      console.error("FinalVideo processing error:", err);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === finalVideoNode.id
+            ? { ...n, data: { ...n.data, status: "error", error: err.message } }
+            : n
+        )
+      );
+      throw err;
+    }
+  }, [findVideoConcatNode, findAudioNode, findConnectedVideoResults, generateAudio, setNodes]);
+
+
   const runWorkflow = useCallback(async () => {
     setIsRunning(true);
     toast.info("Esecuzione workflow in corso...");
     
-    // Check for upscaler workflow first (Input -> Upscaler -> Result)
-    const upscalerNodes = nodes.filter((n) => n.type === "upscaler");
+    // Check for FinalVideo workflow first
+    const finalVideoNodes = nodes.filter((n) => n.type === "finalVideo");
+    for (const finalVideoNode of finalVideoNodes) {
+      try {
+        await processFinalVideo(finalVideoNode);
+        setIsRunning(false);
+        return;
+      } catch (err: any) {
+        setIsRunning(false);
+        toast.error(err.message || "Errore nel processamento video finale");
+        return;
+      }
+    }
+    
+    // Check for upscaler workflow (Input -> Upscaler -> Result)
     const resultNodes = nodes.filter((n) => n.type === "imageResult" || n.type === "videoResult");
     
     // Find upscaler connected to a result
@@ -613,7 +775,7 @@ const FreepikWorkflowInner = () => {
       setIsRunning(false);
       toast.error(err.message || "Errore nell'esecuzione del workflow");
     }
-  }, [nodes, edges, setNodes, findInputImage, findUpscalerNode, findFreepikVideoNode, pollImageStatus, pollVideoStatus, pollFreepikVideoStatus]);
+  }, [nodes, edges, setNodes, findInputImage, findUpscalerNode, findFreepikVideoNode, pollImageStatus, pollVideoStatus, pollFreepikVideoStatus, processFinalVideo]);
 
   const loadTemplate = useCallback((template: TemplateType) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
