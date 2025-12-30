@@ -12,9 +12,20 @@ const requestSchema = z.object({
   videoUrls: z.array(z.string().url()).min(1, 'Almeno un video richiesto'),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
+  resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
 });
+
+// Map resolution to Shotstack format
+const mapResolution = (resolution: string): string => {
+  switch (resolution) {
+    case 'sd': return 'sd';
+    case 'hd': return 'hd';
+    case 'fhd': return '1080';
+    default: return 'hd';
+  }
+};
 
 // Map transition types to Shotstack format
 const mapTransition = (transition: string): string | null => {
@@ -43,13 +54,14 @@ serve(async (req) => {
       );
     }
     
-    const { videoUrls, transition, transitionDuration, audioUrl, audioVolume } = parseResult.data;
+    const { videoUrls, transition, transitionDuration, resolution, audioUrl, audioVolume } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
       transition, 
       transitionDuration,
+      resolution,
       hasAudio: !!audioUrl,
       useShotstack: !!SHOTSTACK_API_KEY
     });
@@ -141,7 +153,7 @@ serve(async (req) => {
           timeline,
           output: {
             format: 'mp4',
-            resolution: 'hd',
+            resolution: mapResolution(resolution),
           },
         };
 

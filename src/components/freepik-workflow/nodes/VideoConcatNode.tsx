@@ -117,20 +117,39 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
           </Select>
         </div>
 
-        <div className="space-y-1">
-          <Label className="text-xs">Output</Label>
-          <Select
-            value={nodeData.outputFormat || "mp4"}
-            onValueChange={(value) => handleChange("outputFormat", value)}
-          >
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mp4">MP4</SelectItem>
-              <SelectItem value="webm">WebM</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <Label className="text-xs">Formato</Label>
+            <Select
+              value={nodeData.outputFormat || "mp4"}
+              onValueChange={(value) => handleChange("outputFormat", value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mp4">MP4</SelectItem>
+                <SelectItem value="webm">WebM</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Risoluzione</Label>
+            <Select
+              value={nodeData.resolution || "hd"}
+              onValueChange={(value) => handleChange("resolution", value)}
+            >
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sd">SD (480p)</SelectItem>
+                <SelectItem value="hd">HD (720p)</SelectItem>
+                <SelectItem value="fhd">Full HD (1080p)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="pt-2 border-t border-border/30">

@@ -118,7 +118,7 @@ const FreepikWorkflowInner = () => {
         case "audio":
           return { label: "Audio / Musica", audioType: "generate" as const, category: "music" as const, duration: 10, volume: 100 };
         case "videoConcat":
-          return { label: "Concatena Video", transition: "none" as const, transitionDuration: 0.5, outputFormat: "mp4" as const };
+          return { label: "Concatena Video", transition: "none" as const, transitionDuration: 0.5, outputFormat: "mp4" as const, resolution: "hd" as const };
         case "finalVideo":
           return { label: "Video Finale", status: "idle" as const };
         default:
@@ -449,6 +449,7 @@ const FreepikWorkflowInner = () => {
             videoUrls,
             transition: concatData?.transition || "none",
             transitionDuration: concatData?.transitionDuration || 0.5,
+            resolution: concatData?.resolution || "hd",
             audioUrl: audioUrl,
             audioVolume: audioNodeData?.volume || 100,
           },
