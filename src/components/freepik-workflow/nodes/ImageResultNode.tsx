@@ -2,11 +2,46 @@ import { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Image, Download, Loader2, AlertCircle } from "lucide-react";
+import { Image, Download, Loader2, AlertCircle, Save } from "lucide-react";
 import { ImageResultNodeData } from "../types";
+import { useImageGallery } from "@/contexts/ImageGalleryContext";
+import { toast } from "sonner";
 
 const ImageResultNode = memo(({ data }: NodeProps) => {
   const nodeData = data as unknown as ImageResultNodeData;
+  const { addImage } = useImageGallery();
+
+  const handleDownload = async () => {
+    if (!nodeData.imageUrl) return;
+    
+    try {
+      const response = await fetch(nodeData.imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workflow-image-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success("Immagine scaricata!");
+    } catch (error) {
+      toast.error("Errore durante il download");
+    }
+  };
+
+  const handleSaveToGallery = () => {
+    if (!nodeData.imageUrl) return;
+    
+    addImage({
+      url: nodeData.imageUrl,
+      prompt: "Workflow generated",
+      aspectRatio: "1:1",
+      model: "freepik",
+    });
+    toast.success("Immagine salvata in galleria!");
+  };
 
   return (
     <Card className="w-64 bg-emerald-500/10 backdrop-blur border-emerald-500/30 shadow-lg shadow-emerald-500/10">
@@ -29,17 +64,29 @@ const ImageResultNode = memo(({ data }: NodeProps) => {
             <img
               src={nodeData.imageUrl}
               alt="Generated"
-              className="w-full h-32 object-cover rounded-md"
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
+              className="w-full h-32 object-cover rounded-md cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => window.open(nodeData.imageUrl, "_blank")}
-            >
-              <Download className="h-3 w-3 mr-1" />
-              Download
-            </Button>
+            />
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={handleDownload}
+              >
+                <Download className="h-3 w-3 mr-1" />
+                Scarica
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={handleSaveToGallery}
+              >
+                <Save className="h-3 w-3 mr-1" />
+                Galleria
+              </Button>
+            </div>
           </div>
         )}
         
