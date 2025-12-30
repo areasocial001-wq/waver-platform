@@ -355,10 +355,16 @@ export const ImageToVideoForm = () => {
                 <span>PiAPI Luma</span>
               </div>
             </SelectItem>
-            <SelectItem value="kling">
+            <SelectItem value="piapi-wan">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-purple-500" />
-                <span>Kling Direct API</span>
+                <span className="w-2 h-2 rounded-full bg-violet-500" />
+                <span>PiAPI Wan</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-hunyuan">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>PiAPI Hunyuan</span>
               </div>
             </SelectItem>
             <SelectItem value="freepik">
@@ -375,45 +381,46 @@ export const ImageToVideoForm = () => {
           {preferredProvider === "piapi-kling-2.1" && "PiAPI Kling 2.1 - Gateway unificato, ottimo rapporto qualità/prezzo"}
           {preferredProvider === "piapi-hailuo" && "PiAPI Hailuo - Video fluidi e naturali"}
           {preferredProvider === "piapi-luma" && "PiAPI Luma - Alta qualità cinematica"}
-          {preferredProvider === "kling" && "Kling Direct API - Connessione diretta (API key separata)"}
+          {preferredProvider === "piapi-wan" && "PiAPI Wan - Modello Alibaba, ottimo per scene naturali"}
+          {preferredProvider === "piapi-hunyuan" && "PiAPI Hunyuan - Modello Tencent, eccellente per volti"}
           {preferredProvider === "freepik" && "Freepik MiniMax - Veloce per transizioni sequenziali"}
         </p>
       </div>
 
       {/* API Indicator */}
       <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-        preferredProvider === "kling" ? "bg-purple-500/10 border-purple-500/30" :
+        preferredProvider?.startsWith("piapi-") ? "bg-orange-500/10 border-orange-500/30" :
         preferredProvider === "freepik" ? "bg-blue-500/10 border-blue-500/30" :
         preferredProvider === "veo" ? "bg-emerald-500/10 border-emerald-500/30" :
-        endImage ? "bg-purple-500/10 border-purple-500/30" : "bg-emerald-500/10 border-emerald-500/30"
+        endImage ? "bg-orange-500/10 border-orange-500/30" : "bg-emerald-500/10 border-emerald-500/30"
       }`}>
         <div className={`w-3 h-3 rounded-full animate-pulse ${
-          preferredProvider === "kling" ? "bg-purple-500" :
+          preferredProvider?.startsWith("piapi-") ? "bg-orange-500" :
           preferredProvider === "freepik" ? "bg-blue-500" :
           preferredProvider === "veo" ? "bg-emerald-500" :
-          endImage ? "bg-purple-500" : "bg-emerald-500"
+          endImage ? "bg-orange-500" : "bg-emerald-500"
         }`} />
         <div className="flex-1">
           <p className="text-sm font-medium">
-            {preferredProvider === "kling" ? "Kling 2.1 API" :
+            {preferredProvider?.startsWith("piapi-") ? `PiAPI ${preferredProvider.replace("piapi-", "").toUpperCase()}` :
              preferredProvider === "freepik" ? "Freepik MiniMax" :
              preferredProvider === "veo" ? "Google Veo 3.1" :
-             endImage ? "Kling 2.1 API" : "Google Veo 3.1"}
+             endImage ? "PiAPI Kling 2.1" : "Google Veo 3.1"}
           </p>
           <p className="text-xs text-muted-foreground">
-            {preferredProvider === "kling" || (preferredProvider === "auto" && endImage)
-              ? "Transizione sequenziale tra start e end frame" 
+            {preferredProvider?.startsWith("piapi-") || (preferredProvider === "auto" && endImage)
+              ? "Video generation via PiAPI gateway" 
               : "Animazione singola con audio sincronizzato"
             }
           </p>
         </div>
         <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-          preferredProvider === "kling" ? "bg-purple-500/20 text-purple-300" :
+          preferredProvider?.startsWith("piapi-") ? "bg-orange-500/20 text-orange-300" :
           preferredProvider === "freepik" ? "bg-blue-500/20 text-blue-300" :
           preferredProvider === "veo" ? "bg-emerald-500/20 text-emerald-300" :
-          endImage ? "bg-purple-500/20 text-purple-300" : "bg-emerald-500/20 text-emerald-300"
+          endImage ? "bg-orange-500/20 text-orange-300" : "bg-emerald-500/20 text-emerald-300"
         }`}>
-          {preferredProvider !== "auto" ? preferredProvider.toUpperCase() : (endImage ? "Sequential" : "Standard")}
+          {preferredProvider !== "auto" ? preferredProvider.toUpperCase() : (endImage ? "PiAPI" : "VEO")}
         </span>
       </div>
 

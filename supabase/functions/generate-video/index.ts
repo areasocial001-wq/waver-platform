@@ -7,28 +7,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Generate JWT token for Kling API authentication (direct API)
-async function generateKlingJWT(accessKey: string, secretKey: string): Promise<string> {
-  const header = { alg: "HS256" as const, typ: "JWT" };
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: accessKey,
-    exp: now + 1800,
-    nbf: now - 5,
-  };
-  
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secretKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyData,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  
-  return await create(header, payload, key);
-}
+// PiAPI is now the only Kling provider (direct API removed)
 
 // PiAPI model configuration
 interface PiAPIModelConfig {
@@ -56,20 +35,15 @@ serve(async (req) => {
 
   try {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
-    const KLING_ACCESS_KEY = Deno.env.get("KLING_ACCESS_KEY");
-    const KLING_SECRET_KEY = Deno.env.get("KLING_SECRET_KEY");
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     
     if (!GOOGLE_AI_API_KEY) {
       throw new Error("GOOGLE_AI_API_KEY is not set");
     }
 
-    const hasValidKlingCredentials = KLING_ACCESS_KEY && KLING_ACCESS_KEY.trim().length > 0 && 
-                                     KLING_SECRET_KEY && KLING_SECRET_KEY.trim().length > 0;
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     
     console.log("API credentials check:", {
-      hasKlingCredentials: hasValidKlingCredentials,
       hasPiAPIKey: hasValidPiAPIKey
     });
 
@@ -154,69 +128,7 @@ serve(async (req) => {
         }
       }
       
-      // Kling direct API polling (format: kling:task_id)
-      if (body.operationId.startsWith('kling:')) {
-        if (!hasValidKlingCredentials) {
-          throw new Error("KLING_ACCESS_KEY or KLING_SECRET_KEY is not properly configured");
-        }
-        
-        const taskId = body.operationId.replace('kling:', '');
-        console.log("Polling Kling task:", taskId);
-        
-        const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
-        
-        const klingResponse = await fetch(`https://api.klingai.com/v1/videos/image2video/${taskId}`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${klingJWT}`,
-          },
-        });
-
-        if (!klingResponse.ok) {
-          const error = await klingResponse.text();
-          throw new Error(`Kling API error: ${klingResponse.status} - ${error}`);
-        }
-
-        const klingData = await klingResponse.json();
-        console.log("Kling task status:", klingData);
-        
-        if (klingData.data.task_status === "succeed") {
-          const videoUrl = klingData.data.task_result.videos[0].url;
-          
-          if (body.generationId) {
-            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-            const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
-            await supabaseClient
-              .from('video_generations')
-              .update({
-                status: 'completed',
-                video_url: videoUrl,
-              })
-              .eq('id', body.generationId);
-          }
-
-          return new Response(JSON.stringify({ 
-            status: "succeeded",
-            output: videoUrl 
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          });
-        } else if (klingData.data.task_status === "failed") {
-          throw new Error(`Kling generation failed: ${klingData.data.task_status_msg || "Unknown error"}`);
-        } else {
-          return new Response(JSON.stringify({ 
-            status: "processing"
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 200,
-          });
-        }
-      }
-      
+      // Kling direct API removed - use PiAPI instead
       // Freepik polling (format: freepik:model:task_id)
       if (body.operationId.startsWith('freepik:')) {
         const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
@@ -632,85 +544,7 @@ serve(async (req) => {
       }
     }
 
-    // ==================== KLING DIRECT API ====================
-    if (type === "image_to_video" && end_image && hasValidKlingCredentials && preferredProvider === "kling") {
-      console.log("Starting video generation with Kling 2.1 (supports start/end frames)");
-      
-      const startImageData = start_image || image || image_url;
-      
-      if (!startImageData) {
-        throw new Error("Start image is required for Kling image-to-video generation");
-      }
-      
-      const startBase64 = extractBase64(startImageData);
-      const endBase64 = extractBase64(end_image);
-      
-      if (!startBase64 || startBase64.length < 100) {
-        throw new Error("Invalid start image base64 data");
-      }
-      
-      const requestedDuration = duration && duration >= 8 ? 10 : 5;
-      const klingMode = "pro";
-      const klingDuration = String(requestedDuration);
-      
-      console.log(`Kling config: mode=${klingMode}, duration=${klingDuration}s`);
-      
-      const klingPayload: any = {
-        model_name: "kling-v1-5",
-        prompt: prompt || "Smooth transition between images",
-        negative_prompt: "",
-        cfg_scale: 0.5,
-        mode: klingMode,
-        image: startBase64,
-        image_tail: endBase64,
-        duration: klingDuration
-      };
-
-      const klingJWT = await generateKlingJWT(KLING_ACCESS_KEY!, KLING_SECRET_KEY!);
-      console.log("Generated Kling JWT for video generation");
-
-      const klingResponse = await fetch("https://api.klingai.com/v1/videos/image2video", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${klingJWT}`,
-        },
-        body: JSON.stringify(klingPayload),
-      });
-
-      if (!klingResponse.ok) {
-        const error = await klingResponse.text();
-        console.error("Kling API error:", error);
-        throw new Error(`Kling API error: ${klingResponse.status} - ${error}`);
-      }
-
-      const klingData = await klingResponse.json();
-      console.log("Kling task started:", klingData);
-
-      if (generationId) {
-        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
-        await supabaseClient
-          .from('video_generations')
-          .update({
-            status: 'processing',
-            prediction_id: `kling:${klingData.data.task_id}`,
-          })
-          .eq('id', generationId);
-      }
-
-      return new Response(JSON.stringify({ 
-        status: "starting",
-        operationId: `kling:${klingData.data.task_id}`,
-        provider: "kling"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
+    // Kling Direct API removed - use PiAPI Kling instead
 
     // ==================== GOOGLE VEO 3.1 (DEFAULT) ====================
     console.log("Starting video generation with Google Veo 3.1");
