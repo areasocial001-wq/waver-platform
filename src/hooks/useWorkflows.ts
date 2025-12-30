@@ -10,12 +10,16 @@ export interface SavedWorkflow {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   is_template: boolean;
+  is_public: boolean;
+  share_code: string | null;
   created_at: string;
   updated_at: string;
+  user_id?: string;
 }
 
 export const useWorkflows = () => {
   const [workflows, setWorkflows] = useState<SavedWorkflow[]>([]);
+  const [publicWorkflows, setPublicWorkflows] = useState<SavedWorkflow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const fetchWorkflows = useCallback(async () => {
@@ -30,11 +34,11 @@ export const useWorkflows = () => {
       const { data, error } = await supabase
         .from("ai_workflows")
         .select("*")
+        .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
 
-      // Parse JSONB nodes and edges
       const parsed = (data || []).map((w) => ({
         ...w,
         nodes: Array.isArray(w.nodes) ? w.nodes as unknown as WorkflowNode[] : [],
@@ -50,12 +54,36 @@ export const useWorkflows = () => {
     }
   }, []);
 
+  const fetchPublicWorkflows = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("ai_workflows")
+        .select("*")
+        .eq("is_public", true)
+        .order("updated_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+
+      const parsed = (data || []).map((w) => ({
+        ...w,
+        nodes: Array.isArray(w.nodes) ? w.nodes as unknown as WorkflowNode[] : [],
+        edges: Array.isArray(w.edges) ? w.edges as unknown as WorkflowEdge[] : [],
+      }));
+
+      setPublicWorkflows(parsed);
+    } catch (err: any) {
+      console.error("Error fetching public workflows:", err);
+    }
+  }, []);
+
   const saveWorkflow = useCallback(async (
     name: string,
     description: string,
     nodes: WorkflowNode[],
     edges: WorkflowEdge[],
-    existingId?: string
+    existingId?: string,
+    isPublic?: boolean
   ): Promise<string | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -64,7 +92,6 @@ export const useWorkflows = () => {
         return null;
       }
 
-      // Clean nodes data - remove any circular references
       const cleanNodes = nodes.map(n => ({
         id: n.id,
         type: n.type,
@@ -80,15 +107,27 @@ export const useWorkflows = () => {
         style: e.style,
       }));
 
+      // Generate share code if making public
+      const shareCode = isPublic ? `wf-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}` : null;
+
       if (existingId) {
+        const updateData: any = {
+          name,
+          description,
+          nodes: cleanNodes,
+          edges: cleanEdges,
+        };
+        
+        if (typeof isPublic === "boolean") {
+          updateData.is_public = isPublic;
+          if (isPublic) {
+            updateData.share_code = shareCode;
+          }
+        }
+
         const { error } = await supabase
           .from("ai_workflows")
-          .update({
-            name,
-            description,
-            nodes: cleanNodes as any,
-            edges: cleanEdges as any,
-          })
+          .update(updateData)
           .eq("id", existingId);
 
         if (error) throw error;
@@ -104,6 +143,8 @@ export const useWorkflows = () => {
             description,
             nodes: cleanNodes as any,
             edges: cleanEdges as any,
+            is_public: isPublic || false,
+            share_code: isPublic ? shareCode : null,
           })
           .select("id")
           .single();
@@ -119,6 +160,59 @@ export const useWorkflows = () => {
       return null;
     }
   }, [fetchWorkflows]);
+
+  const togglePublic = useCallback(async (id: string, isPublic: boolean): Promise<string | null> => {
+    try {
+      const shareCode = isPublic ? `wf-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 6)}` : null;
+      
+      const { data, error } = await supabase
+        .from("ai_workflows")
+        .update({ 
+          is_public: isPublic,
+          share_code: shareCode,
+        })
+        .eq("id", id)
+        .select("share_code")
+        .single();
+
+      if (error) throw error;
+      
+      toast.success(isPublic ? "Workflow condiviso pubblicamente" : "Workflow reso privato");
+      fetchWorkflows();
+      return data?.share_code || null;
+    } catch (err: any) {
+      console.error("Error toggling public:", err);
+      toast.error("Errore nel cambio visibilità");
+      return null;
+    }
+  }, [fetchWorkflows]);
+
+  const loadByShareCode = useCallback(async (shareCode: string): Promise<SavedWorkflow | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("ai_workflows")
+        .select("*")
+        .eq("share_code", shareCode)
+        .eq("is_public", true)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        toast.error("Workflow non trovato o non pubblico");
+        return null;
+      }
+
+      return {
+        ...data,
+        nodes: Array.isArray(data.nodes) ? data.nodes as unknown as WorkflowNode[] : [],
+        edges: Array.isArray(data.edges) ? data.edges as unknown as WorkflowEdge[] : [],
+      };
+    } catch (err: any) {
+      console.error("Error loading by share code:", err);
+      toast.error("Errore nel caricamento del workflow");
+      return null;
+    }
+  }, []);
 
   const deleteWorkflow = useCallback(async (id: string) => {
     try {
@@ -138,13 +232,18 @@ export const useWorkflows = () => {
 
   useEffect(() => {
     fetchWorkflows();
-  }, [fetchWorkflows]);
+    fetchPublicWorkflows();
+  }, [fetchWorkflows, fetchPublicWorkflows]);
 
   return {
     workflows,
+    publicWorkflows,
     isLoading,
     saveWorkflow,
     deleteWorkflow,
+    togglePublic,
+    loadByShareCode,
     refreshWorkflows: fetchWorkflows,
+    refreshPublicWorkflows: fetchPublicWorkflows,
   };
 };
