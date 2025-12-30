@@ -8,6 +8,7 @@ import {
   Sparkles, 
   ImageIcon, 
   Video,
+  Film,
   Play,
   Trash2,
   Download,
@@ -52,6 +53,7 @@ export const WorkflowToolbar = ({
     { type: "note" as NodeTypeKey, icon: StickyNote, label: "Note", color: "text-amber-500" },
     { type: "instructions" as NodeTypeKey, icon: Sparkles, label: "Instructions", color: "text-violet-500" },
     { type: "upscaler" as NodeTypeKey, icon: ZoomIn, label: "Upscaler", color: "text-pink-500" },
+    { type: "freepikVideo" as NodeTypeKey, icon: Film, label: "Freepik Video", color: "text-cyan-500" },
     { type: "imageResult" as NodeTypeKey, icon: ImageIcon, label: "Image Result", color: "text-emerald-500" },
     { type: "videoResult" as NodeTypeKey, icon: Video, label: "Video Result", color: "text-blue-500" },
   ];

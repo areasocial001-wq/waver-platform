@@ -27,6 +27,13 @@ export interface UpscalerNodeData extends Record<string, unknown> {
   creativity: number;
 }
 
+export interface FreepikVideoNodeData extends Record<string, unknown> {
+  label: string;
+  prompt: string;
+  model: "kling" | "minimax";
+  duration: number;
+}
+
 export interface ImageResultNodeData extends Record<string, unknown> {
   label: string;
   imageUrl?: string;
@@ -47,6 +54,7 @@ export type WorkflowNodeData =
   | NoteNodeData 
   | InstructionsNodeData 
   | UpscalerNodeData
+  | FreepikVideoNodeData
   | ImageResultNodeData
   | VideoResultNodeData;
 
@@ -60,6 +68,7 @@ export const NODE_TYPES = {
   note: "note",
   instructions: "instructions",
   upscaler: "upscaler",
+  freepikVideo: "freepikVideo",
   imageResult: "imageResult",
   videoResult: "videoResult",
 } as const;
