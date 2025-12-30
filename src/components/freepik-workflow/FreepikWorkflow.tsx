@@ -460,20 +460,26 @@ const FreepikWorkflowInner = () => {
         
         const audioNodeData = audioNode?.data as unknown as AudioNodeData | undefined;
         
-        // Get clip durations in the correct order
+        // Get clip durations and effects in the correct order
         const connectedVideos = findConnectedVideoResults(concatNode!.id);
         const clipDurations = connectedVideos.map(v => concatData?.clipDurations?.[v.id] || 5);
+        const clipEffects = connectedVideos.map(v => concatData?.clipEffects?.[v.id] || {
+          blur: 0, saturation: 100, contrast: 100, brightness: 100
+        });
         
         const { data: concatResult, error: concatError } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls,
             clipDurations,
+            clipEffects,
             transition: concatData?.transition || "none",
             transitionDuration: concatData?.transitionDuration || 0.5,
             resolution: concatData?.resolution || "hd",
             aspectRatio: concatData?.aspectRatio || "16:9",
             audioUrl: audioUrl,
             audioVolume: audioNodeData?.volume || 100,
+            intro: concatData?.intro,
+            outro: concatData?.outro,
           },
         });
         

@@ -7,16 +7,38 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Clip effects schema
+const clipEffectsSchema = z.object({
+  blur: z.number().min(0).max(10).default(0),
+  saturation: z.number().min(0).max(200).default(100),
+  contrast: z.number().min(0).max(200).default(100),
+  brightness: z.number().min(0).max(200).default(100),
+});
+
+// Intro/outro schema
+const introOutroSchema = z.object({
+  enabled: z.boolean().default(false),
+  text: z.string().default(''),
+  duration: z.number().min(1).max(10).default(3),
+  backgroundColor: z.string().default('#000000'),
+  textColor: z.string().default('#ffffff'),
+  animation: z.enum(['fade', 'slide', 'zoom', 'typewriter']).default('fade'),
+  fontSize: z.enum(['small', 'medium', 'large']).default('medium'),
+});
+
 // Input validation schema
 const requestSchema = z.object({
   videoUrls: z.array(z.string().url()).min(1, 'Almeno un video richiesto'),
   clipDurations: z.array(z.number().min(1).max(30)).optional(),
+  clipEffects: z.array(clipEffectsSchema).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
+  intro: introOutroSchema.optional(),
+  outro: introOutroSchema.optional(),
 });
 
 // Map resolution to Shotstack format
@@ -61,6 +83,102 @@ const mapTransition = (transition: string): string | null => {
   }
 };
 
+// Map effects to Shotstack filter
+const mapEffects = (effects?: { blur: number; saturation: number; contrast: number; brightness: number }): any[] => {
+  const filters: any[] = [];
+  
+  if (!effects) return filters;
+  
+  if (effects.blur > 0) {
+    filters.push({ type: 'blur', value: effects.blur / 10 }); // Convert 0-10 to 0-1
+  }
+  
+  // Shotstack uses multiply factor, 1 = normal
+  if (effects.saturation !== 100) {
+    filters.push({ type: 'saturation', value: effects.saturation / 100 });
+  }
+  
+  if (effects.contrast !== 100) {
+    filters.push({ type: 'contrast', value: effects.contrast / 100 });
+  }
+  
+  if (effects.brightness !== 100) {
+    filters.push({ type: 'brightness', value: effects.brightness / 100 });
+  }
+  
+  return filters;
+};
+
+// Get font size in pixels
+const getFontSize = (size: string): number => {
+  switch (size) {
+    case 'small': return 32;
+    case 'large': return 72;
+    default: return 48;
+  }
+};
+
+// Create intro/outro title clip
+const createTitleClip = (
+  config: { text: string; duration: number; backgroundColor: string; textColor: string; animation: string; fontSize: string },
+  start: number,
+  aspectRatio: string,
+  resolution: string
+): any[] => {
+  const clips: any[] = [];
+  const fontSize = getFontSize(config.fontSize);
+  
+  // Background clip
+  const bgClip: any = {
+    asset: {
+      type: 'html',
+      html: `<div style="width: 100%; height: 100%; background-color: ${config.backgroundColor};"></div>`,
+      width: aspectRatio === '9:16' ? 1080 : 1920,
+      height: aspectRatio === '9:16' ? 1920 : aspectRatio === '1:1' ? 1080 : 1080,
+    },
+    start,
+    length: config.duration,
+    fit: 'cover',
+  };
+  
+  // Text clip
+  const textClip: any = {
+    asset: {
+      type: 'html',
+      html: `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 40px;">
+        <p style="color: ${config.textColor}; font-size: ${fontSize}px; font-family: Arial, sans-serif; font-weight: bold; margin: 0;">${config.text}</p>
+      </div>`,
+      width: aspectRatio === '9:16' ? 1080 : 1920,
+      height: aspectRatio === '9:16' ? 1920 : aspectRatio === '1:1' ? 1080 : 1080,
+    },
+    start,
+    length: config.duration,
+    position: 'center',
+  };
+  
+  // Add animation
+  switch (config.animation) {
+    case 'fade':
+      textClip.transition = { in: 'fade', out: 'fade' };
+      break;
+    case 'slide':
+      textClip.transition = { in: 'slideRight', out: 'slideLeft' };
+      break;
+    case 'zoom':
+      textClip.transition = { in: 'zoom', out: 'zoom' };
+      break;
+    case 'typewriter':
+      // Typewriter effect - fade in character by character isn't native, use fade
+      textClip.transition = { in: 'fade' };
+      break;
+  }
+  
+  clips.push(bgClip);
+  clips.push(textClip);
+  
+  return clips;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -78,17 +196,23 @@ serve(async (req) => {
       );
     }
     
-    const { videoUrls, clipDurations, transition, transitionDuration, resolution, aspectRatio, audioUrl, audioVolume } = parseResult.data;
+    const { 
+      videoUrls, clipDurations, clipEffects, transition, transitionDuration, 
+      resolution, aspectRatio, audioUrl, audioVolume, intro, outro 
+    } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
       clipDurations,
+      clipEffects: clipEffects?.length,
       transition, 
       transitionDuration,
       resolution,
       aspectRatio,
       hasAudio: !!audioUrl,
+      hasIntro: intro?.enabled,
+      hasOutro: outro?.enabled,
       useShotstack: !!SHOTSTACK_API_KEY
     });
 
@@ -103,12 +227,22 @@ serve(async (req) => {
       
       try {
         // Build Shotstack timeline clips
-        const clips: any[] = [];
+        const videoClips: any[] = [];
         let currentStart = 0;
+        
+        // Add intro if enabled
+        const introDuration = intro?.enabled ? intro.duration : 0;
+        if (intro?.enabled && intro.text) {
+          const introClips = createTitleClip(intro, 0, aspectRatio, resolution);
+          videoClips.push(...introClips);
+          currentStart = introDuration;
+        }
 
+        // Add video clips
         for (let i = 0; i < videoUrls.length; i++) {
           // Use custom duration or default to 5 seconds
           const clipLength = clipDurations?.[i] || 5;
+          const effects = clipEffects?.[i];
           
           const clip: any = {
             asset: {
@@ -118,6 +252,12 @@ serve(async (req) => {
             start: currentStart,
             length: clipLength,
           };
+          
+          // Add filters for effects
+          const filters = mapEffects(effects);
+          if (filters.length > 0) {
+            clip.filter = filters;
+          }
 
           // Add transition effect between clips
           const shotstackTransition = mapTransition(transition);
@@ -129,18 +269,27 @@ serve(async (req) => {
             clip.start = Math.max(0, currentStart - transitionDuration);
           }
 
-          clips.push(clip);
+          videoClips.push(clip);
           currentStart += clipLength;
+        }
+        
+        // Add outro if enabled
+        if (outro?.enabled && outro.text) {
+          const outroClips = createTitleClip(outro, currentStart, aspectRatio, resolution);
+          videoClips.push(...outroClips);
+          currentStart += outro.duration;
         }
 
         // Build timeline
         const timeline: any = {
-          tracks: [{ clips }],
+          tracks: [{ clips: videoClips }],
         };
 
         // Add audio track if provided
         if (audioUrl) {
-          const totalDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          // Calculate total duration including intro/outro
+          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          const totalDuration = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
           let audioSrc = audioUrl;
           
           // If audio is base64, we need to upload it first

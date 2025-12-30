@@ -7,8 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Layers, Video, GripVertical, Loader2, Clock, Play, Eye, X, SkipBack, SkipForward, Pause, RectangleHorizontal, Square, RectangleVertical } from "lucide-react";
-import { VideoConcatNodeData, VideoResultNodeData } from "../types";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  Layers, Video, GripVertical, Loader2, Clock, Play, Eye, 
+  SkipBack, SkipForward, Pause, RectangleHorizontal, Square, RectangleVertical,
+  Sliders, Type, ChevronDown, Sparkles, Sun, Contrast
+} from "lucide-react";
+import { VideoConcatNodeData, VideoResultNodeData, ClipEffects, IntroOutroConfig } from "../types";
 import {
   DndContext,
   closestCenter,
@@ -33,6 +41,23 @@ interface ConnectedVideo {
   thumbnail?: string;
   duration?: number;
 }
+
+const DEFAULT_EFFECTS: ClipEffects = {
+  blur: 0,
+  saturation: 100,
+  contrast: 100,
+  brightness: 100,
+};
+
+const DEFAULT_INTRO_OUTRO: IntroOutroConfig = {
+  enabled: false,
+  text: "",
+  duration: 3,
+  backgroundColor: "#000000",
+  textColor: "#ffffff",
+  animation: "fade",
+  fontSize: "medium",
+};
 
 // Component for video thumbnail with hover preview
 const VideoThumbnail = memo(({ url }: { url?: string }) => {
@@ -380,12 +405,16 @@ const SortableVideoItem = memo(({
   video, 
   index, 
   duration,
-  onDurationChange 
+  hasEffects,
+  onDurationChange,
+  onEditEffects,
 }: { 
   video: ConnectedVideo; 
   index: number; 
   duration: number;
+  hasEffects: boolean;
   onDurationChange: (videoId: string, duration: number) => void;
+  onEditEffects: (videoId: string) => void;
 }) => {
   const {
     attributes,
@@ -432,15 +461,268 @@ const SortableVideoItem = memo(({
           max={30}
           value={duration}
           onChange={(e) => onDurationChange(video.id, parseInt(e.target.value) || 5)}
-          className="w-12 h-6 text-[10px] px-1 text-center"
+          className="w-10 h-6 text-[10px] px-1 text-center"
         />
         <span className="text-[10px] text-muted-foreground">s</span>
       </div>
+
+      <Button
+        size="sm"
+        variant={hasEffects ? "default" : "ghost"}
+        className={`h-6 w-6 p-0 shrink-0 ${hasEffects ? "bg-purple-500 hover:bg-purple-600" : ""}`}
+        onClick={() => onEditEffects(video.id)}
+        title="Effetti video"
+      >
+        <Sliders className="h-3 w-3" />
+      </Button>
     </div>
   );
 });
 
 SortableVideoItem.displayName = "SortableVideoItem";
+
+// Effects Editor Dialog
+const EffectsEditorDialog = memo(({
+  isOpen,
+  onClose,
+  videoId,
+  videoUrl,
+  effects,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  videoId: string;
+  videoUrl?: string;
+  effects: ClipEffects;
+  onSave: (effects: ClipEffects) => void;
+}) => {
+  const [localEffects, setLocalEffects] = useState<ClipEffects>(effects);
+
+  useEffect(() => {
+    setLocalEffects(effects);
+  }, [effects, isOpen]);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Sliders className="h-5 w-5 text-purple-500" />
+            Effetti Video
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {videoUrl && (
+            <div className="aspect-video bg-black rounded-lg overflow-hidden">
+              <video src={videoUrl} className="w-full h-full object-contain" muted autoPlay loop />
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" /> Blur
+                </Label>
+                <span className="text-xs text-muted-foreground">{localEffects.blur}</span>
+              </div>
+              <Slider
+                value={[localEffects.blur]}
+                onValueChange={([v]) => setLocalEffects({ ...localEffects, blur: v })}
+                max={10}
+                step={1}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-2">
+                  <Sun className="h-4 w-4" /> Luminosità
+                </Label>
+                <span className="text-xs text-muted-foreground">{localEffects.brightness}%</span>
+              </div>
+              <Slider
+                value={[localEffects.brightness]}
+                onValueChange={([v]) => setLocalEffects({ ...localEffects, brightness: v })}
+                min={0}
+                max={200}
+                step={5}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm flex items-center gap-2">
+                  <Contrast className="h-4 w-4" /> Contrasto
+                </Label>
+                <span className="text-xs text-muted-foreground">{localEffects.contrast}%</span>
+              </div>
+              <Slider
+                value={[localEffects.contrast]}
+                onValueChange={([v]) => setLocalEffects({ ...localEffects, contrast: v })}
+                min={0}
+                max={200}
+                step={5}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Saturazione</Label>
+                <span className="text-xs text-muted-foreground">{localEffects.saturation}%</span>
+              </div>
+              <Slider
+                value={[localEffects.saturation]}
+                onValueChange={([v]) => setLocalEffects({ ...localEffects, saturation: v })}
+                min={0}
+                max={200}
+                step={5}
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setLocalEffects(DEFAULT_EFFECTS)}
+            >
+              Reset
+            </Button>
+            <Button
+              className="flex-1 bg-purple-500 hover:bg-purple-600"
+              onClick={() => {
+                onSave(localEffects);
+                onClose();
+              }}
+            >
+              Applica
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+EffectsEditorDialog.displayName = "EffectsEditorDialog";
+
+// Intro/Outro Editor Component
+const IntroOutroEditor = memo(({
+  label,
+  config,
+  onChange,
+}: {
+  label: string;
+  config: IntroOutroConfig;
+  onChange: (config: IntroOutroConfig) => void;
+}) => {
+  return (
+    <div className="space-y-2 p-2 bg-muted/20 rounded-md">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs flex items-center gap-1">
+          <Type className="h-3 w-3" />
+          {label}
+        </Label>
+        <Switch
+          checked={config.enabled}
+          onCheckedChange={(enabled) => onChange({ ...config, enabled })}
+        />
+      </div>
+
+      {config.enabled && (
+        <div className="space-y-2 pt-1">
+          <Input
+            placeholder="Testo..."
+            value={config.text}
+            onChange={(e) => onChange({ ...config, text: e.target.value })}
+            className="h-7 text-xs"
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[10px]">Durata</Label>
+              <Select
+                value={String(config.duration)}
+                onValueChange={(v) => onChange({ ...config, duration: parseInt(v) })}
+              >
+                <SelectTrigger className="h-6 text-[10px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[2, 3, 4, 5, 6, 8, 10].map(d => (
+                    <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[10px]">Animazione</Label>
+              <Select
+                value={config.animation}
+                onValueChange={(v: any) => onChange({ ...config, animation: v })}
+              >
+                <SelectTrigger className="h-6 text-[10px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fade">Fade</SelectItem>
+                  <SelectItem value="slide">Slide</SelectItem>
+                  <SelectItem value="zoom">Zoom</SelectItem>
+                  <SelectItem value="typewriter">Typewriter</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[10px]">Font</Label>
+              <Select
+                value={config.fontSize}
+                onValueChange={(v: any) => onChange({ ...config, fontSize: v })}
+              >
+                <SelectTrigger className="h-6 text-[10px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small">S</SelectItem>
+                  <SelectItem value="medium">M</SelectItem>
+                  <SelectItem value="large">L</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[10px]">BG</Label>
+              <Input
+                type="color"
+                value={config.backgroundColor}
+                onChange={(e) => onChange({ ...config, backgroundColor: e.target.value })}
+                className="h-6 p-0.5 cursor-pointer"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[10px]">Testo</Label>
+              <Input
+                type="color"
+                value={config.textColor}
+                onChange={(e) => onChange({ ...config, textColor: e.target.value })}
+                className="h-6 p-0.5 cursor-pointer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+IntroOutroEditor.displayName = "IntroOutroEditor";
 
 const VideoConcatNode = memo(({ data, id }: NodeProps) => {
   const nodeData = data as unknown as VideoConcatNodeData;
@@ -448,7 +730,10 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
   const [connectedVideos, setConnectedVideos] = useState<ConnectedVideo[]>([]);
   const [orderedIds, setOrderedIds] = useState<string[]>([]);
   const [clipDurations, setClipDurations] = useState<Record<string, number>>({});
+  const [clipEffects, setClipEffects] = useState<Record<string, ClipEffects>>({});
   const [showPreview, setShowPreview] = useState(false);
+  const [editingEffectsFor, setEditingEffectsFor] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -500,12 +785,15 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
     setConnectedVideos(videos);
   }, [getNodes, getEdges, id]);
 
-  // Initialize clip durations from node data
+  // Initialize clip durations and effects from node data
   useEffect(() => {
     if (nodeData.clipDurations) {
       setClipDurations(prev => ({ ...prev, ...nodeData.clipDurations }));
     }
-  }, [nodeData.clipDurations]);
+    if (nodeData.clipEffects) {
+      setClipEffects(prev => ({ ...prev, ...nodeData.clipEffects }));
+    }
+  }, [nodeData.clipDurations, nodeData.clipEffects]);
 
   // Get videos in the correct order
   const orderedVideos = orderedIds
@@ -559,6 +847,30 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
     window.dispatchEvent(event);
   };
 
+  const handleEffectsChange = useCallback((videoId: string, effects: ClipEffects) => {
+    const newEffects = { ...clipEffects, [videoId]: effects };
+    setClipEffects(newEffects);
+    
+    const event = new CustomEvent("nodeDataChange", {
+      detail: {
+        nodeId: id,
+        data: { ...nodeData, clipEffects: newEffects },
+      },
+    });
+    window.dispatchEvent(event);
+  }, [id, nodeData, clipEffects]);
+
+  const hasEffects = (videoId: string): boolean => {
+    const effects = clipEffects[videoId];
+    if (!effects) return false;
+    return effects.blur > 0 || effects.saturation !== 100 || 
+           effects.contrast !== 100 || effects.brightness !== 100;
+  };
+
+  // Calculate intro/outro durations
+  const introDuration = nodeData.intro?.enabled ? nodeData.intro.duration : 0;
+  const outroDuration = nodeData.outro?.enabled ? nodeData.outro.duration : 0;
+
   // Calculate total duration
   const totalDuration = orderedVideos.reduce((sum, v) => sum + (clipDurations[v.id] || 5), 0);
 
@@ -606,7 +918,9 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
                       video={video}
                       index={index}
                       duration={clipDurations[video.id] || 5}
+                      hasEffects={hasEffects(video.id)}
                       onDurationChange={handleDurationChange}
+                      onEditEffects={(videoId) => setEditingEffectsFor(videoId)}
                     />
                   ))}
                 </div>
@@ -618,7 +932,16 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
             <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1">
               <span>Durata totale:</span>
               <div className="flex items-center gap-2">
-                <span className="font-medium text-purple-400">{totalDuration}s</span>
+                <span className="font-medium text-purple-400">
+                  {totalDuration + introDuration + outroDuration}s
+                  {(introDuration > 0 || outroDuration > 0) && (
+                    <span className="text-muted-foreground ml-1">
+                      ({introDuration > 0 && `+${introDuration}s intro`}
+                      {introDuration > 0 && outroDuration > 0 && ", "}
+                      {outroDuration > 0 && `+${outroDuration}s outro`})
+                    </span>
+                  )}
+                </span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -730,6 +1053,35 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
             </Select>
           </div>
         </div>
+
+        {/* Intro/Outro Section */}
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-between h-7 text-xs"
+            >
+              <span className="flex items-center gap-1">
+                <Type className="h-3 w-3" />
+                Intro / Outro
+              </span>
+              <ChevronDown className={`h-3 w-3 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 pt-2">
+            <IntroOutroEditor
+              label="Intro"
+              config={nodeData.intro || DEFAULT_INTRO_OUTRO}
+              onChange={(config) => handleChange("intro", config)}
+            />
+            <IntroOutroEditor
+              label="Outro"
+              config={nodeData.outro || DEFAULT_INTRO_OUTRO}
+              onChange={(config) => handleChange("outro", config)}
+            />
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
       <Handle
         type="target"
@@ -749,6 +1101,18 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
         videos={orderedVideos.filter(v => v.url)}
         clipDurations={clipDurations}
       />
+
+      {/* Effects Editor Dialog */}
+      {editingEffectsFor && (
+        <EffectsEditorDialog
+          isOpen={!!editingEffectsFor}
+          onClose={() => setEditingEffectsFor(null)}
+          videoId={editingEffectsFor}
+          videoUrl={orderedVideos.find(v => v.id === editingEffectsFor)?.url}
+          effects={clipEffects[editingEffectsFor] || DEFAULT_EFFECTS}
+          onSave={(effects) => handleEffectsChange(editingEffectsFor, effects)}
+        />
+      )}
     </Card>
   );
 });

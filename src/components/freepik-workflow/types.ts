@@ -61,6 +61,23 @@ export interface AudioNodeData extends Record<string, unknown> {
   audioFileName?: string;
 }
 
+export interface ClipEffects {
+  blur: number; // 0-10
+  saturation: number; // 0-200, 100 = normal
+  contrast: number; // 0-200, 100 = normal
+  brightness: number; // 0-200, 100 = normal
+}
+
+export interface IntroOutroConfig {
+  enabled: boolean;
+  text: string;
+  duration: number; // seconds
+  backgroundColor: string;
+  textColor: string;
+  animation: "fade" | "slide" | "zoom" | "typewriter";
+  fontSize: "small" | "medium" | "large";
+}
+
 export interface VideoConcatNodeData extends Record<string, unknown> {
   label: string;
   transition: "none" | "fade" | "crossfade" | "wipe";
@@ -70,6 +87,9 @@ export interface VideoConcatNodeData extends Record<string, unknown> {
   aspectRatio: "16:9" | "9:16" | "1:1";
   videoOrder?: string[];
   clipDurations?: Record<string, number>;
+  clipEffects?: Record<string, ClipEffects>;
+  intro?: IntroOutroConfig;
+  outro?: IntroOutroConfig;
 }
 
 export interface FinalVideoNodeData extends Record<string, unknown> {
