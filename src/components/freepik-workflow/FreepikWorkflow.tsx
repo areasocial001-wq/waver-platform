@@ -15,10 +15,11 @@ import "@xyflow/react/dist/style.css";
 
 import { WorkflowToolbar } from "./WorkflowToolbar";
 import { SaveWorkflowDialog, LoadWorkflowDialog } from "./WorkflowDialogs";
-import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData } from "./types";
+import { NODE_TYPES, NodeTypeKey, WorkflowNode, WorkflowEdge, InstructionsNodeData, ImageInputNodeData, UpscalerNodeData } from "./types";
 import ImageInputNode from "./nodes/ImageInputNode";
 import NoteNode from "./nodes/NoteNode";
 import InstructionsNode from "./nodes/InstructionsNode";
+import UpscalerNode from "./nodes/UpscalerNode";
 import ImageResultNode from "./nodes/ImageResultNode";
 import VideoResultNode from "./nodes/VideoResultNode";
 import { SavedWorkflow } from "@/hooks/useWorkflows";
@@ -29,6 +30,7 @@ const nodeTypes = {
   imageInput: ImageInputNode,
   note: NoteNode,
   instructions: InstructionsNode,
+  upscaler: UpscalerNode,
   imageResult: ImageResultNode,
   videoResult: VideoResultNode,
 };
@@ -97,6 +99,8 @@ const FreepikWorkflowInner = () => {
           return { label: "Note", text: "" };
         case "instructions":
           return { label: "Instructions", prompt: "", model: "mystic", aspectRatio: "1:1" };
+        case "upscaler":
+          return { label: "Upscaler", mode: "creative" as const, scaleFactor: "2x", optimizedFor: "standard", creativity: 0 };
         case "imageResult":
           return { label: "Image Result", status: "idle" as const };
         case "videoResult":
@@ -142,11 +146,37 @@ const FreepikWorkflowInner = () => {
     return undefined;
   }, [nodes, edges]);
 
+  // Find upscaler node between input and result
+  const findUpscalerNode = useCallback((resultNodeId: string): { node: WorkflowNode; inputImageUrl: string } | undefined => {
+    const visitedNodes = new Set<string>();
+    const queue = [resultNodeId];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      if (visitedNodes.has(currentId)) continue;
+      visitedNodes.add(currentId);
+      
+      const incomingEdges = edges.filter(e => e.target === currentId);
+      for (const edge of incomingEdges) {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        if (sourceNode?.type === "upscaler") {
+          // Find input image for this upscaler
+          const inputImage = findInputImage(sourceNode.id);
+          if (inputImage) {
+            return { node: sourceNode, inputImageUrl: inputImage };
+          }
+        }
+        queue.push(edge.source);
+      }
+    }
+    return undefined;
+  }, [nodes, edges, findInputImage]);
+
   // Poll for image generation status
-  const pollImageStatus = useCallback(async (taskId: string, resultNodeId: string) => {
+  const pollImageStatus = useCallback(async (taskId: string, resultNodeId: string, source: "freepik-image" | "freepik-upscale" = "freepik-image", mode?: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke("freepik-image", {
-        body: { action: "status", taskId },
+      const { data, error } = await supabase.functions.invoke(source, {
+        body: { action: "status", taskId, mode },
       });
 
       if (error) throw error;
@@ -161,7 +191,7 @@ const FreepikWorkflowInner = () => {
           )
         );
         setIsRunning(false);
-        toast.success("Immagine generata!");
+        toast.success(source === "freepik-upscale" ? "Immagine upscalata!" : "Immagine generata!");
       } else if (data?.data?.status === "FAILED") {
         if (pollingRef.current) clearInterval(pollingRef.current);
         setNodes((nds) =>
@@ -222,10 +252,88 @@ const FreepikWorkflowInner = () => {
     setIsRunning(true);
     toast.info("Esecuzione workflow in corso...");
     
-    // Find instructions node and its connected result node
+    // Check for upscaler workflow first (Input -> Upscaler -> Result)
+    const upscalerNodes = nodes.filter((n) => n.type === "upscaler");
+    const resultNodes = nodes.filter((n) => n.type === "imageResult" || n.type === "videoResult");
+    
+    // Find upscaler connected to a result
+    for (const resultNode of resultNodes) {
+      const upscalerInfo = findUpscalerNode(resultNode.id);
+      if (upscalerInfo) {
+        // Execute upscaling workflow
+        const upscalerData = upscalerInfo.node.data as unknown as UpscalerNodeData;
+        
+        setNodes((nds) =>
+          nds.map((n) =>
+            n.id === resultNode.id
+              ? { ...n, data: { ...n.data, status: "generating" } }
+              : n
+          )
+        );
+
+        try {
+          // Convert image URL to base64 for upscaling
+          const response = await fetch(upscalerInfo.inputImageUrl);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          
+          reader.onloadend = async () => {
+            const base64 = (reader.result as string).split(",")[1];
+            
+            const body: any = {
+              image: base64,
+              scaleFactor: upscalerData.scaleFactor || "2x",
+              mode: upscalerData.mode || "creative",
+              optimizedFor: upscalerData.optimizedFor || "standard",
+            };
+            
+            if (upscalerData.mode === "creative") {
+              body.creativity = upscalerData.creativity || 0;
+            }
+
+            const { data, error } = await supabase.functions.invoke("freepik-upscale", { body });
+
+            if (error) throw error;
+
+            if (data?.data?.task_id) {
+              pollingRef.current = setInterval(() => {
+                pollImageStatus(data.data.task_id, resultNode.id, "freepik-upscale", upscalerData.mode);
+              }, 4000);
+            } else if (data?.data?.generated?.[0]?.url) {
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === resultNode.id
+                    ? { ...n, data: { ...n.data, status: "completed", imageUrl: data.data.generated[0].url } }
+                    : n
+                )
+              );
+              setIsRunning(false);
+              toast.success("Immagine upscalata!");
+            }
+          };
+          
+          reader.readAsDataURL(blob);
+          return; // Exit after starting upscale workflow
+        } catch (err: any) {
+          console.error("Upscale error:", err);
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === resultNode.id
+                ? { ...n, data: { ...n.data, status: "error", error: err.message } }
+                : n
+            )
+          );
+          setIsRunning(false);
+          toast.error("Errore nell'upscaling");
+          return;
+        }
+      }
+    }
+
+    // Standard instructions workflow
     const instructionsNode = nodes.find((n) => n.type === "instructions");
     if (!instructionsNode) {
-      toast.error("Aggiungi un nodo Instructions per eseguire il workflow");
+      toast.error("Aggiungi un nodo Instructions o Upscaler per eseguire il workflow");
       setIsRunning(false);
       return;
     }

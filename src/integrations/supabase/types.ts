@@ -20,9 +20,11 @@ export type Database = {
           description: string | null
           edges: Json
           id: string
+          is_public: boolean
           is_template: boolean
           name: string
           nodes: Json
+          share_code: string | null
           updated_at: string
           user_id: string
         }
@@ -31,9 +33,11 @@ export type Database = {
           description?: string | null
           edges?: Json
           id?: string
+          is_public?: boolean
           is_template?: boolean
           name: string
           nodes?: Json
+          share_code?: string | null
           updated_at?: string
           user_id: string
         }
@@ -42,9 +46,11 @@ export type Database = {
           description?: string | null
           edges?: Json
           id?: string
+          is_public?: boolean
           is_template?: boolean
           name?: string
           nodes?: Json
+          share_code?: string | null
           updated_at?: string
           user_id?: string
         }

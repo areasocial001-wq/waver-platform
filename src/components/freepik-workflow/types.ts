@@ -19,6 +19,14 @@ export interface InstructionsNodeData extends Record<string, unknown> {
   aspectRatio: string;
 }
 
+export interface UpscalerNodeData extends Record<string, unknown> {
+  label: string;
+  mode: "creative" | "precision";
+  scaleFactor: string;
+  optimizedFor: string;
+  creativity: number;
+}
+
 export interface ImageResultNodeData extends Record<string, unknown> {
   label: string;
   imageUrl?: string;
@@ -38,6 +46,7 @@ export type WorkflowNodeData =
   | ImageInputNodeData 
   | NoteNodeData 
   | InstructionsNodeData 
+  | UpscalerNodeData
   | ImageResultNodeData
   | VideoResultNodeData;
 
@@ -50,6 +59,7 @@ export const NODE_TYPES = {
   imageInput: "imageInput",
   note: "note",
   instructions: "instructions",
+  upscaler: "upscaler",
   imageResult: "imageResult",
   videoResult: "videoResult",
 } as const;
