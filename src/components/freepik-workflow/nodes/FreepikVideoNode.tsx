@@ -1,17 +1,19 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Handle, Position, NodeProps, useReactFlow } from "@xyflow/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video } from "lucide-react";
+import { Video, Upload, X, ImageIcon } from "lucide-react";
 import { FreepikVideoNodeData } from "../types";
 
 const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
   const nodeData = data as unknown as FreepikVideoNodeData;
   const { setNodes } = useReactFlow();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const updateNodeData = useCallback((field: string, value: string | number) => {
+  const updateNodeData = useCallback((field: string, value: string | number | undefined) => {
     setNodes((nds) =>
       nds.map((node) =>
         node.id === id
@@ -20,6 +22,50 @@ const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
       )
     );
   }, [id, setNodes]);
+
+  const handleLastFrameUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const imageUrl = event.target?.result as string;
+      setNodes((nds) =>
+        nds.map((node) =>
+          node.id === id
+            ? { 
+                ...node, 
+                data: { 
+                  ...node.data, 
+                  lastFrameImageUrl: imageUrl,
+                  lastFrameFileName: file.name 
+                } 
+              }
+            : node
+        )
+      );
+    };
+    reader.readAsDataURL(file);
+  }, [id, setNodes]);
+
+  const clearLastFrame = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === id
+          ? { 
+              ...node, 
+              data: { 
+                ...node.data, 
+                lastFrameImageUrl: undefined,
+                lastFrameFileName: undefined 
+              } 
+            }
+          : node
+      )
+    );
+  }, [id, setNodes]);
+
+  const isMinimax = nodeData.model === "minimax";
 
   return (
     <Card className="w-72 bg-cyan-500/10 backdrop-blur border-cyan-500/30 shadow-lg shadow-cyan-500/10">
@@ -45,7 +91,13 @@ const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
             <Label className="text-xs text-muted-foreground">Modello</Label>
             <Select
               value={nodeData.model || "kling"}
-              onValueChange={(v) => updateNodeData("model", v)}
+              onValueChange={(v) => {
+                updateNodeData("model", v);
+                // Clear last frame if switching away from minimax
+                if (v !== "minimax" && nodeData.lastFrameImageUrl) {
+                  clearLastFrame();
+                }
+              }}
             >
               <SelectTrigger className="h-8 text-xs bg-background/50">
                 <SelectValue />
@@ -74,6 +126,53 @@ const FreepikVideoNode = memo(({ id, data }: NodeProps) => {
             </Select>
           </div>
         </div>
+
+        {/* Last Frame Image - Only for MiniMax */}
+        {isMinimax && (
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Last Frame (opzionale)</Label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLastFrameUpload}
+            />
+            {nodeData.lastFrameImageUrl ? (
+              <div className="relative">
+                <img
+                  src={nodeData.lastFrameImageUrl}
+                  alt="Last frame"
+                  className="w-full h-16 object-cover rounded-md border border-border/50"
+                />
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute -top-1 -right-1 h-5 w-5"
+                  onClick={clearLastFrame}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-1 truncate">
+                  {nodeData.lastFrameFileName}
+                </p>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-8 text-xs"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <ImageIcon className="h-3 w-3 mr-1" />
+                Carica Last Frame
+              </Button>
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              Solo MiniMax supporta l'immagine finale
+            </p>
+          </div>
+        )}
 
         <p className="text-[10px] text-muted-foreground">
           Collega un Input Image per image-to-video, o lascia vuoto per text-to-video.

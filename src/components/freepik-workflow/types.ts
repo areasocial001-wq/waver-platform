@@ -32,6 +32,8 @@ export interface FreepikVideoNodeData extends Record<string, unknown> {
   prompt: string;
   model: "kling" | "minimax";
   duration: number;
+  lastFrameImageUrl?: string;
+  lastFrameFileName?: string;
 }
 
 export interface ImageResultNodeData extends Record<string, unknown> {
