@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { usePushNotifications } from "./usePushNotifications";
+import { apiLogger } from "@/lib/apiLogger";
 
 interface VideoGeneration {
   id: string;
@@ -181,6 +182,12 @@ export const useVideoPolling = (
               })
               .eq("id", gen.id);
             
+            // Log success
+            await apiLogger.success("Replicate", "Video Generation", `Video completato: ${gen.prompt?.slice(0, 50)}...`, {
+              videoId: gen.id,
+              predictionId: gen.prediction_id
+            });
+            
             // Show toast notification if we haven't already
             if (!notifiedVideos.current.has(gen.id)) {
               notifiedVideos.current.add(gen.id);
@@ -222,9 +229,25 @@ export const useVideoPolling = (
               })
               .eq("id", gen.id);
             
+            // Log error
+            await apiLogger.error("Replicate", "Video Generation", data.error || "Generation failed", {
+              videoId: gen.id,
+              predictionId: gen.prediction_id,
+              retryable: data.retryable
+            });
+            
             // Show error toast with retry option if applicable
             if (!notifiedVideos.current.has(gen.id)) {
               notifiedVideos.current.add(gen.id);
+              
+              // Push notification for failures
+              if (pushEnabled && document.hidden) {
+                showNotification(
+                  "Generazione Fallita ❌",
+                  data.error || "Si è verificato un errore",
+                  { videoId: gen.id }
+                );
+              }
               
               if (data.retryable) {
                 toast.error("Modello AI sovraccarico", {
