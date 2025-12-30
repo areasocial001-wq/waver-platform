@@ -1,0 +1,153 @@
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { 
+  Image, 
+  StickyNote, 
+  Sparkles, 
+  ImageIcon, 
+  Video,
+  Play,
+  Trash2,
+  Download,
+  ZoomIn,
+  ZoomOut,
+  Maximize2
+} from "lucide-react";
+import { NodeTypeKey } from "./types";
+
+interface WorkflowToolbarProps {
+  onAddNode: (type: NodeTypeKey) => void;
+  onRunWorkflow: () => void;
+  onClearCanvas: () => void;
+  onExport: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onFitView: () => void;
+  isRunning: boolean;
+}
+
+export const WorkflowToolbar = ({
+  onAddNode,
+  onRunWorkflow,
+  onClearCanvas,
+  onExport,
+  onZoomIn,
+  onZoomOut,
+  onFitView,
+  isRunning,
+}: WorkflowToolbarProps) => {
+  const nodeButtons = [
+    { type: "imageInput" as NodeTypeKey, icon: Image, label: "Input Image", color: "text-primary" },
+    { type: "note" as NodeTypeKey, icon: StickyNote, label: "Note", color: "text-amber-500" },
+    { type: "instructions" as NodeTypeKey, icon: Sparkles, label: "Instructions", color: "text-violet-500" },
+    { type: "imageResult" as NodeTypeKey, icon: ImageIcon, label: "Image Result", color: "text-emerald-500" },
+    { type: "videoResult" as NodeTypeKey, icon: Video, label: "Video Result", color: "text-blue-500" },
+  ];
+
+  return (
+    <TooltipProvider delayDuration={300}>
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-background/80 backdrop-blur-sm border border-border/50 rounded-lg p-2 shadow-lg">
+        {/* Node buttons */}
+        {nodeButtons.map(({ type, icon: Icon, label, color }) => (
+          <Tooltip key={type}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => onAddNode(type)}
+              >
+                <Icon className={`h-5 w-5 ${color}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>{label}</p>
+            </TooltipContent>
+          </Tooltip>
+        ))}
+
+        <Separator orientation="vertical" className="h-6" />
+
+        {/* Actions */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="default"
+              size="icon"
+              className="h-9 w-9"
+              onClick={onRunWorkflow}
+              disabled={isRunning}
+            >
+              <Play className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Esegui Workflow</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        {/* Zoom controls */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onZoomIn}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Zoom In</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onZoomOut}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Zoom Out</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onFitView}>
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Adatta Vista</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        {/* Clear & Export */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onExport}>
+              <Download className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Esporta</p>
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={onClearCanvas}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Pulisci Canvas</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </TooltipProvider>
+  );
+};

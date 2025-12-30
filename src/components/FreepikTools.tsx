@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
+import { FreepikWorkflow } from "./freepik-workflow/FreepikWorkflow";
 
 // Freepik API Disclaimer Component
 const FreepikDisclaimer = () => (
@@ -684,14 +685,18 @@ export const FreepikTools = () => {
           Freepik AI Tools
         </h2>
         <p className="text-muted-foreground">
-          Genera immagini, upscala e cerca contenuti stock
+          Genera immagini, upscala, cerca contenuti stock e crea workflow AI
         </p>
       </div>
 
       <FreepikDisclaimer />
 
-      <Tabs defaultValue="mystic" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+      <Tabs defaultValue="workflow" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="workflow" className="flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Workflow</span>
+          </TabsTrigger>
           <TabsTrigger value="mystic" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             <span className="hidden sm:inline">Mystic</span>
@@ -705,6 +710,10 @@ export const FreepikTools = () => {
             <span className="hidden sm:inline">Stock</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="workflow" className="mt-6">
+          <FreepikWorkflow />
+        </TabsContent>
 
         <TabsContent value="mystic" className="mt-6">
           <MysticImageGenerator />
