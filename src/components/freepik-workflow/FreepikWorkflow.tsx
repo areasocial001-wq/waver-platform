@@ -425,7 +425,7 @@ const FreepikWorkflowInner = () => {
             model: videoData.model || "kling",
           };
 
-          // If there's an input image, convert to base64
+          // If there's an input image from connected node, convert to base64
           if (freepikVideoInfo.inputImageUrl) {
             const response = await fetch(freepikVideoInfo.inputImageUrl);
             const blob = await response.blob();
@@ -435,6 +435,15 @@ const FreepikWorkflowInner = () => {
               reader.readAsDataURL(blob);
             });
             body.firstFrameImage = base64;
+          }
+
+          // If there's a last frame image (MiniMax only), add it
+          if (videoData.model === "minimax" && videoData.lastFrameImageUrl) {
+            // Last frame is already base64 from file upload
+            const base64Data = videoData.lastFrameImageUrl.split(",")[1];
+            if (base64Data) {
+              body.lastFrameImage = base64Data;
+            }
           }
 
           const { data, error } = await supabase.functions.invoke("freepik-video", { body });
