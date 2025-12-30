@@ -47,7 +47,7 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* Custom gradients for Waver */
+    /* Custom gradients for AI Production Hub */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(270 60% 50%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(25 95% 55%) 0%, hsl(340 82% 60%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(217 91% 50% / 0.1) 0%, hsl(270 60% 50% / 0.1) 50%, hsl(25 95% 55% / 0.1) 100%);
@@ -96,7 +96,7 @@ All colors MUST be HSL.
     --sidebar-border: 224 30% 18%;
     --sidebar-ring: 217 91% 60%;
 
-    /* Custom gradients for Waver */
+    /* Custom gradients for AI Production Hub */
     --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%) 0%, hsl(270 60% 55%) 100%);
     --gradient-accent: linear-gradient(135deg, hsl(25 95% 63%) 0%, hsl(340 82% 65%) 100%);
     --gradient-hero: linear-gradient(135deg, hsl(217 91% 60% / 0.1) 0%, hsl(270 60% 55% / 0.1) 50%, hsl(25 95% 63% / 0.1) 100%);
