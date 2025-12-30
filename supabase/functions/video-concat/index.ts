@@ -187,6 +187,14 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
+    // Handle health check requests
+    if (body.healthCheck) {
+      return new Response(
+        JSON.stringify({ status: 'ok', service: 'video-concat' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     // Validate input
     const parseResult = requestSchema.safeParse(body);
     if (!parseResult.success) {

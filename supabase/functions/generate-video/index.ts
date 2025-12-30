@@ -50,6 +50,14 @@ serve(async (req) => {
     body = await req.json();
     console.log("Generate video request:", body);
 
+    // Handle health check requests
+    if (body.healthCheck) {
+      return new Response(
+        JSON.stringify({ status: 'ok', service: 'generate-video', hasPiAPIKey: hasValidPiAPIKey }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Check if it's a polling request
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
