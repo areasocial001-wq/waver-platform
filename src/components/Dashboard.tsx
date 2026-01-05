@@ -20,6 +20,7 @@ import { ApiStatusWidget } from "./ApiStatusWidget";
 import { ApiUptimeChart } from "./ApiUptimeChart";
 import { ApiThresholdSettings } from "./ApiThresholdSettings";
 import { ApiMonitoringDashboard } from "./ApiMonitoringDashboard";
+import { ApiWeeklyUptimeChart } from "./ApiWeeklyUptimeChart";
 import { UsageCharts } from "./UsageCharts";
 import { LogViewer } from "./LogViewer";
 import { NotificationSettings } from "./NotificationSettings";
@@ -278,6 +279,11 @@ export const Dashboard = () => {
           isRefreshing={isRefreshing} 
           onRefresh={checkApiStatus} 
         />
+
+        {/* Weekly Uptime Chart */}
+        <div className="mb-6">
+          <ApiWeeklyUptimeChart />
+        </div>
 
         {/* Usage Charts and Threshold Settings */}
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
