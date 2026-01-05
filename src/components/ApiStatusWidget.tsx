@@ -1,4 +1,3 @@
-import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,207 +11,17 @@ import {
   Loader2,
   RotateCcw
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-
-interface ApiStatus {
-  name: string;
-  status: "online" | "offline" | "degraded" | "checking" | "retrying";
-  lastCheck: Date | null;
-  responseTime?: number;
-  description: string;
-  retryCount: number;
-  nextRetryIn?: number;
-}
+import { ApiStatus } from "@/hooks/useApiMonitoring";
 
 const MAX_RETRIES = 3;
-const BASE_DELAY = 2000; // 2 seconds
 
-export const ApiStatusWidget = () => {
-  const [apis, setApis] = useState<ApiStatus[]>([
-    { name: "Replicate", status: "checking", lastCheck: null, description: "Video AI Generation", retryCount: 0 },
-    { name: "Freepik", status: "checking", lastCheck: null, description: "Image Generation", retryCount: 0 },
-    { name: "Shotstack", status: "checking", lastCheck: null, description: "Video Concat", retryCount: 0 },
-    { name: "ElevenLabs", status: "checking", lastCheck: null, description: "Audio/TTS", retryCount: 0 },
-  ]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const retryTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+interface ApiStatusWidgetProps {
+  apis: ApiStatus[];
+  isRefreshing: boolean;
+  onRefresh: () => void;
+}
 
-  // Exponential backoff delay calculation
-  const getBackoffDelay = (retryCount: number): number => {
-    return Math.min(BASE_DELAY * Math.pow(2, retryCount), 30000); // Max 30 seconds
-  };
-
-  const checkSingleApi = useCallback(async (apiName: string): Promise<Partial<ApiStatus>> => {
-    const apiStartTime = Date.now();
-    let status: "online" | "offline" | "degraded" = "online";
-    let responseTime = 0;
-
-    try {
-      let result;
-      switch (apiName) {
-        case "Replicate":
-          result = await supabase.functions.invoke("generate-video", {
-            body: { healthCheck: true }
-          });
-          break;
-        case "Freepik":
-          result = await supabase.functions.invoke("freepik-image", {
-            body: { healthCheck: true }
-          });
-          break;
-        case "Shotstack":
-          result = await supabase.functions.invoke("video-concat", {
-            body: { healthCheck: true }
-          });
-          break;
-        case "ElevenLabs":
-          result = await supabase.functions.invoke("elevenlabs-tts", {
-            body: { healthCheck: true }
-          });
-          break;
-      }
-      
-      responseTime = Date.now() - apiStartTime;
-      status = result?.error ? "degraded" : "online";
-    } catch {
-      status = "offline";
-      responseTime = Date.now() - apiStartTime;
-    }
-
-    return { status, responseTime, lastCheck: new Date() };
-  }, []);
-
-  const retryApiCheck = useCallback(async (apiName: string, currentRetryCount: number) => {
-    if (currentRetryCount >= MAX_RETRIES) {
-      // Max retries reached, mark as offline
-      setApis(prev => prev.map(api => 
-        api.name === apiName 
-          ? { ...api, status: "offline" as const, retryCount: currentRetryCount, nextRetryIn: undefined }
-          : api
-      ));
-      toast.error(`${apiName}: Connessione fallita dopo ${MAX_RETRIES} tentativi`);
-      return;
-    }
-
-    const delay = getBackoffDelay(currentRetryCount);
-    
-    // Update status to retrying with countdown
-    setApis(prev => prev.map(api => 
-      api.name === apiName 
-        ? { ...api, status: "retrying" as const, retryCount: currentRetryCount, nextRetryIn: delay / 1000 }
-        : api
-    ));
-
-    // Countdown timer
-    let remainingTime = delay / 1000;
-    const countdownInterval = setInterval(() => {
-      remainingTime -= 1;
-      if (remainingTime > 0) {
-        setApis(prev => prev.map(api => 
-          api.name === apiName 
-            ? { ...api, nextRetryIn: remainingTime }
-            : api
-        ));
-      }
-    }, 1000);
-
-    // Schedule retry
-    const timeout = setTimeout(async () => {
-      clearInterval(countdownInterval);
-      
-      setApis(prev => prev.map(api => 
-        api.name === apiName 
-          ? { ...api, status: "checking" as const, nextRetryIn: undefined }
-          : api
-      ));
-
-      const result = await checkSingleApi(apiName);
-      
-      if (result.status === "offline" || result.status === "degraded") {
-        // Retry again with incremented count
-        retryApiCheck(apiName, currentRetryCount + 1);
-      } else {
-        // Success!
-        setApis(prev => prev.map(api => 
-          api.name === apiName 
-            ? { ...api, ...result, retryCount: 0, nextRetryIn: undefined }
-            : api
-        ));
-        if (currentRetryCount > 0) {
-          toast.success(`${apiName}: Connessione ripristinata`);
-        }
-      }
-    }, delay);
-
-    retryTimeouts.current.set(apiName, timeout);
-  }, [checkSingleApi]);
-
-  const checkApiStatus = useCallback(async () => {
-    // Clear any pending retries
-    retryTimeouts.current.forEach(timeout => clearTimeout(timeout));
-    retryTimeouts.current.clear();
-
-    setIsRefreshing(true);
-    
-    // Set all to checking
-    setApis(prev => prev.map(api => ({ 
-      ...api, 
-      status: "checking" as const, 
-      retryCount: 0, 
-      nextRetryIn: undefined 
-    })));
-
-    const results = await Promise.all(
-      apis.map(async (api) => {
-        const result = await checkSingleApi(api.name);
-        return { name: api.name, ...result };
-      })
-    );
-
-    // Update with results and start retries for failed ones
-    setApis(prev => prev.map(api => {
-      const result = results.find(r => r.name === api.name);
-      return {
-        ...api,
-        status: result?.status || "offline",
-        responseTime: result?.responseTime,
-        lastCheck: result?.lastCheck || new Date(),
-        retryCount: 0,
-        nextRetryIn: undefined
-      };
-    }));
-
-    // Start retry for failed APIs
-    results.forEach(result => {
-      if (result.status === "offline" || result.status === "degraded") {
-        retryApiCheck(result.name, 0);
-      }
-    });
-
-    setIsRefreshing(false);
-  }, [apis, checkSingleApi, retryApiCheck]);
-
-  useEffect(() => {
-    // Initial check
-    checkApiStatus();
-    
-    // Check every 5 minutes
-    const interval = setInterval(checkApiStatus, 5 * 60 * 1000);
-    
-    return () => {
-      clearInterval(interval);
-      retryTimeouts.current.forEach(timeout => clearTimeout(timeout));
-    };
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      retryTimeouts.current.forEach(timeout => clearTimeout(timeout));
-    };
-  }, []);
-
+export const ApiStatusWidget = ({ apis, isRefreshing, onRefresh }: ApiStatusWidgetProps) => {
   const getStatusIcon = (api: ApiStatus) => {
     switch (api.status) {
       case "online":
@@ -347,7 +156,7 @@ export const ApiStatusWidget = () => {
           <Button 
             variant="ghost" 
             size="sm" 
-            onClick={checkApiStatus}
+            onClick={onRefresh}
             disabled={isRefreshing}
           >
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />

@@ -17,9 +17,12 @@ import {
   Loader2
 } from "lucide-react";
 import { ApiStatusWidget } from "./ApiStatusWidget";
+import { ApiUptimeChart } from "./ApiUptimeChart";
+import { ApiThresholdSettings } from "./ApiThresholdSettings";
 import { UsageCharts } from "./UsageCharts";
 import { LogViewer } from "./LogViewer";
 import { NotificationSettings } from "./NotificationSettings";
+import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 
 interface Stats {
   totalVideos: number;
@@ -47,6 +50,17 @@ export const Dashboard = () => {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
+  
+  const {
+    apis,
+    isRefreshing,
+    thresholds,
+    notifyOnChange,
+    history,
+    loadingHistory,
+    checkApiStatus,
+    saveSettings,
+  } = useApiMonitoring();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -256,10 +270,22 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* Charts and API Status */}
+        {/* API Status and Uptime Chart */}
         <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          <UsageCharts />
-          <ApiStatusWidget />
+          <ApiStatusWidget apis={apis} isRefreshing={isRefreshing} onRefresh={checkApiStatus} />
+          <ApiUptimeChart history={history} loading={loadingHistory} />
+        </div>
+
+        {/* Usage Charts and Threshold Settings */}
+        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <UsageCharts />
+          </div>
+          <ApiThresholdSettings 
+            thresholds={thresholds} 
+            notifyOnChange={notifyOnChange} 
+            onSave={saveSettings} 
+          />
         </div>
 
         {/* Logs and Notifications */}
