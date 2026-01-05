@@ -11,6 +11,7 @@ import MyStoryboards from "./pages/MyStoryboards";
 import ViewStoryboard from "./pages/ViewStoryboard";
 import ContentGenerator from "./pages/ContentGenerator";
 import FreepikPage from "./pages/FreepikPage";
+import ApiMonitoring from "./pages/ApiMonitoring";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/storyboard/:id" element={<ViewStoryboard />} />
             <Route path="/content-generator" element={<ContentGenerator />} />
             <Route path="/freepik" element={<FreepikPage />} />
+            <Route path="/api-monitoring" element={<ApiMonitoring />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

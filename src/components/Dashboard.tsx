@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { 
   Video, 
@@ -14,16 +15,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Loader2
+  Loader2,
+  ArrowRight
 } from "lucide-react";
 import { ApiStatusWidget } from "./ApiStatusWidget";
-import { ApiUptimeChart } from "./ApiUptimeChart";
-import { ApiThresholdSettings } from "./ApiThresholdSettings";
-import { ApiMonitoringDashboard } from "./ApiMonitoringDashboard";
-import { ApiWeeklyUptimeChart } from "./ApiWeeklyUptimeChart";
-import { UsageCharts } from "./UsageCharts";
-import { LogViewer } from "./LogViewer";
-import { NotificationSettings } from "./NotificationSettings";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 
 interface Stats {
@@ -53,16 +48,7 @@ export const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   
-  const {
-    apis,
-    isRefreshing,
-    thresholds,
-    notifyOnChange,
-    history,
-    loadingHistory,
-    checkApiStatus,
-    saveSettings,
-  } = useApiMonitoring();
+  const { apis, isRefreshing, checkApiStatus } = useApiMonitoring();
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -127,6 +113,9 @@ export const Dashboard = () => {
       minute: "2-digit"
     });
   };
+
+  const onlineApis = apis.filter(a => a.status === "online").length;
+  const totalApis = apis.length;
 
   const quickActions = [
     { 
@@ -272,41 +261,80 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* Full API Monitoring Dashboard */}
-        <ApiMonitoringDashboard 
-          apis={apis} 
-          history={history} 
-          isRefreshing={isRefreshing} 
-          onRefresh={checkApiStatus} 
-        />
+        {/* API Monitoring Widget + Recent Activity */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          {/* API Status Widget */}
+          <Card className="bg-card/50 border-border/50">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-primary" />
+                  Monitoraggio API in Tempo Reale
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs h-7"
+                  onClick={() => navigate("/api-monitoring")}
+                >
+                  Dettagli
+                  <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+              <CardDescription className="text-xs">
+                Stato delle API e servizi esterni
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${onlineApis === totalApis ? 'bg-green-500' : onlineApis > 0 ? 'bg-yellow-500' : 'bg-destructive'} animate-pulse`} />
+                  <span className="text-sm font-medium">
+                    {onlineApis}/{totalApis} Online
+                  </span>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 text-xs"
+                  onClick={checkApiStatus}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    "Aggiorna"
+                  )}
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {apis.map((api) => (
+                  <div 
+                    key={api.name}
+                    className="flex items-center justify-between p-2 rounded-lg bg-background/50"
+                  >
+                    <span className="text-xs font-medium">{api.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {api.responseTime && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {api.responseTime}ms
+                        </span>
+                      )}
+                      <div className={`w-2 h-2 rounded-full ${
+                        api.status === "online" ? "bg-green-500" :
+                        api.status === "degraded" ? "bg-yellow-500" :
+                        api.status === "offline" ? "bg-destructive" :
+                        api.status === "retrying" ? "bg-orange-500" :
+                        "bg-muted-foreground"
+                      }`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Weekly Uptime Chart */}
-        <div className="mb-6">
-          <ApiWeeklyUptimeChart />
-        </div>
-
-        {/* Usage Charts and Threshold Settings */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
-            <UsageCharts />
-          </div>
-          <ApiThresholdSettings 
-            thresholds={thresholds} 
-            notifyOnChange={notifyOnChange} 
-            onSave={saveSettings} 
-          />
-        </div>
-
-        {/* Logs and Notifications */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
-            <LogViewer />
-          </div>
-          <NotificationSettings />
-        </div>
-
-        {/* Recent Activity and System Info */}
-        <div className="grid md:grid-cols-2 gap-6">
+          {/* Recent Activity */}
           <Card className="bg-card/50 border-border/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -352,40 +380,41 @@ export const Dashboard = () => {
               )}
             </CardContent>
           </Card>
-
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Database className="w-4 h-4 text-primary" />
-                Sistema
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
-                  <span className="text-xs">Provider Video</span>
-                  <span className="text-xs font-medium text-primary">Replicate</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
-                  <span className="text-xs">Modello AI</span>
-                  <span className="text-xs font-medium text-primary">Waver 1.0</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
-                  <span className="text-xs">Risoluzione Max</span>
-                  <span className="text-xs font-medium">1080p</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
-                  <span className="text-xs">Durata Max</span>
-                  <span className="text-xs font-medium">10s</span>
-                </div>
-                <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
-                  <span className="text-xs">Concat Engine</span>
-                  <span className="text-xs font-medium text-primary">Shotstack</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
+
+        {/* System Info */}
+        <Card className="bg-card/50 border-border/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary" />
+              Sistema
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                <span className="text-xs">Provider Video</span>
+                <span className="text-xs font-medium text-primary">Replicate</span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                <span className="text-xs">Modello AI</span>
+                <span className="text-xs font-medium text-primary">Waver 1.0</span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                <span className="text-xs">Risoluzione Max</span>
+                <span className="text-xs font-medium">1080p</span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                <span className="text-xs">Durata Max</span>
+                <span className="text-xs font-medium">10s</span>
+              </div>
+              <div className="flex justify-between items-center p-2 rounded-lg bg-background/50">
+                <span className="text-xs">Concat Engine</span>
+                <span className="text-xs font-medium text-primary">Shotstack</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </section>
   );

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2 } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -26,6 +26,7 @@ export const Navbar = () => {
   const isStoryboardsPage = location.pathname === "/my-storyboards";
   const isContentGeneratorPage = location.pathname === "/content-generator";
   const isFreepikPage = location.pathname === "/freepik";
+  const isApiMonitoringPage = location.pathname === "/api-monitoring";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -69,7 +70,7 @@ export const Navbar = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.email}
           </span>
-          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage ? (
+          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage ? (
             <Button
               variant="outline"
               size="sm"
@@ -116,6 +117,15 @@ export const Navbar = () => {
               >
                 <Wand2 className="w-4 h-4 mr-2" />
                 Freepik
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/api-monitoring")}
+                className="bg-card hover:bg-accent text-foreground border-border"
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                API
               </Button>
             </>
           )}
