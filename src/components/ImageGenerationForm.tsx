@@ -178,9 +178,29 @@ type SortOption = "name" | "popularity" | "category";
 // Sample image for filter previews (gradient placeholder)
 const PREVIEW_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40' viewBox='0 0 60 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23ff6b6b'/%3E%3Cstop offset='33%25' stop-color='%23feca57'/%3E%3Cstop offset='66%25' stop-color='%2354a0ff'/%3E%3Cstop offset='100%25' stop-color='%235f27cd'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='60' height='40'/%3E%3Ccircle cx='20' cy='15' r='6' fill='%23fff' opacity='0.8'/%3E%3Cpath d='M5 35 L20 20 L30 28 L45 15 L55 25 L55 40 L5 40 Z' fill='%23228B22' opacity='0.7'/%3E%3C/svg%3E";
 
+// Provider and model types
+type ImageProvider = "replicate" | "piapi";
+interface ModelOption {
+  id: string;
+  name: string;
+  provider: ImageProvider;
+  description: string;
+}
+
+const imageModels: ModelOption[] = [
+  // Replicate models
+  { id: "black-forest-labs/flux-schnell", name: "Flux Schnell", provider: "replicate", description: "Veloce" },
+  { id: "black-forest-labs/flux-dev", name: "Flux Dev", provider: "replicate", description: "Alta Qualità" },
+  // PIAPI models
+  { id: "flux", name: "PIAPI Flux.1", provider: "piapi", description: "Versatile" },
+  { id: "qwen", name: "Qwen Image", provider: "piapi", description: "Creativo" },
+  { id: "nano-banana", name: "Nano Banana", provider: "piapi", description: "Artistico" },
+];
+
 export const ImageGenerationForm = () => {
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [provider, setProvider] = useState<ImageProvider>("replicate");
   const [model, setModel] = useState("black-forest-labs/flux-schnell");
   const [isLoading, setIsLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -842,32 +862,88 @@ export const ImageGenerationForm = () => {
         }
       } else {
         // Standard image generation
-        console.log("Calling generate-image function with:", { prompt, aspectRatio, model });
+        if (provider === "piapi") {
+          // PIAPI image generation
+          console.log("Calling piapi-image function with:", { prompt, aspectRatio, model });
+          
+          const { data, error } = await supabase.functions.invoke('piapi-image', {
+            body: { 
+              prompt,
+              aspectRatio,
+              model
+            }
+          });
 
-        const { data, error } = await supabase.functions.invoke('generate-image', {
-          body: { 
-            prompt,
-            aspectRatio,
-            model,
-            outputFormat: "webp",
-            outputQuality: 90
+          if (error) {
+            console.error("PIAPI edge function error:", error);
+            throw error;
           }
-        });
 
-        if (error) {
-          console.error("Edge function error:", error);
-          throw error;
-        }
+          if (data?.error) {
+            throw new Error(data.error);
+          }
 
-        if (data?.error) {
-          throw new Error(data.error);
-        }
-
-        if (data?.imageUrl) {
-          setGeneratedImage(data.imageUrl);
-          toast.success("Immagine generata con successo!");
+          if (data?.taskId) {
+            // Poll for result
+            toast.info("Generazione avviata, attendere...");
+            let attempts = 0;
+            const maxAttempts = 60;
+            
+            while (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              
+              const { data: statusData, error: statusError } = await supabase.functions.invoke('piapi-image', {
+                body: { action: "status", taskId: data.taskId }
+              });
+              
+              if (statusError) throw statusError;
+              
+              if (statusData?.status === "completed" && statusData?.imageUrl) {
+                setGeneratedImage(statusData.imageUrl);
+                toast.success("Immagine generata con successo!");
+                break;
+              } else if (statusData?.status === "failed") {
+                throw new Error(statusData?.error || "Generazione fallita");
+              }
+              
+              attempts++;
+            }
+            
+            if (attempts >= maxAttempts) {
+              throw new Error("Timeout nella generazione");
+            }
+          } else {
+            throw new Error("Nessun taskId ricevuto");
+          }
         } else {
-          throw new Error("Nessun URL immagine ricevuto");
+          // Replicate image generation
+          console.log("Calling generate-image function with:", { prompt, aspectRatio, model });
+
+          const { data, error } = await supabase.functions.invoke('generate-image', {
+            body: { 
+              prompt,
+              aspectRatio,
+              model,
+              outputFormat: "webp",
+              outputQuality: 90
+            }
+          });
+
+          if (error) {
+            console.error("Edge function error:", error);
+            throw error;
+          }
+
+          if (data?.error) {
+            throw new Error(data.error);
+          }
+
+          if (data?.imageUrl) {
+            setGeneratedImage(data.imageUrl);
+            toast.success("Immagine generata con successo!");
+          } else {
+            throw new Error("Nessun URL immagine ricevuto");
+          }
         }
       }
 
@@ -1817,34 +1893,74 @@ export const ImageGenerationForm = () => {
         </div>
 
         {!referenceImage && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="aspectRatio">Aspect Ratio</Label>
-              <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                <SelectTrigger id="aspectRatio" className="bg-background/50 border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1:1">Quadrato (1:1)</SelectItem>
-                  <SelectItem value="16:9">Panoramico (16:9)</SelectItem>
-                  <SelectItem value="9:16">Verticale (9:16)</SelectItem>
-                  <SelectItem value="4:3">Standard (4:3)</SelectItem>
-                  <SelectItem value="3:4">Ritratto (3:4)</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="space-y-4">
+            {/* Provider Selector */}
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setProvider("replicate");
+                  setModel("black-forest-labs/flux-schnell");
+                }}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  provider === "replicate" 
+                    ? "border-primary bg-primary/10" 
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                <div className="text-sm font-medium">Replicate</div>
+                <div className="text-xs text-muted-foreground">Flux AI Models</div>
+              </button>
+              <button
+                onClick={() => {
+                  setProvider("piapi");
+                  setModel("flux");
+                }}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  provider === "piapi" 
+                    ? "border-accent bg-accent/10" 
+                    : "border-border hover:border-accent/50"
+                }`}
+              >
+                <div className="text-sm font-medium">PIAPI</div>
+                <div className="text-xs text-muted-foreground">Flux.1, Qwen, Nano</div>
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="model">Modello</Label>
-              <Select value={model} onValueChange={setModel}>
-                <SelectTrigger id="model" className="bg-background/50 border-border">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="black-forest-labs/flux-schnell">Flux Schnell (Veloce)</SelectItem>
-                  <SelectItem value="black-forest-labs/flux-dev">Flux Dev (Qualità Alta)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="aspectRatio">Aspect Ratio</Label>
+                <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                  <SelectTrigger id="aspectRatio" className="bg-background/50 border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1:1">Quadrato (1:1)</SelectItem>
+                    <SelectItem value="16:9">Panoramico (16:9)</SelectItem>
+                    <SelectItem value="9:16">Verticale (9:16)</SelectItem>
+                    <SelectItem value="4:3">Standard (4:3)</SelectItem>
+                    <SelectItem value="3:4">Ritratto (3:4)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="model">Modello ({provider === "replicate" ? "Replicate" : "PIAPI"})</Label>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger id="model" className="bg-background/50 border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {imageModels
+                      .filter(m => m.provider === provider)
+                      .map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name} ({m.description})
+                        </SelectItem>
+                      ))
+                    }
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         )}
@@ -1900,9 +2016,10 @@ export const ImageGenerationForm = () => {
 
         {!generatedImage && !isLoading && !referenceImage && (
           <p className="text-sm text-muted-foreground text-center">
+            Provider: <span className="font-medium text-foreground">{provider === "replicate" ? "Replicate" : "PIAPI"}</span> • 
             Aspect Ratio: <span className="font-medium text-foreground">{aspectRatio}</span> • 
             Modello: <span className="font-medium text-foreground">
-              {model === "black-forest-labs/flux-schnell" ? "Flux Schnell" : "Flux Dev"}
+              {imageModels.find(m => m.id === model)?.name || model}
             </span>
           </p>
         )}

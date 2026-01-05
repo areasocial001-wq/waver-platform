@@ -36,14 +36,20 @@ const DEFAULT_THRESHOLDS: ThresholdSettings = {
   Freepik: { warning: 1000, critical: 3000 },
   Shotstack: { warning: 1000, critical: 3000 },
   ElevenLabs: { warning: 1000, critical: 3000 },
+  "PIAPI Video": { warning: 1500, critical: 4000 },
+  "PIAPI Image": { warning: 1500, critical: 4000 },
+  "PIAPI Audio": { warning: 1500, critical: 4000 },
 };
 
 export const useApiMonitoring = () => {
   const [apis, setApis] = useState<ApiStatus[]>([
-    { name: "Replicate", status: "checking", lastCheck: null, description: "Video AI Generation", retryCount: 0 },
-    { name: "Freepik", status: "checking", lastCheck: null, description: "Image Generation", retryCount: 0 },
+    { name: "Replicate", status: "checking", lastCheck: null, description: "Video AI (Waver)", retryCount: 0 },
+    { name: "Freepik", status: "checking", lastCheck: null, description: "Image & Video", retryCount: 0 },
     { name: "Shotstack", status: "checking", lastCheck: null, description: "Video Concat", retryCount: 0 },
-    { name: "ElevenLabs", status: "checking", lastCheck: null, description: "Audio/TTS", retryCount: 0 },
+    { name: "ElevenLabs", status: "checking", lastCheck: null, description: "Audio/TTS/Music", retryCount: 0 },
+    { name: "PIAPI Video", status: "checking", lastCheck: null, description: "Kling/Hailuo/Luma/Sora", retryCount: 0 },
+    { name: "PIAPI Image", status: "checking", lastCheck: null, description: "Flux/Qwen/Nano", retryCount: 0 },
+    { name: "PIAPI Audio", status: "checking", lastCheck: null, description: "Udio/DiffRhythm", retryCount: 0 },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [thresholds, setThresholds] = useState<ThresholdSettings>(DEFAULT_THRESHOLDS);
@@ -215,6 +221,21 @@ export const useApiMonitoring = () => {
           break;
         case "ElevenLabs":
           result = await supabase.functions.invoke("elevenlabs-tts", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "PIAPI Video":
+          result = await supabase.functions.invoke("generate-video", {
+            body: { healthCheck: true, provider: "kling" }
+          });
+          break;
+        case "PIAPI Image":
+          result = await supabase.functions.invoke("piapi-image", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "PIAPI Audio":
+          result = await supabase.functions.invoke("piapi-audio", {
             body: { healthCheck: true }
           });
           break;
