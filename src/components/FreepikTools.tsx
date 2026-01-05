@@ -26,11 +26,13 @@ import {
   RefreshCw,
   ExternalLink,
   Filter,
-  Info
+  Info,
+  LayoutTemplate
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useImageGallery } from "@/contexts/ImageGalleryContext";
 import { FreepikWorkflow } from "./freepik-workflow/FreepikWorkflow";
+import { PiAPITemplates } from "./PiAPITemplates";
 
 // Freepik API Disclaimer Component
 const FreepikDisclaimer = () => (
@@ -709,6 +711,10 @@ export const FreepikTools = () => {
             <Search className="h-4 w-4" />
             <span className="hidden sm:inline">Stock</span>
           </TabsTrigger>
+          <TabsTrigger value="piapi-templates" className="flex items-center gap-2">
+            <LayoutTemplate className="h-4 w-4" />
+            <span className="hidden sm:inline">Templates</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="workflow" className="mt-6">
@@ -725,6 +731,10 @@ export const FreepikTools = () => {
 
         <TabsContent value="stock" className="mt-6">
           <StockLibrary />
+        </TabsContent>
+
+        <TabsContent value="piapi-templates" className="mt-6">
+          <PiAPITemplates />
         </TabsContent>
       </Tabs>
     </div>

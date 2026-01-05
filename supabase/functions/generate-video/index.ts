@@ -17,13 +17,20 @@ interface PiAPIModelConfig {
 }
 
 const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
+  // Kling models
   "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std" },
   "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std" },
   "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std" },
+  // Other video models
   "hailuo": { model: "hailuo" },
   "luma": { model: "luma" },
   "wan": { model: "wan" },
   "hunyuan": { model: "hunyuan" },
+  // New models from PIAPI Creator subscription
+  "skyreels": { model: "skyreels" },
+  "framepack": { model: "framepack" },
+  "veo3": { model: "veo3" },
+  "sora2": { model: "sora2" },
 };
 
 serve(async (req) => {

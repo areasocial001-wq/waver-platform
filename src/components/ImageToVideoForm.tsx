@@ -367,6 +367,30 @@ export const ImageToVideoForm = () => {
                 <span>PiAPI Hunyuan</span>
               </div>
             </SelectItem>
+            <SelectItem value="piapi-skyreels">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                <span>PiAPI Skyreels</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-framepack">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-teal-500" />
+                <span>PiAPI Framepack</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-veo3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span>PiAPI Veo 3.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-sora2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span>PiAPI Sora 2</span>
+              </div>
+            </SelectItem>
             <SelectItem value="freepik">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
@@ -383,6 +407,10 @@ export const ImageToVideoForm = () => {
           {preferredProvider === "piapi-luma" && "PiAPI Luma - Alta qualità cinematica"}
           {preferredProvider === "piapi-wan" && "PiAPI Wan - Modello Alibaba, ottimo per scene naturali"}
           {preferredProvider === "piapi-hunyuan" && "PiAPI Hunyuan - Modello Tencent, eccellente per volti"}
+          {preferredProvider === "piapi-skyreels" && "PiAPI Skyreels - Video cinematografici con effetti speciali"}
+          {preferredProvider === "piapi-framepack" && "PiAPI Framepack - Ottimo per animazioni fluide e interpolazione"}
+          {preferredProvider === "piapi-veo3" && "PiAPI Veo 3.1 - Google Veo via PiAPI gateway"}
+          {preferredProvider === "piapi-sora2" && "PiAPI Sora 2 - OpenAI Sora via PiAPI gateway"}
           {preferredProvider === "freepik" && "Freepik MiniMax - Veloce per transizioni sequenziali"}
         </p>
       </div>

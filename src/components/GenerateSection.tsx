@@ -6,7 +6,8 @@ import { ImageToVideoForm } from "./ImageToVideoForm";
 import { ImageGenerationForm } from "./ImageGenerationForm";
 import { StoryboardEditor } from "./StoryboardEditor";
 import { VideoToAudioForm } from "./VideoToAudioForm";
-import { Video, Image, Sparkles, Layout, Volume2 } from "lucide-react";
+import { PiAPIAudioGenerator } from "./PiAPIAudioGenerator";
+import { Video, Image, Sparkles, Layout, Volume2, Music } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -22,41 +23,48 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-5xl mx-auto grid-cols-5 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-6 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Video className="w-4 h-4" />
-              Text to Video
+              <span className="hidden md:inline">Text to Video</span>
             </TabsTrigger>
             <TabsTrigger 
               value="image" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Image className="w-4 h-4" />
-              Image to Video
+              <span className="hidden md:inline">Image to Video</span>
             </TabsTrigger>
             <TabsTrigger 
               value="video-audio" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground"
             >
               <Volume2 className="w-4 h-4" />
-              Video to Audio
+              <span className="hidden md:inline">Video to Audio</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="piapi-audio" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+            >
+              <Music className="w-4 h-4" />
+              <span className="hidden md:inline">AI Music</span>
             </TabsTrigger>
             <TabsTrigger 
               value="generate-image" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
             >
               <Sparkles className="w-4 h-4" />
-              Genera Immagini
+              <span className="hidden md:inline">Genera Immagini</span>
             </TabsTrigger>
             <TabsTrigger 
               value="storyboard" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Layout className="w-4 h-4" />
-              Storyboard
+              <span className="hidden md:inline">Storyboard</span>
             </TabsTrigger>
           </TabsList>
 
@@ -109,6 +117,10 @@ export const GenerateSection = () => {
                 <VideoToAudioForm />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="piapi-audio">
+            <PiAPIAudioGenerator />
           </TabsContent>
 
           <TabsContent value="generate-image">
