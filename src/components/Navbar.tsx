@@ -5,6 +5,7 @@ import { User } from "@supabase/supabase-js";
 import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
+import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,7 +62,10 @@ export const Navbar = () => {
           </h1>
         </button>
         
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* API Status Widget */}
+          <ApiStatusNavWidget />
+          
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.email}
           </span>
