@@ -7,8 +7,10 @@ import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { UsageCharts } from "@/components/UsageCharts";
 import { LogViewer } from "@/components/LogViewer";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { ApiAnalyticsDashboard } from "@/components/ApiAnalyticsDashboard";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 import { Activity } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function ApiMonitoring() {
   const {
@@ -36,41 +38,51 @@ export default function ApiMonitoring() {
             </p>
           </div>
 
-          {/* Full API Monitoring Dashboard */}
-          <ApiMonitoringDashboard 
-            apis={apis} 
-            history={history} 
-            isRefreshing={isRefreshing} 
-            onRefresh={checkApiStatus} 
-          />
+          <Tabs defaultValue="status" className="space-y-6">
+            <TabsList className="grid w-full max-w-md grid-cols-3">
+              <TabsTrigger value="status">Stato</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="settings">Impostazioni</TabsTrigger>
+            </TabsList>
 
-          {/* Weekly Uptime Chart */}
-          <div className="mb-6">
-            <ApiWeeklyUptimeChart />
-          </div>
+            <TabsContent value="status" className="space-y-6">
+              {/* Full API Monitoring Dashboard */}
+              <ApiMonitoringDashboard 
+                apis={apis} 
+                history={history} 
+                isRefreshing={isRefreshing} 
+                onRefresh={checkApiStatus} 
+              />
 
-          {/* Usage Charts and Threshold Settings */}
-          <div className="grid lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
+              {/* Weekly Uptime Chart */}
+              <ApiWeeklyUptimeChart />
+
+              {/* Usage Charts */}
               <UsageCharts />
-            </div>
-            <ApiThresholdSettings 
-              thresholds={thresholds} 
-              notifyOnChange={notifyOnChange} 
-              onSave={saveSettings} 
-            />
-          </div>
 
-          {/* Logs and Notifications */}
-          <div className="grid lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
+              {/* Logs */}
               <LogViewer />
-            </div>
-            <NotificationSettings />
-          </div>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-6">
+              <ApiAnalyticsDashboard />
+            </TabsContent>
+
+            <TabsContent value="settings" className="space-y-6">
+              <div className="grid lg:grid-cols-2 gap-6">
+                <ApiThresholdSettings 
+                  thresholds={thresholds} 
+                  notifyOnChange={notifyOnChange} 
+                  onSave={saveSettings} 
+                />
+                <NotificationSettings />
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
         <Footer />
       </div>
     </AuthGuard>
   );
 }
+
