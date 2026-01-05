@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -7,10 +7,60 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Sparkles, X, Video, Image, Play, Loader2, Info, Wand2 } from "lucide-react";
+import { Upload, Sparkles, X, Video, Image, Play, Loader2, Info, Wand2, Library, History, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Motion presets library
+const MOTION_PRESETS = {
+  dance: [
+    { id: "dance_hiphop", name: "Hip Hop", description: "Movimenti hip hop urbani e dinamici", thumbnail: "🕺" },
+    { id: "dance_ballet", name: "Balletto", description: "Movimenti eleganti di danza classica", thumbnail: "🩰" },
+    { id: "dance_salsa", name: "Salsa", description: "Passi di salsa latina energici", thumbnail: "💃" },
+    { id: "dance_robot", name: "Robot", description: "Movimenti meccanici stile robot", thumbnail: "🤖" },
+    { id: "dance_wave", name: "Wave", description: "Movimento ondulatorio fluido", thumbnail: "🌊" },
+  ],
+  gestures: [
+    { id: "gesture_wave", name: "Saluto", description: "Saluto con la mano", thumbnail: "👋" },
+    { id: "gesture_thumbsup", name: "Pollice su", description: "Gesto di approvazione", thumbnail: "👍" },
+    { id: "gesture_clap", name: "Applauso", description: "Battere le mani", thumbnail: "👏" },
+    { id: "gesture_point", name: "Indicare", description: "Indicare con il dito", thumbnail: "👉" },
+    { id: "gesture_shrug", name: "Scrollata", description: "Scrollare le spalle", thumbnail: "🤷" },
+  ],
+  expressions: [
+    { id: "expr_smile", name: "Sorriso", description: "Espressione di felicità", thumbnail: "😊" },
+    { id: "expr_surprise", name: "Sorpresa", description: "Espressione sorpresa", thumbnail: "😮" },
+    { id: "expr_think", name: "Pensieroso", description: "Espressione riflessiva", thumbnail: "🤔" },
+    { id: "expr_laugh", name: "Risata", description: "Risata genuina", thumbnail: "😂" },
+    { id: "expr_wink", name: "Occhiolino", description: "Strizzare l'occhio", thumbnail: "😉" },
+  ],
+  actions: [
+    { id: "action_walk", name: "Camminata", description: "Camminare normalmente", thumbnail: "🚶" },
+    { id: "action_run", name: "Corsa", description: "Correre velocemente", thumbnail: "🏃" },
+    { id: "action_jump", name: "Salto", description: "Saltare in alto", thumbnail: "⬆️" },
+    { id: "action_sit", name: "Sedersi", description: "Sedersi lentamente", thumbnail: "🪑" },
+    { id: "action_turn", name: "Girarsi", description: "Ruotare su se stessi", thumbnail: "🔄" },
+  ],
+};
+
+type MotionPreset = {
+  id: string;
+  name: string;
+  description: string;
+  thumbnail: string;
+};
+
+type HistoryVideo = {
+  id: string;
+  video_url: string | null;
+  prompt: string | null;
+  created_at: string;
+  image_name: string | null;
+};
 
 export const MotionControlForm = () => {
   const [characterImage, setCharacterImage] = useState<string | null>(null);
@@ -24,9 +74,81 @@ export const MotionControlForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [generatedVideoUrl, setGeneratedVideoUrl] = useState<string | null>(null);
+  const [selectedPreset, setSelectedPreset] = useState<MotionPreset | null>(null);
+  const [historyVideos, setHistoryVideos] = useState<HistoryVideo[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [showPresetLibrary, setShowPresetLibrary] = useState(false);
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch history videos on mount
+  useEffect(() => {
+    fetchHistoryVideos();
+  }, []);
+
+  const fetchHistoryVideos = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("video_generations")
+        .select("id, video_url, prompt, created_at, image_name")
+        .eq("user_id", user.id)
+        .eq("status", "completed")
+        .not("video_url", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setHistoryVideos(data || []);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handleSelectHistoryVideo = async (video: HistoryVideo) => {
+    if (!video.video_url) return;
+
+    try {
+      toast.info("Caricamento video dalla galleria...");
+      
+      // Fetch the video and convert to base64
+      const response = await fetch(video.video_url);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setMotionVideo(base64);
+        setMotionVideoName(video.prompt || video.image_name || "Video dalla galleria");
+        setMotionVideoPreview(video.video_url!);
+        setShowHistoryDialog(false);
+        toast.success("Video selezionato dalla galleria!");
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error loading video:", error);
+      toast.error("Errore nel caricamento del video");
+    }
+  };
+
+  const handleSelectPreset = (preset: MotionPreset) => {
+    setSelectedPreset(preset);
+    // Add preset description to prompt
+    setPrompt((prev) => {
+      const presetText = `${preset.name}: ${preset.description}`;
+      if (prev.includes(presetText)) return prev;
+      return prev ? `${prev}\n${presetText}` : presetText;
+    });
+    setShowPresetLibrary(false);
+    toast.success(`Preset "${preset.name}" applicato al prompt`);
+  };
 
   const compressImage = (file: File, maxWidth: number = 1280, quality: number = 0.85): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -299,15 +421,15 @@ export const MotionControlForm = () => {
               Video Riferimento Movimenti
             </CardTitle>
             <CardDescription className="text-xs">
-              Carica il video con i movimenti da trasferire
+              Carica video, seleziona dalla galleria o usa un preset
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             {motionVideo ? (
               <div className="relative">
                 <video 
                   src={motionVideoPreview} 
-                  className="w-full h-48 object-cover rounded-lg"
+                  className="w-full h-40 object-cover rounded-lg"
                   controls
                   muted
                 />
@@ -319,7 +441,10 @@ export const MotionControlForm = () => {
                     setMotionVideo(null);
                     setMotionVideoName("");
                     setMotionVideoPreview("");
-                    if (motionVideoPreview) URL.revokeObjectURL(motionVideoPreview);
+                    setSelectedPreset(null);
+                    if (motionVideoPreview && !motionVideoPreview.startsWith("http")) {
+                      URL.revokeObjectURL(motionVideoPreview);
+                    }
                   }}
                 >
                   <X className="h-3 w-3" />
@@ -328,14 +453,148 @@ export const MotionControlForm = () => {
               </div>
             ) : (
               <div 
-                className="flex flex-col items-center justify-center h-48 cursor-pointer"
+                className="flex flex-col items-center justify-center h-32 cursor-pointer border rounded-lg border-dashed hover:bg-muted/50 transition-colors"
                 onClick={() => videoInputRef.current?.click()}
               >
-                <Play className="w-8 h-8 text-muted-foreground mb-2" />
+                <Play className="w-6 h-6 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">Clicca per caricare</p>
-                <p className="text-xs text-muted-foreground mt-1">MP4, MOV (max 100MB, 3-30s)</p>
+                <p className="text-xs text-muted-foreground mt-1">MP4, MOV (max 100MB)</p>
               </div>
             )}
+            
+            {/* Quick action buttons */}
+            <div className="flex gap-2">
+              <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <History className="w-4 h-4 mr-1" />
+                    Galleria
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <History className="w-5 h-5" />
+                      Seleziona Video dalla Galleria
+                    </DialogTitle>
+                  </DialogHeader>
+                  <ScrollArea className="h-[60vh] pr-4">
+                    {isLoadingHistory ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                      </div>
+                    ) : historyVideos.length === 0 ? (
+                      <div className="text-center py-12 text-muted-foreground">
+                        <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>Nessun video nella galleria</p>
+                        <p className="text-xs mt-1">Genera prima alcuni video per usarli come riferimento</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        {historyVideos.map((video) => (
+                          <Card 
+                            key={video.id} 
+                            className="cursor-pointer hover:border-primary transition-colors overflow-hidden"
+                            onClick={() => handleSelectHistoryVideo(video)}
+                          >
+                            <div className="relative aspect-video">
+                              <video 
+                                src={video.video_url || ""} 
+                                className="w-full h-full object-cover"
+                                muted
+                                preload="metadata"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Check className="w-8 h-8 text-white" />
+                              </div>
+                            </div>
+                            <CardContent className="p-2">
+                              <p className="text-xs text-muted-foreground truncate">
+                                {video.prompt || video.image_name || "Video"}
+                              </p>
+                              <p className="text-xs text-muted-foreground/70">
+                                {new Date(video.created_at).toLocaleDateString()}
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={showPresetLibrary} onOpenChange={setShowPresetLibrary}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Library className="w-4 h-4 mr-1" />
+                    Preset
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl max-h-[80vh]">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Library className="w-5 h-5" />
+                      Libreria Preset Movimenti
+                    </DialogTitle>
+                  </DialogHeader>
+                  <Tabs defaultValue="dance" className="w-full">
+                    <TabsList className="grid grid-cols-4 w-full">
+                      <TabsTrigger value="dance">🕺 Danza</TabsTrigger>
+                      <TabsTrigger value="gestures">👋 Gesti</TabsTrigger>
+                      <TabsTrigger value="expressions">😊 Espressioni</TabsTrigger>
+                      <TabsTrigger value="actions">🏃 Azioni</TabsTrigger>
+                    </TabsList>
+                    {Object.entries(MOTION_PRESETS).map(([category, presets]) => (
+                      <TabsContent key={category} value={category} className="mt-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {presets.map((preset) => (
+                            <Card 
+                              key={preset.id}
+                              className={`cursor-pointer hover:border-primary transition-colors ${
+                                selectedPreset?.id === preset.id ? "border-primary bg-primary/5" : ""
+                              }`}
+                              onClick={() => handleSelectPreset(preset)}
+                            >
+                              <CardContent className="p-4 text-center">
+                                <div className="text-4xl mb-2">{preset.thumbnail}</div>
+                                <p className="font-medium text-sm">{preset.name}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{preset.description}</p>
+                                {selectedPreset?.id === preset.id && (
+                                  <Badge variant="secondary" className="mt-2">
+                                    <Check className="w-3 h-3 mr-1" />
+                                    Selezionato
+                                  </Badge>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </TabsContent>
+                    ))}
+                  </Tabs>
+                </DialogContent>
+              </Dialog>
+            </div>
+            
+            {selectedPreset && (
+              <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
+                <span className="text-lg">{selectedPreset.thumbnail}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{selectedPreset.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{selectedPreset.description}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => setSelectedPreset(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            
             <input
               ref={videoInputRef}
               type="file"
