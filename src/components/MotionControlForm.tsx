@@ -15,35 +15,63 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Example video URLs for presets (using public domain / royalty-free motion reference videos)
+const PRESET_VIDEOS: Record<string, string> = {
+  // Dance
+  dance_hiphop: "https://assets.mixkit.co/videos/preview/mixkit-young-man-dancing-hip-hop-in-a-dark-studio-37808-large.mp4",
+  dance_ballet: "https://assets.mixkit.co/videos/preview/mixkit-ballet-dancer-on-a-dark-stage-4846-large.mp4",
+  dance_salsa: "https://assets.mixkit.co/videos/preview/mixkit-couple-dancing-salsa-in-the-dark-4875-large.mp4",
+  dance_robot: "https://assets.mixkit.co/videos/preview/mixkit-young-man-dancing-hip-hop-in-a-dark-studio-37808-large.mp4",
+  dance_wave: "https://assets.mixkit.co/videos/preview/mixkit-young-woman-doing-a-contemporary-dance-50319-large.mp4",
+  // Gestures
+  gesture_wave: "https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-woman-waving-with-her-hand-22616-large.mp4",
+  gesture_thumbsup: "https://assets.mixkit.co/videos/preview/mixkit-woman-giving-a-thumbs-up-on-a-pink-background-43295-large.mp4",
+  gesture_clap: "https://assets.mixkit.co/videos/preview/mixkit-happy-audience-clapping-505-large.mp4",
+  gesture_point: "https://assets.mixkit.co/videos/preview/mixkit-woman-pointing-with-her-finger-to-the-left-44494-large.mp4",
+  gesture_shrug: "https://assets.mixkit.co/videos/preview/mixkit-woman-shrugging-her-shoulders-while-talking-44495-large.mp4",
+  // Expressions  
+  expr_smile: "https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-smiling-woman-on-a-pink-background-43292-large.mp4",
+  expr_surprise: "https://assets.mixkit.co/videos/preview/mixkit-woman-with-a-surprised-expression-44491-large.mp4",
+  expr_think: "https://assets.mixkit.co/videos/preview/mixkit-woman-thinking-and-looking-to-the-side-44493-large.mp4",
+  expr_laugh: "https://assets.mixkit.co/videos/preview/mixkit-happy-woman-laughing-hard-43303-large.mp4",
+  expr_wink: "https://assets.mixkit.co/videos/preview/mixkit-portrait-of-a-smiling-woman-on-a-pink-background-43292-large.mp4",
+  // Actions
+  action_walk: "https://assets.mixkit.co/videos/preview/mixkit-woman-walking-in-high-heels-through-an-aisle-6563-large.mp4",
+  action_run: "https://assets.mixkit.co/videos/preview/mixkit-woman-running-in-the-park-at-sunset-43017-large.mp4",
+  action_jump: "https://assets.mixkit.co/videos/preview/mixkit-young-man-jumping-on-the-street-1230-large.mp4",
+  action_sit: "https://assets.mixkit.co/videos/preview/mixkit-woman-sitting-on-a-pink-background-43305-large.mp4",
+  action_turn: "https://assets.mixkit.co/videos/preview/mixkit-woman-turning-around-and-posing-43301-large.mp4",
+};
+
 // Motion presets library
 const MOTION_PRESETS = {
   dance: [
-    { id: "dance_hiphop", name: "Hip Hop", description: "Movimenti hip hop urbani e dinamici", thumbnail: "🕺" },
-    { id: "dance_ballet", name: "Balletto", description: "Movimenti eleganti di danza classica", thumbnail: "🩰" },
-    { id: "dance_salsa", name: "Salsa", description: "Passi di salsa latina energici", thumbnail: "💃" },
-    { id: "dance_robot", name: "Robot", description: "Movimenti meccanici stile robot", thumbnail: "🤖" },
-    { id: "dance_wave", name: "Wave", description: "Movimento ondulatorio fluido", thumbnail: "🌊" },
+    { id: "dance_hiphop", name: "Hip Hop", description: "Movimenti hip hop urbani e dinamici", thumbnail: "🕺", hasVideo: true },
+    { id: "dance_ballet", name: "Balletto", description: "Movimenti eleganti di danza classica", thumbnail: "🩰", hasVideo: true },
+    { id: "dance_salsa", name: "Salsa", description: "Passi di salsa latina energici", thumbnail: "💃", hasVideo: true },
+    { id: "dance_robot", name: "Robot", description: "Movimenti meccanici stile robot", thumbnail: "🤖", hasVideo: true },
+    { id: "dance_wave", name: "Wave", description: "Movimento ondulatorio fluido", thumbnail: "🌊", hasVideo: true },
   ],
   gestures: [
-    { id: "gesture_wave", name: "Saluto", description: "Saluto con la mano", thumbnail: "👋" },
-    { id: "gesture_thumbsup", name: "Pollice su", description: "Gesto di approvazione", thumbnail: "👍" },
-    { id: "gesture_clap", name: "Applauso", description: "Battere le mani", thumbnail: "👏" },
-    { id: "gesture_point", name: "Indicare", description: "Indicare con il dito", thumbnail: "👉" },
-    { id: "gesture_shrug", name: "Scrollata", description: "Scrollare le spalle", thumbnail: "🤷" },
+    { id: "gesture_wave", name: "Saluto", description: "Saluto con la mano", thumbnail: "👋", hasVideo: true },
+    { id: "gesture_thumbsup", name: "Pollice su", description: "Gesto di approvazione", thumbnail: "👍", hasVideo: true },
+    { id: "gesture_clap", name: "Applauso", description: "Battere le mani", thumbnail: "👏", hasVideo: true },
+    { id: "gesture_point", name: "Indicare", description: "Indicare con il dito", thumbnail: "👉", hasVideo: true },
+    { id: "gesture_shrug", name: "Scrollata", description: "Scrollare le spalle", thumbnail: "🤷", hasVideo: true },
   ],
   expressions: [
-    { id: "expr_smile", name: "Sorriso", description: "Espressione di felicità", thumbnail: "😊" },
-    { id: "expr_surprise", name: "Sorpresa", description: "Espressione sorpresa", thumbnail: "😮" },
-    { id: "expr_think", name: "Pensieroso", description: "Espressione riflessiva", thumbnail: "🤔" },
-    { id: "expr_laugh", name: "Risata", description: "Risata genuina", thumbnail: "😂" },
-    { id: "expr_wink", name: "Occhiolino", description: "Strizzare l'occhio", thumbnail: "😉" },
+    { id: "expr_smile", name: "Sorriso", description: "Espressione di felicità", thumbnail: "😊", hasVideo: true },
+    { id: "expr_surprise", name: "Sorpresa", description: "Espressione sorpresa", thumbnail: "😮", hasVideo: true },
+    { id: "expr_think", name: "Pensieroso", description: "Espressione riflessiva", thumbnail: "🤔", hasVideo: true },
+    { id: "expr_laugh", name: "Risata", description: "Risata genuina", thumbnail: "😂", hasVideo: true },
+    { id: "expr_wink", name: "Occhiolino", description: "Strizzare l'occhio", thumbnail: "😉", hasVideo: true },
   ],
   actions: [
-    { id: "action_walk", name: "Camminata", description: "Camminare normalmente", thumbnail: "🚶" },
-    { id: "action_run", name: "Corsa", description: "Correre velocemente", thumbnail: "🏃" },
-    { id: "action_jump", name: "Salto", description: "Saltare in alto", thumbnail: "⬆️" },
-    { id: "action_sit", name: "Sedersi", description: "Sedersi lentamente", thumbnail: "🪑" },
-    { id: "action_turn", name: "Girarsi", description: "Ruotare su se stessi", thumbnail: "🔄" },
+    { id: "action_walk", name: "Camminata", description: "Camminare normalmente", thumbnail: "🚶", hasVideo: true },
+    { id: "action_run", name: "Corsa", description: "Correre velocemente", thumbnail: "🏃", hasVideo: true },
+    { id: "action_jump", name: "Salto", description: "Saltare in alto", thumbnail: "⬆️", hasVideo: true },
+    { id: "action_sit", name: "Sedersi", description: "Sedersi lentamente", thumbnail: "🪑", hasVideo: true },
+    { id: "action_turn", name: "Girarsi", description: "Ruotare su se stessi", thumbnail: "🔄", hasVideo: true },
   ],
 };
 
@@ -52,6 +80,7 @@ type MotionPreset = {
   name: string;
   description: string;
   thumbnail: string;
+  hasVideo?: boolean;
 };
 
 type HistoryVideo = {
@@ -60,6 +89,167 @@ type HistoryVideo = {
   prompt: string | null;
   created_at: string;
   image_name: string | null;
+};
+
+// Video card with hover preview component
+const VideoPreviewCard = ({ 
+  video, 
+  onSelect 
+}: { 
+  video: HistoryVideo; 
+  onSelect: (video: HistoryVideo) => void;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isHovering, setIsHovering] = useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = 0;
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
+
+  return (
+    <Card 
+      className="cursor-pointer hover:border-primary transition-all overflow-hidden group"
+      onClick={() => onSelect(video)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="relative aspect-video bg-muted">
+        <video 
+          ref={videoRef}
+          src={video.video_url || ""} 
+          className="w-full h-full object-cover"
+          muted
+          loop
+          playsInline
+          preload="metadata"
+        />
+        <div className={`absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isHovering ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}`}>
+          <Check className="w-8 h-8 text-white" />
+        </div>
+        {isHovering && (
+          <div className="absolute bottom-1 left-1 bg-primary/90 text-primary-foreground text-[10px] px-1.5 py-0.5 rounded">
+            ▶ Anteprima
+          </div>
+        )}
+      </div>
+      <CardContent className="p-2">
+        <p className="text-xs text-muted-foreground truncate">
+          {video.prompt || video.image_name || "Video"}
+        </p>
+        <p className="text-xs text-muted-foreground/70">
+          {new Date(video.created_at).toLocaleDateString()}
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Preset card with video preview
+const PresetVideoCard = ({
+  preset,
+  isSelected,
+  onSelect,
+  onUseVideo
+}: {
+  preset: MotionPreset;
+  isSelected: boolean;
+  onSelect: () => void;
+  onUseVideo: (videoUrl: string, presetName: string) => void;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isHovering, setIsHovering] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const videoUrl = PRESET_VIDEOS[preset.id];
+
+  const handleMouseEnter = () => {
+    setIsHovering(true);
+    setShowVideo(true);
+    setTimeout(() => {
+      if (videoRef.current) {
+        videoRef.current.currentTime = 0;
+        videoRef.current.play().catch(() => {});
+      }
+    }, 100);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    if (videoRef.current) {
+      videoRef.current.pause();
+    }
+  };
+
+  const handleUseVideo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoUrl) {
+      onUseVideo(videoUrl, preset.name);
+    }
+  };
+
+  return (
+    <Card 
+      className={`cursor-pointer hover:border-primary transition-all overflow-hidden ${
+        isSelected ? "border-primary bg-primary/5 ring-2 ring-primary/20" : ""
+      }`}
+      onClick={onSelect}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <div className="relative aspect-video bg-gradient-to-br from-muted to-muted/50 overflow-hidden">
+        {showVideo && videoUrl ? (
+          <video 
+            ref={videoRef}
+            src={videoUrl} 
+            className="w-full h-full object-cover"
+            muted
+            loop
+            playsInline
+            preload="metadata"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-5xl">{preset.thumbnail}</span>
+          </div>
+        )}
+        {isHovering && videoUrl && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col items-center justify-end pb-2">
+            <Button 
+              size="sm" 
+              variant="secondary"
+              className="text-xs h-7 shadow-lg"
+              onClick={handleUseVideo}
+            >
+              <Video className="w-3 h-3 mr-1" />
+              Usa questo video
+            </Button>
+          </div>
+        )}
+        {isSelected && (
+          <div className="absolute top-1 right-1">
+            <Badge variant="default" className="text-[10px] px-1.5 py-0.5">
+              <Check className="w-3 h-3" />
+            </Badge>
+          </div>
+        )}
+      </div>
+      <CardContent className="p-3 text-center">
+        <p className="font-medium text-sm">{preset.name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{preset.description}</p>
+      </CardContent>
+    </Card>
+  );
 };
 
 export const MotionControlForm = () => {
@@ -146,8 +336,30 @@ export const MotionControlForm = () => {
       if (prev.includes(presetText)) return prev;
       return prev ? `${prev}\n${presetText}` : presetText;
     });
-    setShowPresetLibrary(false);
     toast.success(`Preset "${preset.name}" applicato al prompt`);
+  };
+
+  const handleUsePresetVideo = async (videoUrl: string, presetName: string) => {
+    try {
+      toast.info("Caricamento video preset...");
+      
+      const response = await fetch(videoUrl);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setMotionVideo(base64);
+        setMotionVideoName(`Preset: ${presetName}`);
+        setMotionVideoPreview(videoUrl);
+        setShowPresetLibrary(false);
+        toast.success(`Video preset "${presetName}" caricato!`);
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error loading preset video:", error);
+      toast.error("Errore nel caricamento del video preset");
+    }
   };
 
   const compressImage = (file: File, maxWidth: number = 1280, quality: number = 0.85): Promise<string> => {
@@ -492,31 +704,11 @@ export const MotionControlForm = () => {
                     ) : (
                       <div className="grid grid-cols-2 gap-3">
                         {historyVideos.map((video) => (
-                          <Card 
-                            key={video.id} 
-                            className="cursor-pointer hover:border-primary transition-colors overflow-hidden"
-                            onClick={() => handleSelectHistoryVideo(video)}
-                          >
-                            <div className="relative aspect-video">
-                              <video 
-                                src={video.video_url || ""} 
-                                className="w-full h-full object-cover"
-                                muted
-                                preload="metadata"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Check className="w-8 h-8 text-white" />
-                              </div>
-                            </div>
-                            <CardContent className="p-2">
-                              <p className="text-xs text-muted-foreground truncate">
-                                {video.prompt || video.image_name || "Video"}
-                              </p>
-                              <p className="text-xs text-muted-foreground/70">
-                                {new Date(video.created_at).toLocaleDateString()}
-                              </p>
-                            </CardContent>
-                          </Card>
+                          <VideoPreviewCard
+                            key={video.id}
+                            video={video}
+                            onSelect={handleSelectHistoryVideo}
+                          />
                         ))}
                       </div>
                     )}
@@ -547,29 +739,19 @@ export const MotionControlForm = () => {
                     </TabsList>
                     {Object.entries(MOTION_PRESETS).map(([category, presets]) => (
                       <TabsContent key={category} value={category} className="mt-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {presets.map((preset) => (
-                            <Card 
-                              key={preset.id}
-                              className={`cursor-pointer hover:border-primary transition-colors ${
-                                selectedPreset?.id === preset.id ? "border-primary bg-primary/5" : ""
-                              }`}
-                              onClick={() => handleSelectPreset(preset)}
-                            >
-                              <CardContent className="p-4 text-center">
-                                <div className="text-4xl mb-2">{preset.thumbnail}</div>
-                                <p className="font-medium text-sm">{preset.name}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{preset.description}</p>
-                                {selectedPreset?.id === preset.id && (
-                                  <Badge variant="secondary" className="mt-2">
-                                    <Check className="w-3 h-3 mr-1" />
-                                    Selezionato
-                                  </Badge>
-                                )}
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
+                        <ScrollArea className="h-[50vh]">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pr-4">
+                            {presets.map((preset) => (
+                              <PresetVideoCard
+                                key={preset.id}
+                                preset={preset}
+                                isSelected={selectedPreset?.id === preset.id}
+                                onSelect={() => handleSelectPreset(preset)}
+                                onUseVideo={handleUsePresetVideo}
+                              />
+                            ))}
+                          </div>
+                        </ScrollArea>
                       </TabsContent>
                     ))}
                   </Tabs>
