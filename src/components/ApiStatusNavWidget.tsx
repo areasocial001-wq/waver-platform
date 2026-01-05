@@ -122,13 +122,26 @@ export const ApiStatusNavWidget = () => {
               <Server className="w-4 h-4 text-primary" />
               <span className="text-sm font-medium">Stato Servizi</span>
             </div>
-            <Badge variant="outline" className={`text-[10px] ${
-              allOnline ? "bg-green-500/10 text-green-500 border-green-500/30" :
-              anyOffline ? "bg-destructive/10 text-destructive border-destructive/30" :
-              "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
-            }`}>
-              {allOnline ? "Tutto OK" : anyOffline ? "Problemi" : "Degradato"}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  checkAllApis();
+                }}
+                disabled={isChecking}
+                className="p-1 rounded hover:bg-accent transition-colors disabled:opacity-50"
+                title="Aggiorna stato"
+              >
+                <Loader2 className={`w-3.5 h-3.5 text-muted-foreground ${isChecking ? "animate-spin" : ""}`} />
+              </button>
+              <Badge variant="outline" className={`text-[10px] ${
+                allOnline ? "bg-green-500/10 text-green-500 border-green-500/30" :
+                anyOffline ? "bg-destructive/10 text-destructive border-destructive/30" :
+                "bg-yellow-500/10 text-yellow-500 border-yellow-500/30"
+              }`}>
+                {allOnline ? "Tutto OK" : anyOffline ? "Problemi" : "Degradato"}
+              </Badge>
+            </div>
           </div>
           <Progress 
             value={(onlineCount / totalCount) * 100} 
