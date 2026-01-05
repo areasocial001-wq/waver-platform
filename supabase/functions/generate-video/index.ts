@@ -18,6 +18,9 @@ interface PiAPIModelConfig {
 
 const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   // Kling models
+  "kling-2.6": { model: "kling", model_name: "kling-v2-6", mode: "std" },
+  "kling-2.6-motion": { model: "kling", model_name: "kling-v2-6", mode: "std" },
+  "kling-2.5": { model: "kling", model_name: "kling-v2-5", mode: "std" },
   "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std" },
   "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std" },
   "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std" },
@@ -360,7 +363,10 @@ serve(async (req) => {
     }
 
     // Start new video generation
-    const { type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId, preferredProvider } = body;
+    const { 
+      type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId, preferredProvider,
+      motion_video, motion_control, character_orientation, keep_original_sound
+    } = body;
 
     if (!type) {
       return new Response(
@@ -391,6 +397,82 @@ serve(async (req) => {
       }
       return data;
     };
+
+    // ==================== KLING 2.6 MOTION CONTROL ====================
+    if (motion_control && motion_video && hasValidPiAPIKey) {
+      console.log("Starting Kling 2.6 Motion Control generation");
+      
+      const startImageData = start_image || image || image_url;
+      
+      // Build motion control payload for PIAPI
+      const motionControlPayload: any = {
+        model: "kling",
+        task_type: "motion_control",
+        input: {
+          prompt: prompt || "Smooth motion transfer",
+          image_url: startImageData.startsWith('data:') ? undefined : startImageData,
+          image: startImageData.startsWith('data:') ? extractBase64(startImageData) : undefined,
+          motion_video_url: motion_video.startsWith('data:') ? undefined : motion_video,
+          motion_video: motion_video.startsWith('data:') ? extractBase64(motion_video) : undefined,
+          character_orientation: character_orientation || "video",
+          keep_original_sound: keep_original_sound !== false,
+          model_name: "kling-v2-6",
+          mode: "std"
+        }
+      };
+      
+      console.log("Motion Control payload:", { 
+        hasImage: !!motionControlPayload.input.image || !!motionControlPayload.input.image_url,
+        hasMotionVideo: !!motionControlPayload.input.motion_video || !!motionControlPayload.input.motion_video_url,
+        orientation: motionControlPayload.input.character_orientation
+      });
+      
+      const piApiResponse = await fetch("https://api.piapi.ai/api/v1/task", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": PIAPI_API_KEY,
+        },
+        body: JSON.stringify(motionControlPayload),
+      });
+
+      if (!piApiResponse.ok) {
+        const error = await piApiResponse.text();
+        console.error("PiAPI Motion Control error:", error);
+        throw new Error(`PiAPI Motion Control error: ${piApiResponse.status} - ${error}`);
+      }
+
+      const piApiData = await piApiResponse.json();
+      console.log("Motion Control task started:", piApiData);
+      
+      const taskId = piApiData.data?.task_id || piApiData.task_id;
+      if (!taskId) {
+        throw new Error("PiAPI did not return a task ID for motion control");
+      }
+
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `piapi:kling-2.6-motion:${taskId}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `piapi:kling-2.6-motion:${taskId}`,
+        message: "Kling 2.6 Motion Control video generation started"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // ==================== PiAPI PROVIDERS ====================
     // Use PiAPI for piapi-kling, piapi-hailuo, piapi-luma, piapi-wan, piapi-hunyuan

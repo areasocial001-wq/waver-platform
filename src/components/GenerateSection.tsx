@@ -7,7 +7,8 @@ import { ImageGenerationForm } from "./ImageGenerationForm";
 import { StoryboardEditor } from "./StoryboardEditor";
 import { VideoToAudioForm } from "./VideoToAudioForm";
 import { PiAPIAudioGenerator } from "./PiAPIAudioGenerator";
-import { Video, Image, Sparkles, Layout, Volume2, Music } from "lucide-react";
+import { MotionControlForm } from "./MotionControlForm";
+import { Video, Image, Sparkles, Layout, Volume2, Music, Wand2 } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -23,7 +24,7 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-6 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-7 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -37,6 +38,13 @@ export const GenerateSection = () => {
             >
               <Image className="w-4 h-4" />
               <span className="hidden md:inline">Image to Video</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="motion-control" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
+            >
+              <Wand2 className="w-4 h-4" />
+              <span className="hidden md:inline">Motion Control</span>
             </TabsTrigger>
             <TabsTrigger 
               value="video-audio" 
@@ -98,6 +106,23 @@ export const GenerateSection = () => {
               </CardHeader>
               <CardContent>
                 <ImageToVideoForm />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="motion-control">
+            <Card className="border-accent/20 bg-card/50 backdrop-blur-sm shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-accent" />
+                  Kling 2.6 Motion Control
+                </CardTitle>
+                <CardDescription>
+                  Trasferisci i movimenti da un video di riferimento a qualsiasi personaggio
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MotionControlForm />
               </CardContent>
             </Card>
           </TabsContent>
