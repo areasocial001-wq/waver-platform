@@ -59,7 +59,11 @@ export const useApiMonitoring = () => {
   
   const retryTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const previousStatus = useRef<Map<string, string>>(new Map());
+  const offlineSince = useRef<Map<string, Date>>(new Map());
+  const offlineAlertSent = useRef<Map<string, boolean>>(new Map());
   const { showNotification, isEnabled: notificationsEnabled } = usePushNotifications();
+
+  const OFFLINE_ALERT_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   const getBackoffDelay = (retryCount: number): number => {
     return Math.min(BASE_DELAY * Math.pow(2, retryCount), 30000);
@@ -178,7 +182,38 @@ export const useApiMonitoring = () => {
   // Check status change and send notification
   const checkStatusChange = useCallback((apiName: string, newStatus: string) => {
     const oldStatus = previousStatus.current.get(apiName);
+    const now = new Date();
     
+    // Track offline duration for 5-minute alert
+    if (newStatus === "offline") {
+      // Start tracking if not already
+      if (!offlineSince.current.has(apiName)) {
+        offlineSince.current.set(apiName, now);
+        offlineAlertSent.current.set(apiName, false);
+      }
+      
+      // Check if offline for more than 5 minutes
+      const offlineStart = offlineSince.current.get(apiName);
+      const alertSent = offlineAlertSent.current.get(apiName);
+      
+      if (offlineStart && !alertSent) {
+        const offlineDuration = now.getTime() - offlineStart.getTime();
+        if (offlineDuration >= OFFLINE_ALERT_THRESHOLD && notificationsEnabled) {
+          const minutes = Math.floor(offlineDuration / 60000);
+          showNotification(
+            `🚨 ${apiName} Offline da ${minutes} minuti`,
+            `Il servizio ${apiName} è offline da più di 5 minuti. Potrebbe essere necessario verificare manualmente.`
+          );
+          offlineAlertSent.current.set(apiName, true);
+        }
+      }
+    } else {
+      // API is back online, clear offline tracking
+      offlineSince.current.delete(apiName);
+      offlineAlertSent.current.delete(apiName);
+    }
+    
+    // Standard status change notification
     if (oldStatus && oldStatus !== newStatus && notifyOnChange && notificationsEnabled) {
       if (newStatus === "offline" && oldStatus === "online") {
         showNotification(
@@ -186,9 +221,13 @@ export const useApiMonitoring = () => {
           `Il servizio ${apiName} non è più raggiungibile. Verificheremo automaticamente.`
         );
       } else if (newStatus === "online" && oldStatus === "offline") {
+        const offlineStart = offlineSince.current.get(apiName);
+        const downtime = offlineStart 
+          ? Math.floor((now.getTime() - offlineStart.getTime()) / 60000)
+          : 0;
         showNotification(
           `✅ ${apiName} Online`,
-          `Il servizio ${apiName} è tornato operativo.`
+          `Il servizio ${apiName} è tornato operativo${downtime > 0 ? ` dopo ${downtime} minuti di inattività` : ""}.`
         );
       }
     }
