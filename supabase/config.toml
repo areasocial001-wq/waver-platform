@@ -44,3 +44,15 @@ verify_jwt = false
 
 [functions.hash-storyboard-password]
 verify_jwt = true
+
+[functions.piapi-image]
+verify_jwt = true
+
+[functions.piapi-audio]
+verify_jwt = true
+
+[functions.piapi-templates]
+verify_jwt = true
+
+[functions.edit-image]
+verify_jwt = true
