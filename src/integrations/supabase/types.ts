@@ -92,6 +92,60 @@ export type Database = {
         }
         Relationships: []
       }
+      api_status_history: {
+        Row: {
+          api_name: string
+          checked_at: string
+          id: string
+          response_time: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          api_name: string
+          checked_at?: string
+          id?: string
+          response_time?: number | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          api_name?: string
+          checked_at?: string
+          id?: string
+          response_time?: number | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      api_threshold_settings: {
+        Row: {
+          created_at: string
+          id: string
+          notify_on_status_change: boolean
+          thresholds: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notify_on_status_change?: boolean
+          thresholds?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notify_on_status_change?: boolean
+          thresholds?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       prompt_templates: {
         Row: {
           audio_suggestion: string | null
