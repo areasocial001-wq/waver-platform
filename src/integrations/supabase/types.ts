@@ -146,6 +146,48 @@ export type Database = {
         }
         Relationships: []
       }
+      motion_presets: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          name: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+          video_url: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          name: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+          video_url: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          name?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+          video_url?: string
+        }
+        Relationships: []
+      }
       prompt_templates: {
         Row: {
           audio_suggestion: string | null
@@ -298,6 +340,7 @@ export type Database = {
       video_generations: {
         Row: {
           batch_id: string | null
+          category: string | null
           created_at: string | null
           duration: number
           error_message: string | null
@@ -316,6 +359,7 @@ export type Database = {
           retry_count: number | null
           sequence_order: number | null
           status: string | null
+          tags: string[] | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at: string | null
           user_id: string
@@ -323,6 +367,7 @@ export type Database = {
         }
         Insert: {
           batch_id?: string | null
+          category?: string | null
           created_at?: string | null
           duration: number
           error_message?: string | null
@@ -341,6 +386,7 @@ export type Database = {
           retry_count?: number | null
           sequence_order?: number | null
           status?: string | null
+          tags?: string[] | null
           type: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
           user_id: string
@@ -348,6 +394,7 @@ export type Database = {
         }
         Update: {
           batch_id?: string | null
+          category?: string | null
           created_at?: string | null
           duration?: number
           error_message?: string | null
@@ -366,6 +413,7 @@ export type Database = {
           retry_count?: number | null
           sequence_order?: number | null
           status?: string | null
+          tags?: string[] | null
           type?: Database["public"]["Enums"]["generation_type"]
           updated_at?: string | null
           user_id?: string

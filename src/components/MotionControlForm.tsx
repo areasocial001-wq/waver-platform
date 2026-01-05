@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Upload, Sparkles, X, Video, Image, Play, Loader2, Info, Wand2, Library, History, Check } from "lucide-react";
+import { Upload, Sparkles, X, Video, Image, Play, Loader2, Info, Wand2, Library, History, Check, Plus, Trash2, Tag, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -83,13 +84,38 @@ type MotionPreset = {
   hasVideo?: boolean;
 };
 
+type CustomPreset = {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  tags: string[];
+  video_url: string;
+  thumbnail_url: string | null;
+  is_public: boolean;
+  created_at: string;
+};
+
 type HistoryVideo = {
   id: string;
   video_url: string | null;
   prompt: string | null;
   created_at: string;
   image_name: string | null;
+  tags?: string[];
+  category?: string;
 };
+
+const VIDEO_CATEGORIES = [
+  { id: "all", name: "Tutti", icon: "📁" },
+  { id: "general", name: "Generale", icon: "🎬" },
+  { id: "dance", name: "Danza", icon: "💃" },
+  { id: "gesture", name: "Gesti", icon: "👋" },
+  { id: "expression", name: "Espressioni", icon: "😊" },
+  { id: "action", name: "Azioni", icon: "🏃" },
+  { id: "custom", name: "Personalizzati", icon: "⭐" },
+];
 
 // Video card with hover preview component
 const VideoPreviewCard = ({ 
@@ -269,14 +295,41 @@ export const MotionControlForm = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [showPresetLibrary, setShowPresetLibrary] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
+  const [showCreatePreset, setShowCreatePreset] = useState(false);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [newPresetDescription, setNewPresetDescription] = useState("");
+  const [newPresetCategory, setNewPresetCategory] = useState("custom");
+  const [newPresetTags, setNewPresetTags] = useState("");
+  const [newPresetIsPublic, setNewPresetIsPublic] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isSavingPreset, setIsSavingPreset] = useState(false);
   
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch history videos on mount
+  // Fetch history videos and custom presets on mount
   useEffect(() => {
     fetchHistoryVideos();
+    fetchCustomPresets();
   }, []);
+
+  const fetchCustomPresets = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("motion_presets")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setCustomPresets(data || []);
+    } catch (error) {
+      console.error("Error fetching custom presets:", error);
+    }
+  };
 
   const fetchHistoryVideos = async () => {
     setIsLoadingHistory(true);
@@ -286,7 +339,7 @@ export const MotionControlForm = () => {
 
       const { data, error } = await supabase
         .from("video_generations")
-        .select("id, video_url, prompt, created_at, image_name")
+        .select("id, video_url, prompt, created_at, image_name, tags, category")
         .eq("user_id", user.id)
         .eq("status", "completed")
         .not("video_url", "is", null)
@@ -301,6 +354,98 @@ export const MotionControlForm = () => {
       setIsLoadingHistory(false);
     }
   };
+
+  const handleSaveAsPreset = async () => {
+    if (!motionVideo || !newPresetName.trim()) {
+      toast.error("Inserisci un nome per il preset");
+      return;
+    }
+
+    setIsSavingPreset(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi effettuare l'accesso");
+        return;
+      }
+
+      const tags = newPresetTags.split(",").map(t => t.trim()).filter(Boolean);
+
+      const { error } = await supabase
+        .from("motion_presets")
+        .insert({
+          user_id: user.id,
+          name: newPresetName.trim(),
+          description: newPresetDescription.trim() || null,
+          category: newPresetCategory,
+          tags,
+          video_url: motionVideoPreview || motionVideo,
+          is_public: newPresetIsPublic,
+        });
+
+      if (error) throw error;
+
+      toast.success("Preset salvato con successo!");
+      setShowCreatePreset(false);
+      setNewPresetName("");
+      setNewPresetDescription("");
+      setNewPresetCategory("custom");
+      setNewPresetTags("");
+      setNewPresetIsPublic(false);
+      fetchCustomPresets();
+    } catch (error: any) {
+      console.error("Error saving preset:", error);
+      toast.error(error.message || "Errore nel salvataggio del preset");
+    } finally {
+      setIsSavingPreset(false);
+    }
+  };
+
+  const handleDeleteCustomPreset = async (presetId: string) => {
+    try {
+      const { error } = await supabase
+        .from("motion_presets")
+        .delete()
+        .eq("id", presetId);
+
+      if (error) throw error;
+      toast.success("Preset eliminato");
+      fetchCustomPresets();
+    } catch (error) {
+      console.error("Error deleting preset:", error);
+      toast.error("Errore nell'eliminazione del preset");
+    }
+  };
+
+  const handleUseCustomPreset = async (preset: CustomPreset) => {
+    try {
+      toast.info("Caricamento preset personalizzato...");
+      
+      const response = await fetch(preset.video_url);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64 = e.target?.result as string;
+        setMotionVideo(base64);
+        setMotionVideoName(`Preset: ${preset.name}`);
+        setMotionVideoPreview(preset.video_url);
+        setShowPresetLibrary(false);
+        if (preset.description) {
+          setPrompt((prev) => prev ? `${prev}\n${preset.description}` : preset.description);
+        }
+        toast.success(`Preset "${preset.name}" caricato!`);
+      };
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error("Error loading custom preset:", error);
+      toast.error("Errore nel caricamento del preset");
+    }
+  };
+
+  const filteredHistoryVideos = selectedCategory === "all" 
+    ? historyVideos 
+    : historyVideos.filter(v => v.category === selectedCategory);
 
   const handleSelectHistoryVideo = async (video: HistoryVideo) => {
     if (!video.video_url) return;
@@ -683,27 +828,48 @@ export const MotionControlForm = () => {
                     Galleria
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh]">
+                <DialogContent className="max-w-3xl max-h-[85vh]">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <History className="w-5 h-5" />
                       Seleziona Video dalla Galleria
                     </DialogTitle>
                   </DialogHeader>
-                  <ScrollArea className="h-[60vh] pr-4">
+                  
+                  {/* Category filter */}
+                  <div className="flex gap-1 flex-wrap pb-2 border-b">
+                    {VIDEO_CATEGORIES.map((cat) => (
+                      <Button
+                        key={cat.id}
+                        variant={selectedCategory === cat.id ? "default" : "outline"}
+                        size="sm"
+                        className="text-xs h-7"
+                        onClick={() => setSelectedCategory(cat.id)}
+                      >
+                        <span className="mr-1">{cat.icon}</span>
+                        {cat.name}
+                      </Button>
+                    ))}
+                  </div>
+                  
+                  <ScrollArea className="h-[55vh] pr-4">
                     {isLoadingHistory ? (
                       <div className="flex items-center justify-center py-12">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
                       </div>
-                    ) : historyVideos.length === 0 ? (
+                    ) : filteredHistoryVideos.length === 0 ? (
                       <div className="text-center py-12 text-muted-foreground">
                         <Video className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p>Nessun video nella galleria</p>
-                        <p className="text-xs mt-1">Genera prima alcuni video per usarli come riferimento</p>
+                        <p>Nessun video in questa categoria</p>
+                        <p className="text-xs mt-1">
+                          {selectedCategory === "all" 
+                            ? "Genera prima alcuni video per usarli come riferimento"
+                            : "Prova a selezionare un'altra categoria"}
+                        </p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3">
-                        {historyVideos.map((video) => (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {filteredHistoryVideos.map((video) => (
                           <VideoPreviewCard
                             key={video.id}
                             video={video}
@@ -723,7 +889,7 @@ export const MotionControlForm = () => {
                     Preset
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[80vh]">
+                <DialogContent className="max-w-3xl max-h-[85vh]">
                   <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                       <Library className="w-5 h-5" />
@@ -731,11 +897,19 @@ export const MotionControlForm = () => {
                     </DialogTitle>
                   </DialogHeader>
                   <Tabs defaultValue="dance" className="w-full">
-                    <TabsList className="grid grid-cols-4 w-full">
+                    <TabsList className="grid grid-cols-5 w-full">
                       <TabsTrigger value="dance">🕺 Danza</TabsTrigger>
                       <TabsTrigger value="gestures">👋 Gesti</TabsTrigger>
                       <TabsTrigger value="expressions">😊 Espressioni</TabsTrigger>
                       <TabsTrigger value="actions">🏃 Azioni</TabsTrigger>
+                      <TabsTrigger value="custom" className="relative">
+                        ⭐ Miei
+                        {customPresets.length > 0 && (
+                          <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                            {customPresets.length}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
                     </TabsList>
                     {Object.entries(MOTION_PRESETS).map(([category, presets]) => (
                       <TabsContent key={category} value={category} className="mt-4">
@@ -754,9 +928,167 @@ export const MotionControlForm = () => {
                         </ScrollArea>
                       </TabsContent>
                     ))}
+                    
+                    {/* Custom presets tab */}
+                    <TabsContent value="custom" className="mt-4">
+                      <ScrollArea className="h-[50vh]">
+                        {customPresets.length === 0 ? (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <Plus className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p>Nessun preset personalizzato</p>
+                            <p className="text-xs mt-1">Carica un video e salvalo come preset</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pr-4">
+                            {customPresets.map((preset) => (
+                              <Card 
+                                key={preset.id}
+                                className="cursor-pointer hover:border-primary transition-all overflow-hidden group"
+                              >
+                                <div className="relative aspect-video bg-muted">
+                                  <video 
+                                    src={preset.video_url} 
+                                    className="w-full h-full object-cover"
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-end pb-2 gap-1">
+                                    <Button 
+                                      size="sm" 
+                                      variant="secondary"
+                                      className="text-xs h-7 shadow-lg"
+                                      onClick={() => handleUseCustomPreset(preset)}
+                                    >
+                                      <Video className="w-3 h-3 mr-1" />
+                                      Usa
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="destructive"
+                                      className="text-xs h-6 shadow-lg"
+                                      onClick={() => handleDeleteCustomPreset(preset.id)}
+                                    >
+                                      <Trash2 className="w-3 h-3 mr-1" />
+                                      Elimina
+                                    </Button>
+                                  </div>
+                                  {preset.is_public && (
+                                    <Badge className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5">
+                                      Pubblico
+                                    </Badge>
+                                  )}
+                                </div>
+                                <CardContent className="p-2">
+                                  <p className="font-medium text-xs truncate">{preset.name}</p>
+                                  {preset.description && (
+                                    <p className="text-xs text-muted-foreground truncate">{preset.description}</p>
+                                  )}
+                                  {preset.tags && preset.tags.length > 0 && (
+                                    <div className="flex gap-1 mt-1 flex-wrap">
+                                      {preset.tags.slice(0, 2).map((tag) => (
+                                        <Badge key={tag} variant="outline" className="text-[9px] px-1 py-0">
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </TabsContent>
                   </Tabs>
                 </DialogContent>
               </Dialog>
+              
+              {/* Save as preset button */}
+              {motionVideo && (
+                <Dialog open={showCreatePreset} onOpenChange={setShowCreatePreset}>
+                  <DialogTrigger asChild>
+                    <Button variant="secondary" size="sm">
+                      <Save className="w-4 h-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Save className="w-5 h-5" />
+                        Salva come Preset
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Nome *</Label>
+                        <Input
+                          placeholder="Es: Danza Hip Hop energica"
+                          value={newPresetName}
+                          onChange={(e) => setNewPresetName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Descrizione</Label>
+                        <Textarea
+                          placeholder="Descrivi il movimento..."
+                          value={newPresetDescription}
+                          onChange={(e) => setNewPresetDescription(e.target.value)}
+                          rows={2}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Categoria</Label>
+                        <Select value={newPresetCategory} onValueChange={setNewPresetCategory}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="custom">⭐ Personalizzato</SelectItem>
+                            <SelectItem value="dance">💃 Danza</SelectItem>
+                            <SelectItem value="gesture">👋 Gesto</SelectItem>
+                            <SelectItem value="expression">😊 Espressione</SelectItem>
+                            <SelectItem value="action">🏃 Azione</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          Tag (separati da virgola)
+                        </Label>
+                        <Input
+                          placeholder="es: energico, veloce, moderno"
+                          value={newPresetTags}
+                          onChange={(e) => setNewPresetTags(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg border">
+                        <div>
+                          <p className="text-sm font-medium">Rendi pubblico</p>
+                          <p className="text-xs text-muted-foreground">Altri utenti potranno usare questo preset</p>
+                        </div>
+                        <Switch
+                          checked={newPresetIsPublic}
+                          onCheckedChange={setNewPresetIsPublic}
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowCreatePreset(false)}>
+                        Annulla
+                      </Button>
+                      <Button onClick={handleSaveAsPreset} disabled={isSavingPreset || !newPresetName.trim()}>
+                        {isSavingPreset ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4 mr-2" />
+                        )}
+                        Salva Preset
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
             
             {selectedPreset && (
