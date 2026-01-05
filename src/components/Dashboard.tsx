@@ -19,6 +19,7 @@ import {
 import { ApiStatusWidget } from "./ApiStatusWidget";
 import { ApiUptimeChart } from "./ApiUptimeChart";
 import { ApiThresholdSettings } from "./ApiThresholdSettings";
+import { ApiMonitoringDashboard } from "./ApiMonitoringDashboard";
 import { UsageCharts } from "./UsageCharts";
 import { LogViewer } from "./LogViewer";
 import { NotificationSettings } from "./NotificationSettings";
@@ -270,11 +271,13 @@ export const Dashboard = () => {
           </div>
         </div>
 
-        {/* API Status and Uptime Chart */}
-        <div className="grid lg:grid-cols-2 gap-6 mb-6">
-          <ApiStatusWidget apis={apis} isRefreshing={isRefreshing} onRefresh={checkApiStatus} />
-          <ApiUptimeChart history={history} loading={loadingHistory} />
-        </div>
+        {/* Full API Monitoring Dashboard */}
+        <ApiMonitoringDashboard 
+          apis={apis} 
+          history={history} 
+          isRefreshing={isRefreshing} 
+          onRefresh={checkApiStatus} 
+        />
 
         {/* Usage Charts and Threshold Settings */}
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
