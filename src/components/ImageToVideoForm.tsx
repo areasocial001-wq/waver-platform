@@ -15,14 +15,8 @@ import { useProviderPreference } from "@/hooks/useProviderPreference";
 // Durate supportate per ogni provider
 const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
   auto: [
-    { value: "4", label: "4 secondi" },
-    { value: "6", label: "6 secondi" },
-    { value: "8", label: "8 secondi" },
-  ],
-  veo: [
-    { value: "4", label: "4 secondi" },
-    { value: "6", label: "6 secondi" },
-    { value: "8", label: "8 secondi" },
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
   ],
   "piapi-kling-2.1": [
     { value: "5", label: "5 secondi" },
@@ -74,11 +68,6 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
 // Risoluzioni supportate per ogni provider
 const PROVIDER_RESOLUTIONS: Record<string, { value: string; label: string }[]> = {
   auto: [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  veo: [
-    { value: "480p", label: "480p (Standard)" },
     { value: "720p", label: "720p (HD)" },
     { value: "1080p", label: "1080p (Full HD)" },
   ],
@@ -142,8 +131,7 @@ interface ProviderInfo {
 }
 
 const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["veo", "piapi-kling-2.5", "piapi-hailuo"] },
-  veo: { name: "Google Veo 3.1", color: "bg-emerald-500", speed: 2, quality: 3, cost: 3, features: ["Audio sync", "Alta qualità"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-veo3", "piapi-hailuo"] },
   "piapi-kling-2.1": { name: "Kling 2.1", color: "bg-orange-400", speed: 2, quality: 2, cost: 1, features: ["Economico"], estimatedTime: "2-3 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.6", "piapi-hailuo"] },
   "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
@@ -153,8 +141,8 @@ const PROVIDER_INFO: Record<string, ProviderInfo> = {
   "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-skyreels": { name: "Skyreels", color: "bg-indigo-500", speed: 2, quality: 2, cost: 1, features: ["Effetti speciali"], estimatedTime: "2-3 min", fallbackOrder: ["piapi-hailuo", "piapi-wan"] },
   "piapi-framepack": { name: "Framepack", color: "bg-teal-500", speed: 3, quality: 2, cost: 1, features: ["Interpolazione"], estimatedTime: "1-2 min", fallbackOrder: ["piapi-hailuo", "piapi-wan"] },
-  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-green-500", speed: 2, quality: 3, cost: 2, features: ["Via gateway"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"], estimatedTime: "5-10 min", fallbackOrder: ["piapi-kling-2.5", "veo"] },
+  "piapi-veo3": { name: "Veo 3", color: "bg-emerald-500", speed: 2, quality: 3, cost: 2, features: ["Audio sync", "Alta qualità"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"], estimatedTime: "5-10 min", fallbackOrder: ["piapi-kling-2.5", "piapi-veo3"] },
   freepik: { name: "Freepik MiniMax", color: "bg-blue-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Transizioni"], estimatedTime: "1-2 min", fallbackOrder: ["piapi-hailuo", "piapi-kling-2.5"] },
 };
 
@@ -491,16 +479,28 @@ export const ImageToVideoForm = () => {
                 <span>Auto (migliore disponibile)</span>
               </div>
             </SelectItem>
-            <SelectItem value="veo">
+            <SelectItem value="piapi-veo3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Google Veo 3.1</span>
+                <span>Veo 3 (Alta qualità)</span>
               </div>
             </SelectItem>
             <SelectItem value="piapi-kling-2.1">
               <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-400" />
+                <span>Kling 2.1 (Economico)</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-kling-2.5">
+              <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-orange-500" />
-                <span>PiAPI Kling 2.1</span>
+                <span>Kling 2.5</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-kling-2.6">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-600" />
+                <span>Kling 2.6 (Motion)</span>
               </div>
             </SelectItem>
             <SelectItem value="piapi-hailuo">
@@ -539,16 +539,10 @@ export const ImageToVideoForm = () => {
                 <span>PiAPI Framepack</span>
               </div>
             </SelectItem>
-            <SelectItem value="piapi-veo3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                <span>PiAPI Veo 3.1</span>
-              </div>
-            </SelectItem>
             <SelectItem value="piapi-sora2">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span>PiAPI Sora 2</span>
+                <span>Sora 2</span>
               </div>
             </SelectItem>
             <SelectItem value="freepik">
