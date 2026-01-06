@@ -29,8 +29,23 @@ export const useVideoPolling = (
   // Track retry timers
   const retryTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
+  // Check if URL is a Google VEO API URL that needs proxying
+  const isGoogleVeoUrl = useCallback((url: string) => {
+    return url.includes("generativelanguage.googleapis.com") || 
+           url.includes("storage.googleapis.com/veo-");
+  }, []);
+
   const repairVideoLink = useCallback(async (videoId: string, currentUrl: string) => {
     try {
+      // Only use video-proxy for Google VEO URLs
+      if (!isGoogleVeoUrl(currentUrl)) {
+        console.log("Skipping video-proxy for non-Google URL:", currentUrl);
+        toast.info("URL non riparabile", {
+          description: "Questo URL non supporta il proxy automatico"
+        });
+        return false;
+      }
+
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const proxyUrl = `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(currentUrl)}`;
       
@@ -48,42 +63,49 @@ export const useVideoPolling = (
       console.error("Error repairing link:", error);
     }
     return false;
-  }, [onUpdate]);
+  }, [onUpdate, isGoogleVeoUrl]);
 
   // Check if a video URL is broken (returns 404)
   const checkVideoUrl = useCallback(async (videoId: string, videoUrl: string) => {
     // Skip if already checked or already a proxy URL
     if (brokenLinkVideos.current.has(videoId)) return;
     if (videoUrl.includes("/functions/v1/video-proxy")) return;
+    
+    // Skip checking for PiAPI/Storage URLs - they don't need proxying and might have CORS issues
+    if (videoUrl.includes("piapi.ai") || 
+        videoUrl.includes("cdn.piapi.ai") ||
+        videoUrl.includes("supabase.co/storage")) {
+      return; // These URLs are managed externally and don't need repair
+    }
 
     try {
       const response = await fetch(videoUrl, { method: "HEAD" });
       if (!response.ok) {
         brokenLinkVideos.current.add(videoId);
         
-        toast.error("Video non raggiungibile", {
-          description: "Il link del video non è più valido",
-          duration: 10000,
-          action: {
-            label: "Ripara",
-            onClick: () => repairVideoLink(videoId, videoUrl),
-          },
-        });
+        // Only offer repair for Google VEO URLs
+        if (isGoogleVeoUrl(videoUrl)) {
+          toast.error("Video non raggiungibile", {
+            description: "Il link del video non è più valido",
+            duration: 10000,
+            action: {
+              label: "Ripara",
+              onClick: () => repairVideoLink(videoId, videoUrl),
+            },
+          });
+        } else {
+          toast.error("Video non raggiungibile", {
+            description: "Il link del video non è più valido (non riparabile)",
+            duration: 5000,
+          });
+        }
       }
     } catch (error) {
       // Network error - likely CORS or unreachable
-      brokenLinkVideos.current.add(videoId);
-      
-      toast.error("Video non raggiungibile", {
-        description: "Impossibile accedere al video",
-        duration: 10000,
-        action: {
-          label: "Ripara",
-          onClick: () => repairVideoLink(videoId, videoUrl),
-        },
-      });
+      // Don't mark as broken for CORS errors on external URLs
+      console.log("Video URL check failed (might be CORS):", videoUrl);
     }
-  }, [repairVideoLink]);
+  }, [repairVideoLink, isGoogleVeoUrl]);
 
   useEffect(() => {
     // Check completed videos for broken links
