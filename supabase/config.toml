@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.edit-image]
 verify_jwt = true
+
+[functions.piapi-balance]
+verify_jwt = false

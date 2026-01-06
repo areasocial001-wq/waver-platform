@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, AlertCircle, Zap, Star, DollarSign, Clock } from "lucide-react";
+import { Sparkles, AlertCircle, Zap, Star, DollarSign, Clock, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 import { ProviderComparisonDialog } from "@/components/ProviderComparisonDialog";
 import { useProviderPreference } from "@/hooks/useProviderPreference";
+
+interface PiAPIBalance {
+  credits: number;
+  equivalent_in_usd: number;
+  account_name: string;
+}
 // Durate supportate per ogni provider
 const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
   auto: [
@@ -130,10 +136,34 @@ export const TextToVideoForm = () => {
   const [cameraMovement, setCameraMovement] = useState<string>("none");
   const [composition, setComposition] = useState<string>("medium");
   const [audioType, setAudioType] = useState<string>("none");
+  const [piapiBalance, setPiapiBalance] = useState<PiAPIBalance | null>(null);
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch PiAPI balance on mount and when provider changes
+  const fetchPiapiBalance = async () => {
+    setIsLoadingBalance(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('piapi-balance');
+      if (error) throw error;
+      setPiapiBalance(data);
+    } catch (error) {
+      console.error("Error fetching PiAPI balance:", error);
+      setPiapiBalance(null);
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  useEffect(() => {
+    // Only fetch balance if using a PiAPI provider
+    if (preferredProvider.startsWith('piapi-') || preferredProvider === 'auto') {
+      fetchPiapiBalance();
+    }
+  }, []);
 
   // Aggiorna durata e risoluzione quando cambia il provider
   useEffect(() => {
@@ -321,6 +351,38 @@ export const TextToVideoForm = () => {
 
   return (
     <div className="space-y-6">
+      {/* PiAPI Balance Alert */}
+      {(preferredProvider.startsWith('piapi-') || preferredProvider === 'auto') && (
+        <Alert className={`border ${piapiBalance && piapiBalance.equivalent_in_usd < 1 ? 'border-destructive/50 bg-destructive/10' : 'border-green-500/30 bg-green-500/5'}`}>
+          <Wallet className={`h-4 w-4 ${piapiBalance && piapiBalance.equivalent_in_usd < 1 ? 'text-destructive' : 'text-green-500'}`} />
+          <AlertDescription className="flex items-center justify-between w-full">
+            <span>
+              {isLoadingBalance ? (
+                "Caricamento saldo..."
+              ) : piapiBalance ? (
+                <>
+                  <strong>Saldo PiAPI:</strong> ${piapiBalance.equivalent_in_usd.toFixed(2)} USD ({piapiBalance.credits.toLocaleString()} crediti)
+                  {piapiBalance.equivalent_in_usd < 1 && (
+                    <span className="text-destructive ml-2">⚠️ Crediti insufficienti!</span>
+                  )}
+                </>
+              ) : (
+                "Impossibile verificare il saldo"
+              )}
+            </span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={fetchPiapiBalance} 
+              disabled={isLoadingBalance}
+              className="h-6 px-2"
+            >
+              <RefreshCw className={`h-3 w-3 ${isLoadingBalance ? 'animate-spin' : ''}`} />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Alert className="border-primary/30 bg-primary/5">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription>
