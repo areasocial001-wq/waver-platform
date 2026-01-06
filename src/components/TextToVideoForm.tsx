@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, AlertCircle } from "lucide-react";
+import { Sparkles, AlertCircle, Zap, Star, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 
@@ -55,6 +56,82 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+// Risoluzioni supportate per ogni provider
+const PROVIDER_RESOLUTIONS: Record<string, { value: string; label: string }[]> = {
+  auto: [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  veo: [
+    { value: "480p", label: "480p (Standard)" },
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-kling-2.5": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-kling-2.6": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-hailuo": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-luma": [
+    { value: "720p", label: "720p (HD)" },
+  ],
+  "piapi-wan": [
+    { value: "480p", label: "480p (Standard)" },
+    { value: "720p", label: "720p (HD)" },
+  ],
+  "piapi-hunyuan": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-veo3": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "piapi-sora2": [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+    { value: "4k", label: "4K (Ultra HD)" },
+  ],
+};
+
+// Caratteristiche dei provider
+interface ProviderInfo {
+  name: string;
+  color: string;
+  speed: 1 | 2 | 3; // 1=lento, 2=medio, 3=veloce
+  quality: 1 | 2 | 3; // 1=base, 2=buona, 3=eccellente
+  cost: 1 | 2 | 3; // 1=economico, 2=medio, 3=costoso
+  features: string[];
+}
+
+const PROVIDER_INFO: Record<string, ProviderInfo> = {
+  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica"] },
+  veo: { name: "Google Veo 3.1", color: "bg-emerald-500", speed: 2, quality: 3, cost: 3, features: ["Audio sync", "Alta qualità"] },
+  "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"] },
+  "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"] },
+  "piapi-hailuo": { name: "Hailuo", color: "bg-pink-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Economico"] },
+  "piapi-luma": { name: "Luma", color: "bg-cyan-500", speed: 2, quality: 3, cost: 2, features: ["Cinematico"] },
+  "piapi-wan": { name: "Wan", color: "bg-violet-500", speed: 2, quality: 2, cost: 1, features: ["Scene naturali"] },
+  "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"] },
+  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-green-500", speed: 2, quality: 3, cost: 2, features: ["Via gateway"] },
+  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"] },
+};
+
+const RatingDots = ({ value, max = 3, color }: { value: number; max?: number; color: string }) => (
+  <div className="flex gap-0.5">
+    {Array.from({ length: max }).map((_, i) => (
+      <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < value ? color : "bg-muted-foreground/30"}`} />
+    ))}
+  </div>
+);
+
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState("6");
@@ -67,12 +144,18 @@ export const TextToVideoForm = () => {
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Aggiorna la durata quando cambia il provider
+  // Aggiorna durata e risoluzione quando cambia il provider
   useEffect(() => {
     const availableDurations = PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto;
     const currentDurationValid = availableDurations.some(d => d.value === duration);
     if (!currentDurationValid) {
       setDuration(availableDurations[0].value);
+    }
+    
+    const availableResolutions = PROVIDER_RESOLUTIONS[preferredProvider] || PROVIDER_RESOLUTIONS.auto;
+    const currentResolutionValid = availableResolutions.some(r => r.value === resolution);
+    if (!currentResolutionValid) {
+      setResolution(availableResolutions[0].value);
     }
   }, [preferredProvider]);
 
@@ -325,33 +408,55 @@ export const TextToVideoForm = () => {
             </SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
-          {preferredProvider === "auto" && "Seleziona automaticamente il provider migliore disponibile"}
-          {preferredProvider === "veo" && "Google Veo 3.1 - Alta qualità con audio sincronizzato"}
-          {preferredProvider === "piapi-kling-2.5" && "PiAPI Kling 2.5 - Ottimo rapporto qualità/prezzo"}
-          {preferredProvider === "piapi-kling-2.6" && "PiAPI Kling 2.6 - Ultima versione con motion control"}
-          {preferredProvider === "piapi-hailuo" && "PiAPI Hailuo - Video fluidi e naturali"}
-          {preferredProvider === "piapi-luma" && "PiAPI Luma - Alta qualità cinematica"}
-          {preferredProvider === "piapi-wan" && "PiAPI Wan - Modello Alibaba, ottimo per scene naturali"}
-          {preferredProvider === "piapi-hunyuan" && "PiAPI Hunyuan - Modello Tencent, eccellente per volti"}
-          {preferredProvider === "piapi-veo3" && "PiAPI Veo 3.1 - Google Veo via PiAPI gateway"}
-          {preferredProvider === "piapi-sora2" && "PiAPI Sora 2 - OpenAI Sora via PiAPI gateway"}
-        </p>
+        
+        {/* Provider Info Badges */}
+        {preferredProvider !== "auto" && PROVIDER_INFO[preferredProvider] && (
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <div className="flex items-center gap-1.5 text-xs">
+              <Zap className="w-3 h-3 text-yellow-500" />
+              <span className="text-muted-foreground">Velocità:</span>
+              <RatingDots value={PROVIDER_INFO[preferredProvider].speed} color="bg-yellow-500" />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <Star className="w-3 h-3 text-blue-500" />
+              <span className="text-muted-foreground">Qualità:</span>
+              <RatingDots value={PROVIDER_INFO[preferredProvider].quality} color="bg-blue-500" />
+            </div>
+            <div className="flex items-center gap-1.5 text-xs">
+              <DollarSign className="w-3 h-3 text-green-500" />
+              <span className="text-muted-foreground">Costo:</span>
+              <RatingDots value={PROVIDER_INFO[preferredProvider].cost} color="bg-green-500" />
+            </div>
+          </div>
+        )}
+        
+        {/* Feature badges */}
+        {preferredProvider !== "auto" && PROVIDER_INFO[preferredProvider] && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {PROVIDER_INFO[preferredProvider].features.map((feature, i) => (
+              <Badge key={i} variant="secondary" className="text-xs px-2 py-0">
+                {feature}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* API Indicator */}
       <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+        PROVIDER_INFO[preferredProvider]?.color ? `${PROVIDER_INFO[preferredProvider].color}/10 border-current/30` :
         preferredProvider?.startsWith("piapi-") ? "bg-orange-500/10 border-orange-500/30" :
         "bg-emerald-500/10 border-emerald-500/30"
       }`}>
         <div className={`w-3 h-3 rounded-full animate-pulse ${
-          preferredProvider?.startsWith("piapi-") ? "bg-orange-500" : "bg-emerald-500"
+          PROVIDER_INFO[preferredProvider]?.color || (preferredProvider?.startsWith("piapi-") ? "bg-orange-500" : "bg-emerald-500")
         }`} />
         <div className="flex-1">
           <p className="text-sm font-medium">
-            {preferredProvider?.startsWith("piapi-") 
+            {PROVIDER_INFO[preferredProvider]?.name || 
+             (preferredProvider?.startsWith("piapi-") 
               ? `PiAPI ${preferredProvider.replace("piapi-", "").toUpperCase()}` 
-              : preferredProvider === "veo" ? "Google Veo 3.1" : "Auto"}
+              : preferredProvider === "veo" ? "Google Veo 3.1" : "Auto")}
           </p>
           <p className="text-xs text-muted-foreground">
             {preferredProvider?.startsWith("piapi-") 
@@ -501,9 +606,9 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="480p">480p (Standard)</SelectItem>
-              <SelectItem value="720p">720p (HD)</SelectItem>
-              <SelectItem value="1080p">1080p (Full HD)</SelectItem>
+              {(PROVIDER_RESOLUTIONS[preferredProvider] || PROVIDER_RESOLUTIONS.auto).map((r) => (
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
