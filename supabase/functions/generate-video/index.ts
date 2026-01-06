@@ -47,13 +47,16 @@ serve(async (req) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     
-    if (!GOOGLE_AI_API_KEY) {
-      throw new Error("GOOGLE_AI_API_KEY is not set");
-    }
-
+    const hasValidGoogleKey = GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.trim().length > 0;
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     
+    // At least one provider must be configured
+    if (!hasValidGoogleKey && !hasValidPiAPIKey) {
+      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY or PIAPI_API_KEY");
+    }
+    
     console.log("API credentials check:", {
+      hasGoogleKey: hasValidGoogleKey,
       hasPiAPIKey: hasValidPiAPIKey
     });
 
@@ -262,12 +265,15 @@ serve(async (req) => {
       }
       
       // Google Veo polling
+      if (!hasValidGoogleKey) {
+        throw new Error("GOOGLE_AI_API_KEY is required for polling Google Veo operations");
+      }
       const pollResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/${body.operationId}`,
         {
           method: "GET",
           headers: {
-            "x-goog-api-key": GOOGLE_AI_API_KEY,
+            "x-goog-api-key": GOOGLE_AI_API_KEY!,
             "Content-Type": "application/json",
           },
         }
@@ -316,7 +322,7 @@ serve(async (req) => {
 
         const videoResponse = await fetch(videoUri, {
           headers: {
-            "x-goog-api-key": GOOGLE_AI_API_KEY,
+            "x-goog-api-key": GOOGLE_AI_API_KEY!,
           },
         });
 
@@ -641,7 +647,95 @@ serve(async (req) => {
       }
     }
 
-    // Kling Direct API removed - use PiAPI Kling instead
+    // ==================== FALLBACK TO PIAPI IF NO GOOGLE KEY ====================
+    if (!hasValidGoogleKey && hasValidPiAPIKey) {
+      console.log("No Google AI key, using PiAPI as default provider");
+      
+      const modelConfig = PIAPI_MODELS["kling-2.5"]; // Default to kling-2.5
+      const startImageData = start_image || image || image_url;
+      
+      const piApiPayload: any = {
+        model: modelConfig.model,
+        task_type: type === "image_to_video" ? "img2video" : "txt2video",
+        input: {
+          prompt: prompt || "Smooth cinematic video",
+          duration: duration || 5,
+        }
+      };
+      
+      if (modelConfig.model_name) {
+        piApiPayload.input.model_name = modelConfig.model_name;
+      }
+      if (modelConfig.mode) {
+        piApiPayload.input.mode = modelConfig.mode;
+      }
+      
+      if (type === "image_to_video" && startImageData) {
+        if (startImageData.startsWith('data:')) {
+          piApiPayload.input.image = extractBase64(startImageData);
+        } else {
+          piApiPayload.input.image_url = startImageData;
+        }
+        
+        if (end_image) {
+          if (end_image.startsWith('data:')) {
+            piApiPayload.input.tail_image = extractBase64(end_image);
+          } else {
+            piApiPayload.input.tail_image_url = end_image;
+          }
+        }
+      }
+      
+      console.log("Calling PiAPI for video generation (fallback):", { model: modelConfig.model, task_type: piApiPayload.task_type });
+      
+      const piApiResponse = await fetch("https://api.piapi.ai/api/v1/task", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": PIAPI_API_KEY!,
+        },
+        body: JSON.stringify(piApiPayload),
+      });
+
+      if (!piApiResponse.ok) {
+        const error = await piApiResponse.text();
+        console.error("PiAPI error:", error);
+        throw new Error(`PiAPI error: ${piApiResponse.status} - ${error}`);
+      }
+
+      const piApiData = await piApiResponse.json();
+      console.log("PiAPI task started:", piApiData);
+      
+      const taskId = piApiData.data?.task_id || piApiData.task_id;
+      if (!taskId) {
+        throw new Error("PiAPI did not return a task ID");
+      }
+
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `piapi:kling-2.5:${taskId}`,
+            provider: 'piapi-kling-2.5'
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `piapi:kling-2.5:${taskId}`,
+        provider: 'piapi-kling-2.5'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
 
     // ==================== GOOGLE VEO 3.1 (DEFAULT) ====================
     console.log("Starting video generation with Google Veo 3.1");
@@ -737,7 +831,7 @@ serve(async (req) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-goog-api-key": GOOGLE_AI_API_KEY,
+          "x-goog-api-key": GOOGLE_AI_API_KEY!,
         },
         body: JSON.stringify(requestBody),
       }
