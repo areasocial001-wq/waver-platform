@@ -9,6 +9,65 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 
+// Durate supportate per ogni provider
+const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
+  auto: [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  veo: [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  "piapi-kling-2.1": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+  ],
+  "piapi-kling-2.5": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+  ],
+  "piapi-kling-2.6": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+  ],
+  "piapi-hailuo": [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+  ],
+  "piapi-luma": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-wan": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-hunyuan": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-skyreels": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-framepack": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-veo3": [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  "piapi-sora2": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+    { value: "15", label: "15 secondi" },
+    { value: "20", label: "20 secondi" },
+  ],
+  freepik: [
+    { value: "5", label: "5 secondi" },
+  ],
+};
+
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
   const [startImagePreview, setStartImagePreview] = useState<string>("");
@@ -25,20 +84,14 @@ export const ImageToVideoForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
 
-  // Reset duration to valid value when switching between modes
+  // Aggiorna la durata quando cambia il provider
   useEffect(() => {
-    if (endImage) {
-      // Kling API mode - default to 5 seconds
-      if (duration !== "5" && duration !== "10") {
-        setDuration("5");
-      }
-    } else {
-      // Google Veo mode - default to 6 seconds
-      if (duration !== "4" && duration !== "6" && duration !== "8") {
-        setDuration("6");
-      }
+    const availableDurations = PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto;
+    const currentDurationValid = availableDurations.some(d => d.value === duration);
+    if (!currentDurationValid) {
+      setDuration(availableDurations[0].value);
     }
-  }, [endImage]);
+  }, [preferredProvider]);
 
   // Compress and resize image to prevent Out of Memory errors and PiAPI size limits
   const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.6): Promise<string> => {
@@ -654,33 +707,17 @@ export const ImageToVideoForm = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="i2v-duration">
-            Durata {endImage && <span className="text-xs text-accent">(Kling API)</span>}
-          </Label>
+          <Label htmlFor="i2v-duration">Durata</Label>
           <Select value={duration} onValueChange={setDuration}>
             <SelectTrigger id="i2v-duration">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {endImage ? (
-                <>
-                  <SelectItem value="5">5 secondi</SelectItem>
-                  <SelectItem value="10">10 secondi</SelectItem>
-                </>
-              ) : (
-                <>
-                  <SelectItem value="4">4 secondi</SelectItem>
-                  <SelectItem value="6">6 secondi</SelectItem>
-                  <SelectItem value="8">8 secondi</SelectItem>
-                </>
-              )}
+              {(PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto).map((d) => (
+                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
-          {endImage && (
-            <p className="text-xs text-muted-foreground">
-              Kling supporta solo 5 o 10 secondi
-            </p>
-          )}
         </div>
 
         <div className="space-y-2">
