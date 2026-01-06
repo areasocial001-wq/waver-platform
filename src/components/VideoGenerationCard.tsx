@@ -2,13 +2,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2 } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2, Layers } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AddVoiceoverDialog } from "./AddVoiceoverDialog";
+import { VideoAudioCombiner } from "./VideoAudioCombiner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -438,6 +439,14 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                       Audio
                     </Badge>
                   )}
+                  
+                  {/* Video + Audio Combiner */}
+                  <VideoAudioCombiner
+                    videoUrl={generation.video_url}
+                    videoName={`video-${generation.id.slice(0, 8)}`}
+                    existingAudioUrl={generation.audio_url || undefined}
+                    dialogueText={generation.dialogue_text || undefined}
+                  />
                   
                   <Button
                     variant="outline"
