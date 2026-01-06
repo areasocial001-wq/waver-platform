@@ -18,6 +18,7 @@ export const TextToVideoForm = () => {
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
+  const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
 
   const handlePresetChange = (preset: ScenePreset) => {
@@ -136,7 +137,8 @@ export const TextToVideoForm = () => {
             type: "text_to_video",
             prompt: cinematicPrompt,
             duration: parseInt(duration),
-            generationId: generationData.id
+            generationId: generationData.id,
+            preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
           }
         });
 
@@ -193,10 +195,116 @@ export const TextToVideoForm = () => {
       <Alert className="border-primary/30 bg-primary/5">
         <AlertCircle className="h-4 w-4 text-primary" />
         <AlertDescription>
-          Genera video ad alta qualità usando Google Veo 3, il modello AI più avanzato per la generazione video. 
+          Genera video ad alta qualità usando vari modelli AI. 
           La generazione richiede qualche minuto.
         </AlertDescription>
       </Alert>
+
+      {/* Provider Selection */}
+      <div className="space-y-2">
+        <Label>Provider AI</Label>
+        <Select value={preferredProvider} onValueChange={setPreferredProvider}>
+          <SelectTrigger>
+            <SelectValue placeholder="Seleziona provider" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-accent" />
+                <span>Auto (migliore disponibile)</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="veo">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span>Google Veo 3.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-kling-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-500" />
+                <span>PiAPI Kling 2.5</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-kling-2.6">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-orange-600" />
+                <span>PiAPI Kling 2.6</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-hailuo">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-pink-500" />
+                <span>PiAPI Hailuo</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-luma">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-500" />
+                <span>PiAPI Luma</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-wan">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-violet-500" />
+                <span>PiAPI Wan</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-hunyuan">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>PiAPI Hunyuan</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-veo3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <span>PiAPI Veo 3.1</span>
+              </div>
+            </SelectItem>
+            <SelectItem value="piapi-sora2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span>PiAPI Sora 2</span>
+              </div>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          {preferredProvider === "auto" && "Seleziona automaticamente il provider migliore disponibile"}
+          {preferredProvider === "veo" && "Google Veo 3.1 - Alta qualità con audio sincronizzato"}
+          {preferredProvider === "piapi-kling-2.5" && "PiAPI Kling 2.5 - Ottimo rapporto qualità/prezzo"}
+          {preferredProvider === "piapi-kling-2.6" && "PiAPI Kling 2.6 - Ultima versione con motion control"}
+          {preferredProvider === "piapi-hailuo" && "PiAPI Hailuo - Video fluidi e naturali"}
+          {preferredProvider === "piapi-luma" && "PiAPI Luma - Alta qualità cinematica"}
+          {preferredProvider === "piapi-wan" && "PiAPI Wan - Modello Alibaba, ottimo per scene naturali"}
+          {preferredProvider === "piapi-hunyuan" && "PiAPI Hunyuan - Modello Tencent, eccellente per volti"}
+          {preferredProvider === "piapi-veo3" && "PiAPI Veo 3.1 - Google Veo via PiAPI gateway"}
+          {preferredProvider === "piapi-sora2" && "PiAPI Sora 2 - OpenAI Sora via PiAPI gateway"}
+        </p>
+      </div>
+
+      {/* API Indicator */}
+      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+        preferredProvider?.startsWith("piapi-") ? "bg-orange-500/10 border-orange-500/30" :
+        "bg-emerald-500/10 border-emerald-500/30"
+      }`}>
+        <div className={`w-3 h-3 rounded-full animate-pulse ${
+          preferredProvider?.startsWith("piapi-") ? "bg-orange-500" : "bg-emerald-500"
+        }`} />
+        <div className="flex-1">
+          <p className="text-sm font-medium">
+            {preferredProvider?.startsWith("piapi-") 
+              ? `PiAPI ${preferredProvider.replace("piapi-", "").toUpperCase()}` 
+              : preferredProvider === "veo" ? "Google Veo 3.1" : "Auto"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {preferredProvider?.startsWith("piapi-") 
+              ? "Video generation via PiAPI gateway" 
+              : "Google Veo con audio sincronizzato"}
+          </p>
+        </div>
+      </div>
 
       <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
