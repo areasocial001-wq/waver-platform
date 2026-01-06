@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Zap, Star, DollarSign, GitCompare, Check, Clock, Film, Music } from "lucide-react";
+import { Zap, Star, DollarSign, GitCompare, Check, Clock, Film, RefreshCw } from "lucide-react";
 
 interface ProviderInfo {
   name: string;
@@ -10,6 +10,8 @@ interface ProviderInfo {
   quality: 1 | 2 | 3;
   cost: 1 | 2 | 3;
   features: string[];
+  estimatedTime?: string;
+  fallbackOrder?: string[];
 }
 
 interface ProviderComparisonDialogProps {
@@ -100,16 +102,21 @@ export const ProviderComparisonDialog = ({
                 <th className="text-center py-3 px-2 font-medium text-muted-foreground">
                   <div className="flex items-center justify-center gap-1">
                     <Clock className="w-3 h-3" />
-                    Durate
+                    Tempo
                   </div>
                 </th>
                 <th className="text-center py-3 px-2 font-medium text-muted-foreground">
                   <div className="flex items-center justify-center gap-1">
                     <Film className="w-3 h-3" />
-                    Risoluzioni
+                    Durate
                   </div>
                 </th>
-                <th className="text-left py-3 px-2 font-medium text-muted-foreground">Caratteristiche</th>
+                <th className="text-center py-3 px-2 font-medium text-muted-foreground">
+                  <div className="flex items-center justify-center gap-1">
+                    <RefreshCw className="w-3 h-3" />
+                    Fallback
+                  </div>
+                </th>
                 <th className="text-center py-3 px-2 font-medium text-muted-foreground">Azione</th>
               </tr>
             </thead>
@@ -163,6 +170,11 @@ export const ProviderComparisonDialog = ({
                       </div>
                     </td>
                     <td className="py-3 px-2 text-center">
+                      <span className="text-xs font-medium text-purple-600">
+                        {provider.estimatedTime || "2-4 min"}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-center">
                       <div className="flex flex-wrap justify-center gap-1">
                         {providerDurations.map((d) => (
                           <Badge key={d.value} variant="outline" className="text-xs">
@@ -172,21 +184,12 @@ export const ProviderComparisonDialog = ({
                       </div>
                     </td>
                     <td className="py-3 px-2 text-center">
-                      <div className="flex flex-wrap justify-center gap-1">
-                        {providerResolutions.map((r) => (
-                          <Badge key={r.value} variant="outline" className="text-xs">
-                            {r.value}
+                      <div className="flex flex-wrap justify-center gap-1 max-w-[120px]">
+                        {provider.fallbackOrder?.slice(0, 2).map((fb, i) => (
+                          <Badge key={i} variant="outline" className="text-xs border-dashed">
+                            {providers[fb]?.name?.split(' ')[0] || fb}
                           </Badge>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex flex-wrap gap-1">
-                        {provider.features.map((feature, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {feature}
-                          </Badge>
-                        ))}
+                        )) || <span className="text-xs text-muted-foreground">-</span>}
                       </div>
                     </td>
                     <td className="py-3 px-2 text-center">

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, AlertCircle, Zap, Star, DollarSign } from "lucide-react";
+import { Sparkles, AlertCircle, Zap, Star, DollarSign, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -110,19 +110,21 @@ interface ProviderInfo {
   quality: 1 | 2 | 3; // 1=base, 2=buona, 3=eccellente
   cost: 1 | 2 | 3; // 1=economico, 2=medio, 3=costoso
   features: string[];
+  estimatedTime: string; // Stima tempo in minuti
+  fallbackOrder: string[]; // Provider di fallback in ordine di priorità
 }
 
 const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica"] },
-  veo: { name: "Google Veo 3.1", color: "bg-emerald-500", speed: 2, quality: 3, cost: 3, features: ["Audio sync", "Alta qualità"] },
-  "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"] },
-  "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"] },
-  "piapi-hailuo": { name: "Hailuo", color: "bg-pink-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Economico"] },
-  "piapi-luma": { name: "Luma", color: "bg-cyan-500", speed: 2, quality: 3, cost: 2, features: ["Cinematico"] },
-  "piapi-wan": { name: "Wan", color: "bg-violet-500", speed: 2, quality: 2, cost: 1, features: ["Scene naturali"] },
-  "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"] },
-  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-green-500", speed: 2, quality: 3, cost: 2, features: ["Via gateway"] },
-  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"] },
+  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["veo", "piapi-kling-2.5", "piapi-hailuo"] },
+  veo: { name: "Google Veo 3.1", color: "bg-emerald-500", speed: 2, quality: 3, cost: 3, features: ["Audio sync", "Alta qualità"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.6", "piapi-hailuo"] },
+  "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-hailuo": { name: "Hailuo", color: "bg-pink-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Economico"], estimatedTime: "1-2 min", fallbackOrder: ["piapi-wan", "piapi-kling-2.5"] },
+  "piapi-luma": { name: "Luma", color: "bg-cyan-500", speed: 2, quality: 3, cost: 2, features: ["Cinematico"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-wan": { name: "Wan", color: "bg-violet-500", speed: 2, quality: 2, cost: 1, features: ["Scene naturali"], estimatedTime: "2-3 min", fallbackOrder: ["piapi-hailuo", "piapi-kling-2.5"] },
+  "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-green-500", speed: 2, quality: 3, cost: 2, features: ["Via gateway"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"], estimatedTime: "5-10 min", fallbackOrder: ["piapi-kling-2.5", "veo"] },
 };
 
 const RatingDots = ({ value, max = 3, color }: { value: number; max?: number; color: string }) => (
@@ -420,8 +422,8 @@ export const TextToVideoForm = () => {
         </Select>
         
         {/* Provider Info Badges */}
-        {preferredProvider !== "auto" && PROVIDER_INFO[preferredProvider] && (
-          <div className="flex flex-wrap items-center gap-2 mt-2">
+        {PROVIDER_INFO[preferredProvider] && (
+          <div className="flex flex-wrap items-center gap-3 mt-2">
             <div className="flex items-center gap-1.5 text-xs">
               <Zap className="w-3 h-3 text-yellow-500" />
               <span className="text-muted-foreground">Velocità:</span>
@@ -437,17 +439,27 @@ export const TextToVideoForm = () => {
               <span className="text-muted-foreground">Costo:</span>
               <RatingDots value={PROVIDER_INFO[preferredProvider].cost} color="bg-green-500" />
             </div>
+            <div className="flex items-center gap-1.5 text-xs border-l pl-3">
+              <Clock className="w-3 h-3 text-purple-500" />
+              <span className="text-muted-foreground">Tempo stimato:</span>
+              <span className="font-medium text-purple-600">{PROVIDER_INFO[preferredProvider].estimatedTime}</span>
+            </div>
           </div>
         )}
         
-        {/* Feature badges */}
-        {preferredProvider !== "auto" && PROVIDER_INFO[preferredProvider] && (
+        {/* Feature badges + Fallback info */}
+        {PROVIDER_INFO[preferredProvider] && (
           <div className="flex flex-wrap gap-1 mt-2">
             {PROVIDER_INFO[preferredProvider].features.map((feature, i) => (
               <Badge key={i} variant="secondary" className="text-xs px-2 py-0">
                 {feature}
               </Badge>
             ))}
+            {PROVIDER_INFO[preferredProvider].fallbackOrder.length > 0 && (
+              <Badge variant="outline" className="text-xs px-2 py-0 border-dashed">
+                Fallback: {PROVIDER_INFO[preferredProvider].fallbackOrder.slice(0, 2).map(p => PROVIDER_INFO[p]?.name || p).join(" → ")}
+              </Badge>
+            )}
           </div>
         )}
       </div>
