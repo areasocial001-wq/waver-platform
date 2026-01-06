@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,52 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
+
+// Durate supportate per ogni provider
+const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
+  auto: [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  veo: [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  "piapi-kling-2.5": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+  ],
+  "piapi-kling-2.6": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+  ],
+  "piapi-hailuo": [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+  ],
+  "piapi-luma": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-wan": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-hunyuan": [
+    { value: "5", label: "5 secondi" },
+  ],
+  "piapi-veo3": [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
+  "piapi-sora2": [
+    { value: "5", label: "5 secondi" },
+    { value: "10", label: "10 secondi" },
+    { value: "15", label: "15 secondi" },
+    { value: "20", label: "20 secondi" },
+  ],
+};
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -20,6 +66,15 @@ export const TextToVideoForm = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [preferredProvider, setPreferredProvider] = useState<string>("auto");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Aggiorna la durata quando cambia il provider
+  useEffect(() => {
+    const availableDurations = PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto;
+    const currentDurationValid = availableDurations.some(d => d.value === duration);
+    if (!currentDurationValid) {
+      setDuration(availableDurations[0].value);
+    }
+  }, [preferredProvider]);
 
   const handlePresetChange = (preset: ScenePreset) => {
     setSelectedPreset(preset.id);
@@ -432,9 +487,9 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="4">4 secondi</SelectItem>
-              <SelectItem value="6">6 secondi</SelectItem>
-              <SelectItem value="8">8 secondi</SelectItem>
+              {(PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto).map((d) => (
+                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
