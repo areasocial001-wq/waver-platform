@@ -8,6 +8,7 @@ import { StoryboardEditor } from "./StoryboardEditor";
 import { VideoToAudioForm } from "./VideoToAudioForm";
 import { PiAPIAudioGenerator } from "./PiAPIAudioGenerator";
 import { MotionControlForm } from "./MotionControlForm";
+import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { Video, Image, Sparkles, Layout, Volume2, Music, Wand2 } from "lucide-react";
 
 export const GenerateSection = () => {
@@ -18,9 +19,12 @@ export const GenerateSection = () => {
           <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             Inizia a Creare
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-4">
             Scegli il metodo di generazione preferito e crea il tuo video in pochi secondi
           </p>
+          <div className="max-w-md mx-auto">
+            <DiagnosticsPanel />
+          </div>
         </div>
 
         <Tabs defaultValue="text" className="w-full">
