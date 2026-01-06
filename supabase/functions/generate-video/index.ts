@@ -14,6 +14,8 @@ interface PiAPIModelConfig {
   model: string;
   model_name?: string;
   mode?: string;
+  task_type_txt2video?: string; // Custom task type for text-to-video
+  task_type_img2video?: string; // Custom task type for image-to-video
 }
 
 const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
@@ -32,7 +34,8 @@ const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   // New models from PIAPI Creator subscription
   "skyreels": { model: "skyreels" },
   "framepack": { model: "framepack" },
-  "veo3": { model: "veo3" },
+  // Veo3 uses specific task_types: veo3-video or veo3-video-fast
+  "veo3": { model: "veo3", task_type_txt2video: "veo3-video", task_type_img2video: "veo3-video" },
   "sora2": { model: "sora2" },
 };
 
@@ -491,14 +494,29 @@ serve(async (req) => {
       const startImageData = start_image || image || image_url;
       
       // Build PiAPI request payload
+      // Determine task_type - some models like veo3 have custom task types
+      let taskType: string;
+      if (type === "image_to_video") {
+        taskType = modelConfig.task_type_img2video || "img2video";
+      } else {
+        taskType = modelConfig.task_type_txt2video || "txt2video";
+      }
+      
       const piApiPayload: any = {
         model: modelConfig.model,
-        task_type: type === "image_to_video" ? "img2video" : "txt2video",
+        task_type: taskType,
         input: {
           prompt: prompt || "Smooth cinematic video",
-          duration: duration || 5,
         }
       };
+      
+      // Add duration - veo3 uses string format like "8s"
+      if (modelConfig.model === "veo3") {
+        piApiPayload.input.duration = `${duration || 8}s`;
+        piApiPayload.input.generate_audio = true;
+      } else {
+        piApiPayload.input.duration = duration || 5;
+      }
       
       // Add model-specific parameters
       if (modelConfig.model_name) {
