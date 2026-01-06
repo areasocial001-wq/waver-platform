@@ -5,10 +5,10 @@ import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2 } from 'lucide-react';
+import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
@@ -19,9 +19,22 @@ interface AudioTrack {
   startTime: number;
   volume: number;
   duration?: number;
-  fadeIn: number; // seconds
-  fadeOut: number; // seconds
+  originalDuration?: number; // Original full duration
+  trimStart: number; // Trim from start (seconds)
+  trimEnd: number; // Trim from end (seconds)
+  fadeIn: number;
+  fadeOut: number;
   color: string;
+}
+
+interface SavedProject {
+  id: string;
+  name: string;
+  videoUrl: string;
+  videoName: string;
+  tracks: Omit<AudioTrack, 'url'>[]; // URLs are blob URLs so we can't persist them
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface VideoAudioCombinerProps {
@@ -33,6 +46,7 @@ interface VideoAudioCombinerProps {
 }
 
 type ExportFormat = 'webm' | 'mp4';
+type DragType = 'move' | 'trim-start' | 'trim-end';
 
 const TRACK_COLORS = [
   'hsl(var(--primary))',
@@ -42,6 +56,8 @@ const TRACK_COLORS = [
   'hsl(199, 89%, 48%)',
   'hsl(0, 84%, 60%)',
 ];
+
+const PROJECTS_STORAGE_KEY = 'video-audio-combiner-projects';
 
 export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   videoUrl,
@@ -62,10 +78,17 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
   const [ffmpegLoading, setFfmpegLoading] = useState(false);
   
+  // Project management
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [projectName, setProjectName] = useState('');
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  
   // Drag state for timeline
   const [draggingTrack, setDraggingTrack] = useState<string | null>(null);
+  const [dragType, setDragType] = useState<DragType>('move');
   const [dragStartX, setDragStartX] = useState(0);
-  const [dragStartTime, setDragStartTime] = useState(0);
+  const [dragStartValue, setDragStartValue] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -74,6 +97,18 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   const animationRef = useRef<number>();
   const ffmpegRef = useRef<FFmpeg | null>(null);
 
+  // Load saved projects from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PROJECTS_STORAGE_KEY);
+      if (saved) {
+        setSavedProjects(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.warn('Failed to load saved projects:', e);
+    }
+  }, []);
+
   // Load FFmpeg on demand
   const loadFFmpeg = useCallback(async () => {
     if (ffmpegRef.current || ffmpegLoading) return;
@@ -81,7 +116,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     setFfmpegLoading(true);
     try {
       const ffmpeg = new FFmpeg();
-      
       const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
       
       ffmpeg.on('progress', ({ progress: p }) => {
@@ -117,6 +151,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         name: 'Voiceover',
         startTime: 0,
         volume: 1,
+        trimStart: 0,
+        trimEnd: 0,
         fadeIn: 0,
         fadeOut: 0,
         color: TRACK_COLORS[0]
@@ -136,7 +172,11 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         audio.volume = track.volume;
         audio.addEventListener('loadedmetadata', () => {
           setAudioTracks(prev => prev.map(t => 
-            t.id === track.id ? { ...t, duration: audio.duration } : t
+            t.id === track.id ? { 
+              ...t, 
+              duration: audio.duration,
+              originalDuration: audio.duration
+            } : t
           ));
         });
         audioRefs.current.set(track.id, audio);
@@ -155,6 +195,12 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     });
   }, [audioTracks]);
 
+  // Calculate effective duration after trim
+  const getEffectiveDuration = (track: AudioTrack) => {
+    const original = track.originalDuration || track.duration || 0;
+    return Math.max(0.1, original - track.trimStart - track.trimEnd);
+  };
+
   const handleVideoLoad = () => {
     if (videoRef.current) {
       setVideoDuration(videoRef.current.duration);
@@ -163,8 +209,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
 
   // Apply fade effects during playback
   const applyFadeEffects = (track: AudioTrack, audio: HTMLAudioElement, videoTime: number) => {
+    const effectiveDuration = getEffectiveDuration(track);
     const audioLocalTime = videoTime - track.startTime;
-    const trackDuration = track.duration || 0;
     
     let volumeMultiplier = 1;
     
@@ -174,9 +220,9 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     }
     
     // Fade out
-    const fadeOutStart = trackDuration - track.fadeOut;
+    const fadeOutStart = effectiveDuration - track.fadeOut;
     if (track.fadeOut > 0 && audioLocalTime > fadeOutStart) {
-      volumeMultiplier = (trackDuration - audioLocalTime) / track.fadeOut;
+      volumeMultiplier = (effectiveDuration - audioLocalTime) / track.fadeOut;
     }
     
     audio.volume = Math.max(0, Math.min(1, track.volume * volumeMultiplier));
@@ -192,16 +238,17 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       const audio = audioRefs.current.get(track.id);
       if (!audio) return;
 
+      const effectiveDuration = getEffectiveDuration(track);
       const audioStartTime = track.startTime;
-      const audioEndTime = audioStartTime + (track.duration || 0);
+      const audioEndTime = audioStartTime + effectiveDuration;
 
       if (videoTime >= audioStartTime && videoTime < audioEndTime) {
-        const audioTime = videoTime - audioStartTime;
+        // Calculate audio time accounting for trim
+        const audioTime = (videoTime - audioStartTime) + track.trimStart;
         if (Math.abs(audio.currentTime - audioTime) > 0.3) {
           audio.currentTime = audioTime;
         }
         
-        // Apply fade effects
         applyFadeEffects(track, audio, videoTime);
         
         if (audio.paused && isPlaying) {
@@ -245,8 +292,9 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         const audio = audioRefs.current.get(track.id);
         if (!audio) return;
         
-        const audioTime = time - track.startTime;
-        if (audioTime >= 0 && audioTime < (track.duration || 0)) {
+        const effectiveDuration = getEffectiveDuration(track);
+        const audioTime = (time - track.startTime) + track.trimStart;
+        if (audioTime >= track.trimStart && audioTime < (track.originalDuration || 0) - track.trimEnd) {
           audio.currentTime = audioTime;
         }
       });
@@ -268,6 +316,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
           name: file.name,
           startTime: 0,
           volume: 1,
+          trimStart: 0,
+          trimEnd: 0,
           fadeIn: 0,
           fadeOut: 0,
           color: TRACK_COLORS[colorIndex]
@@ -294,15 +344,24 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     setAudioTracks(prev => prev.filter(t => t.id !== trackId));
   };
 
-  // Timeline drag handlers
-  const handleTimelineDragStart = (e: React.MouseEvent, trackId: string) => {
+  // Timeline drag handlers for move and trim
+  const handleTimelineDragStart = (e: React.MouseEvent, trackId: string, type: DragType) => {
     const track = audioTracks.find(t => t.id === trackId);
     if (!track || !timelineRef.current) return;
     
     e.preventDefault();
+    e.stopPropagation();
     setDraggingTrack(trackId);
+    setDragType(type);
     setDragStartX(e.clientX);
-    setDragStartTime(track.startTime);
+    
+    if (type === 'move') {
+      setDragStartValue(track.startTime);
+    } else if (type === 'trim-start') {
+      setDragStartValue(track.trimStart);
+    } else if (type === 'trim-end') {
+      setDragStartValue(track.trimEnd);
+    }
   };
 
   const handleTimelineDragMove = useCallback((e: MouseEvent) => {
@@ -311,14 +370,28 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     const rect = timelineRef.current.getBoundingClientRect();
     const deltaX = e.clientX - dragStartX;
     const deltaSec = (deltaX / rect.width) * videoDuration;
+    const track = audioTracks.find(t => t.id === draggingTrack);
+    if (!track) return;
     
-    const newStartTime = Math.max(0, Math.min(
-      videoDuration - (audioTracks.find(t => t.id === draggingTrack)?.duration || 0),
-      dragStartTime + deltaSec
-    ));
-    
-    updateTrack(draggingTrack, { startTime: newStartTime });
-  }, [draggingTrack, dragStartX, dragStartTime, videoDuration, audioTracks]);
+    if (dragType === 'move') {
+      const effectiveDuration = getEffectiveDuration(track);
+      const newStartTime = Math.max(0, Math.min(
+        videoDuration - effectiveDuration,
+        dragStartValue + deltaSec
+      ));
+      updateTrack(draggingTrack, { startTime: newStartTime });
+    } else if (dragType === 'trim-start') {
+      const originalDuration = track.originalDuration || track.duration || 0;
+      const maxTrim = originalDuration - track.trimEnd - 0.5; // Min 0.5s duration
+      const newTrimStart = Math.max(0, Math.min(maxTrim, dragStartValue + deltaSec));
+      updateTrack(draggingTrack, { trimStart: newTrimStart });
+    } else if (dragType === 'trim-end') {
+      const originalDuration = track.originalDuration || track.duration || 0;
+      const maxTrim = originalDuration - track.trimStart - 0.5;
+      const newTrimEnd = Math.max(0, Math.min(maxTrim, dragStartValue - deltaSec));
+      updateTrack(draggingTrack, { trimEnd: newTrimEnd });
+    }
+  }, [draggingTrack, dragType, dragStartX, dragStartValue, videoDuration, audioTracks]);
 
   const handleTimelineDragEnd = useCallback(() => {
     setDraggingTrack(null);
@@ -335,6 +408,53 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     }
   }, [draggingTrack, handleTimelineDragMove, handleTimelineDragEnd]);
 
+  // Project save/load functions
+  const saveProject = () => {
+    if (!projectName.trim()) {
+      toast.error('Inserisci un nome per il progetto');
+      return;
+    }
+
+    const project: SavedProject = {
+      id: `project-${Date.now()}`,
+      name: projectName,
+      videoUrl,
+      videoName,
+      tracks: audioTracks.map(({ url, ...rest }) => rest),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const updatedProjects = [...savedProjects, project];
+    setSavedProjects(updatedProjects);
+    
+    try {
+      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
+      toast.success(`Progetto "${projectName}" salvato!`);
+      setShowSaveDialog(false);
+      setProjectName('');
+    } catch (e) {
+      toast.error('Errore nel salvataggio del progetto');
+    }
+  };
+
+  const loadProject = (project: SavedProject) => {
+    // Can only load track metadata, URLs need to be re-added
+    toast.info('Progetto caricato. Le tracce audio devono essere ricaricate.');
+    setShowLoadDialog(false);
+  };
+
+  const deleteProject = (projectId: string) => {
+    const updatedProjects = savedProjects.filter(p => p.id !== projectId);
+    setSavedProjects(updatedProjects);
+    try {
+      localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
+      toast.success('Progetto eliminato');
+    } catch (e) {
+      toast.error('Errore nell\'eliminazione del progetto');
+    }
+  };
+
   // Combine using FFmpeg for MP4 export
   const combineWithFFmpeg = async () => {
     if (!ffmpegRef.current) {
@@ -347,13 +467,11 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
     setProgressMessage('Preparazione file...');
 
     try {
-      // Fetch and write video file
       const videoData = await fetchFile(videoUrl);
       await ffmpeg.writeFile('input.mp4', videoData);
       setProgress(10);
       setProgressMessage('Video caricato...');
 
-      // Process each audio track
       const audioInputs: string[] = [];
       for (let i = 0; i < audioTracks.length; i++) {
         const track = audioTracks[i];
@@ -367,16 +485,22 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       
       setProgress(30);
 
-      // Build complex filter for audio mixing with fades
+      // Build complex filter for audio mixing with trim and fades
       let filterComplex = '';
       let audioMixInputs = '';
       
       for (let i = 0; i < audioTracks.length; i++) {
         const track = audioTracks[i];
-        const inputIdx = i + 1; // 0 is video
+        const inputIdx = i + 1;
+        const effectiveDuration = getEffectiveDuration(track);
         
-        // Apply delay, volume, and fades
         let audioFilter = `[${inputIdx}:a]`;
+        
+        // Apply trim first
+        if (track.trimStart > 0 || track.trimEnd > 0) {
+          const endTime = (track.originalDuration || track.duration || 0) - track.trimEnd;
+          audioFilter += `atrim=start=${track.trimStart}:end=${endTime},asetpts=PTS-STARTPTS,`;
+        }
         
         // Delay to start at the right time
         if (track.startTime > 0) {
@@ -392,8 +516,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         }
         
         // Fade out
-        if (track.fadeOut > 0 && track.duration) {
-          const fadeOutStart = track.duration - track.fadeOut;
+        if (track.fadeOut > 0) {
+          const fadeOutStart = effectiveDuration - track.fadeOut;
           audioFilter += `,afade=t=out:st=${fadeOutStart}:d=${track.fadeOut}`;
         }
         
@@ -402,7 +526,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         audioMixInputs += `[a${i}]`;
       }
       
-      // Mix all audio streams
       if (audioTracks.length > 0) {
         filterComplex += `${audioMixInputs}amix=inputs=${audioTracks.length}:duration=longest:dropout_transition=0[aout]`;
       }
@@ -410,7 +533,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       setProgress(40);
       setProgressMessage('Encoding video...');
 
-      // Build FFmpeg command
       const inputArgs: string[] = ['-i', 'input.mp4'];
       for (const audioFile of audioInputs) {
         inputArgs.push('-i', audioFile);
@@ -454,7 +576,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       setProgress(90);
       setProgressMessage('Finalizzazione...');
 
-      // Read output file
       const data = await ffmpeg.readFile(outputFile);
       const uint8Array = data instanceof Uint8Array ? data : new TextEncoder().encode(data as string);
       const arrayBuffer = new ArrayBuffer(uint8Array.byteLength);
@@ -462,7 +583,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       const blob = new Blob([arrayBuffer], { type: exportFormat === 'mp4' ? 'video/mp4' : 'video/webm' });
       const url = URL.createObjectURL(blob);
 
-      // Download
       const a = document.createElement('a');
       a.href = url;
       a.download = `${videoName}_combined.${exportFormat}`;
@@ -470,7 +590,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       a.click();
       document.body.removeChild(a);
 
-      // Cleanup FFmpeg files
       await ffmpeg.deleteFile('input.mp4');
       for (const audioFile of audioInputs) {
         await ffmpeg.deleteFile(audioFile);
@@ -506,7 +625,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       const audioContext = new AudioContext();
       const destination = audioContext.createMediaStreamDestination();
 
-      // Load and process audio tracks with fades
       const audioBuffers: { buffer: AudioBuffer; track: AudioTrack }[] = [];
       
       for (const track of audioTracks) {
@@ -520,44 +638,42 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         }
       }
 
-      // Create offline context for rendering with fades
       const offlineContext = new OfflineAudioContext(
         2,
         Math.ceil(videoDuration * audioContext.sampleRate),
         audioContext.sampleRate
       );
 
-      // Schedule all audio buffers with fade effects
+      // Schedule all audio buffers with trim and fade effects
       audioBuffers.forEach(({ buffer, track }) => {
         const source = offlineContext.createBufferSource();
         source.buffer = buffer;
         
         const gainNode = offlineContext.createGain();
         const startTime = track.startTime;
-        const duration = track.duration || buffer.duration;
+        const effectiveDuration = getEffectiveDuration(track);
         
-        // Set initial gain
+        // Set initial gain for fade
         gainNode.gain.setValueAtTime(0, startTime);
         
-        // Fade in
         if (track.fadeIn > 0) {
           gainNode.gain.linearRampToValueAtTime(track.volume, startTime + track.fadeIn);
         } else {
           gainNode.gain.setValueAtTime(track.volume, startTime);
         }
         
-        // Hold volume
-        const fadeOutStart = startTime + duration - track.fadeOut;
+        const fadeOutStart = startTime + effectiveDuration - track.fadeOut;
         gainNode.gain.setValueAtTime(track.volume, fadeOutStart);
         
-        // Fade out
         if (track.fadeOut > 0) {
-          gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
+          gainNode.gain.linearRampToValueAtTime(0, startTime + effectiveDuration);
         }
         
         source.connect(gainNode);
         gainNode.connect(offlineContext.destination);
-        source.start(startTime);
+        
+        // Start with offset for trim
+        source.start(startTime, track.trimStart, effectiveDuration);
       });
 
       setProgress(20);
@@ -690,9 +806,21 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       </DialogTrigger>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Editor Video e Audio
+          <DialogTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Editor Video e Audio
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
+                <Save className="h-4 w-4 mr-1" />
+                Salva
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowLoadDialog(true)}>
+                <FolderOpen className="h-4 w-4 mr-1" />
+                Carica
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -742,7 +870,12 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-sm">Timeline</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  Timeline
+                  <span className="text-xs text-muted-foreground font-normal">
+                    (Trascina i bordi per tagliare)
+                  </span>
+                </CardTitle>
                 <Button variant="outline" size="sm" onClick={addAudioTrack} disabled={isProcessing}>
                   <Plus className="h-4 w-4 mr-2" />
                   Aggiungi Audio
@@ -762,7 +895,6 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                     <span className="text-[10px] text-muted-foreground">{formatTime(time)}</span>
                   </div>
                 ))}
-                {/* Playhead */}
                 <div
                   className="absolute top-0 w-0.5 h-full bg-primary z-10"
                   style={{ left: `${(currentTime / videoDuration) * 100}%` }}
@@ -774,55 +906,84 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                 {audioTracks.length === 0 ? (
                   <div className="flex items-center justify-center h-20 text-muted-foreground text-sm border-2 border-dashed border-border rounded-lg">
                     <Volume2 className="h-5 w-5 mr-2 opacity-50" />
-                    Trascina qui le tracce audio
+                    Aggiungi tracce audio per iniziare
                   </div>
                 ) : (
-                  audioTracks.map((track, index) => (
-                    <div key={track.id} className="relative h-12 bg-muted/30 rounded">
-                      {/* Track block */}
-                      <div
-                        className={`absolute h-full rounded cursor-grab active:cursor-grabbing transition-opacity ${
-                          draggingTrack === track.id ? 'opacity-70' : ''
-                        }`}
-                        style={{
-                          left: `${(track.startTime / videoDuration) * 100}%`,
-                          width: `${((track.duration || 1) / videoDuration) * 100}%`,
-                          backgroundColor: track.color,
-                          minWidth: '20px'
-                        }}
-                        onMouseDown={(e) => handleTimelineDragStart(e, track.id)}
-                      >
-                        {/* Fade in indicator */}
-                        {track.fadeIn > 0 && (
+                  audioTracks.map((track) => {
+                    const effectiveDuration = getEffectiveDuration(track);
+                    return (
+                      <div key={track.id} className="relative h-14 bg-muted/30 rounded">
+                        {/* Track block */}
+                        <div
+                          className={`absolute h-full rounded transition-opacity ${
+                            draggingTrack === track.id ? 'opacity-70' : ''
+                          }`}
+                          style={{
+                            left: `${(track.startTime / videoDuration) * 100}%`,
+                            width: `${(effectiveDuration / videoDuration) * 100}%`,
+                            backgroundColor: track.color,
+                            minWidth: '40px'
+                          }}
+                        >
+                          {/* Left trim handle */}
                           <div
-                            className="absolute left-0 top-0 h-full bg-gradient-to-r from-black/50 to-transparent pointer-events-none"
-                            style={{ width: `${(track.fadeIn / (track.duration || 1)) * 100}%` }}
-                          />
-                        )}
-                        
-                        {/* Fade out indicator */}
-                        {track.fadeOut > 0 && (
+                            className="absolute left-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-l group"
+                            onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'trim-start')}
+                          >
+                            <Scissors className="h-3 w-3 text-white/70 group-hover:text-white rotate-90" />
+                          </div>
+                          
+                          {/* Center drag area */}
                           <div
-                            className="absolute right-0 top-0 h-full bg-gradient-to-l from-black/50 to-transparent pointer-events-none"
-                            style={{ width: `${(track.fadeOut / (track.duration || 1)) * 100}%` }}
-                          />
-                        )}
-                        
-                        <div className="flex items-center gap-1 h-full px-2 overflow-hidden">
-                          <GripVertical className="h-3 w-3 shrink-0 opacity-60" />
-                          <span className="text-xs font-medium truncate text-white drop-shadow">
-                            {track.name}
-                          </span>
+                            className="absolute left-3 right-3 top-0 h-full cursor-grab active:cursor-grabbing flex items-center gap-1 px-2 overflow-hidden"
+                            onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'move')}
+                          >
+                            <GripVertical className="h-3 w-3 shrink-0 opacity-60" />
+                            <span className="text-xs font-medium truncate text-white drop-shadow">
+                              {track.name}
+                            </span>
+                          </div>
+                          
+                          {/* Right trim handle */}
+                          <div
+                            className="absolute right-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-r group"
+                            onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'trim-end')}
+                          >
+                            <Scissors className="h-3 w-3 text-white/70 group-hover:text-white rotate-90" />
+                          </div>
+                          
+                          {/* Fade indicators */}
+                          {track.fadeIn > 0 && (
+                            <div
+                              className="absolute left-3 top-0 h-full bg-gradient-to-r from-black/40 to-transparent pointer-events-none"
+                              style={{ width: `${(track.fadeIn / effectiveDuration) * 100}%` }}
+                            />
+                          )}
+                          {track.fadeOut > 0 && (
+                            <div
+                              className="absolute right-3 top-0 h-full bg-gradient-to-l from-black/40 to-transparent pointer-events-none"
+                              style={{ width: `${(track.fadeOut / effectiveDuration) * 100}%` }}
+                            />
+                          )}
+                          
+                          {/* Trim info */}
+                          {(track.trimStart > 0 || track.trimEnd > 0) && (
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/40 px-1 rounded">
+                              {track.trimStart > 0 && `↦${track.trimStart.toFixed(1)}s`}
+                              {track.trimStart > 0 && track.trimEnd > 0 && ' '}
+                              {track.trimEnd > 0 && `${track.trimEnd.toFixed(1)}s↤`}
+                            </div>
+                          )}
                         </div>
+                        
+                        {/* Playhead on track */}
+                        <div
+                          className="absolute top-0 w-0.5 h-full bg-primary/50 pointer-events-none"
+                          style={{ left: `${(currentTime / videoDuration) * 100}%` }}
+                        />
                       </div>
-                      
-                      {/* Playhead on track */}
-                      <div
-                        className="absolute top-0 w-0.5 h-full bg-primary/50 pointer-events-none"
-                        style={{ left: `${(currentTime / videoDuration) * 100}%` }}
-                      />
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>
@@ -835,92 +996,126 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                 <CardTitle className="text-sm">Impostazioni Tracce</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {audioTracks.map((track, index) => (
-                  <div key={track.id} className="p-3 bg-muted/30 rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: track.color }}
-                        />
-                        <span className="font-medium text-sm truncate max-w-[200px]">
-                          {track.name}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeTrack(track.id)}
-                        disabled={isProcessing}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {/* Start Time */}
-                      <div className="space-y-1">
-                        <Label className="text-xs flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Inizio: {track.startTime.toFixed(1)}s
-                        </Label>
-                        <Slider
-                          value={[track.startTime]}
-                          max={videoDuration}
-                          step={0.1}
-                          onValueChange={(v) => updateTrack(track.id, { startTime: v[0] })}
+                {audioTracks.map((track) => {
+                  const effectiveDuration = getEffectiveDuration(track);
+                  const originalDuration = track.originalDuration || track.duration || 0;
+                  
+                  return (
+                    <div key={track.id} className="p-3 bg-muted/30 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: track.color }}
+                          />
+                          <span className="font-medium text-sm truncate max-w-[200px]">
+                            {track.name}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeTrack(track.id)}
                           disabled={isProcessing}
-                        />
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </div>
                       
-                      {/* Volume */}
-                      <div className="space-y-1">
-                        <Label className="text-xs flex items-center gap-1">
-                          <Volume2 className="h-3 w-3" />
-                          Volume: {Math.round(track.volume * 100)}%
-                        </Label>
-                        <Slider
-                          value={[track.volume]}
-                          max={1}
-                          step={0.05}
-                          onValueChange={(v) => updateTrack(track.id, { volume: v[0] })}
-                          disabled={isProcessing}
-                        />
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                        {/* Start Time */}
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            Inizio: {track.startTime.toFixed(1)}s
+                          </Label>
+                          <Slider
+                            value={[track.startTime]}
+                            max={videoDuration}
+                            step={0.1}
+                            onValueChange={(v) => updateTrack(track.id, { startTime: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
+                        
+                        {/* Volume */}
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Volume2 className="h-3 w-3" />
+                            Volume: {Math.round(track.volume * 100)}%
+                          </Label>
+                          <Slider
+                            value={[track.volume]}
+                            max={1}
+                            step={0.05}
+                            onValueChange={(v) => updateTrack(track.id, { volume: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
+                        
+                        {/* Trim Start */}
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Scissors className="h-3 w-3" />
+                            Taglia inizio: {track.trimStart.toFixed(1)}s
+                          </Label>
+                          <Slider
+                            value={[track.trimStart]}
+                            max={originalDuration - track.trimEnd - 0.5}
+                            step={0.1}
+                            onValueChange={(v) => updateTrack(track.id, { trimStart: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
+                        
+                        {/* Trim End */}
+                        <div className="space-y-1">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Scissors className="h-3 w-3" />
+                            Taglia fine: {track.trimEnd.toFixed(1)}s
+                          </Label>
+                          <Slider
+                            value={[track.trimEnd]}
+                            max={originalDuration - track.trimStart - 0.5}
+                            step={0.1}
+                            onValueChange={(v) => updateTrack(track.id, { trimEnd: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
+                        
+                        {/* Fade In */}
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fade In: {track.fadeIn.toFixed(1)}s</Label>
+                          <Slider
+                            value={[track.fadeIn]}
+                            max={Math.min(5, effectiveDuration / 2)}
+                            step={0.1}
+                            onValueChange={(v) => updateTrack(track.id, { fadeIn: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
+                        
+                        {/* Fade Out */}
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fade Out: {track.fadeOut.toFixed(1)}s</Label>
+                          <Slider
+                            value={[track.fadeOut]}
+                            max={Math.min(5, effectiveDuration / 2)}
+                            step={0.1}
+                            onValueChange={(v) => updateTrack(track.id, { fadeOut: v[0] })}
+                            disabled={isProcessing}
+                          />
+                        </div>
                       </div>
                       
-                      {/* Fade In */}
-                      <div className="space-y-1">
-                        <Label className="text-xs">Fade In: {track.fadeIn.toFixed(1)}s</Label>
-                        <Slider
-                          value={[track.fadeIn]}
-                          max={Math.min(5, (track.duration || 5) / 2)}
-                          step={0.1}
-                          onValueChange={(v) => updateTrack(track.id, { fadeIn: v[0] })}
-                          disabled={isProcessing}
-                        />
-                      </div>
-                      
-                      {/* Fade Out */}
-                      <div className="space-y-1">
-                        <Label className="text-xs">Fade Out: {track.fadeOut.toFixed(1)}s</Label>
-                        <Slider
-                          value={[track.fadeOut]}
-                          max={Math.min(5, (track.duration || 5) / 2)}
-                          step={0.1}
-                          onValueChange={(v) => updateTrack(track.id, { fadeOut: v[0] })}
-                          disabled={isProcessing}
-                        />
-                      </div>
-                    </div>
-                    
-                    {track.duration && (
                       <div className="text-xs text-muted-foreground">
-                        Durata: {formatTime(track.duration)} • 
-                        Fine: {formatTime(track.startTime + track.duration)}
+                        Originale: {formatTime(originalDuration)} • 
+                        Effettiva: {formatTime(effectiveDuration)} • 
+                        Fine: {formatTime(track.startTime + effectiveDuration)}
                       </div>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}
@@ -1002,6 +1197,61 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
             </CardContent>
           </Card>
         </div>
+
+        {/* Save Project Dialog */}
+        {showSaveDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSaveDialog(false)}>
+            <div className="bg-background p-6 rounded-lg shadow-xl max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Salva Progetto</h3>
+              <Input
+                placeholder="Nome del progetto"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="mb-4"
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowSaveDialog(false)}>Annulla</Button>
+                <Button onClick={saveProject}>Salva</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Load Project Dialog */}
+        {showLoadDialog && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowLoadDialog(false)}>
+            <div className="bg-background p-6 rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[60vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <h3 className="text-lg font-semibold mb-4">Progetti Salvati</h3>
+              {savedProjects.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">Nessun progetto salvato</p>
+              ) : (
+                <div className="space-y-2">
+                  {savedProjects.map(project => (
+                    <div key={project.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div>
+                        <p className="font-medium">{project.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(project.updatedAt).toLocaleDateString('it-IT')}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => loadProject(project)}>
+                          Carica
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => deleteProject(project.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex justify-end mt-4">
+                <Button variant="outline" onClick={() => setShowLoadDialog(false)}>Chiudi</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
