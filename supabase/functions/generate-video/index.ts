@@ -139,7 +139,8 @@ serve(async (req) => {
             status: 200,
           });
         } else if (taskStatus === "failed" || taskStatus === "FAILED" || taskStatus === "error") {
-          const errorMsg = piApiData.data?.error || piApiData.error || "Unknown error";
+          const errorObj = piApiData.data?.error || piApiData.error;
+          const errorMsg = typeof errorObj === 'object' ? (errorObj.message || JSON.stringify(errorObj)) : (errorObj || "Unknown error");
           throw new Error(`PiAPI generation failed: ${errorMsg}`);
         } else {
           // Still processing
