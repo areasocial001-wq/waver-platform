@@ -339,9 +339,11 @@ export type Database = {
       }
       video_generations: {
         Row: {
+          audio_url: string | null
           batch_id: string | null
           category: string | null
           created_at: string | null
+          dialogue_text: string | null
           duration: number
           error_message: string | null
           id: string
@@ -350,6 +352,7 @@ export type Database = {
           max_retries: number | null
           motion_intensity: string | null
           next_retry_at: string | null
+          original_prompt: string | null
           prediction_id: string | null
           priority: number | null
           prompt: string | null
@@ -366,9 +369,11 @@ export type Database = {
           video_url: string | null
         }
         Insert: {
+          audio_url?: string | null
           batch_id?: string | null
           category?: string | null
           created_at?: string | null
+          dialogue_text?: string | null
           duration: number
           error_message?: string | null
           id?: string
@@ -377,6 +382,7 @@ export type Database = {
           max_retries?: number | null
           motion_intensity?: string | null
           next_retry_at?: string | null
+          original_prompt?: string | null
           prediction_id?: string | null
           priority?: number | null
           prompt?: string | null
@@ -393,9 +399,11 @@ export type Database = {
           video_url?: string | null
         }
         Update: {
+          audio_url?: string | null
           batch_id?: string | null
           category?: string | null
           created_at?: string | null
+          dialogue_text?: string | null
           duration?: number
           error_message?: string | null
           id?: string
@@ -404,6 +412,7 @@ export type Database = {
           max_retries?: number | null
           motion_intensity?: string | null
           next_retry_at?: string | null
+          original_prompt?: string | null
           prediction_id?: string | null
           priority?: number | null
           prompt?: string | null

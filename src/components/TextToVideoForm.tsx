@@ -249,12 +249,17 @@ export const TextToVideoForm = () => {
       // Add user prompt
       cinematicPrompt += prompt;
       
+      // Store dialogue separately for TTS processing
+      let dialogueText = "";
+      
       // Add audio generation instructions
       if (audioType !== "none" && audioPrompt) {
         cinematicPrompt += ". ";
         
         switch (audioType) {
           case "dialogue":
+            // Store dialogue for separate TTS generation
+            dialogueText = audioPrompt;
             // Use quotation marks for dialogue as per Veo 3.1 best practices
             cinematicPrompt += `Dialogue: "${audioPrompt}"`;
             break;
@@ -269,13 +274,36 @@ export const TextToVideoForm = () => {
         }
       }
 
+      // Store original prompt before translation
+      const originalPrompt = cinematicPrompt;
+
+      // Translate prompt to English for better Veo3 results (keeping dialogue in original language)
+      let translatedPrompt = cinematicPrompt;
+      if (preferredProvider === "piapi-veo3" || preferredProvider === "auto") {
+        try {
+          toast.info("Traduzione prompt in inglese...", { duration: 2000 });
+          const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-prompt', {
+            body: { prompt: cinematicPrompt, dialogueText }
+          });
+          
+          if (!translateError && translateData?.translatedPrompt) {
+            translatedPrompt = translateData.translatedPrompt;
+            console.log("Prompt tradotto:", translatedPrompt);
+          }
+        } catch (translateErr) {
+          console.warn("Translation failed, using original prompt:", translateErr);
+        }
+      }
+
       // Save to database first
       const { data: generationData, error: dbError } = await supabase
         .from("video_generations")
         .insert({
           user_id: user.id,
           type: "text_to_video",
-          prompt: cinematicPrompt,
+          prompt: translatedPrompt,
+          original_prompt: originalPrompt,
+          dialogue_text: dialogueText || null,
           duration: parseInt(duration),
           resolution: resolution,
           status: "processing"
@@ -294,7 +322,7 @@ export const TextToVideoForm = () => {
         .invoke("generate-video", {
           body: {
             type: "text_to_video",
-            prompt: cinematicPrompt,
+            prompt: translatedPrompt,
             duration: parseInt(duration),
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined

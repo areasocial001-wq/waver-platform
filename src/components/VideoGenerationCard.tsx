@@ -2,12 +2,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AddVoiceoverDialog } from "./AddVoiceoverDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +38,8 @@ interface VideoGenerationCardProps {
     queue_position?: number;
     priority?: number;
     provider?: string;
+    dialogue_text?: string | null;
+    audio_url?: string | null;
   };
   onDelete?: () => void;
 }
@@ -418,22 +421,41 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
               <span className="capitalize">{generation.type.replace("_", " ")}</span>
               
               {generation.status === "completed" && generation.video_url && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-3 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                >
-                  {isDownloading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4 mr-1" />
-                      Scarica
-                    </>
+                <>
+                  {/* Voiceover button */}
+                  <AddVoiceoverDialog 
+                    videoId={generation.id}
+                    dialogueText={generation.dialogue_text}
+                    onVoiceoverAdded={() => {
+                      toast.success("Voiceover aggiunto al video!");
+                    }}
+                  />
+                  
+                  {/* Show audio indicator if voiceover exists */}
+                  {generation.audio_url && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Volume2 className="h-3 w-3" />
+                      Audio
+                    </Badge>
                   )}
-                </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-1" />
+                        Scarica
+                      </>
+                    )}
+                  </Button>
+                </>
               )}
               
               <AlertDialog>

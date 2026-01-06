@@ -52,6 +52,8 @@ type VideoGeneration = {
   error_message: string | null;
   batch_id: string | null;
   sequence_order: number | null;
+  dialogue_text?: string | null;
+  audio_url?: string | null;
 };
 
 export default function History() {
