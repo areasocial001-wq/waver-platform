@@ -9,7 +9,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
-
+import { ProviderComparisonDialog } from "@/components/ProviderComparisonDialog";
+import { useProviderPreference } from "@/hooks/useProviderPreference";
 // Durate supportate per ogni provider
 const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
   auto: [
@@ -141,7 +142,7 @@ export const TextToVideoForm = () => {
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
-  const [preferredProvider, setPreferredProvider] = useState<string>("auto");
+  const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   const [isLoading, setIsLoading] = useState(false);
 
   // Aggiorna durata e risoluzione quando cambia il provider
@@ -340,7 +341,16 @@ export const TextToVideoForm = () => {
 
       {/* Provider Selection */}
       <div className="space-y-2">
-        <Label>Provider AI</Label>
+        <div className="flex items-center justify-between">
+          <Label>Provider AI</Label>
+          <ProviderComparisonDialog
+            providers={PROVIDER_INFO}
+            selectedProvider={preferredProvider}
+            onSelectProvider={setPreferredProvider}
+            durations={PROVIDER_DURATIONS}
+            resolutions={PROVIDER_RESOLUTIONS}
+          />
+        </div>
         <Select value={preferredProvider} onValueChange={setPreferredProvider}>
           <SelectTrigger>
             <SelectValue placeholder="Seleziona provider" />
