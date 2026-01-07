@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors, Wand2, Sparkles, Music, Undo2, Redo2, Zap, Wind, MousePointer, Bomb, Bell, Footprints } from 'lucide-react';
+import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors, Wand2, Sparkles, Music, Undo2, Redo2, Zap, Wind, MousePointer, Bomb, Bell, Footprints, AudioLines } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { TrackWaveform } from './TrackWaveform';
+import { AudioEffectsPanel, AudioEffects, defaultAudioEffects } from './AudioEffectsPanel';
 
 interface AudioTrack {
   id: string;
@@ -26,6 +28,7 @@ interface AudioTrack {
   fadeIn: number;
   fadeOut: number;
   color: string;
+  effects: AudioEffects;
 }
 
 interface SavedProject {
@@ -259,7 +262,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         trimEnd: 0,
         fadeIn: 0,
         fadeOut: 0,
-        color: TRACK_COLORS[0]
+        color: TRACK_COLORS[0],
+        effects: defaultAudioEffects
       };
       setAudioTracks(prev => {
         if (prev.find(t => t.id === 'existing-voiceover')) return prev;
@@ -424,7 +428,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
           trimEnd: 0,
           fadeIn: 0,
           fadeOut: 0,
-          color: TRACK_COLORS[colorIndex]
+          color: TRACK_COLORS[colorIndex],
+          effects: defaultAudioEffects
         };
         setAudioTracks(prev => {
           const newTracks = [...prev, newTrack];
@@ -451,7 +456,8 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       trimEnd: 0,
       fadeIn: 0,
       fadeOut: 0,
-      color: TRACK_COLORS[colorIndex]
+      color: TRACK_COLORS[colorIndex],
+      effects: defaultAudioEffects
     };
     setAudioTracks(prev => {
       const newTracks = [...prev, newTrack];
@@ -726,7 +732,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       
       setProgress(30);
 
-      // Build complex filter for audio mixing with trim and fades
+      // Build complex filter for audio mixing with trim, fades, and effects
       let filterComplex = '';
       let audioMixInputs = '';
       
@@ -750,6 +756,37 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
         
         // Volume adjustment
         audioFilter += `volume=${track.volume}`;
+        
+        // Apply audio effects
+        const fx = track.effects;
+        
+        // Pitch shift using asetrate and atempo
+        if (fx.pitchEnabled && fx.pitchSemitones !== 0) {
+          const pitchRatio = Math.pow(2, fx.pitchSemitones / 12);
+          audioFilter += `,asetrate=44100*${pitchRatio},atempo=${1/pitchRatio}`;
+        }
+        
+        // Equalizer (3-band)
+        if (fx.eqEnabled && (fx.eqLow !== 0 || fx.eqMid !== 0 || fx.eqHigh !== 0)) {
+          const lowGain = fx.eqLow;
+          const midGain = fx.eqMid;
+          const highGain = fx.eqHigh;
+          audioFilter += `,equalizer=f=100:t=h:width=200:g=${lowGain}`;
+          audioFilter += `,equalizer=f=1000:t=h:width=1000:g=${midGain}`;
+          audioFilter += `,equalizer=f=8000:t=h:width=4000:g=${highGain}`;
+        }
+        
+        // Compressor
+        if (fx.compressorEnabled) {
+          audioFilter += `,acompressor=threshold=${fx.compressorThreshold}dB:ratio=${fx.compressorRatio}:attack=5:release=50`;
+        }
+        
+        // Reverb using aecho (simulated reverb)
+        if (fx.reverbEnabled) {
+          const decay = Math.min(0.9, fx.reverbWet / 100);
+          const delay = Math.min(500, fx.reverbDecay * 50);
+          audioFilter += `,aecho=0.8:${decay}:${delay}:${decay * 0.8}`;
+        }
         
         // Fade in
         if (track.fadeIn > 0) {
@@ -1305,23 +1342,39 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                 ) : (
                   audioTracks.map((track) => {
                     const effectiveDuration = getEffectiveDuration(track);
+                    const hasEffects = track.effects.reverbEnabled || track.effects.pitchEnabled || 
+                                       track.effects.eqEnabled || track.effects.compressorEnabled;
                     return (
-                      <div key={track.id} className="relative h-14 bg-muted/30 rounded">
+                      <div key={track.id} className="relative h-16 bg-muted/30 rounded">
                         {/* Track block */}
                         <div
-                          className={`absolute h-full rounded transition-opacity ${
+                          className={`absolute h-full rounded transition-opacity overflow-hidden ${
                             draggingTrack === track.id ? 'opacity-70' : ''
                           }`}
                           style={{
                             left: `${(track.startTime / videoDuration) * 100}%`,
                             width: `${(effectiveDuration / videoDuration) * 100}%`,
                             backgroundColor: track.color,
-                            minWidth: '40px'
+                            minWidth: '60px'
                           }}
                         >
+                          {/* Waveform visualization */}
+                          <div className="absolute inset-0 pointer-events-none">
+                            <TrackWaveform
+                              audioUrl={track.url}
+                              color={track.color}
+                              trimStart={track.trimStart}
+                              trimEnd={track.trimEnd}
+                              isPlaying={isPlaying}
+                              currentTime={currentTime}
+                              startTime={track.startTime}
+                              height={64}
+                            />
+                          </div>
+                          
                           {/* Left trim handle */}
                           <div
-                            className="absolute left-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-l group"
+                            className="absolute left-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-l group z-10"
                             onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'trim-start')}
                           >
                             <Scissors className="h-3 w-3 text-white/70 group-hover:text-white rotate-90" />
@@ -1329,18 +1382,21 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                           
                           {/* Center drag area */}
                           <div
-                            className="absolute left-3 right-3 top-0 h-full cursor-grab active:cursor-grabbing flex items-center gap-1 px-2 overflow-hidden"
+                            className="absolute left-3 right-3 top-0 h-full cursor-grab active:cursor-grabbing flex items-center gap-1 px-2 overflow-hidden z-10"
                             onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'move')}
                           >
-                            <GripVertical className="h-3 w-3 shrink-0 opacity-60" />
+                            <GripVertical className="h-3 w-3 shrink-0 opacity-60 text-white drop-shadow" />
                             <span className="text-xs font-medium truncate text-white drop-shadow">
                               {track.name}
                             </span>
+                            {hasEffects && (
+                              <AudioLines className="h-3 w-3 shrink-0 text-white/80" />
+                            )}
                           </div>
                           
                           {/* Right trim handle */}
                           <div
-                            className="absolute right-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-r group"
+                            className="absolute right-0 top-0 w-3 h-full cursor-ew-resize bg-black/30 hover:bg-black/50 flex items-center justify-center rounded-r group z-10"
                             onMouseDown={(e) => handleTimelineDragStart(e, track.id, 'trim-end')}
                           >
                             <Scissors className="h-3 w-3 text-white/70 group-hover:text-white rotate-90" />
@@ -1349,20 +1405,20 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                           {/* Fade indicators */}
                           {track.fadeIn > 0 && (
                             <div
-                              className="absolute left-3 top-0 h-full bg-gradient-to-r from-black/40 to-transparent pointer-events-none"
+                              className="absolute left-3 top-0 h-full bg-gradient-to-r from-black/40 to-transparent pointer-events-none z-5"
                               style={{ width: `${(track.fadeIn / effectiveDuration) * 100}%` }}
                             />
                           )}
                           {track.fadeOut > 0 && (
                             <div
-                              className="absolute right-3 top-0 h-full bg-gradient-to-l from-black/40 to-transparent pointer-events-none"
+                              className="absolute right-3 top-0 h-full bg-gradient-to-l from-black/40 to-transparent pointer-events-none z-5"
                               style={{ width: `${(track.fadeOut / effectiveDuration) * 100}%` }}
                             />
                           )}
                           
                           {/* Trim info */}
                           {(track.trimStart > 0 || track.trimEnd > 0) && (
-                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/40 px-1 rounded">
+                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[9px] text-white/80 bg-black/40 px-1 rounded z-10">
                               {track.trimStart > 0 && `↦${track.trimStart.toFixed(1)}s`}
                               {track.trimStart > 0 && track.trimEnd > 0 && ' '}
                               {track.trimEnd > 0 && `${track.trimEnd.toFixed(1)}s↤`}
@@ -1501,6 +1557,14 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                           />
                         </div>
                       </div>
+                      
+                      {/* Audio Effects Panel */}
+                      <AudioEffectsPanel
+                        effects={track.effects}
+                        onChange={(effects) => updateTrack(track.id, { effects })}
+                        disabled={isProcessing}
+                        trackName={track.name}
+                      />
                       
                       <div className="text-xs text-muted-foreground">
                         Originale: {formatTime(originalDuration)} • 
