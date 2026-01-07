@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, dialogueText, targetLanguage = 'en' } = await req.json();
+    const { prompt, dialogueText, title, targetLanguage = 'en' } = await req.json();
 
     if (!prompt) {
       return new Response(
@@ -29,10 +29,13 @@ serve(async (req) => {
     if (dialogueText) {
       console.log("Keeping dialogue in original language:", dialogueText.substring(0, 50) + "...");
     }
+    if (title) {
+      console.log("Preserving title:", title);
+    }
 
     // Use Lovable AI to translate the visual description to English
     // while preserving any dialogue in the original language AND titles/labels
-    const systemPrompt = `You are a professional translator specialized in video production prompts.
+    let systemPrompt = `You are a professional translator specialized in video production prompts.
 Your task is to translate the visual/scene description to English for better AI video generation.
 
 IMPORTANT RULES:
@@ -42,7 +45,14 @@ IMPORTANT RULES:
 4. Keep technical terms consistent with video production terminology
 5. Preserve the exact structure and formatting of the prompt
 6. If the prompt contains dialogue, keep it in the ORIGINAL language exactly as provided
-7. Return ONLY the translated prompt, no explanations
+7. Return ONLY the translated prompt, no explanations`;
+
+    // Add explicit title preservation if provided
+    if (title) {
+      systemPrompt += `\n8. CRITICAL: The following title MUST be preserved EXACTLY as written, do NOT translate it: "${title}"`;
+    }
+
+    systemPrompt += `
 
 Examples:
 Input: "Slow dolly in shot, Una città futuristica di notte con luci al neon. Dialogue: \"Benvenuto nel futuro\""
