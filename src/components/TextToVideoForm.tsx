@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -153,6 +154,7 @@ export const TextToVideoForm = () => {
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [generateAudio, setGenerateAudio] = useState(true);
+  const [videoTitle, setVideoTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch PiAPI balance on mount and when provider changes
@@ -295,7 +297,7 @@ export const TextToVideoForm = () => {
         try {
           toast.info("Traduzione prompt in inglese...", { duration: 2000 });
           const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-prompt', {
-            body: { prompt: cinematicPrompt, dialogueText }
+            body: { prompt: cinematicPrompt, dialogueText, title: videoTitle || undefined }
           });
           
           if (!translateError && translateData?.translatedPrompt) {
@@ -576,6 +578,21 @@ export const TextToVideoForm = () => {
       </div>
 
       <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
+
+      {/* Video Title (optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="video-title">Titolo Video (opzionale)</Label>
+        <Input
+          id="video-title"
+          placeholder="Es: La notte dei ricordi, Scena 1..."
+          value={videoTitle}
+          onChange={(e) => setVideoTitle(e.target.value)}
+          className="bg-background"
+        />
+        <p className="text-xs text-muted-foreground">
+          Il titolo verrà preservato nella lingua originale durante la traduzione
+        </p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="prompt">Descrizione del Video</Label>
