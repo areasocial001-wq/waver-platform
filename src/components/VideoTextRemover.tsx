@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -17,7 +19,9 @@ import {
   Upload,
   ImageIcon,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  Video,
+  Wand2
 } from "lucide-react";
 
 interface ExtractedFrame {
@@ -29,6 +33,7 @@ interface ExtractedFrame {
 }
 
 export function VideoTextRemover() {
+  const navigate = useNavigate();
   const [videoUrl, setVideoUrl] = useState("");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -38,6 +43,9 @@ export function VideoTextRemover() {
   const [selectedFrame, setSelectedFrame] = useState<ExtractedFrame | null>(null);
   const [removalPrompt, setRemovalPrompt] = useState("Remove all text, watermarks, and written content from this image. Keep the background and all other elements intact. Make it look natural.");
   const [isExtracting, setIsExtracting] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+  const [regeneratePrompt, setRegeneratePrompt] = useState("");
+  const [regenerateDuration, setRegenerateDuration] = useState("5");
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -250,6 +258,82 @@ export function VideoTextRemover() {
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+  };
+
+  const regenerateVideoFromFrame = async (frame: ExtractedFrame) => {
+    if (!frame.editedImageData) {
+      toast.error("Devi prima rimuovere le scritte dal frame");
+      return;
+    }
+
+    setIsGeneratingVideo(true);
+
+    try {
+      // Get user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi essere autenticato");
+        return;
+      }
+
+      // Create video generation record
+      const { data: newGen, error: insertError } = await supabase
+        .from("video_generations")
+        .insert({
+          type: "image_to_video",
+          prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
+          duration: parseInt(regenerateDuration),
+          resolution: "720p",
+          image_url: frame.editedImageData,
+          image_name: `frame-edited-${formatTime(frame.timestamp)}`,
+          status: "processing",
+          user_id: user.id,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      toast.info("Avvio generazione video...");
+
+      // Call generate-video function
+      const { data, error } = await supabase.functions.invoke("generate-video", {
+        body: {
+          prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
+          duration: parseInt(regenerateDuration),
+          resolution: "720p",
+          type: "image_to_video",
+          imageUrl: frame.editedImageData,
+          generationId: newGen.id,
+        },
+      });
+
+      if (error) throw error;
+
+      // Update with prediction ID
+      if (data?.id) {
+        await supabase
+          .from("video_generations")
+          .update({ prediction_id: data.id })
+          .eq("id", newGen.id);
+      }
+
+      toast.success("Generazione video avviata! Controlla la tab 'Tutti i video'");
+      
+      // Navigate to history tab to see the generation
+      // We're already on history page, just switch tab
+      const tabsList = document.querySelector('[data-state="active"][value="text-remover"]');
+      if (tabsList) {
+        const allTab = document.querySelector('[value="all"]') as HTMLButtonElement;
+        if (allTab) allTab.click();
+      }
+
+    } catch (error: any) {
+      console.error("Error generating video:", error);
+      toast.error(`Errore: ${error.message || "Impossibile generare il video"}`);
+    } finally {
+      setIsGeneratingVideo(false);
+    }
   };
 
   return (
@@ -569,6 +653,59 @@ export function VideoTextRemover() {
                 </div>
               </div>
             </div>
+
+            {/* Regenerate Video Section */}
+            {selectedFrame.editedImageData && (
+              <div className="mt-6 pt-6 border-t space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Rigenera Video</h3>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Usa il frame editato (senza scritte) come primo frame per generare un nuovo video.
+                </p>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="regenerate-prompt">Prompt (opzionale)</Label>
+                    <Textarea
+                      id="regenerate-prompt"
+                      value={regeneratePrompt}
+                      onChange={(e) => setRegeneratePrompt(e.target.value)}
+                      placeholder="Descrivi il movimento desiderato..."
+                      rows={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="regenerate-duration">Durata</Label>
+                    <Select value={regenerateDuration} onValueChange={setRegenerateDuration}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 secondi</SelectItem>
+                        <SelectItem value="6">6 secondi</SelectItem>
+                        <SelectItem value="8">8 secondi</SelectItem>
+                        <SelectItem value="10">10 secondi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <Button 
+                  onClick={() => regenerateVideoFromFrame(selectedFrame)}
+                  disabled={isGeneratingVideo}
+                  className="w-full"
+                >
+                  {isGeneratingVideo ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Video className="w-4 h-4 mr-2" />
+                  )}
+                  Genera nuovo video da frame editato
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
