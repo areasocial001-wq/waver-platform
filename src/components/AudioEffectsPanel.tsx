@@ -1,9 +1,8 @@
-import React, { memo } from 'react';
+import React, { memo, useCallback, useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   AudioLines, 
   Waves, 
@@ -11,9 +10,16 @@ import {
   Volume2,
   RotateCcw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Play,
+  Square,
+  Mic,
+  Music,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { toast } from 'sonner';
 
 export interface AudioEffects {
   // Reverb
@@ -52,20 +58,165 @@ export const defaultAudioEffects: AudioEffects = {
   compressorRatio: 4,
 };
 
+// Effects Presets
+interface EffectsPreset {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  description: string;
+  effects: AudioEffects;
+}
+
+export const effectsPresets: EffectsPreset[] = [
+  {
+    id: 'voice-enhance',
+    name: 'Voice Enhancement',
+    icon: <Mic className="h-4 w-4" />,
+    description: 'Ottimizza la voce con chiarezza e presenza',
+    effects: {
+      reverbEnabled: false,
+      reverbDecay: 1,
+      reverbWet: 15,
+      pitchEnabled: false,
+      pitchSemitones: 0,
+      eqEnabled: true,
+      eqLow: -3,
+      eqMid: 2,
+      eqHigh: 4,
+      compressorEnabled: true,
+      compressorThreshold: -20,
+      compressorRatio: 4,
+    }
+  },
+  {
+    id: 'bass-boost',
+    name: 'Bass Boost',
+    icon: <Music className="h-4 w-4" />,
+    description: 'Potenzia i bassi per più impatto',
+    effects: {
+      reverbEnabled: false,
+      reverbDecay: 2,
+      reverbWet: 30,
+      pitchEnabled: false,
+      pitchSemitones: 0,
+      eqEnabled: true,
+      eqLow: 8,
+      eqMid: 0,
+      eqHigh: -2,
+      compressorEnabled: true,
+      compressorThreshold: -15,
+      compressorRatio: 3,
+    }
+  },
+  {
+    id: 'reverb-room',
+    name: 'Reverb Room',
+    icon: <Waves className="h-4 w-4" />,
+    description: 'Aggiunge spazialità con riverbero ambiente',
+    effects: {
+      reverbEnabled: true,
+      reverbDecay: 3,
+      reverbWet: 40,
+      pitchEnabled: false,
+      pitchSemitones: 0,
+      eqEnabled: true,
+      eqLow: 0,
+      eqMid: 1,
+      eqHigh: 2,
+      compressorEnabled: false,
+      compressorThreshold: -24,
+      compressorRatio: 4,
+    }
+  },
+  {
+    id: 'radio-voice',
+    name: 'Radio Voice',
+    icon: <AudioLines className="h-4 w-4" />,
+    description: 'Effetto radio/telefono vintage',
+    effects: {
+      reverbEnabled: false,
+      reverbDecay: 0.5,
+      reverbWet: 10,
+      pitchEnabled: false,
+      pitchSemitones: 0,
+      eqEnabled: true,
+      eqLow: -12,
+      eqMid: 6,
+      eqHigh: -8,
+      compressorEnabled: true,
+      compressorThreshold: -10,
+      compressorRatio: 8,
+    }
+  },
+  {
+    id: 'cinematic',
+    name: 'Cinematic',
+    icon: <Sparkles className="h-4 w-4" />,
+    description: 'Audio cinematografico professionale',
+    effects: {
+      reverbEnabled: true,
+      reverbDecay: 4,
+      reverbWet: 25,
+      pitchEnabled: false,
+      pitchSemitones: 0,
+      eqEnabled: true,
+      eqLow: 2,
+      eqMid: 0,
+      eqHigh: 3,
+      compressorEnabled: true,
+      compressorThreshold: -18,
+      compressorRatio: 3,
+    }
+  },
+];
+
 interface AudioEffectsPanelProps {
   effects: AudioEffects;
   onChange: (effects: AudioEffects) => void;
   disabled?: boolean;
   trackName?: string;
+  audioUrl?: string;
 }
+
+// Create a convolver impulse response for reverb
+const createImpulseResponse = (audioContext: AudioContext, duration: number, decay: number): AudioBuffer => {
+  const sampleRate = audioContext.sampleRate;
+  const length = sampleRate * duration;
+  const impulse = audioContext.createBuffer(2, length, sampleRate);
+  
+  for (let channel = 0; channel < 2; channel++) {
+    const channelData = impulse.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  
+  return impulse;
+};
 
 export const AudioEffectsPanel = memo(function AudioEffectsPanel({
   effects,
   onChange,
   disabled = false,
-  trackName
+  trackName,
+  audioUrl
 }: AudioEffectsPanelProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  
+  // Web Audio API refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const eqLowRef = useRef<BiquadFilterNode | null>(null);
+  const eqMidRef = useRef<BiquadFilterNode | null>(null);
+  const eqHighRef = useRef<BiquadFilterNode | null>(null);
+  const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const convolverRef = useRef<ConvolverNode | null>(null);
+  const dryGainRef = useRef<GainNode | null>(null);
+  const wetGainRef = useRef<GainNode | null>(null);
   
   const updateEffect = <K extends keyof AudioEffects>(key: K, value: AudioEffects[K]) => {
     onChange({ ...effects, [key]: value });
@@ -75,7 +226,212 @@ export const AudioEffectsPanel = memo(function AudioEffectsPanel({
     onChange(defaultAudioEffects);
   };
   
+  const applyPreset = (preset: EffectsPreset) => {
+    onChange(preset.effects);
+    toast.success(`Preset "${preset.name}" applicato`);
+  };
+  
   const hasActiveEffects = effects.reverbEnabled || effects.pitchEnabled || effects.eqEnabled || effects.compressorEnabled;
+
+  // Load audio buffer for preview
+  const loadAudioBuffer = useCallback(async () => {
+    if (!audioUrl) return null;
+    
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      const response = await fetch(audioUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      audioBufferRef.current = audioBuffer;
+      return audioBuffer;
+    } catch (error) {
+      console.error('Error loading audio:', error);
+      return null;
+    }
+  }, [audioUrl]);
+
+  // Setup and apply effects chain
+  const setupEffectsChain = useCallback(() => {
+    const ctx = audioContextRef.current;
+    if (!ctx) return null;
+    
+    // Create nodes
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 1;
+    gainNodeRef.current = gainNode;
+    
+    // EQ nodes (3-band)
+    const eqLow = ctx.createBiquadFilter();
+    eqLow.type = 'lowshelf';
+    eqLow.frequency.value = 320;
+    eqLow.gain.value = effects.eqEnabled ? effects.eqLow : 0;
+    eqLowRef.current = eqLow;
+    
+    const eqMid = ctx.createBiquadFilter();
+    eqMid.type = 'peaking';
+    eqMid.frequency.value = 1000;
+    eqMid.Q.value = 0.5;
+    eqMid.gain.value = effects.eqEnabled ? effects.eqMid : 0;
+    eqMidRef.current = eqMid;
+    
+    const eqHigh = ctx.createBiquadFilter();
+    eqHigh.type = 'highshelf';
+    eqHigh.frequency.value = 3200;
+    eqHigh.gain.value = effects.eqEnabled ? effects.eqHigh : 0;
+    eqHighRef.current = eqHigh;
+    
+    // Compressor
+    const compressor = ctx.createDynamicsCompressor();
+    compressor.threshold.value = effects.compressorEnabled ? effects.compressorThreshold : 0;
+    compressor.ratio.value = effects.compressorEnabled ? effects.compressorRatio : 1;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    compressorRef.current = compressor;
+    
+    // Reverb (convolver)
+    const convolver = ctx.createConvolver();
+    const impulseResponse = createImpulseResponse(ctx, effects.reverbDecay, 2);
+    convolver.buffer = impulseResponse;
+    convolverRef.current = convolver;
+    
+    // Dry/Wet mix for reverb
+    const dryGain = ctx.createGain();
+    const wetGain = ctx.createGain();
+    const wetAmount = effects.reverbEnabled ? effects.reverbWet / 100 : 0;
+    dryGain.gain.value = 1 - wetAmount * 0.5;
+    wetGain.gain.value = wetAmount;
+    dryGainRef.current = dryGain;
+    wetGainRef.current = wetGain;
+    
+    // Connect chain
+    gainNode.connect(eqLow);
+    eqLow.connect(eqMid);
+    eqMid.connect(eqHigh);
+    eqHigh.connect(compressor);
+    
+    // Split for reverb
+    compressor.connect(dryGain);
+    compressor.connect(convolver);
+    convolver.connect(wetGain);
+    
+    dryGain.connect(ctx.destination);
+    wetGain.connect(ctx.destination);
+    
+    return gainNode;
+  }, [effects]);
+
+  // Update effects in real-time
+  useEffect(() => {
+    if (!isPreviewing) return;
+    
+    // Update EQ
+    if (eqLowRef.current) {
+      eqLowRef.current.gain.value = effects.eqEnabled ? effects.eqLow : 0;
+    }
+    if (eqMidRef.current) {
+      eqMidRef.current.gain.value = effects.eqEnabled ? effects.eqMid : 0;
+    }
+    if (eqHighRef.current) {
+      eqHighRef.current.gain.value = effects.eqEnabled ? effects.eqHigh : 0;
+    }
+    
+    // Update compressor
+    if (compressorRef.current) {
+      compressorRef.current.threshold.value = effects.compressorEnabled ? effects.compressorThreshold : 0;
+      compressorRef.current.ratio.value = effects.compressorEnabled ? effects.compressorRatio : 1;
+    }
+    
+    // Update reverb mix
+    if (dryGainRef.current && wetGainRef.current) {
+      const wetAmount = effects.reverbEnabled ? effects.reverbWet / 100 : 0;
+      dryGainRef.current.gain.value = 1 - wetAmount * 0.5;
+      wetGainRef.current.gain.value = wetAmount;
+    }
+  }, [effects, isPreviewing]);
+
+  // Start preview
+  const startPreview = async () => {
+    if (!audioUrl) {
+      toast.error('Nessuna traccia audio disponibile per la preview');
+      return;
+    }
+    
+    setIsLoadingPreview(true);
+    
+    try {
+      // Stop any existing preview
+      stopPreview();
+      
+      // Load buffer if needed
+      if (!audioBufferRef.current) {
+        await loadAudioBuffer();
+      }
+      
+      if (!audioBufferRef.current || !audioContextRef.current) {
+        throw new Error('Failed to load audio');
+      }
+      
+      const ctx = audioContextRef.current;
+      
+      // Resume context if suspended
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+      
+      // Setup effects chain
+      const inputNode = setupEffectsChain();
+      if (!inputNode) throw new Error('Failed to setup effects');
+      
+      // Create source
+      const source = ctx.createBufferSource();
+      source.buffer = audioBufferRef.current;
+      
+      // Apply pitch shift using playbackRate (simple method)
+      if (effects.pitchEnabled && effects.pitchSemitones !== 0) {
+        source.playbackRate.value = Math.pow(2, effects.pitchSemitones / 12);
+      }
+      
+      source.connect(inputNode);
+      source.loop = true;
+      source.start(0);
+      sourceNodeRef.current = source;
+      
+      setIsPreviewing(true);
+      toast.success('Preview avviata - Modifica gli effetti per sentire le modifiche in tempo reale');
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast.error('Errore nell\'avvio della preview');
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  // Stop preview
+  const stopPreview = useCallback(() => {
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current.disconnect();
+      } catch (e) {
+        // Ignore errors from already stopped sources
+      }
+      sourceNodeRef.current = null;
+    }
+    setIsPreviewing(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopPreview();
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, [stopPreview]);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -100,6 +456,54 @@ export const AudioEffectsPanel = memo(function AudioEffectsPanel({
       </CollapsibleTrigger>
       
       <CollapsibleContent className="space-y-4 pt-4">
+        {/* Presets */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Preset Rapidi</Label>
+          <div className="flex flex-wrap gap-2">
+            {effectsPresets.map((preset) => (
+              <Button
+                key={preset.id}
+                variant="outline"
+                size="sm"
+                onClick={() => applyPreset(preset)}
+                disabled={disabled}
+                className="gap-1 text-xs h-7"
+                title={preset.description}
+              >
+                {preset.icon}
+                {preset.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+        
+        {/* Preview Controls */}
+        {audioUrl && (
+          <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
+            <Button
+              variant={isPreviewing ? "destructive" : "default"}
+              size="sm"
+              onClick={isPreviewing ? stopPreview : startPreview}
+              disabled={disabled || isLoadingPreview}
+              className="gap-1"
+            >
+              {isLoadingPreview ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPreviewing ? (
+                <Square className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              {isPreviewing ? 'Stop Preview' : 'Preview Effetti'}
+            </Button>
+            {isPreviewing && (
+              <span className="text-xs text-muted-foreground animate-pulse">
+                🔊 Preview attiva - modifica gli effetti per sentirli in tempo reale
+              </span>
+            )}
+          </div>
+        )}
+        
         {/* Reset Button */}
         <div className="flex justify-end">
           <Button variant="ghost" size="sm" onClick={resetEffects} disabled={disabled}>
@@ -188,6 +592,11 @@ export const AudioEffectsPanel = memo(function AudioEffectsPanel({
                   <span>+12 (alto)</span>
                 </div>
               </div>
+              {isPreviewing && effects.pitchSemitones !== 0 && (
+                <p className="text-[10px] text-amber-500">
+                  ⚠️ Per sentire le modifiche al pitch, riavvia la preview
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -311,7 +720,9 @@ export const AudioEffectsPanel = memo(function AudioEffectsPanel({
         
         {/* Info */}
         <p className="text-xs text-muted-foreground text-center">
-          Gli effetti vengono applicati durante l'esportazione
+          {isPreviewing 
+            ? '🎧 Preview in tempo reale attiva' 
+            : 'Gli effetti vengono applicati durante l\'esportazione'}
         </p>
       </CollapsibleContent>
     </Collapsible>
