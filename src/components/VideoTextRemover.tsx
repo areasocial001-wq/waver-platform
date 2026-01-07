@@ -387,7 +387,7 @@ export function VideoTextRemover() {
           duration: parseInt(regenerateDuration),
           resolution: "720p",
           type: "image_to_video",
-          imageUrl: frame.editedImageData,
+          start_image: frame.editedImageData,
           generationId: newGen.id,
         },
       });
