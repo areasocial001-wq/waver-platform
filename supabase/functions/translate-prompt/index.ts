@@ -31,21 +31,28 @@ serve(async (req) => {
     }
 
     // Use Lovable AI to translate the visual description to English
-    // while preserving any dialogue in the original language
+    // while preserving any dialogue in the original language AND titles/labels
     const systemPrompt = `You are a professional translator specialized in video production prompts.
 Your task is to translate the visual/scene description to English for better AI video generation.
 
 IMPORTANT RULES:
 1. Translate ONLY the visual descriptions, camera movements, and scene settings to English
 2. DO NOT translate any dialogue or spoken text (marked with Dialogue:, SFX:, Ambient:, or in quotes)
-3. Keep technical terms consistent with video production terminology
-4. Preserve the exact structure and formatting of the prompt
-5. If the prompt contains dialogue, keep it in the ORIGINAL language exactly as provided
-6. Return ONLY the translated prompt, no explanations
+3. DO NOT translate titles, scene labels, or panel names (like "Scena 1:", "Scene 1:", "Pannello 1:", "Title:", etc.)
+4. Keep technical terms consistent with video production terminology
+5. Preserve the exact structure and formatting of the prompt
+6. If the prompt contains dialogue, keep it in the ORIGINAL language exactly as provided
+7. Return ONLY the translated prompt, no explanations
 
-Example:
+Examples:
 Input: "Slow dolly in shot, Una città futuristica di notte con luci al neon. Dialogue: \"Benvenuto nel futuro\""
-Output: "Slow dolly in shot, A futuristic city at night with neon lights. Dialogue: \"Benvenuto nel futuro\""`;
+Output: "Slow dolly in shot, A futuristic city at night with neon lights. Dialogue: \"Benvenuto nel futuro\""
+
+Input: "Scena 1: Il risveglio - Close-up shot, Un uomo si sveglia in una stanza buia"
+Output: "Scena 1: Il risveglio - Close-up shot, A man wakes up in a dark room"
+
+Input: "Title: La notte dei ricordi - Wide shot, Una piazza illuminata dalla luna"  
+Output: "Title: La notte dei ricordi - Wide shot, A moonlit square"`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
