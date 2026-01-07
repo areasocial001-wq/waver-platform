@@ -511,10 +511,14 @@ serve(async (req) => {
         }
       };
       
-      // Add duration - veo3 uses string format like "8s", sora2 uses integer
+      // Add duration and model-specific parameters
       if (modelConfig.model === "veo3") {
         piApiPayload.input.duration = `${duration || 8}s`;
         piApiPayload.input.generate_audio = true;
+        // Veo3 supports aspect_ratio
+        if (aspect_ratio) {
+          piApiPayload.input.aspect_ratio = aspect_ratio;
+        }
       } else if (modelConfig.model === "sora2") {
         piApiPayload.input.duration = duration || 4;
         // Sora2 supports aspect_ratio and resolution
