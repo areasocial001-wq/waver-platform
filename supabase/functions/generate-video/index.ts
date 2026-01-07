@@ -36,7 +36,7 @@ const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   "framepack": { model: "framepack" },
   // Veo3 uses specific task_types: veo3-video or veo3-video-fast
   "veo3": { model: "veo3", task_type_txt2video: "veo3-video", task_type_img2video: "veo3-video" },
-  "sora2": { model: "sora2" },
+  "sora2": { model: "sora2", task_type_txt2video: "sora2-video", task_type_img2video: "sora2-video" },
 };
 
 serve(async (req) => {
