@@ -41,7 +41,7 @@ export function VideoTextRemover() {
   const [duration, setDuration] = useState(0);
   const [frames, setFrames] = useState<ExtractedFrame[]>([]);
   const [selectedFrame, setSelectedFrame] = useState<ExtractedFrame | null>(null);
-  const [removalPrompt, setRemovalPrompt] = useState("Remove all text, watermarks, and written content from this image. Keep the background and all other elements intact. Make it look natural.");
+  const [removalPrompt, setRemovalPrompt] = useState("Remove all visible text (subtitles, captions, signs) from this image. Keep the background and all other elements intact. Make it look natural.");
   const [isExtracting, setIsExtracting] = useState(false);
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [regeneratePrompt, setRegeneratePrompt] = useState("");
@@ -179,7 +179,13 @@ export function VideoTextRemover() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const messageFromBody =
+          data && typeof data === "object" && "error" in data
+            ? String((data as any).error)
+            : null;
+        throw new Error(messageFromBody || error.message);
+      }
 
       if (data?.imageUrl) {
         setFrames((prev) =>
@@ -189,23 +195,23 @@ export function VideoTextRemover() {
               : f
           )
         );
-        
+
         // Update selected frame if it's the one being edited
         if (selectedFrame?.id === frame.id) {
           setSelectedFrame((prev) =>
             prev ? { ...prev, editedImageData: data.imageUrl, isProcessing: false } : null
           );
         }
-        
+
         toast.success("Scritte rimosse con successo!");
+      } else {
+        throw new Error("Risposta AI non valida: immagine mancante");
       }
     } catch (error: any) {
       console.error("Error removing text:", error);
       toast.error(`Errore: ${error.message || "Impossibile rimuovere le scritte"}`);
       setFrames((prev) =>
-        prev.map((f) =>
-          f.id === frame.id ? { ...f, isProcessing: false } : f
-        )
+        prev.map((f) => (f.id === frame.id ? { ...f, isProcessing: false } : f))
       );
     }
   };
@@ -464,7 +470,7 @@ export function VideoTextRemover() {
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              Personalizza il prompt per ottenere risultati migliori. L'AI cercherà di rimuovere scritte e watermark mantenendo intatto il resto dell'immagine.
+              Personalizza il prompt per ottenere risultati migliori. Suggerimento: evita di chiedere la rimozione di watermark (non è supportata) e concentra il prompt su scritte/sottotitoli.
             </p>
             <Button 
               onClick={removeTextFromAllFrames}

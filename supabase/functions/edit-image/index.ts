@@ -100,8 +100,27 @@ serve(async (req) => {
     }
 
     if (!editedImageUrl) {
+      const assistantText = data.choices?.[0]?.message?.content;
       console.error("Full response data:", JSON.stringify(data).substring(0, 2000));
-      throw new Error("No image returned from AI - check response format");
+
+      // Common case: model refuses watermark removal and answers with text only
+      const looksLikeWatermarkRefusal =
+        typeof assistantText === "string" &&
+        /watermark/i.test(assistantText) &&
+        /(cannot|can't|unable|won't|refuse)/i.test(assistantText);
+
+      const errorMessage = looksLikeWatermarkRefusal
+        ? "The AI cannot remove watermarks. Try removing only subtitles/text overlays, or use an unwatermarked source."
+        : "No image returned from AI (the model replied with text only).";
+
+      return new Response(
+        JSON.stringify({
+          error: errorMessage,
+          // Small excerpt for debugging / UX
+          aiMessage: typeof assistantText === "string" ? assistantText.slice(0, 400) : null,
+        }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
     return new Response(
