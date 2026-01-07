@@ -7,8 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { sanitizeRemovalPrompt, hasWatermarkTerms } from "@/lib/promptSanitizer";
+import { InpaintingCanvas } from "@/components/InpaintingCanvas";
 import { 
   Play, 
   Pause, 
@@ -21,7 +24,9 @@ import {
   Trash2,
   RotateCcw,
   Video,
-  Wand2
+  Wand2,
+  Paintbrush,
+  AlertTriangle
 } from "lucide-react";
 
 interface ExtractedFrame {
@@ -30,6 +35,7 @@ interface ExtractedFrame {
   imageData: string;
   editedImageData?: string;
   isProcessing?: boolean;
+  maskData?: string;
 }
 
 export function VideoTextRemover() {
@@ -46,6 +52,9 @@ export function VideoTextRemover() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [regeneratePrompt, setRegeneratePrompt] = useState("");
   const [regenerateDuration, setRegenerateDuration] = useState("5");
+  const [useInpainting, setUseInpainting] = useState(true);
+  const [showInpaintingCanvas, setShowInpaintingCanvas] = useState(false);
+  const [frameForInpainting, setFrameForInpainting] = useState<ExtractedFrame | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,7 +173,7 @@ export function VideoTextRemover() {
     setIsExtracting(false);
   };
 
-  const removeTextFromFrame = async (frame: ExtractedFrame) => {
+  const removeTextFromFrame = async (frame: ExtractedFrame, maskData?: string) => {
     setFrames((prev) =>
       prev.map((f) =>
         f.id === frame.id ? { ...f, isProcessing: true } : f
@@ -172,12 +181,40 @@ export function VideoTextRemover() {
     );
 
     try {
-      const { data, error } = await supabase.functions.invoke("edit-image", {
-        body: {
-          prompt: removalPrompt,
-          referenceImage: frame.imageData,
-        },
-      });
+      // Sanitize the prompt before sending
+      const { sanitized, wasModified, removedTerms } = sanitizeRemovalPrompt(removalPrompt);
+      
+      if (wasModified) {
+        toast.info(`Prompt modificato: rimossi termini non supportati (${removedTerms.join(", ")})`);
+      }
+
+      let data, error;
+
+      // Use inpainting API if mask is provided or useInpainting is enabled with mask
+      const effectiveMask = maskData || frame.maskData;
+      
+      if (useInpainting && effectiveMask) {
+        // Use OpenAI inpainting with mask
+        const result = await supabase.functions.invoke("inpaint-image", {
+          body: {
+            prompt: sanitized,
+            image: frame.imageData,
+            mask: effectiveMask,
+          },
+        });
+        data = result.data;
+        error = result.error;
+      } else {
+        // Use standard edit-image
+        const result = await supabase.functions.invoke("edit-image", {
+          body: {
+            prompt: sanitized,
+            referenceImage: frame.imageData,
+          },
+        });
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
         const messageFromBody =
@@ -191,7 +228,7 @@ export function VideoTextRemover() {
         setFrames((prev) =>
           prev.map((f) =>
             f.id === frame.id
-              ? { ...f, editedImageData: data.imageUrl, isProcessing: false }
+              ? { ...f, editedImageData: data.imageUrl, isProcessing: false, maskData: effectiveMask }
               : f
           )
         );
@@ -199,7 +236,7 @@ export function VideoTextRemover() {
         // Update selected frame if it's the one being edited
         if (selectedFrame?.id === frame.id) {
           setSelectedFrame((prev) =>
-            prev ? { ...prev, editedImageData: data.imageUrl, isProcessing: false } : null
+            prev ? { ...prev, editedImageData: data.imageUrl, isProcessing: false, maskData: effectiveMask } : null
           );
         }
 
@@ -214,6 +251,28 @@ export function VideoTextRemover() {
         prev.map((f) => (f.id === frame.id ? { ...f, isProcessing: false } : f))
       );
     }
+  };
+
+  const openInpaintingCanvas = (frame: ExtractedFrame) => {
+    setFrameForInpainting(frame);
+    setShowInpaintingCanvas(true);
+  };
+
+  const handleMaskComplete = async (maskData: string) => {
+    if (!frameForInpainting) return;
+    
+    setShowInpaintingCanvas(false);
+    
+    // Store the mask and process
+    setFrames((prev) =>
+      prev.map((f) =>
+        f.id === frameForInpainting.id ? { ...f, maskData } : f
+      )
+    );
+    
+    // Start processing with the mask
+    await removeTextFromFrame(frameForInpainting, maskData);
+    setFrameForInpainting(null);
   };
 
   const removeTextFromAllFrames = async () => {
@@ -456,29 +515,91 @@ export function VideoTextRemover() {
         </CardContent>
       </Card>
 
-      {/* Removal Prompt */}
-      {frames.length > 0 && (
+      {/* Inpainting Canvas Modal */}
+      {showInpaintingCanvas && frameForInpainting && (
         <Card>
           <CardHeader>
-            <CardTitle>Prompt di Rimozione</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Paintbrush className="w-5 h-5" />
+              Disegna maschera - Frame {formatTime(frameForInpainting.timestamp)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <InpaintingCanvas
+              imageData={frameForInpainting.imageData}
+              onMaskComplete={handleMaskComplete}
+              onCancel={() => {
+                setShowInpaintingCanvas(false);
+                setFrameForInpainting(null);
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Removal Prompt */}
+      {frames.length > 0 && !showInpaintingCanvas && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Impostazioni Rimozione</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Textarea
-              value={removalPrompt}
-              onChange={(e) => setRemovalPrompt(e.target.value)}
-              placeholder="Descrivi cosa vuoi rimuovere dall'immagine..."
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground">
-              Personalizza il prompt per ottenere risultati migliori. Suggerimento: evita di chiedere la rimozione di watermark (non è supportata) e concentra il prompt su scritte/sottotitoli.
-            </p>
+            {/* Inpainting toggle */}
+            <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="space-y-0.5">
+                <Label htmlFor="use-inpainting" className="font-medium">Usa Inpainting (OpenAI)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Abilita per disegnare manualmente le aree da rimuovere. Più preciso ma richiede API key OpenAI.
+                </p>
+              </div>
+              <Switch
+                id="use-inpainting"
+                checked={useInpainting}
+                onCheckedChange={setUseInpainting}
+              />
+            </div>
+
+            {/* Warning for watermark terms */}
+            {hasWatermarkTerms(removalPrompt) && (
+              <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-yellow-600">Termini non supportati rilevati</p>
+                  <p className="text-muted-foreground">
+                    Il prompt contiene parole come "watermark", "logo" o "brand" che l'AI non può elaborare. 
+                    Questi termini verranno automaticamente rimossi.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Prompt di Rimozione</Label>
+              <Textarea
+                value={removalPrompt}
+                onChange={(e) => setRemovalPrompt(e.target.value)}
+                placeholder="Descrivi cosa vuoi rimuovere dall'immagine..."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Personalizza il prompt per ottenere risultati migliori. Concentra il prompt su scritte/sottotitoli.
+              </p>
+            </div>
+
             <Button 
               onClick={removeTextFromAllFrames}
               className="w-full"
+              disabled={useInpainting}
             >
               <Eraser className="w-4 h-4 mr-2" />
-              Rimuovi scritte da tutti i frame
+              {useInpainting ? "Disegna una maschera per ogni frame" : "Rimuovi scritte da tutti i frame"}
             </Button>
+            
+            {useInpainting && (
+              <p className="text-xs text-center text-muted-foreground">
+                Con l'inpainting attivo, clicca su un frame e poi "Disegna maschera" per selezionare le aree da rimuovere.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -528,17 +649,33 @@ export function VideoTextRemover() {
 
                   {/* Actions overlay */}
                   <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <Button
-                      size="icon"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeTextFromFrame(frame);
-                      }}
-                      disabled={frame.isProcessing}
-                    >
-                      <Eraser className="w-4 h-4" />
-                    </Button>
+                    {useInpainting ? (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openInpaintingCanvas(frame);
+                        }}
+                        disabled={frame.isProcessing}
+                        title="Disegna maschera"
+                      >
+                        <Paintbrush className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeTextFromFrame(frame);
+                        }}
+                        disabled={frame.isProcessing}
+                        title="Rimuovi scritte"
+                      >
+                        <Eraser className="w-4 h-4" />
+                      </Button>
+                    )}
                     <Button
                       size="icon"
                       variant="secondary"
@@ -546,6 +683,7 @@ export function VideoTextRemover() {
                         e.stopPropagation();
                         downloadFrame(frame, !!frame.editedImageData);
                       }}
+                      title="Scarica"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -557,6 +695,7 @@ export function VideoTextRemover() {
                           e.stopPropagation();
                           resetFrame(frame.id);
                         }}
+                        title="Ripristina"
                       >
                         <RotateCcw className="w-4 h-4" />
                       </Button>
@@ -568,6 +707,7 @@ export function VideoTextRemover() {
                         e.stopPropagation();
                         deleteFrame(frame.id);
                       }}
+                      title="Elimina"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -623,28 +763,56 @@ export function VideoTextRemover() {
                     />
                   ) : (
                     <div className="text-center p-4">
-                      <Eraser className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">
-                        Clicca "Rimuovi scritte" per elaborare
-                      </p>
+                      {useInpainting ? (
+                        <>
+                          <Paintbrush className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Clicca "Disegna maschera" per selezionare le aree
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Eraser className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">
+                            Clicca "Rimuovi scritte" per elaborare
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => removeTextFromFrame(selectedFrame)}
-                    disabled={selectedFrame.isProcessing}
-                  >
-                    {selectedFrame.isProcessing ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <Eraser className="w-4 h-4 mr-2" />
-                    )}
-                    Rimuovi scritte
-                  </Button>
+                  {useInpainting ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => openInpaintingCanvas(selectedFrame)}
+                      disabled={selectedFrame.isProcessing}
+                    >
+                      {selectedFrame.isProcessing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Paintbrush className="w-4 h-4 mr-2" />
+                      )}
+                      Disegna maschera
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1"
+                      onClick={() => removeTextFromFrame(selectedFrame)}
+                      disabled={selectedFrame.isProcessing}
+                    >
+                      {selectedFrame.isProcessing ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Eraser className="w-4 h-4 mr-2" />
+                      )}
+                      Rimuovi scritte
+                    </Button>
+                  )}
                   {selectedFrame.editedImageData && (
                     <Button
                       variant="outline"
