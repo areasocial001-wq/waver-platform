@@ -2,15 +2,22 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Paintbrush, Eraser, RotateCcw, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Paintbrush, Eraser, RotateCcw, Check, Undo2, Redo2, Layers } from "lucide-react";
 
 interface InpaintingCanvasProps {
   imageData: string;
-  onMaskComplete: (maskData: string) => void;
+  onMaskComplete: (maskData: string, applyToAll?: boolean) => void;
   onCancel: () => void;
+  frameCount?: number;
 }
 
-export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: InpaintingCanvasProps) {
+export function InpaintingCanvas({ 
+  imageData, 
+  onMaskComplete, 
+  onCancel,
+  frameCount = 1 
+}: InpaintingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,6 +25,70 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
   const [brushSize, setBrushSize] = useState(30);
   const [tool, setTool] = useState<"brush" | "eraser">("brush");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [applyToAllFrames, setApplyToAllFrames] = useState(false);
+  
+  // Undo/Redo history
+  const [history, setHistory] = useState<ImageData[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const maxHistorySize = 20;
+
+  // Save current state to history
+  const saveToHistory = useCallback(() => {
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+    const ctx = maskCanvas.getContext("2d");
+    if (!ctx) return;
+
+    const currentState = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+    
+    setHistory(prev => {
+      // Remove any future states if we're not at the end
+      const newHistory = prev.slice(0, historyIndex + 1);
+      // Add new state
+      newHistory.push(currentState);
+      // Limit history size
+      if (newHistory.length > maxHistorySize) {
+        newHistory.shift();
+        return newHistory;
+      }
+      return newHistory;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, maxHistorySize - 1));
+  }, [historyIndex]);
+
+  // Undo action
+  const undo = useCallback(() => {
+    if (historyIndex <= 0) return;
+    
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+    const ctx = maskCanvas.getContext("2d");
+    if (!ctx) return;
+
+    const newIndex = historyIndex - 1;
+    const previousState = history[newIndex];
+    if (previousState) {
+      ctx.putImageData(previousState, 0, 0);
+      setHistoryIndex(newIndex);
+    }
+  }, [history, historyIndex]);
+
+  // Redo action
+  const redo = useCallback(() => {
+    if (historyIndex >= history.length - 1) return;
+    
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+    const ctx = maskCanvas.getContext("2d");
+    if (!ctx) return;
+
+    const newIndex = historyIndex + 1;
+    const nextState = history[newIndex];
+    if (nextState) {
+      ctx.putImageData(nextState, 0, 0);
+      setHistoryIndex(newIndex);
+    }
+  }, [history, historyIndex]);
 
   // Load image and setup canvas
   useEffect(() => {
@@ -61,10 +132,35 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
       if (maskCtx) {
         maskCtx.fillStyle = "black";
         maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+        
+        // Save initial state to history
+        const initialState = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+        setHistory([initialState]);
+        setHistoryIndex(0);
       }
     };
     img.src = imageData;
   }, [imageData]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   const getCanvasCoordinates = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const canvas = maskCanvasRef.current;
@@ -113,8 +209,12 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
   }, [draw]);
 
   const stopDrawing = useCallback(() => {
+    if (isDrawing) {
+      // Save state after each stroke
+      saveToHistory();
+    }
     setIsDrawing(false);
-  }, []);
+  }, [isDrawing, saveToHistory]);
 
   const clearMask = useCallback(() => {
     const maskCanvas = maskCanvasRef.current;
@@ -123,7 +223,8 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
     if (!ctx) return;
     ctx.fillStyle = "black";
     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
-  }, []);
+    saveToHistory();
+  }, [saveToHistory]);
 
   const completeMask = useCallback(() => {
     const maskCanvas = maskCanvasRef.current;
@@ -159,9 +260,11 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
     ctx.putImageData(imageData, 0, 0);
     const maskDataUrl = maskCanvas.toDataURL("image/png");
 
-    // Reset canvas for visual feedback before callback
-    onMaskComplete(maskDataUrl);
-  }, [onMaskComplete]);
+    onMaskComplete(maskDataUrl, applyToAllFrames);
+  }, [onMaskComplete, applyToAllFrames]);
+
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
 
   return (
     <div className="space-y-4">
@@ -182,6 +285,27 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
           >
             <Eraser className="w-4 h-4 mr-2" />
             Gomma
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={undo}
+            disabled={!canUndo}
+            title="Annulla (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+          </Button>
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={redo}
+            disabled={!canRedo}
+            title="Ripeti (Ctrl+Shift+Z)"
+          >
+            <Redo2 className="w-4 h-4" />
           </Button>
         </div>
 
@@ -233,7 +357,29 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
 
       <p className="text-sm text-muted-foreground text-center">
         Disegna sulle aree di testo che vuoi rimuovere. Le zone bianche verranno elaborate dall'AI.
+        <br />
+        <span className="text-xs">Scorciatoie: Ctrl+Z = Annulla, Ctrl+Shift+Z = Ripeti</span>
       </p>
+
+      {/* Batch application option */}
+      {frameCount > 1 && (
+        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+          <Checkbox
+            id="apply-to-all"
+            checked={applyToAllFrames}
+            onCheckedChange={(checked) => setApplyToAllFrames(checked === true)}
+          />
+          <div className="flex-1">
+            <Label htmlFor="apply-to-all" className="font-medium cursor-pointer flex items-center gap-2">
+              <Layers className="w-4 h-4" />
+              Applica a tutti i {frameCount} frame
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Usa questa maschera per rimuovere le scritte da tutti i frame estratti
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>
@@ -241,7 +387,7 @@ export function InpaintingCanvas({ imageData, onMaskComplete, onCancel }: Inpain
         </Button>
         <Button onClick={completeMask}>
           <Check className="w-4 h-4 mr-2" />
-          Applica maschera
+          {applyToAllFrames ? `Applica a ${frameCount} frame` : "Applica maschera"}
         </Button>
       </div>
     </div>
