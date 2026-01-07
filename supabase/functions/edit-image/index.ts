@@ -59,16 +59,49 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("Lovable AI error:", errorText);
-      throw new Error(`Lovable AI error: ${response.status}`);
+      throw new Error(`Lovable AI error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log("Lovable AI response received");
+    console.log("Lovable AI response structure:", JSON.stringify({
+      hasChoices: !!data.choices,
+      choicesLength: data.choices?.length,
+      hasMessage: !!data.choices?.[0]?.message,
+      hasImages: !!data.choices?.[0]?.message?.images,
+      imagesLength: data.choices?.[0]?.message?.images?.length,
+      messageContent: data.choices?.[0]?.message?.content?.substring?.(0, 200),
+    }));
 
-    const editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Try multiple possible image locations in the response
+    let editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    
+    // Alternative: check if image is directly in content
+    if (!editedImageUrl && data.choices?.[0]?.message?.content) {
+      const content = data.choices[0].message.content;
+      // Check if content is an array with image objects
+      if (Array.isArray(content)) {
+        for (const item of content) {
+          if (item.type === 'image_url' || item.type === 'image') {
+            editedImageUrl = item.image_url?.url || item.url;
+            if (editedImageUrl) break;
+          }
+        }
+      }
+    }
+
+    // Alternative: check for base64 in response
+    if (!editedImageUrl && data.choices?.[0]?.message?.images?.[0]) {
+      const imageObj = data.choices[0].message.images[0];
+      if (typeof imageObj === 'string' && imageObj.startsWith('data:')) {
+        editedImageUrl = imageObj;
+      } else if (imageObj.url) {
+        editedImageUrl = imageObj.url;
+      }
+    }
 
     if (!editedImageUrl) {
-      throw new Error("No image returned from AI");
+      console.error("Full response data:", JSON.stringify(data).substring(0, 2000));
+      throw new Error("No image returned from AI - check response format");
     }
 
     return new Response(
