@@ -1564,6 +1564,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                         onChange={(effects) => updateTrack(track.id, { effects })}
                         disabled={isProcessing}
                         trackName={track.name}
+                        audioUrl={track.url}
                       />
                       
                       <div className="text-xs text-muted-foreground">
