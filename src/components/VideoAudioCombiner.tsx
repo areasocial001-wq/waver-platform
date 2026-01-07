@@ -3,12 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors } from 'lucide-react';
+import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors, Wand2, Sparkles, Music } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
@@ -83,6 +84,13 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   const [projectName, setProjectName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  
+  // ElevenLabs SFX generation
+  const [showSfxDialog, setShowSfxDialog] = useState(false);
+  const [sfxPrompt, setSfxPrompt] = useState('');
+  const [sfxCategory, setSfxCategory] = useState<'sfx' | 'music' | 'ambient'>('sfx');
+  const [sfxDuration, setSfxDuration] = useState(5);
+  const [isGeneratingSfx, setIsGeneratingSfx] = useState(false);
   
   // Drag state for timeline
   const [draggingTrack, setDraggingTrack] = useState<string | null>(null);
@@ -326,6 +334,87 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       }
     };
     input.click();
+  };
+
+  // Add audio from URL (for ElevenLabs generated audio)
+  const addAudioFromUrl = (url: string, name: string, duration: number) => {
+    const colorIndex = audioTracks.length % TRACK_COLORS.length;
+    const newTrack: AudioTrack = {
+      id: `track-${Date.now()}`,
+      url,
+      name,
+      startTime: 0,
+      volume: 1,
+      duration,
+      originalDuration: duration,
+      trimStart: 0,
+      trimEnd: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      color: TRACK_COLORS[colorIndex]
+    };
+    setAudioTracks(prev => [...prev, newTrack]);
+  };
+
+  // Generate sound effects with ElevenLabs
+  const generateSfx = async () => {
+    if (!sfxPrompt.trim()) {
+      toast.error('Inserisci una descrizione per l\'effetto sonoro');
+      return;
+    }
+
+    setIsGeneratingSfx(true);
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            prompt: sfxPrompt,
+            category: sfxCategory,
+            duration: sfxDuration,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Errore nella generazione');
+      }
+
+      const data = await response.json();
+      
+      // Create audio URL from base64
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      
+      // Get category label for name
+      const categoryLabels = {
+        sfx: 'SFX',
+        music: 'Musica',
+        ambient: 'Ambiente'
+      };
+      
+      addAudioFromUrl(
+        audioUrl, 
+        `${categoryLabels[sfxCategory]}: ${sfxPrompt.substring(0, 25)}${sfxPrompt.length > 25 ? '...' : ''}`,
+        data.duration || sfxDuration
+      );
+      
+      toast.success('Effetto sonoro generato e aggiunto alla timeline!');
+      setShowSfxDialog(false);
+      setSfxPrompt('');
+    } catch (error) {
+      console.error('Error generating SFX:', error);
+      toast.error(error instanceof Error ? error.message : 'Errore nella generazione dell\'effetto sonoro');
+    } finally {
+      setIsGeneratingSfx(false);
+    }
   };
 
   const updateTrack = (trackId: string, updates: Partial<AudioTrack>) => {
@@ -869,17 +958,128 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
           {/* Visual Timeline */}
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <CardTitle className="text-sm flex items-center gap-2">
                   Timeline
                   <span className="text-xs text-muted-foreground font-normal">
                     (Trascina i bordi per tagliare)
                   </span>
                 </CardTitle>
-                <Button variant="outline" size="sm" onClick={addAudioTrack} disabled={isProcessing}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Aggiungi Audio
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Dialog open={showSfxDialog} onOpenChange={setShowSfxDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        disabled={isProcessing}
+                        className="bg-gradient-to-r from-purple-500/10 to-pink-500/10 hover:from-purple-500/20 hover:to-pink-500/20 border-purple-500/30"
+                      >
+                        <Wand2 className="h-4 w-4 mr-2 text-purple-500" />
+                        Genera AI
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Sparkles className="h-5 w-5 text-purple-500" />
+                          Genera Audio con ElevenLabs
+                        </DialogTitle>
+                        <DialogDescription>
+                          Descrivi l'effetto sonoro, la musica o l'ambiente che vuoi generare
+                        </DialogDescription>
+                      </DialogHeader>
+                      
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Categoria</Label>
+                          <Select value={sfxCategory} onValueChange={(v) => setSfxCategory(v as 'sfx' | 'music' | 'ambient')}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sfx">
+                                <div className="flex items-center gap-2">
+                                  <Sparkles className="h-4 w-4" />
+                                  Effetto Sonoro
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="music">
+                                <div className="flex items-center gap-2">
+                                  <Music className="h-4 w-4" />
+                                  Musica di Sottofondo
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="ambient">
+                                <div className="flex items-center gap-2">
+                                  <Volume2 className="h-4 w-4" />
+                                  Suono Ambientale
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Descrizione</Label>
+                          <Textarea
+                            value={sfxPrompt}
+                            onChange={(e) => setSfxPrompt(e.target.value)}
+                            placeholder={
+                              sfxCategory === 'sfx' 
+                                ? "Es: esplosione cinematografica, whoosh veloce, click di bottone, porta che si chiude..."
+                                : sfxCategory === 'music'
+                                ? "Es: musica epica orchestrale, lo-fi hip hop rilassante, chitarra acustica..."
+                                : "Es: foresta con uccelli e vento, pioggia su finestra, traffico cittadino..."
+                            }
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label>Durata: {sfxDuration} secondi</Label>
+                          <Slider
+                            value={[sfxDuration]}
+                            onValueChange={([v]) => setSfxDuration(v)}
+                            min={1}
+                            max={sfxCategory === 'sfx' ? 22 : 30}
+                            step={1}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            {sfxCategory === 'sfx' ? 'Max 22 secondi per effetti sonori' : 'Max 30 secondi per musica/ambiente'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowSfxDialog(false)}>
+                          Annulla
+                        </Button>
+                        <Button 
+                          onClick={generateSfx} 
+                          disabled={isGeneratingSfx || !sfxPrompt.trim()}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                        >
+                          {isGeneratingSfx ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              Generazione...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-1" />
+                              Genera
+                            </>
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                  
+                  <Button variant="outline" size="sm" onClick={addAudioTrack} disabled={isProcessing}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Aggiungi File
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
