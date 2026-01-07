@@ -100,15 +100,18 @@ export function InpaintingCanvas({
       const container = containerRef.current;
       if (!canvas || !maskCanvas || !container) return;
 
+      // Wait for container to have dimensions
+      const containerWidth = container.clientWidth || 600;
+      
       // Calculate display size while maintaining aspect ratio
-      const maxWidth = container.clientWidth;
+      const maxWidth = Math.max(containerWidth, 400);
       const maxHeight = 500;
       const scale = Math.min(maxWidth / img.width, maxHeight / img.height, 1);
       
-      const displayWidth = img.width * scale;
-      const displayHeight = img.height * scale;
+      const displayWidth = Math.max(img.width * scale, 200);
+      const displayHeight = Math.max(img.height * scale, 200);
 
-      // Set canvas sizes
+      // Set canvas sizes - use actual image dimensions for the canvas
       canvas.width = img.width;
       canvas.height = img.height;
       canvas.style.width = `${displayWidth}px`;
@@ -127,10 +130,13 @@ export function InpaintingCanvas({
         ctx.drawImage(img, 0, 0);
       }
 
-      // Initialize mask canvas as fully black (nothing masked)
+      // Initialize mask canvas as fully transparent (nothing masked)
       const maskCtx = maskCanvas.getContext("2d");
       if (maskCtx) {
-        maskCtx.fillStyle = "black";
+        // Clear to transparent first
+        maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+        // Then fill with semi-transparent black so user can see where they haven't drawn
+        maskCtx.fillStyle = "rgba(0, 0, 0, 0.01)";
         maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
         
         // Save initial state to history
@@ -197,10 +203,17 @@ export function InpaintingCanvas({
 
     ctx.beginPath();
     ctx.arc(x, y, brushSize, 0, Math.PI * 2);
-    // White = transparent in mask (area to edit)
-    // Black = opaque (area to preserve)
-    ctx.fillStyle = tool === "brush" ? "white" : "black";
+    // Red semi-transparent = area to edit (will be visible on the image)
+    // Clear = area to preserve
+    if (tool === "brush") {
+      ctx.fillStyle = "rgba(255, 50, 50, 0.6)";
+    } else {
+      // Eraser: clear the area
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "rgba(0, 0, 0, 1)";
+    }
     ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
   }, [isDrawing, brushSize, tool, getCanvasCoordinates]);
 
   const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -221,7 +234,8 @@ export function InpaintingCanvas({
     if (!maskCanvas) return;
     const ctx = maskCanvas.getContext("2d");
     if (!ctx) return;
-    ctx.fillStyle = "black";
+    ctx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+    ctx.fillStyle = "rgba(0, 0, 0, 0.01)";
     ctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
     saveToHistory();
   }, [saveToHistory]);
@@ -230,35 +244,48 @@ export function InpaintingCanvas({
     const maskCanvas = maskCanvasRef.current;
     if (!maskCanvas) return;
 
+    // Create a new canvas for the final mask
+    const outputCanvas = document.createElement("canvas");
+    outputCanvas.width = maskCanvas.width;
+    outputCanvas.height = maskCanvas.height;
+    const outputCtx = outputCanvas.getContext("2d");
+    if (!outputCtx) return;
+
     // Export mask as PNG with alpha channel
     // For OpenAI: transparent areas = edit, opaque = preserve
-    // We need to convert our white/black mask to RGBA where white areas become transparent
     const ctx = maskCanvas.getContext("2d");
     if (!ctx) return;
 
     const imageData = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
     const data = imageData.data;
 
-    // Convert: white pixels (drawn areas) → transparent, black → opaque
+    // Create output image data
+    const outputImageData = outputCtx.createImageData(maskCanvas.width, maskCanvas.height);
+    const outputData = outputImageData.data;
+
+    // Convert: red areas (drawn with brush) → transparent, other → opaque
     for (let i = 0; i < data.length; i += 4) {
-      const brightness = data[i]; // R channel (grayscale, so R=G=B)
-      if (brightness > 128) {
-        // White area: make transparent (this is where we want to edit)
-        data[i] = 0;     // R
-        data[i + 1] = 0; // G
-        data[i + 2] = 0; // B
-        data[i + 3] = 0; // A = transparent
+      const r = data[i];
+      const a = data[i + 3];
+      
+      // Check if this pixel has significant red (was painted with brush)
+      if (r > 100 && a > 50) {
+        // Painted area: make transparent (this is where we want to edit)
+        outputData[i] = 0;     // R
+        outputData[i + 1] = 0; // G
+        outputData[i + 2] = 0; // B
+        outputData[i + 3] = 0; // A = transparent
       } else {
-        // Black area: keep opaque (preserve this area)
-        data[i] = 0;       // R
-        data[i + 1] = 0;   // G
-        data[i + 2] = 0;   // B
-        data[i + 3] = 255; // A = opaque
+        // Unpainted area: keep opaque (preserve this area)
+        outputData[i] = 0;       // R
+        outputData[i + 1] = 0;   // G
+        outputData[i + 2] = 0;   // B
+        outputData[i + 3] = 255; // A = opaque
       }
     }
 
-    ctx.putImageData(imageData, 0, 0);
-    const maskDataUrl = maskCanvas.toDataURL("image/png");
+    outputCtx.putImageData(outputImageData, 0, 0);
+    const maskDataUrl = outputCanvas.toDataURL("image/png");
 
     onMaskComplete(maskDataUrl, applyToAllFrames);
   }, [onMaskComplete, applyToAllFrames]);
@@ -342,7 +369,7 @@ export function InpaintingCanvas({
             <canvas
               ref={maskCanvasRef}
               className="absolute top-0 left-0 rounded cursor-crosshair"
-              style={{ opacity: 0.5, mixBlendMode: "multiply" }}
+              style={{ pointerEvents: "auto" }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
