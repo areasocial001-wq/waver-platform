@@ -56,9 +56,13 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-// Aspect ratio supportati per Sora2
+// Aspect ratio supportati per provider
 const PROVIDER_ASPECT_RATIOS: Record<string, { value: string; label: string }[]> = {
   "piapi-sora2": [
+    { value: "16:9", label: "16:9 (Orizzontale)" },
+    { value: "9:16", label: "9:16 (Verticale)" },
+  ],
+  "piapi-veo3": [
     { value: "16:9", label: "16:9 (Orizzontale)" },
     { value: "9:16", label: "9:16 (Verticale)" },
   ],
@@ -331,7 +335,7 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: parseInt(duration),
             resolution: resolution,
-            aspect_ratio: preferredProvider === "piapi-sora2" ? aspectRatio : undefined,
+            aspect_ratio: (preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
           }
@@ -715,8 +719,8 @@ export const TextToVideoForm = () => {
           </Select>
         </div>
 
-        {/* Aspect Ratio for Sora2 */}
-        {preferredProvider === "piapi-sora2" && (
+        {/* Aspect Ratio for Sora2 and Veo3 */}
+        {(preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") && (
           <div className="space-y-2">
             <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
             <Select value={aspectRatio} onValueChange={setAspectRatio}>
@@ -724,7 +728,7 @@ export const TextToVideoForm = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PROVIDER_ASPECT_RATIOS["piapi-sora2"].map((ar) => (
+                {(PROVIDER_ASPECT_RATIOS[preferredProvider] || []).map((ar) => (
                   <SelectItem key={ar.value} value={ar.value}>{ar.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -756,10 +760,16 @@ export const TextToVideoForm = () => {
             <span className="text-muted-foreground">Risoluzione:</span>
             <span className="font-medium">{resolution}</span>
           </div>
-          {preferredProvider === "piapi-sora2" && (
+          {(preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Aspect Ratio:</span>
               <span className="font-medium">{aspectRatio}</span>
+            </div>
+          )}
+          {preferredProvider === "piapi-veo3" && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Audio generato:</span>
+              <span className="font-medium">Sì (automatico)</span>
             </div>
           )}
           <div className="flex justify-between">
