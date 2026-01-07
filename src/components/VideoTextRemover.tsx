@@ -258,21 +258,40 @@ export function VideoTextRemover() {
     setShowInpaintingCanvas(true);
   };
 
-  const handleMaskComplete = async (maskData: string) => {
+  const handleMaskComplete = async (maskData: string, applyToAll?: boolean) => {
     if (!frameForInpainting) return;
     
     setShowInpaintingCanvas(false);
     
-    // Store the mask and process
-    setFrames((prev) =>
-      prev.map((f) =>
-        f.id === frameForInpainting.id ? { ...f, maskData } : f
-      )
-    );
-    
-    // Start processing with the mask
-    await removeTextFromFrame(frameForInpainting, maskData);
-    setFrameForInpainting(null);
+    if (applyToAll && frames.length > 1) {
+      // Apply mask to all frames
+      toast.info(`Applicazione maschera a ${frames.length} frame...`);
+      
+      // Update all frames with the mask
+      setFrames((prev) =>
+        prev.map((f) => ({ ...f, maskData }))
+      );
+      
+      // Process all frames sequentially
+      for (const frame of frames) {
+        if (!frame.editedImageData && !frame.isProcessing) {
+          await removeTextFromFrame(frame, maskData);
+        }
+      }
+      
+      setFrameForInpainting(null);
+    } else {
+      // Apply to single frame only
+      setFrames((prev) =>
+        prev.map((f) =>
+          f.id === frameForInpainting.id ? { ...f, maskData } : f
+        )
+      );
+      
+      // Start processing with the mask
+      await removeTextFromFrame(frameForInpainting, maskData);
+      setFrameForInpainting(null);
+    }
   };
 
   const removeTextFromAllFrames = async () => {
@@ -532,6 +551,7 @@ export function VideoTextRemover() {
                 setShowInpaintingCanvas(false);
                 setFrameForInpainting(null);
               }}
+              frameCount={frames.length}
             />
           </CardContent>
         </Card>
