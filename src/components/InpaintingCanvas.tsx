@@ -3,7 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Paintbrush, Eraser, RotateCcw, Check, Undo2, Redo2, Layers } from "lucide-react";
+import { Paintbrush, Eraser, RotateCcw, Check, Undo2, Redo2, Layers, Palette } from "lucide-react";
+
+const MASK_COLORS = [
+  { name: "Rosso", value: "rgba(255, 50, 50, 0.6)", rgb: { r: 255, g: 50, b: 50 } },
+  { name: "Verde", value: "rgba(50, 255, 50, 0.6)", rgb: { r: 50, g: 255, b: 50 } },
+  { name: "Blu", value: "rgba(50, 50, 255, 0.6)", rgb: { r: 50, g: 50, b: 255 } },
+  { name: "Giallo", value: "rgba(255, 255, 50, 0.6)", rgb: { r: 255, g: 255, b: 50 } },
+  { name: "Ciano", value: "rgba(50, 255, 255, 0.6)", rgb: { r: 50, g: 255, b: 255 } },
+  { name: "Magenta", value: "rgba(255, 50, 255, 0.6)", rgb: { r: 255, g: 50, b: 255 } },
+];
 
 interface InpaintingCanvasProps {
   imageData: string;
@@ -20,17 +29,22 @@ export function InpaintingCanvas({
 }: InpaintingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cursorCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushSize, setBrushSize] = useState(30);
   const [tool, setTool] = useState<"brush" | "eraser">("brush");
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [applyToAllFrames, setApplyToAllFrames] = useState(false);
+  const [maskColorIndex, setMaskColorIndex] = useState(0);
+  const [cursorPos, setCursorPos] = useState<{ x: number; y: number } | null>(null);
   
   // Undo/Redo history
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const maxHistorySize = 20;
+  
+  const maskColor = MASK_COLORS[maskColorIndex];
 
   // Save current state to history
   const saveToHistory = useCallback(() => {
@@ -122,6 +136,15 @@ export function InpaintingCanvas({
       maskCanvas.style.width = `${displayWidth}px`;
       maskCanvas.style.height = `${displayHeight}px`;
 
+      // Setup cursor preview canvas
+      const cursorCanvas = cursorCanvasRef.current;
+      if (cursorCanvas) {
+        cursorCanvas.width = img.width;
+        cursorCanvas.height = img.height;
+        cursorCanvas.style.width = `${displayWidth}px`;
+        cursorCanvas.style.height = `${displayHeight}px`;
+      }
+
       setCanvasSize({ width: displayWidth, height: displayHeight });
 
       // Draw image on main canvas
@@ -168,6 +191,31 @@ export function InpaintingCanvas({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
+  // Draw cursor preview
+  useEffect(() => {
+    const cursorCanvas = cursorCanvasRef.current;
+    if (!cursorCanvas) return;
+    const ctx = cursorCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+
+    if (cursorPos) {
+      ctx.beginPath();
+      ctx.arc(cursorPos.x, cursorPos.y, brushSize, 0, Math.PI * 2);
+      ctx.strokeStyle = tool === "brush" ? maskColor.value : "rgba(255, 255, 255, 0.8)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Inner circle for better visibility
+      ctx.beginPath();
+      ctx.arc(cursorPos.x, cursorPos.y, brushSize, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }, [cursorPos, brushSize, tool, maskColor]);
+
   const getCanvasCoordinates = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     const canvas = maskCanvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -191,39 +239,78 @@ export function InpaintingCanvas({
     };
   }, []);
 
-  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const coords = getCanvasCoordinates(e);
+    setCursorPos(coords);
+    if (isDrawing) {
+      const maskCanvas = maskCanvasRef.current;
+      if (!maskCanvas) return;
+      const ctx = maskCanvas.getContext("2d");
+      if (!ctx) return;
+
+      ctx.beginPath();
+      ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+      if (tool === "brush") {
+        ctx.fillStyle = maskColor.value;
+      } else {
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.fillStyle = "rgba(0, 0, 0, 1)";
+      }
+      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+    }
+  }, [isDrawing, brushSize, tool, getCanvasCoordinates, maskColor]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isDrawing) return;
     const maskCanvas = maskCanvasRef.current;
     if (!maskCanvas) return;
-
     const ctx = maskCanvas.getContext("2d");
     if (!ctx) return;
 
-    const { x, y } = getCanvasCoordinates(e);
-
+    const coords = getCanvasCoordinates(e);
     ctx.beginPath();
-    ctx.arc(x, y, brushSize, 0, Math.PI * 2);
-    // Red semi-transparent = area to edit (will be visible on the image)
-    // Clear = area to preserve
+    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
     if (tool === "brush") {
-      ctx.fillStyle = "rgba(255, 50, 50, 0.6)";
+      ctx.fillStyle = maskColor.value;
     } else {
-      // Eraser: clear the area
       ctx.globalCompositeOperation = "destination-out";
       ctx.fillStyle = "rgba(0, 0, 0, 1)";
     }
     ctx.fill();
     ctx.globalCompositeOperation = "source-over";
-  }, [isDrawing, brushSize, tool, getCanvasCoordinates]);
+  }, [isDrawing, brushSize, tool, getCanvasCoordinates, maskColor]);
+
+  const handleMouseLeave = useCallback(() => {
+    setCursorPos(null);
+    if (isDrawing) {
+      saveToHistory();
+    }
+    setIsDrawing(false);
+  }, [isDrawing, saveToHistory]);
 
   const startDrawing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     setIsDrawing(true);
-    draw(e);
-  }, [draw]);
+    const maskCanvas = maskCanvasRef.current;
+    if (!maskCanvas) return;
+    const ctx = maskCanvas.getContext("2d");
+    if (!ctx) return;
+
+    const coords = getCanvasCoordinates(e);
+    ctx.beginPath();
+    ctx.arc(coords.x, coords.y, brushSize, 0, Math.PI * 2);
+    if (tool === "brush") {
+      ctx.fillStyle = maskColor.value;
+    } else {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "rgba(0, 0, 0, 1)";
+    }
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+  }, [getCanvasCoordinates, brushSize, tool, maskColor]);
 
   const stopDrawing = useCallback(() => {
     if (isDrawing) {
-      // Save state after each stroke
       saveToHistory();
     }
     setIsDrawing(false);
@@ -263,13 +350,12 @@ export function InpaintingCanvas({
     const outputImageData = outputCtx.createImageData(maskCanvas.width, maskCanvas.height);
     const outputData = outputImageData.data;
 
-    // Convert: red areas (drawn with brush) → transparent, other → opaque
+    // Convert: colored areas (drawn with brush) → transparent, other → opaque
     for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
       const a = data[i + 3];
       
-      // Check if this pixel has significant red (was painted with brush)
-      if (r > 100 && a > 50) {
+      // Check if this pixel was painted (has significant alpha)
+      if (a > 50) {
         // Painted area: make transparent (this is where we want to edit)
         outputData[i] = 0;     // R
         outputData[i + 1] = 0; // G
@@ -352,6 +438,24 @@ export function InpaintingCanvas({
           <RotateCcw className="w-4 h-4 mr-2" />
           Pulisci
         </Button>
+
+        {/* Color picker */}
+        <div className="flex items-center gap-2">
+          <Palette className="w-4 h-4 text-muted-foreground" />
+          <div className="flex gap-1">
+            {MASK_COLORS.map((color, idx) => (
+              <button
+                key={color.name}
+                className={`w-6 h-6 rounded-full border-2 transition-all ${
+                  idx === maskColorIndex ? "border-foreground scale-110" : "border-transparent"
+                }`}
+                style={{ backgroundColor: color.value }}
+                onClick={() => setMaskColorIndex(idx)}
+                title={color.name}
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
       <div 
@@ -368,14 +472,20 @@ export function InpaintingCanvas({
             {/* Mask overlay canvas */}
             <canvas
               ref={maskCanvasRef}
-              className="absolute top-0 left-0 rounded cursor-crosshair"
+              className="absolute top-0 left-0 rounded"
+              style={{ pointerEvents: "none" }}
+            />
+            {/* Cursor preview canvas - this one receives events */}
+            <canvas
+              ref={cursorCanvasRef}
+              className="absolute top-0 left-0 rounded cursor-none"
               style={{ pointerEvents: "auto" }}
               onMouseDown={startDrawing}
-              onMouseMove={draw}
+              onMouseMove={handleMouseMove}
               onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
+              onMouseLeave={handleMouseLeave}
               onTouchStart={startDrawing}
-              onTouchMove={draw}
+              onTouchMove={handleTouchMove}
               onTouchEnd={stopDrawing}
             />
           </div>
