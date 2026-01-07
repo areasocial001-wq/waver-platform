@@ -52,6 +52,7 @@ export function VideoTextRemover() {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
   const [regeneratePrompt, setRegeneratePrompt] = useState("");
   const [regenerateDuration, setRegenerateDuration] = useState("5");
+  const [regenerateQuality, setRegenerateQuality] = useState(70); // 0-100 slider
   const [useInpainting, setUseInpainting] = useState(true);
   const [showInpaintingCanvas, setShowInpaintingCanvas] = useState(false);
   const [frameForInpainting, setFrameForInpainting] = useState<ExtractedFrame | null>(null);
@@ -398,12 +399,48 @@ export function VideoTextRemover() {
         return;
       }
 
-      toast.info("Compressione immagine...");
+      toast.info("Preparazione immagine...");
       
-      // Compress the image aggressively - PiAPI has ~1MB limit
-      const compressedImage = await compressImageForApi(frame.editedImageData, 720, 0.6);
+      // Calculate compression settings based on quality slider
+      // Quality 0 = smallest file, Quality 100 = highest quality
+      const maxDimension = Math.round(720 + (regenerateQuality / 100) * 560); // 720-1280px
+      const jpegQuality = 0.5 + (regenerateQuality / 100) * 0.4; // 0.5-0.9
       
-      // Create video generation record with compressed image
+      // Compress the image based on quality setting
+      const compressedImage = await compressImageForApi(frame.editedImageData, maxDimension, jpegQuality);
+      
+      // Convert base64 to blob for upload
+      const base64Data = compressedImage.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/jpeg' });
+      
+      // Upload to Supabase storage
+      toast.info("Upload immagine...");
+      const fileName = `${user.id}/${Date.now()}-frame-${formatTime(frame.timestamp).replace(/:/g, '-')}.jpg`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('edited-frames')
+        .upload(fileName, blob, {
+          contentType: 'image/jpeg',
+          upsert: false
+        });
+      
+      if (uploadError) throw uploadError;
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('edited-frames')
+        .getPublicUrl(fileName);
+      
+      const imageUrl = urlData.publicUrl;
+      console.log("Uploaded frame to:", imageUrl);
+      
+      // Create video generation record with storage URL
       const { data: newGen, error: insertError } = await supabase
         .from("video_generations")
         .insert({
@@ -411,7 +448,7 @@ export function VideoTextRemover() {
           prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
           duration: parseInt(regenerateDuration),
           resolution: "720p",
-          image_url: compressedImage,
+          image_url: imageUrl,
           image_name: `frame-edited-${formatTime(frame.timestamp)}`,
           status: "processing",
           user_id: user.id,
@@ -423,14 +460,14 @@ export function VideoTextRemover() {
 
       toast.info("Avvio generazione video...");
 
-      // Call generate-video function with compressed image
+      // Call generate-video function with storage URL (not base64)
       const { data, error } = await supabase.functions.invoke("generate-video", {
         body: {
           prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
           duration: parseInt(regenerateDuration),
           resolution: "720p",
           type: "image_to_video",
-          start_image: compressedImage,
+          start_image: imageUrl,
           generationId: newGen.id,
         },
       });
@@ -925,6 +962,28 @@ export function VideoTextRemover() {
                         <SelectItem value="10">10 secondi</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                {/* Quality Slider */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Qualità immagine</Label>
+                    <span className="text-sm text-muted-foreground">
+                      {regenerateQuality < 30 ? 'Veloce' : regenerateQuality < 70 ? 'Bilanciata' : 'Alta qualità'}
+                    </span>
+                  </div>
+                  <Slider
+                    value={[regenerateQuality]}
+                    onValueChange={(value) => setRegenerateQuality(value[0])}
+                    min={10}
+                    max={100}
+                    step={10}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>File piccolo</span>
+                    <span>Qualità alta</span>
                   </div>
                 </div>
 
