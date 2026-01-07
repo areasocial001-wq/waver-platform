@@ -50,10 +50,17 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
     { value: "8", label: "8 secondi" },
   ],
   "piapi-sora2": [
-    { value: "5", label: "5 secondi" },
-    { value: "10", label: "10 secondi" },
-    { value: "15", label: "15 secondi" },
-    { value: "20", label: "20 secondi" },
+    { value: "4", label: "4 secondi" },
+    { value: "8", label: "8 secondi" },
+    { value: "12", label: "12 secondi" },
+  ],
+};
+
+// Aspect ratio supportati per Sora2
+const PROVIDER_ASPECT_RATIOS: Record<string, { value: string; label: string }[]> = {
+  "piapi-sora2": [
+    { value: "16:9", label: "16:9 (Orizzontale)" },
+    { value: "9:16", label: "9:16 (Verticale)" },
   ],
 };
 
@@ -92,8 +99,6 @@ const PROVIDER_RESOLUTIONS: Record<string, { value: string; label: string }[]> =
   ],
   "piapi-sora2": [
     { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-    { value: "4k", label: "4K (Ultra HD)" },
   ],
 };
 
@@ -141,6 +146,7 @@ export const TextToVideoForm = () => {
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
+  const [aspectRatio, setAspectRatio] = useState("16:9");
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch PiAPI balance on mount and when provider changes
@@ -324,6 +330,8 @@ export const TextToVideoForm = () => {
             type: "text_to_video",
             prompt: translatedPrompt,
             duration: parseInt(duration),
+            resolution: resolution,
+            aspect_ratio: preferredProvider === "piapi-sora2" ? aspectRatio : undefined,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
           }
@@ -706,6 +714,23 @@ export const TextToVideoForm = () => {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Aspect Ratio for Sora2 */}
+        {preferredProvider === "piapi-sora2" && (
+          <div className="space-y-2">
+            <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
+            <Select value={aspectRatio} onValueChange={setAspectRatio}>
+              <SelectTrigger id="aspect-ratio">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROVIDER_ASPECT_RATIOS["piapi-sora2"].map((ar) => (
+                  <SelectItem key={ar.value} value={ar.value}>{ar.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <Button 
@@ -731,6 +756,12 @@ export const TextToVideoForm = () => {
             <span className="text-muted-foreground">Risoluzione:</span>
             <span className="font-medium">{resolution}</span>
           </div>
+          {preferredProvider === "piapi-sora2" && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Aspect Ratio:</span>
+              <span className="font-medium">{aspectRatio}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Caratteri prompt:</span>
             <span className="font-medium">{prompt.length}</span>

@@ -374,7 +374,7 @@ serve(async (req) => {
 
     // Start new video generation
     const { 
-      type, prompt, image_url, image, start_image, end_image, duration, resolution, generationId, preferredProvider,
+      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generationId, preferredProvider,
       motion_video, motion_control, character_orientation, keep_original_sound
     } = body;
 
@@ -511,10 +511,19 @@ serve(async (req) => {
         }
       };
       
-      // Add duration - veo3 uses string format like "8s"
+      // Add duration - veo3 uses string format like "8s", sora2 uses integer
       if (modelConfig.model === "veo3") {
         piApiPayload.input.duration = `${duration || 8}s`;
         piApiPayload.input.generate_audio = true;
+      } else if (modelConfig.model === "sora2") {
+        piApiPayload.input.duration = duration || 4;
+        // Sora2 supports aspect_ratio and resolution
+        if (aspect_ratio) {
+          piApiPayload.input.aspect_ratio = aspect_ratio;
+        }
+        if (resolution) {
+          piApiPayload.input.resolution = resolution;
+        }
       } else {
         piApiPayload.input.duration = duration || 5;
       }
