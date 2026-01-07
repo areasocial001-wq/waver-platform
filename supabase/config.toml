@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.translate-prompt]
 verify_jwt = true
+
+[functions.inpaint-image]
+verify_jwt = true
