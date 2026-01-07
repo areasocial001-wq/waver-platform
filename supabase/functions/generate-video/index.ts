@@ -374,7 +374,7 @@ serve(async (req) => {
 
     // Start new video generation
     const { 
-      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generationId, preferredProvider,
+      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generate_audio, generationId, preferredProvider,
       motion_video, motion_control, character_orientation, keep_original_sound
     } = body;
 
@@ -514,7 +514,7 @@ serve(async (req) => {
       // Add duration and model-specific parameters
       if (modelConfig.model === "veo3") {
         piApiPayload.input.duration = `${duration || 8}s`;
-        piApiPayload.input.generate_audio = true;
+        piApiPayload.input.generate_audio = generate_audio !== false; // Default true
         // Veo3 supports aspect_ratio
         if (aspect_ratio) {
           piApiPayload.input.aspect_ratio = aspect_ratio;
