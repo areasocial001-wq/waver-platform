@@ -344,8 +344,8 @@ export function VideoTextRemover() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
-  // Compress image to reduce size for API
-  const compressImageForApi = (imageData: string, maxWidth = 1280, quality = 0.8): Promise<string> => {
+  // Compress image to reduce size for API - PiAPI has strict size limits
+  const compressImageForApi = (imageData: string, maxDimension = 720, quality = 0.6): Promise<string> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
@@ -353,11 +353,10 @@ export function VideoTextRemover() {
         let width = img.width;
         let height = img.height;
         
-        // Scale down if larger than maxWidth
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
+        // Scale down to max dimension while maintaining aspect ratio
+        const scaleFactor = Math.min(maxDimension / width, maxDimension / height, 1);
+        width = Math.floor(width * scaleFactor);
+        height = Math.floor(height * scaleFactor);
         
         canvas.width = width;
         canvas.height = height;
@@ -371,6 +370,11 @@ export function VideoTextRemover() {
         ctx.drawImage(img, 0, 0, width, height);
         // Use JPEG for smaller file size
         const compressed = canvas.toDataURL('image/jpeg', quality);
+        
+        // Log size for debugging
+        const sizeKB = Math.round((compressed.length * 3/4) / 1024);
+        console.log(`Compressed image: ${width}x${height}, ~${sizeKB}KB`);
+        
         resolve(compressed);
       };
       img.onerror = () => reject(new Error('Failed to load image'));
@@ -396,8 +400,8 @@ export function VideoTextRemover() {
 
       toast.info("Compressione immagine...");
       
-      // Compress the image before sending
-      const compressedImage = await compressImageForApi(frame.editedImageData, 1280, 0.85);
+      // Compress the image aggressively - PiAPI has ~1MB limit
+      const compressedImage = await compressImageForApi(frame.editedImageData, 720, 0.6);
       
       // Create video generation record with compressed image
       const { data: newGen, error: insertError } = await supabase
