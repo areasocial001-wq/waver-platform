@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Sparkles, AlertCircle, Zap, Star, DollarSign, Clock, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -151,6 +152,7 @@ export const TextToVideoForm = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [generateAudio, setGenerateAudio] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch PiAPI balance on mount and when provider changes
@@ -336,6 +338,7 @@ export const TextToVideoForm = () => {
             duration: parseInt(duration),
             resolution: resolution,
             aspect_ratio: (preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
+            generate_audio: preferredProvider === "piapi-veo3" ? generateAudio : undefined,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
           }
@@ -735,6 +738,21 @@ export const TextToVideoForm = () => {
             </Select>
           </div>
         )}
+
+        {/* Generate Audio toggle for Veo3 */}
+        {preferredProvider === "piapi-veo3" && (
+          <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
+            <div className="space-y-0.5">
+              <Label htmlFor="generate-audio" className="text-sm font-medium">Genera Audio</Label>
+              <p className="text-xs text-muted-foreground">Veo 3.1 può generare audio sincronizzato</p>
+            </div>
+            <Switch
+              id="generate-audio"
+              checked={generateAudio}
+              onCheckedChange={setGenerateAudio}
+            />
+          </div>
+        )}
       </div>
 
       <Button 
@@ -769,7 +787,7 @@ export const TextToVideoForm = () => {
           {preferredProvider === "piapi-veo3" && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Audio generato:</span>
-              <span className="font-medium">Sì (automatico)</span>
+              <span className="font-medium">{generateAudio ? "Sì" : "No"}</span>
             </div>
           )}
           <div className="flex justify-between">
