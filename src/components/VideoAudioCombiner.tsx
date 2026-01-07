@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors, Wand2, Sparkles, Music } from 'lucide-react';
+import { Download, Play, Pause, Volume2, Clock, Layers, Plus, Trash2, GripVertical, Loader2, Save, FolderOpen, Scissors, Wand2, Sparkles, Music, Undo2, Redo2, Zap, Wind, MousePointer, Bomb, Bell, Footprints } from 'lucide-react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
@@ -49,6 +49,21 @@ interface VideoAudioCombinerProps {
 type ExportFormat = 'webm' | 'mp4';
 type DragType = 'move' | 'trim-start' | 'trim-end';
 
+// Undo/Redo history types
+interface HistoryState {
+  tracks: AudioTrack[];
+}
+
+// SFX Preset type
+interface SfxPreset {
+  id: string;
+  name: string;
+  icon: React.ReactNode;
+  prompt: string;
+  category: 'sfx' | 'music' | 'ambient';
+  duration: number;
+}
+
 const TRACK_COLORS = [
   'hsl(var(--primary))',
   'hsl(142, 76%, 36%)',
@@ -59,6 +74,9 @@ const TRACK_COLORS = [
 ];
 
 const PROJECTS_STORAGE_KEY = 'video-audio-combiner-projects';
+
+// Maximum history size
+const MAX_HISTORY_SIZE = 50;
 
 export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   videoUrl,
@@ -91,6 +109,12 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   const [sfxCategory, setSfxCategory] = useState<'sfx' | 'music' | 'ambient'>('sfx');
   const [sfxDuration, setSfxDuration] = useState(5);
   const [isGeneratingSfx, setIsGeneratingSfx] = useState(false);
+  const [generatingPresetId, setGeneratingPresetId] = useState<string | null>(null);
+  
+  // Undo/Redo state
+  const [history, setHistory] = useState<HistoryState[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedo = useRef(false);
   
   // Drag state for timeline
   const [draggingTrack, setDraggingTrack] = useState<string | null>(null);
@@ -104,6 +128,78 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   const timelineRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<number>();
   const ffmpegRef = useRef<FFmpeg | null>(null);
+
+  // SFX Presets
+  const sfxPresets: SfxPreset[] = [
+    { id: 'explosion', name: 'Esplosione', icon: <Bomb className="h-4 w-4" />, prompt: 'cinematic explosion with deep bass rumble', category: 'sfx', duration: 3 },
+    { id: 'whoosh', name: 'Whoosh', icon: <Wind className="h-4 w-4" />, prompt: 'fast swoosh whoosh sound effect', category: 'sfx', duration: 2 },
+    { id: 'click', name: 'Click', icon: <MousePointer className="h-4 w-4" />, prompt: 'clean UI button click sound', category: 'sfx', duration: 1 },
+    { id: 'notification', name: 'Notifica', icon: <Bell className="h-4 w-4" />, prompt: 'pleasant notification chime sound', category: 'sfx', duration: 2 },
+    { id: 'footsteps', name: 'Passi', icon: <Footprints className="h-4 w-4" />, prompt: 'walking footsteps on concrete floor', category: 'sfx', duration: 5 },
+    { id: 'impact', name: 'Impatto', icon: <Zap className="h-4 w-4" />, prompt: 'heavy impact hit punch sound', category: 'sfx', duration: 2 },
+  ];
+
+  // Track history for undo/redo
+  const pushToHistory = useCallback((tracks: AudioTrack[]) => {
+    if (isUndoRedo.current) {
+      isUndoRedo.current = false;
+      return;
+    }
+    
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push({ tracks: JSON.parse(JSON.stringify(tracks)) });
+      
+      // Limit history size
+      if (newHistory.length > MAX_HISTORY_SIZE) {
+        newHistory.shift();
+        return newHistory;
+      }
+      return newHistory;
+    });
+    setHistoryIndex(prev => Math.min(prev + 1, MAX_HISTORY_SIZE - 1));
+  }, [historyIndex]);
+
+  // Undo function
+  const undo = useCallback(() => {
+    if (historyIndex <= 0) return;
+    
+    isUndoRedo.current = true;
+    const newIndex = historyIndex - 1;
+    setHistoryIndex(newIndex);
+    setAudioTracks(JSON.parse(JSON.stringify(history[newIndex].tracks)));
+  }, [historyIndex, history]);
+
+  // Redo function
+  const redo = useCallback(() => {
+    if (historyIndex >= history.length - 1) return;
+    
+    isUndoRedo.current = true;
+    const newIndex = historyIndex + 1;
+    setHistoryIndex(newIndex);
+    setAudioTracks(JSON.parse(JSON.stringify(history[newIndex].tracks)));
+  }, [historyIndex, history]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Load saved projects from localStorage
   useEffect(() => {
@@ -330,7 +426,11 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
           fadeOut: 0,
           color: TRACK_COLORS[colorIndex]
         };
-        setAudioTracks(prev => [...prev, newTrack]);
+        setAudioTracks(prev => {
+          const newTracks = [...prev, newTrack];
+          pushToHistory(newTracks);
+          return newTracks;
+        });
       }
     };
     input.click();
@@ -353,7 +453,51 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       fadeOut: 0,
       color: TRACK_COLORS[colorIndex]
     };
-    setAudioTracks(prev => [...prev, newTrack]);
+    setAudioTracks(prev => {
+      const newTracks = [...prev, newTrack];
+      pushToHistory(newTracks);
+      return newTracks;
+    });
+  };
+
+  // Generate SFX from preset (one click)
+  const generateFromPreset = async (preset: SfxPreset) => {
+    setGeneratingPresetId(preset.id);
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            prompt: preset.prompt,
+            category: preset.category,
+            duration: preset.duration,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Errore nella generazione');
+      }
+
+      const data = await response.json();
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      
+      addAudioFromUrl(audioUrl, preset.name, data.duration || preset.duration);
+      toast.success(`${preset.name} aggiunto alla timeline!`);
+    } catch (error) {
+      console.error('Error generating preset SFX:', error);
+      toast.error(error instanceof Error ? error.message : 'Errore nella generazione');
+    } finally {
+      setGeneratingPresetId(null);
+    }
   };
 
   // Generate sound effects with ElevenLabs
@@ -418,9 +562,13 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
   };
 
   const updateTrack = (trackId: string, updates: Partial<AudioTrack>) => {
-    setAudioTracks(prev => prev.map(t => 
-      t.id === trackId ? { ...t, ...updates } : t
-    ));
+    setAudioTracks(prev => {
+      const newTracks = prev.map(t => 
+        t.id === trackId ? { ...t, ...updates } : t
+      );
+      pushToHistory(newTracks);
+      return newTracks;
+    });
   };
 
   const removeTrack = (trackId: string) => {
@@ -430,7 +578,11 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
       URL.revokeObjectURL(audio.src);
       audioRefs.current.delete(trackId);
     }
-    setAudioTracks(prev => prev.filter(t => t.id !== trackId));
+    setAudioTracks(prev => {
+      const newTracks = prev.filter(t => t.id !== trackId);
+      pushToHistory(newTracks);
+      return newTracks;
+    });
   };
 
   // Timeline drag handlers for move and trim
@@ -901,6 +1053,26 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
               Editor Video e Audio
             </div>
             <div className="flex items-center gap-2">
+              {/* Undo/Redo buttons */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={undo} 
+                disabled={historyIndex <= 0 || isProcessing}
+                title="Annulla (Ctrl+Z)"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={redo} 
+                disabled={historyIndex >= history.length - 1 || isProcessing}
+                title="Ripristina (Ctrl+Y)"
+              >
+                <Redo2 className="h-4 w-4" />
+              </Button>
+              <div className="w-px h-6 bg-border mx-1" />
               <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(true)}>
                 <Save className="h-4 w-4 mr-1" />
                 Salva
@@ -1083,6 +1255,28 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
+              {/* Quick SFX Presets */}
+              <div className="flex items-center gap-2 pb-2 border-b border-border overflow-x-auto">
+                <span className="text-xs text-muted-foreground shrink-0">Preset:</span>
+                {sfxPresets.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateFromPreset(preset)}
+                    disabled={isProcessing || generatingPresetId !== null}
+                    className="shrink-0 gap-1 text-xs h-7"
+                  >
+                    {generatingPresetId === preset.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      preset.icon
+                    )}
+                    {preset.name}
+                  </Button>
+                ))}
+              </div>
+              
               {/* Time markers */}
               <div className="relative h-6 border-b border-border">
                 {timelineMarkers.map((time) => (
