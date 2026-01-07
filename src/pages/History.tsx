@@ -5,13 +5,14 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle, Bell, BellOff } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle, Bell, BellOff, Eraser } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
 import { VideoQueueMonitor } from "@/components/VideoQueueMonitor";
+import { VideoTextRemover } from "@/components/VideoTextRemover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -456,6 +457,10 @@ export default function History() {
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="text-remover">
+                <Eraser className="w-4 h-4 mr-1" />
+                Rimuovi Scritte
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="all" className="mt-6">
@@ -504,6 +509,10 @@ export default function History() {
                   {renderGenerationsList(generations, true)}
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="text-remover" className="mt-6">
+              <VideoTextRemover />
             </TabsContent>
           </Tabs>
 
