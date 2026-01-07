@@ -344,6 +344,40 @@ export function VideoTextRemover() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
+  // Compress image to reduce size for API
+  const compressImageForApi = (imageData: string, maxWidth = 1280, quality = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Scale down if larger than maxWidth
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        // Use JPEG for smaller file size
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressed);
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = imageData;
+    });
+  };
+
   const regenerateVideoFromFrame = async (frame: ExtractedFrame) => {
     if (!frame.editedImageData) {
       toast.error("Devi prima rimuovere le scritte dal frame");
@@ -360,7 +394,12 @@ export function VideoTextRemover() {
         return;
       }
 
-      // Create video generation record
+      toast.info("Compressione immagine...");
+      
+      // Compress the image before sending
+      const compressedImage = await compressImageForApi(frame.editedImageData, 1280, 0.85);
+      
+      // Create video generation record with compressed image
       const { data: newGen, error: insertError } = await supabase
         .from("video_generations")
         .insert({
@@ -368,7 +407,7 @@ export function VideoTextRemover() {
           prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
           duration: parseInt(regenerateDuration),
           resolution: "720p",
-          image_url: frame.editedImageData,
+          image_url: compressedImage,
           image_name: `frame-edited-${formatTime(frame.timestamp)}`,
           status: "processing",
           user_id: user.id,
@@ -380,14 +419,14 @@ export function VideoTextRemover() {
 
       toast.info("Avvio generazione video...");
 
-      // Call generate-video function
+      // Call generate-video function with compressed image
       const { data, error } = await supabase.functions.invoke("generate-video", {
         body: {
           prompt: regeneratePrompt || "Continue the motion naturally, maintain consistency",
           duration: parseInt(regenerateDuration),
           resolution: "720p",
           type: "image_to_video",
-          start_image: frame.editedImageData,
+          start_image: compressedImage,
           generationId: newGen.id,
         },
       });
@@ -395,17 +434,16 @@ export function VideoTextRemover() {
       if (error) throw error;
 
       // Update with prediction ID
-      if (data?.id) {
+      if (data?.id || data?.operationId) {
         await supabase
           .from("video_generations")
-          .update({ prediction_id: data.id })
+          .update({ prediction_id: data.id || data.operationId })
           .eq("id", newGen.id);
       }
 
       toast.success("Generazione video avviata! Controlla la tab 'Tutti i video'");
       
       // Navigate to history tab to see the generation
-      // We're already on history page, just switch tab
       const tabsList = document.querySelector('[data-state="active"][value="text-remover"]');
       if (tabsList) {
         const allTab = document.querySelector('[value="all"]') as HTMLButtonElement;
