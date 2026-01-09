@@ -19,21 +19,21 @@ interface PiAPIModelConfig {
 }
 
 const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
-  // Kling models
-  "kling-2.6": { model: "kling", model_name: "kling-v2-6", mode: "std" },
-  "kling-2.6-motion": { model: "kling", model_name: "kling-v2-6", mode: "std" },
-  "kling-2.5": { model: "kling", model_name: "kling-v2-5", mode: "std" },
-  "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std" },
-  "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std" },
-  "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std" },
-  // Other video models
-  "hailuo": { model: "hailuo" },
-  "luma": { model: "luma" },
-  "wan": { model: "wan" },
-  "hunyuan": { model: "hunyuan" },
+  // Kling models - use video_generation for text-to-video, img2video for image-to-video
+  "kling-2.6": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  "kling-2.6-motion": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  "kling-2.5": { model: "kling", model_name: "kling-v2-5", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  // Other video models - these use txt2video/img2video
+  "hailuo": { model: "hailuo", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "luma": { model: "luma", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "wan": { model: "wan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "hunyuan": { model: "hunyuan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   // New models from PIAPI Creator subscription
-  "skyreels": { model: "skyreels" },
-  "framepack": { model: "framepack" },
+  "skyreels": { model: "skyreels", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "framepack": { model: "framepack", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   // Veo3 uses specific task_types: veo3-video or veo3-video-fast
   "veo3": { model: "veo3", task_type_txt2video: "veo3-video", task_type_img2video: "veo3-video" },
   "sora2": { model: "sora2", task_type_txt2video: "sora2-video", task_type_img2video: "sora2-video" },
@@ -692,9 +692,14 @@ serve(async (req) => {
       const modelConfig = PIAPI_MODELS["kling-2.5"]; // Default to kling-2.5
       const startImageData = start_image || image || image_url;
       
+      // For Kling fallback, use correct task types
+      const taskType = type === "image_to_video" 
+        ? (modelConfig.task_type_img2video || "img2video") 
+        : (modelConfig.task_type_txt2video || "video_generation");
+      
       const piApiPayload: any = {
         model: modelConfig.model,
-        task_type: type === "image_to_video" ? "img2video" : "txt2video",
+        task_type: taskType,
         input: {
           prompt: prompt || "Smooth cinematic video",
           duration: duration || 5,
