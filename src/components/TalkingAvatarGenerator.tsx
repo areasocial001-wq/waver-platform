@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { TalkingAvatarTimeline, TimelineClip } from './TalkingAvatarTimeline';
 import { TalkingAvatarBatch, BatchScene } from './TalkingAvatarBatch';
+import { StoryTemplates } from './StoryTemplates';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
 import { 
   User, 
@@ -551,6 +552,30 @@ export function TalkingAvatarGenerator() {
     }
   }, [batchScenes, timelineClips, musicDuration]);
 
+  // Handle story template selection
+  const handleTemplateSelect = useCallback((scenes: BatchScene[], suggestedEmotion: string) => {
+    setBatchScenes(scenes);
+    // Convert to timeline clips
+    const clips: TimelineClip[] = scenes.map((scene, index) => ({
+      id: scene.id,
+      videoUrl: '', // Will be filled when generated
+      prompt: scene.scenePrompt,
+      duration: 5,
+      expression: scene.expression,
+      order: index,
+    }));
+    // Don't add empty clips to timeline yet - user needs to generate first
+    
+    // Auto-generate music for the template's suggested emotion
+    if (suggestedEmotion) {
+      generateBackgroundMusic(suggestedEmotion);
+    }
+    
+    // Switch to batch tab
+    setActiveTab('batch');
+    toast.success('Template applicato! Genera le scene nel tab Batch.');
+  }, [generateBackgroundMusic]);
+
   return (
     <div className="space-y-6">
       {/* Project Management Bar */}
@@ -674,6 +699,9 @@ export function TalkingAvatarGenerator() {
                 Progetto: {projectName}
               </Badge>
             )}
+
+            {/* Story Templates */}
+            <StoryTemplates onSelectTemplate={handleTemplateSelect} />
 
             <div className="flex-1" />
 
@@ -1185,8 +1213,10 @@ export function TalkingAvatarGenerator() {
                 referenceImageUrl={activeReferenceUrl}
                 selectedVoice={selectedVoice}
                 sampleSteps={sampleSteps}
+                initialScenes={batchScenes}
                 onSceneGenerated={handleBatchSceneGenerated}
                 onAllCompleted={handleBatchCompleted}
+                onScenesChange={setBatchScenes}
               />
             </div>
           </div>
@@ -1199,6 +1229,8 @@ export function TalkingAvatarGenerator() {
             onClipsChange={setTimelineClips}
             onRemoveClip={handleRemoveClip}
             onReorderClips={handleReorderClips}
+            backgroundMusicUrl={backgroundMusicUrl}
+            backgroundMusicEmotion={backgroundMusicEmotion}
           />
         </TabsContent>
       </Tabs>

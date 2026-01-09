@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 import { 
   Play, 
   Pause, 
@@ -17,7 +19,9 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Plus
+  Plus,
+  Music,
+  Volume2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +56,8 @@ interface TalkingAvatarTimelineProps {
   onClipsChange: (clips: TimelineClip[]) => void;
   onRemoveClip: (id: string) => void;
   onReorderClips: (fromIndex: number, toIndex: number) => void;
+  backgroundMusicUrl?: string | null;
+  backgroundMusicEmotion?: string | null;
 }
 
 export function TalkingAvatarTimeline({
@@ -59,6 +65,8 @@ export function TalkingAvatarTimeline({
   onClipsChange,
   onRemoveClip,
   onReorderClips,
+  backgroundMusicUrl,
+  backgroundMusicEmotion,
 }: TalkingAvatarTimelineProps) {
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [selectedTransition, setSelectedTransition] = useState<string>('fade');
@@ -67,6 +75,7 @@ export function TalkingAvatarTimeline({
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [draggedClipId, setDraggedClipId] = useState<string | null>(null);
+  const [musicVolume, setMusicVolume] = useState(30); // Background music volume (0-100)
 
   // Calculate total timeline duration
   const totalDuration = useMemo(() => {
@@ -125,7 +134,7 @@ export function TalkingAvatarTimeline({
     setCurrentPlayIndex((prev) => Math.max(prev - 1, 0));
   }, []);
 
-  // Export final video
+  // Export final video with background music
   const handleExport = useCallback(async () => {
     if (clips.length === 0) {
       toast.error('Aggiungi almeno un clip alla timeline');
@@ -140,15 +149,33 @@ export function TalkingAvatarTimeline({
       const videoUrls = clips
         .sort((a, b) => a.order - b.order)
         .map(clip => clip.videoUrl);
+      
+      // Prepare clip durations
+      const clipDurations = clips
+        .sort((a, b) => a.order - b.order)
+        .map(clip => clip.duration);
 
       setExportProgress(30);
 
+      // Build request with optional background music
+      const requestBody: Record<string, unknown> = {
+        videoUrls,
+        clipDurations,
+        transition: selectedTransition === 'slide-left' ? 'wipe' : 
+                   selectedTransition === 'slide-right' ? 'wipe' : 
+                   selectedTransition === 'zoom' ? 'fade' : selectedTransition,
+        transitionDuration: TRANSITIONS.find(t => t.id === selectedTransition)?.duration || 0.5,
+      };
+
+      // Add background music if available
+      if (backgroundMusicUrl) {
+        requestBody.audioUrl = backgroundMusicUrl;
+        requestBody.audioVolume = musicVolume;
+        toast.info(`Esportando con musica di sottofondo (${backgroundMusicEmotion || 'custom'})...`);
+      }
+
       const { data, error } = await supabase.functions.invoke('video-concat', {
-        body: {
-          videos: videoUrls,
-          transition: selectedTransition,
-          transitionDuration: TRANSITIONS.find(t => t.id === selectedTransition)?.duration || 0.5,
-        },
+        body: requestBody,
       });
 
       if (error) throw new Error(error.message);
@@ -177,7 +204,7 @@ export function TalkingAvatarTimeline({
       setIsExporting(false);
       setExportProgress(0);
     }
-  }, [clips, selectedTransition]);
+  }, [clips, selectedTransition, backgroundMusicUrl, backgroundMusicEmotion, musicVolume]);
 
   // Move clip left/right
   const moveClip = useCallback((clipId: string, direction: 'left' | 'right') => {
@@ -231,7 +258,27 @@ export function TalkingAvatarTimeline({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* Background Music Controls */}
+            {backgroundMusicUrl && (
+              <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg">
+                <Music className="w-4 h-4 text-primary" />
+                <span className="text-xs text-primary">{backgroundMusicEmotion}</span>
+                <div className="flex items-center gap-1 w-20">
+                  <Volume2 className="w-3 h-3" />
+                  <Slider
+                    value={[musicVolume]}
+                    onValueChange={([v]) => setMusicVolume(v)}
+                    min={0}
+                    max={100}
+                    step={5}
+                    className="w-16"
+                  />
+                  <span className="text-xs w-6">{musicVolume}%</span>
+                </div>
+              </div>
+            )}
+            
             <select
               value={selectedTransition}
               onChange={(e) => setSelectedTransition(e.target.value)}
@@ -252,7 +299,7 @@ export function TalkingAvatarTimeline({
               ) : (
                 <>
                   <Merge className="w-4 h-4 mr-1" />
-                  Esporta
+                  {backgroundMusicUrl ? 'Esporta con Musica' : 'Esporta'}
                 </>
               )}
             </Button>

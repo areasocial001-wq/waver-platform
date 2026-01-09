@@ -37,8 +37,10 @@ interface TalkingAvatarBatchProps {
   referenceImageUrl: string | null;
   selectedVoice: string;
   sampleSteps: number;
+  initialScenes?: BatchScene[];
   onSceneGenerated: (scene: BatchScene) => void;
   onAllCompleted: (scenes: BatchScene[]) => void;
+  onScenesChange?: (scenes: BatchScene[]) => void;
 }
 
 // Expression presets with keywords for auto-detection
@@ -105,12 +107,26 @@ export function TalkingAvatarBatch({
   referenceImageUrl,
   selectedVoice,
   sampleSteps,
+  initialScenes,
   onSceneGenerated,
   onAllCompleted,
+  onScenesChange,
 }: TalkingAvatarBatchProps) {
-  const [scenes, setScenes] = useState<BatchScene[]>([]);
+  const [scenes, setScenes] = useState<BatchScene[]>(initialScenes || []);
   const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
   const [currentGeneratingIndex, setCurrentGeneratingIndex] = useState(-1);
+
+  // Sync with initial scenes from parent (template selection)
+  React.useEffect(() => {
+    if (initialScenes && initialScenes.length > 0) {
+      setScenes(initialScenes);
+    }
+  }, [initialScenes]);
+
+  // Notify parent of scene changes
+  React.useEffect(() => {
+    onScenesChange?.(scenes);
+  }, [scenes, onScenesChange]);
 
   // Auto-detect expression from dialogue text
   const detectExpression = useCallback((dialogueText: string): string => {
