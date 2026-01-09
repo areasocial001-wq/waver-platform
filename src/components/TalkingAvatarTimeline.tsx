@@ -153,22 +153,41 @@ export function TalkingAvatarTimeline({
     setExportProgress(10);
 
     try {
+      // Sort clips by order
+      const sortedClips = [...clips].sort((a, b) => a.order - b.order);
+      
       // Prepare video URLs for concatenation
-      const videoUrls = clips
-        .sort((a, b) => a.order - b.order)
-        .map(clip => clip.videoUrl);
+      const videoUrls = sortedClips.map(clip => clip.videoUrl);
       
       // Prepare clip durations
-      const clipDurations = clips
-        .sort((a, b) => a.order - b.order)
-        .map(clip => clip.duration);
+      const clipDurations = sortedClips.map(clip => clip.duration);
+      
+      // Prepare clip effects for server-side processing
+      const clipEffectsData = sortedClips.map(clip => {
+        const effect = clipEffects[clip.id];
+        if (!effect) return undefined;
+        
+        return {
+          blur: effect.motionBlur || 0,
+          saturation: effect.saturation,
+          contrast: effect.contrast,
+          brightness: effect.brightness,
+          zoom: effect.zoom,
+          panX: effect.panX,
+          panY: effect.panY,
+          zoomAnimation: effect.zoomAnimation,
+          filter: effect.filter,
+          motionBlur: effect.motionBlur,
+        };
+      });
 
       setExportProgress(30);
 
-      // Build request with optional background music
+      // Build request with optional background music and effects
       const requestBody: Record<string, unknown> = {
         videoUrls,
         clipDurations,
+        clipEffects: clipEffectsData,
         transition: selectedTransition === 'slide-left' ? 'wipe' : 
                    selectedTransition === 'slide-right' ? 'wipe' : 
                    selectedTransition === 'zoom' ? 'fade' : selectedTransition,
@@ -212,7 +231,7 @@ export function TalkingAvatarTimeline({
       setIsExporting(false);
       setExportProgress(0);
     }
-  }, [clips, selectedTransition, backgroundMusicUrl, backgroundMusicEmotion, musicVolume]);
+  }, [clips, selectedTransition, backgroundMusicUrl, backgroundMusicEmotion, musicVolume, clipEffects]);
 
   // Move clip left/right
   const moveClip = useCallback((clipId: string, direction: 'left' | 'right') => {
