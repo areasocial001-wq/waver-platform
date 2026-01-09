@@ -65,3 +65,6 @@ verify_jwt = true
 
 [functions.inpaint-image]
 verify_jwt = true
+
+[functions.talking-avatar]
+verify_jwt = true

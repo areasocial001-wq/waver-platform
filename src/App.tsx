@@ -12,6 +12,7 @@ import ViewStoryboard from "./pages/ViewStoryboard";
 import ContentGenerator from "./pages/ContentGenerator";
 import FreepikPage from "./pages/FreepikPage";
 import ApiMonitoring from "./pages/ApiMonitoring";
+import TalkingAvatarPage from "./pages/TalkingAvatar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/content-generator" element={<ContentGenerator />} />
             <Route path="/freepik" element={<FreepikPage />} />
             <Route path="/api-monitoring" element={<ApiMonitoring />} />
+            <Route path="/talking-avatar" element={<TalkingAvatarPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
