@@ -65,13 +65,67 @@ const ZOOM_ANIMATIONS = [
   { id: 'ken-burns', name: 'Ken Burns' },
 ];
 
+// Preset definitions for batch apply
+export const EFFECT_PRESETS = [
+  { 
+    id: 'cinematic', 
+    name: 'Cinematico', 
+    icon: '🎬',
+    effect: { filter: 'cinematic', contrast: 120, saturation: 90, zoomAnimation: 'ken-burns', zoom: 1.05 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'vintage', 
+    name: 'Vintage', 
+    icon: '📷',
+    effect: { filter: 'vintage', brightness: 95, saturation: 85, contrast: 110 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'dramatic', 
+    name: 'Drammatico', 
+    icon: '🎭',
+    effect: { filter: 'dramatic', contrast: 130, brightness: 90 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'warm', 
+    name: 'Caldo', 
+    icon: '☀️',
+    effect: { filter: 'warm', brightness: 105, saturation: 120 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'cool', 
+    name: 'Freddo', 
+    icon: '❄️',
+    effect: { filter: 'cool', saturation: 90, brightness: 105 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'bw', 
+    name: 'Bianco/Nero', 
+    icon: '⬛',
+    effect: { filter: 'bw', contrast: 115 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'zoom-motion', 
+    name: 'Zoom Dinamico', 
+    icon: '🔍',
+    effect: { zoomAnimation: 'zoom-in', zoom: 1.1 } as Partial<ClipEffect>
+  },
+  { 
+    id: 'none', 
+    name: 'Nessuno', 
+    icon: '🚫',
+    effect: { ...DEFAULT_EFFECT } as Partial<ClipEffect>
+  },
+];
+
 interface ClipEffectsPanelProps {
   clip: TimelineClip | null;
+  allClips?: TimelineClip[];
   effects: Record<string, ClipEffect>;
   onEffectsChange: (clipId: string, effect: ClipEffect) => void;
+  onApplyToAll?: (effect: Partial<ClipEffect>) => void;
 }
 
-export function ClipEffectsPanel({ clip, effects, onEffectsChange }: ClipEffectsPanelProps) {
+export function ClipEffectsPanel({ clip, allClips = [], effects, onEffectsChange, onApplyToAll }: ClipEffectsPanelProps) {
   const currentEffect = clip ? effects[clip.id] || DEFAULT_EFFECT : DEFAULT_EFFECT;
   
   const updateEffect = useCallback((partial: Partial<ClipEffect>) => {
@@ -83,6 +137,12 @@ export function ClipEffectsPanel({ clip, effects, onEffectsChange }: ClipEffects
     if (!clip) return;
     onEffectsChange(clip.id, DEFAULT_EFFECT);
   }, [clip, onEffectsChange]);
+
+  const handleApplyPresetToAll = useCallback((preset: typeof EFFECT_PRESETS[0]) => {
+    if (onApplyToAll) {
+      onApplyToAll(preset.effect);
+    }
+  }, [onApplyToAll]);
 
   // Generate CSS filter string
   const getFilterStyle = useCallback(() => {
@@ -323,7 +383,7 @@ export function ClipEffectsPanel({ clip, effects, onEffectsChange }: ClipEffects
 
         {/* Quick Presets */}
         <div className="pt-2 border-t">
-          <Label className="text-xs text-muted-foreground mb-2 block">Preset Rapidi</Label>
+          <Label className="text-xs text-muted-foreground mb-2 block">Preset Rapidi (Clip Corrente)</Label>
           <div className="flex flex-wrap gap-2">
             <Button
               variant="outline"
@@ -373,6 +433,31 @@ export function ClipEffectsPanel({ clip, effects, onEffectsChange }: ClipEffects
             </Button>
           </div>
         </div>
+
+        {/* Apply to All Clips */}
+        {allClips.length > 1 && onApplyToAll && (
+          <div className="pt-3 border-t space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Applica a Tutti i Clip ({allClips.length})</Label>
+              <Badge variant="secondary" className="text-[10px]">Batch</Badge>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {EFFECT_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  variant="outline"
+                  size="sm"
+                  className="h-auto py-2 flex flex-col items-center gap-1 text-xs hover:bg-primary/10"
+                  onClick={() => handleApplyPresetToAll(preset)}
+                  title={`Applica ${preset.name} a tutti i clip`}
+                >
+                  <span className="text-lg">{preset.icon}</span>
+                  <span className="truncate w-full text-center">{preset.name}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

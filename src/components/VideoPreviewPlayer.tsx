@@ -19,7 +19,7 @@ import type { TimelineClip } from './TalkingAvatarTimeline';
 import type { ClipEffect } from './ClipEffectsPanel';
 
 // Transition types
-type TransitionType = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'zoom' | 'crossfade';
+type TransitionTypeValue = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'zoom' | 'crossfade' | string;
 
 interface VideoPreviewPlayerProps {
   clips: TimelineClip[];
@@ -28,7 +28,7 @@ interface VideoPreviewPlayerProps {
   musicVolume?: number;
   onMusicVolumeChange?: (volume: number) => void;
   clipEffects?: Record<string, ClipEffect>;
-  transition?: TransitionType;
+  transition?: TransitionTypeValue;
   transitionDuration?: number;
 }
 
