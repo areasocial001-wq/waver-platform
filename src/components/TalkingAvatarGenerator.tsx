@@ -19,7 +19,8 @@ import { TalkingAvatarBatch, BatchScene } from './TalkingAvatarBatch';
 import { StoryTemplates } from './StoryTemplates';
 import { UserTemplates } from './UserTemplates';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
-import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT } from './ClipEffectsPanel';
+import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT, EFFECT_PRESETS } from './ClipEffectsPanel';
+import { TransitionSelector, TRANSITION_TYPES } from './TransitionSelector';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
 import { 
   User, 
@@ -142,6 +143,10 @@ export function TalkingAvatarGenerator() {
   
   // Music volume for preview
   const [musicVolume, setMusicVolume] = useState(30);
+  
+  // Transition state
+  const [selectedTransition, setSelectedTransition] = useState('fade');
+  const [transitionDuration, setTransitionDuration] = useState(0.5);
   
   // Refs
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -598,6 +603,22 @@ export function TalkingAvatarGenerator() {
     setActiveTab('batch');
     toast.success('Template applicato! Genera le scene nel tab Batch.');
   }, [generateBackgroundMusic]);
+
+  // Apply preset effect to all clips
+  const handleApplyEffectToAll = useCallback((effectPartial: Partial<ClipEffect>) => {
+    if (timelineClips.length === 0) {
+      toast.error('Nessun clip nella timeline');
+      return;
+    }
+    
+    const newEffects = { ...clipEffects };
+    timelineClips.forEach(clip => {
+      const currentEffect = newEffects[clip.id] || DEFAULT_EFFECT;
+      newEffects[clip.id] = { ...currentEffect, ...effectPartial };
+    });
+    setClipEffects(newEffects);
+    toast.success(`Effetto applicato a ${timelineClips.length} clip!`);
+  }, [timelineClips, clipEffects]);
 
   return (
     <div className="space-y-6">
@@ -1252,7 +1273,7 @@ export function TalkingAvatarGenerator() {
         {/* Timeline Tab */}
         <TabsContent value="timeline">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Video Preview */}
+            {/* Left Panel - Video Preview & Effects */}
             <div className="lg:col-span-1 space-y-6">
               <VideoPreviewPlayer
                 clips={timelineClips}
@@ -1261,15 +1282,25 @@ export function TalkingAvatarGenerator() {
                 musicVolume={musicVolume}
                 onMusicVolumeChange={setMusicVolume}
                 clipEffects={clipEffects}
-                transition="fade"
-                transitionDuration={0.5}
+                transition={selectedTransition}
+                transitionDuration={transitionDuration}
+              />
+              
+              {/* Transition Selector */}
+              <TransitionSelector
+                selectedTransition={selectedTransition}
+                onTransitionChange={setSelectedTransition}
+                transitionDuration={transitionDuration}
+                onDurationChange={setTransitionDuration}
               />
               
               {/* Clip Effects Panel */}
               <ClipEffectsPanel
                 clip={selectedClip}
+                allClips={timelineClips}
                 effects={clipEffects}
                 onEffectsChange={handleClipEffectChange}
+                onApplyToAll={handleApplyEffectToAll}
               />
             </div>
             
