@@ -17,6 +17,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { TalkingAvatarTimeline, TimelineClip } from './TalkingAvatarTimeline';
 import { TalkingAvatarBatch, BatchScene } from './TalkingAvatarBatch';
 import { StoryTemplates } from './StoryTemplates';
+import { UserTemplates } from './UserTemplates';
+import { VideoPreviewPlayer } from './VideoPreviewPlayer';
+import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT } from './ClipEffectsPanel';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
 import { 
   User, 
@@ -132,6 +135,13 @@ export function TalkingAvatarGenerator() {
   
   // Timeline clips
   const [timelineClips, setTimelineClips] = useState<TimelineClip[]>([]);
+  
+  // Selected clip for effects
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [clipEffects, setClipEffects] = useState<Record<string, ClipEffect>>({});
+  
+  // Music volume for preview
+  const [musicVolume, setMusicVolume] = useState(30);
   
   // Refs
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -455,6 +465,19 @@ export function TalkingAvatarGenerator() {
     document.body.removeChild(a);
   }, []);
 
+  // Handle clip effects change
+  const handleClipEffectChange = useCallback((clipId: string, effect: ClipEffect) => {
+    setClipEffects(prev => ({ ...prev, [clipId]: effect }));
+  }, []);
+
+  // Handle clip selection from timeline
+  const handleClipSelect = useCallback((clipId: string | null) => {
+    setSelectedClipId(clipId);
+  }, []);
+
+  // Get selected clip
+  const selectedClip = selectedClipId ? timelineClips.find(c => c.id === selectedClipId) || null : null;
+
   // Save project
   const handleSaveProject = useCallback(async () => {
     if (!projectName.trim()) {
@@ -702,8 +725,12 @@ export function TalkingAvatarGenerator() {
 
             {/* Story Templates */}
             <StoryTemplates onSelectTemplate={handleTemplateSelect} />
-
-            <div className="flex-1" />
+            
+            {/* User Templates */}
+            <UserTemplates 
+              currentScenes={batchScenes}
+              onSelectTemplate={handleTemplateSelect}
+            />
 
             {/* Background Music Section */}
             <div className="flex items-center gap-2">
@@ -1224,14 +1251,40 @@ export function TalkingAvatarGenerator() {
 
         {/* Timeline Tab */}
         <TabsContent value="timeline">
-          <TalkingAvatarTimeline
-            clips={timelineClips}
-            onClipsChange={setTimelineClips}
-            onRemoveClip={handleRemoveClip}
-            onReorderClips={handleReorderClips}
-            backgroundMusicUrl={backgroundMusicUrl}
-            backgroundMusicEmotion={backgroundMusicEmotion}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Video Preview */}
+            <div className="lg:col-span-1 space-y-6">
+              <VideoPreviewPlayer
+                clips={timelineClips}
+                backgroundMusicUrl={backgroundMusicUrl}
+                backgroundMusicEmotion={backgroundMusicEmotion}
+                musicVolume={musicVolume}
+                onMusicVolumeChange={setMusicVolume}
+              />
+              
+              {/* Clip Effects Panel */}
+              <ClipEffectsPanel
+                clip={selectedClip}
+                effects={clipEffects}
+                onEffectsChange={handleClipEffectChange}
+              />
+            </div>
+            
+            {/* Timeline Editor */}
+            <div className="lg:col-span-2">
+              <TalkingAvatarTimeline
+                clips={timelineClips}
+                onClipsChange={setTimelineClips}
+                onRemoveClip={handleRemoveClip}
+                onReorderClips={handleReorderClips}
+                backgroundMusicUrl={backgroundMusicUrl}
+                backgroundMusicEmotion={backgroundMusicEmotion}
+                onClipSelect={handleClipSelect}
+                selectedClipId={selectedClipId}
+                clipEffects={clipEffects}
+              />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
