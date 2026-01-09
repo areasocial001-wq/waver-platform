@@ -10,10 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { TalkingAvatarTimeline, TimelineClip } from './TalkingAvatarTimeline';
 import { TalkingAvatarBatch, BatchScene } from './TalkingAvatarBatch';
+import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
 import { 
   User, 
   Upload, 
@@ -29,7 +32,11 @@ import {
   AudioLines,
   ListOrdered,
   Clock,
-  Plus
+  Plus,
+  Save,
+  FolderOpen,
+  Music,
+  Loader2
 } from 'lucide-react';
 
 interface ReferenceImage {
@@ -72,6 +79,29 @@ const EXPRESSION_PRESETS = [
 export function TalkingAvatarGenerator() {
   // Tab state
   const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'timeline'>('single');
+  
+  // Project management
+  const { 
+    projects, 
+    isLoading: isLoadingProjects, 
+    currentProjectId, 
+    saveProject, 
+    loadProject, 
+    deleteProject 
+  } = useTalkingAvatarProjects();
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  
+  // Background music state
+  const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
+  const [backgroundMusicEmotion, setBackgroundMusicEmotion] = useState<string | null>(null);
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [musicDuration, setMusicDuration] = useState(30);
+  
+  // Batch scenes for project saving
+  const [batchScenes, setBatchScenes] = useState<BatchScene[]>([]);
   
   // State for reference images (character consistency)
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
@@ -392,6 +422,7 @@ export function TalkingAvatarGenerator() {
 
   // Handle all batch scenes completed
   const handleBatchCompleted = useCallback((scenes: BatchScene[]) => {
+    setBatchScenes(scenes);
     // Auto-switch to timeline tab
     setActiveTab('timeline');
   }, []);
@@ -423,8 +454,280 @@ export function TalkingAvatarGenerator() {
     document.body.removeChild(a);
   }, []);
 
+  // Save project
+  const handleSaveProject = useCallback(async () => {
+    if (!projectName.trim()) {
+      toast.error('Inserisci un nome per il progetto');
+      return;
+    }
+
+    const id = await saveProject(
+      projectName,
+      projectDescription,
+      batchScenes,
+      timelineClips,
+      referenceImages,
+      backgroundMusicUrl || undefined,
+      backgroundMusicEmotion || undefined,
+      { selectedVoice, sampleSteps },
+      currentProjectId || undefined
+    );
+
+    if (id) {
+      setShowSaveDialog(false);
+    }
+  }, [projectName, projectDescription, batchScenes, timelineClips, referenceImages, backgroundMusicUrl, backgroundMusicEmotion, selectedVoice, sampleSteps, saveProject, currentProjectId]);
+
+  // Load project
+  const handleLoadProject = useCallback(async (projectId: string) => {
+    const project = await loadProject(projectId);
+    if (project) {
+      setProjectName(project.name);
+      setProjectDescription(project.description || '');
+      setBatchScenes(project.scenes);
+      setTimelineClips(project.timeline_clips);
+      setReferenceImages(project.reference_images.map(img => ({ ...img, isActive: false })));
+      if (project.reference_images.length > 0) {
+        setActiveReferenceId(project.reference_images[0].id);
+      }
+      setBackgroundMusicUrl(project.background_music_url || null);
+      setBackgroundMusicEmotion(project.background_music_emotion || null);
+      if (project.settings.selectedVoice) {
+        setSelectedVoice(project.settings.selectedVoice as string);
+      }
+      if (project.settings.sampleSteps) {
+        setSampleSteps(project.settings.sampleSteps as number);
+      }
+      setShowLoadDialog(false);
+    }
+  }, [loadProject]);
+
+  // Generate background music based on scene emotions
+  const generateBackgroundMusic = useCallback(async (customEmotion?: string) => {
+    const emotion = customEmotion || detectDominantEmotion(batchScenes) || detectDominantEmotion(
+      timelineClips.map(c => ({ expression: c.expression || 'neutral' } as BatchScene))
+    );
+    
+    const musicPrompt = EMOTION_MUSIC_PROMPTS[emotion] || EMOTION_MUSIC_PROMPTS.neutral;
+    
+    setIsGeneratingMusic(true);
+    setBackgroundMusicEmotion(emotion);
+    
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            prompt: musicPrompt,
+            category: 'music',
+            duration: musicDuration,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Errore generazione musica');
+      }
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+
+      // Convert base64 to audio URL
+      const audioUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+      setBackgroundMusicUrl(audioUrl);
+      toast.success(`Musica di sottofondo generata (${emotion})!`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Errore sconosciuto';
+      console.error('Music generation error:', error);
+      toast.error(`Errore generazione musica: ${message}`);
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  }, [batchScenes, timelineClips, musicDuration]);
+
   return (
     <div className="space-y-6">
+      {/* Project Management Bar */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Save Dialog */}
+            <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Save className="w-4 h-4 mr-2" />
+                  Salva Progetto
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Salva Progetto</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Nome Progetto</Label>
+                    <Input 
+                      value={projectName} 
+                      onChange={(e) => setProjectName(e.target.value)}
+                      placeholder="La mia storia..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrizione (opzionale)</Label>
+                    <Textarea 
+                      value={projectDescription} 
+                      onChange={(e) => setProjectDescription(e.target.value)}
+                      placeholder="Descrivi il progetto..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+                    Annulla
+                  </Button>
+                  <Button onClick={handleSaveProject}>
+                    <Save className="w-4 h-4 mr-2" />
+                    {currentProjectId ? 'Aggiorna' : 'Salva'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Load Dialog */}
+            <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Carica Progetto
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>I Tuoi Progetti</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[400px]">
+                  {isLoadingProjects ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    </div>
+                  ) : projects.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nessun progetto salvato
+                    </div>
+                  ) : (
+                    <div className="space-y-2 pr-4">
+                      {projects.map((project) => (
+                        <div
+                          key={project.id}
+                          className="p-3 rounded-lg border hover:border-primary transition-colors cursor-pointer"
+                          onClick={() => handleLoadProject(project.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-medium">{project.name}</h4>
+                              {project.description && (
+                                <p className="text-sm text-muted-foreground truncate max-w-[300px]">
+                                  {project.description}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {project.scenes.length} scene
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {project.timeline_clips.length} clip
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(project.updated_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteProject(project.id);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+
+            {currentProjectId && (
+              <Badge variant="outline" className="text-xs">
+                Progetto: {projectName}
+              </Badge>
+            )}
+
+            <div className="flex-1" />
+
+            {/* Background Music Section */}
+            <div className="flex items-center gap-2">
+              <Select value={String(musicDuration)} onValueChange={(v) => setMusicDuration(Number(v))}>
+                <SelectTrigger className="w-[100px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10 sec</SelectItem>
+                  <SelectItem value="20">20 sec</SelectItem>
+                  <SelectItem value="30">30 sec</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => generateBackgroundMusic()}
+                disabled={isGeneratingMusic}
+              >
+                {isGeneratingMusic ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Music className="w-4 h-4 mr-2" />
+                )}
+                Genera Musica AI
+              </Button>
+            </div>
+
+            {backgroundMusicUrl && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  🎵 {backgroundMusicEmotion}
+                </Badge>
+                <audio src={backgroundMusicUrl} controls className="h-8 w-40" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="w-6 h-6"
+                  onClick={() => {
+                    setBackgroundMusicUrl(null);
+                    setBackgroundMusicEmotion(null);
+                  }}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList className="grid w-full grid-cols-3">

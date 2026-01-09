@@ -337,6 +337,51 @@ export type Database = {
         }
         Relationships: []
       }
+      talking_avatar_projects: {
+        Row: {
+          background_music_emotion: string | null
+          background_music_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          reference_images: Json
+          scenes: Json
+          settings: Json
+          timeline_clips: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_music_emotion?: string | null
+          background_music_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          reference_images?: Json
+          scenes?: Json
+          settings?: Json
+          timeline_clips?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_music_emotion?: string | null
+          background_music_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          reference_images?: Json
+          scenes?: Json
+          settings?: Json
+          timeline_clips?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_generations: {
         Row: {
           audio_url: string | null
