@@ -7,12 +7,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Clip effects schema
+// Clip effects schema (extended for zoom, pan, filters)
 const clipEffectsSchema = z.object({
   blur: z.number().min(0).max(10).default(0),
   saturation: z.number().min(0).max(200).default(100),
   contrast: z.number().min(0).max(200).default(100),
   brightness: z.number().min(0).max(200).default(100),
+  // New properties for zoom, pan, filters
+  zoom: z.number().min(0.5).max(2).default(1),
+  panX: z.number().min(-100).max(100).default(0),
+  panY: z.number().min(-100).max(100).default(0),
+  zoomAnimation: z.enum(['none', 'zoom-in', 'zoom-out', 'ken-burns']).default('none'),
+  filter: z.enum(['none', 'vintage', 'cinematic', 'warm', 'cool', 'bw', 'sepia', 'dramatic']).default('none'),
+  motionBlur: z.number().min(0).max(10).default(0),
 });
 
 // Intro/outro schema
@@ -83,17 +90,36 @@ const mapTransition = (transition: string): string | null => {
   }
 };
 
-// Map effects to Shotstack filter
-const mapEffects = (effects?: { blur: number; saturation: number; contrast: number; brightness: number }): any[] => {
+// Map filter presets to Shotstack filters
+const FILTER_PRESETS: Record<string, any[]> = {
+  none: [],
+  vintage: [{ type: 'sepia', value: 0.3 }, { type: 'contrast', value: 1.1 }],
+  cinematic: [{ type: 'contrast', value: 1.2 }, { type: 'saturation', value: 0.85 }],
+  warm: [{ type: 'sepia', value: 0.2 }, { type: 'saturation', value: 1.3 }],
+  cool: [{ type: 'saturation', value: 0.9 }],
+  bw: [{ type: 'saturation', value: 0 }],
+  sepia: [{ type: 'sepia', value: 0.8 }],
+  dramatic: [{ type: 'contrast', value: 1.4 }, { type: 'saturation', value: 1.2 }],
+};
+
+// Map effects to Shotstack filter and transform
+const mapEffects = (effects?: z.infer<typeof clipEffectsSchema>): { filters: any[]; transform?: any; transition?: any } => {
   const filters: any[] = [];
+  let transform: any = undefined;
+  let transition: any = undefined;
   
-  if (!effects) return filters;
+  if (!effects) return { filters };
   
-  if (effects.blur > 0) {
-    filters.push({ type: 'blur', value: effects.blur / 10 }); // Convert 0-10 to 0-1
+  // Apply filter preset
+  if (effects.filter && effects.filter !== 'none') {
+    filters.push(...(FILTER_PRESETS[effects.filter] || []));
   }
   
-  // Shotstack uses multiply factor, 1 = normal
+  // Apply custom adjustments
+  if (effects.blur > 0) {
+    filters.push({ type: 'blur', value: effects.blur / 10 });
+  }
+  
   if (effects.saturation !== 100) {
     filters.push({ type: 'saturation', value: effects.saturation / 100 });
   }
@@ -106,7 +132,40 @@ const mapEffects = (effects?: { blur: number; saturation: number; contrast: numb
     filters.push({ type: 'brightness', value: effects.brightness / 100 });
   }
   
-  return filters;
+  // Apply zoom and pan as scale and offset
+  if (effects.zoom !== 1 || effects.panX !== 0 || effects.panY !== 0) {
+    transform = {
+      scale: {
+        x: effects.zoom,
+        y: effects.zoom,
+      },
+      ...(effects.panX !== 0 || effects.panY !== 0 ? {
+        offset: {
+          x: effects.panX / 100,
+          y: effects.panY / 100,
+        },
+      } : {}),
+    };
+  }
+  
+  // Apply zoom animation as motion effect
+  if (effects.zoomAnimation !== 'none') {
+    switch (effects.zoomAnimation) {
+      case 'zoom-in':
+        // Slow zoom in effect
+        transition = { in: 'zoom' };
+        break;
+      case 'zoom-out':
+        transition = { out: 'zoom' };
+        break;
+      case 'ken-burns':
+        // Ken Burns uses slow pan/zoom, Shotstack's 'zoom' is similar
+        transition = { in: 'slideRight', out: 'zoom' };
+        break;
+    }
+  }
+  
+  return { filters, transform, transition };
 };
 
 // Get font size in pixels
@@ -261,16 +320,27 @@ serve(async (req) => {
             length: clipLength,
           };
           
-          // Add filters for effects
-          const filters = mapEffects(effects);
-          if (filters.length > 0) {
-            clip.filter = filters;
+          // Add filters, transform, and transitions for effects
+          const effectsResult = mapEffects(effects);
+          if (effectsResult.filters.length > 0) {
+            clip.filter = effectsResult.filters;
+          }
+          
+          // Add transform for zoom/pan
+          if (effectsResult.transform) {
+            clip.transform = effectsResult.transform;
+          }
+          
+          // Add animation transition from effects
+          if (effectsResult.transition) {
+            clip.transition = effectsResult.transition;
           }
 
           // Add transition effect between clips
           const shotstackTransition = mapTransition(transition);
           if (shotstackTransition && i > 0) {
             clip.transition = {
+              ...clip.transition,
               in: shotstackTransition,
             };
             // Overlap clips for smooth transition

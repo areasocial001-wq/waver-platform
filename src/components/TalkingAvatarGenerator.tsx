@@ -1260,6 +1260,9 @@ export function TalkingAvatarGenerator() {
                 backgroundMusicEmotion={backgroundMusicEmotion}
                 musicVolume={musicVolume}
                 onMusicVolumeChange={setMusicVolume}
+                clipEffects={clipEffects}
+                transition="fade"
+                transitionDuration={0.5}
               />
               
               {/* Clip Effects Panel */}

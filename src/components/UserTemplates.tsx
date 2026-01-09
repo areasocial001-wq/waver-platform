@@ -17,7 +17,10 @@ import {
   Share2,
   Loader2,
   Clock,
-  Film
+  Film,
+  Download,
+  Upload,
+  FileJson
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -190,6 +193,82 @@ export function UserTemplates({ currentScenes, onSelectTemplate }: UserTemplates
     toast.success(`Template "${template.name}" applicato!`);
   }, [onSelectTemplate]);
 
+  // Export template as JSON
+  const handleExportTemplate = useCallback((template: UserTemplate, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const exportData = {
+      name: template.name,
+      description: template.description,
+      category: template.category,
+      scenes: template.scenes,
+      suggested_music_emotion: template.suggested_music_emotion,
+      estimated_duration: template.estimated_duration,
+      exported_at: new Date().toISOString(),
+      version: '1.0',
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `template-${template.name.toLowerCase().replace(/\s+/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success('Template esportato come JSON!');
+  }, []);
+
+  // Import template from JSON
+  const handleImportTemplate = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      // Validate imported data
+      if (!data.name || !data.scenes || !Array.isArray(data.scenes)) {
+        throw new Error('Formato template non valido');
+      }
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Devi effettuare il login');
+        return;
+      }
+      
+      // Save imported template
+      const { error } = await supabase
+        .from('user_story_templates')
+        .insert({
+          user_id: user.id,
+          name: data.name,
+          description: data.description || null,
+          category: data.category || 'custom',
+          scenes: data.scenes,
+          suggested_music_emotion: data.suggested_music_emotion || 'neutral',
+          estimated_duration: data.estimated_duration || data.scenes.length * 15,
+          is_public: false,
+        });
+      
+      if (error) throw error;
+      
+      toast.success(`Template "${data.name}" importato!`);
+      fetchTemplates();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Errore sconosciuto';
+      console.error('Import error:', error);
+      toast.error(`Errore importazione: ${message}`);
+    }
+    
+    // Reset input
+    e.target.value = '';
+  }, [fetchTemplates]);
+
   const canSaveTemplate = currentScenes.length > 0 && currentScenes.some(s => s.scenePrompt?.trim());
 
   return (
@@ -284,10 +363,29 @@ export function UserTemplates({ currentScenes, onSelectTemplate }: UserTemplates
         </DialogTrigger>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <BookMarked className="w-5 h-5" />
-              I Miei Template Personalizzati
-            </DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <BookMarked className="w-5 h-5" />
+                I Miei Template Personalizzati
+              </DialogTitle>
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleImportTemplate}
+                  className="hidden"
+                  id="import-template-input"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('import-template-input')?.click()}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Importa JSON
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
           <ScrollArea className="h-[500px]">
             {isLoading ? (
@@ -320,6 +418,15 @@ export function UserTemplates({ currentScenes, onSelectTemplate }: UserTemplates
                               Pubblico
                             </Badge>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => handleExportTemplate(template, e)}
+                            title="Esporta JSON"
+                          >
+                            <Download className="w-3 h-3" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
