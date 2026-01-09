@@ -382,6 +382,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_story_templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          estimated_duration: number | null
+          id: string
+          is_public: boolean | null
+          name: string
+          scenes: Json
+          suggested_music_emotion: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          estimated_duration?: number | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+          scenes?: Json
+          suggested_music_emotion?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          estimated_duration?: number | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+          scenes?: Json
+          suggested_music_emotion?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_generations: {
         Row: {
           audio_url: string | null

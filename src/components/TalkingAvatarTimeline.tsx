@@ -6,7 +6,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { 
+import type { ClipEffect } from './ClipEffectsPanel';
+import {
   Play, 
   Pause, 
   SkipForward, 
@@ -58,6 +59,9 @@ interface TalkingAvatarTimelineProps {
   onReorderClips: (fromIndex: number, toIndex: number) => void;
   backgroundMusicUrl?: string | null;
   backgroundMusicEmotion?: string | null;
+  onClipSelect?: (clipId: string | null) => void;
+  selectedClipId?: string | null;
+  clipEffects?: Record<string, ClipEffect>;
 }
 
 export function TalkingAvatarTimeline({
@@ -67,8 +71,12 @@ export function TalkingAvatarTimeline({
   onReorderClips,
   backgroundMusicUrl,
   backgroundMusicEmotion,
+  onClipSelect,
+  selectedClipId: externalSelectedClipId,
+  clipEffects = {},
 }: TalkingAvatarTimelineProps) {
-  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  const [internalSelectedClipId, setInternalSelectedClipId] = useState<string | null>(null);
+  const selectedClipId = externalSelectedClipId !== undefined ? externalSelectedClipId : internalSelectedClipId;
   const [selectedTransition, setSelectedTransition] = useState<string>('fade');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayIndex, setCurrentPlayIndex] = useState(0);
@@ -338,7 +346,13 @@ export function TalkingAvatarTimeline({
                             ? 'border-green-500'
                             : 'border-border hover:border-primary/50'
                         } ${draggedClipId === clip.id ? 'opacity-50' : ''}`}
-                        onClick={() => setSelectedClipId(clip.id)}
+                        onClick={() => {
+                          if (onClipSelect) {
+                            onClipSelect(clip.id);
+                          } else {
+                            setInternalSelectedClipId(clip.id);
+                          }
+                        }}
                       >
                         {/* Grip Handle */}
                         <div className="absolute top-1 left-1 p-1 bg-background/80 rounded">
