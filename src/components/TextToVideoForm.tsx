@@ -25,6 +25,11 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
     { value: "5", label: "5 secondi" },
     { value: "10", label: "10 secondi" },
   ],
+  "google-veo": [
+    { value: "4", label: "4 secondi" },
+    { value: "6", label: "6 secondi" },
+    { value: "8", label: "8 secondi" },
+  ],
   "piapi-kling-2.5": [
     { value: "5", label: "5 secondi" },
     { value: "10", label: "10 secondi" },
@@ -60,6 +65,10 @@ const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
 
 // Aspect ratio supportati per provider
 const PROVIDER_ASPECT_RATIOS: Record<string, { value: string; label: string }[]> = {
+  "google-veo": [
+    { value: "16:9", label: "16:9 (Orizzontale)" },
+    { value: "9:16", label: "9:16 (Verticale)" },
+  ],
   "piapi-sora2": [
     { value: "16:9", label: "16:9 (Orizzontale)" },
     { value: "9:16", label: "9:16 (Verticale)" },
@@ -73,6 +82,10 @@ const PROVIDER_ASPECT_RATIOS: Record<string, { value: string; label: string }[]>
 // Risoluzioni supportate per ogni provider
 const PROVIDER_RESOLUTIONS: Record<string, { value: string; label: string }[]> = {
   auto: [
+    { value: "720p", label: "720p (HD)" },
+    { value: "1080p", label: "1080p (Full HD)" },
+  ],
+  "google-veo": [
     { value: "720p", label: "720p (HD)" },
     { value: "1080p", label: "1080p (Full HD)" },
   ],
@@ -121,14 +134,15 @@ interface ProviderInfo {
 }
 
 const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-veo3", "piapi-hailuo"] },
+  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["google-veo", "piapi-kling-2.5", "piapi-hailuo"] },
+  "google-veo": { name: "Google Veo 3.1", color: "bg-blue-500", speed: 2, quality: 3, cost: 2, features: ["API Diretta", "Audio nativo", "Alta qualità"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.6", "piapi-hailuo"] },
   "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-hailuo": { name: "Hailuo", color: "bg-pink-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Economico"], estimatedTime: "1-2 min", fallbackOrder: ["piapi-wan", "piapi-kling-2.5"] },
   "piapi-luma": { name: "Luma", color: "bg-cyan-500", speed: 2, quality: 3, cost: 2, features: ["Cinematico"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-wan": { name: "Wan", color: "bg-violet-500", speed: 2, quality: 2, cost: 1, features: ["Scene naturali"], estimatedTime: "2-3 min", fallbackOrder: ["piapi-hailuo", "piapi-kling-2.5"] },
   "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-veo3": { name: "Veo 3", color: "bg-emerald-500", speed: 2, quality: 3, cost: 2, features: ["Audio sync", "Alta qualità"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
+  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-emerald-500", speed: 2, quality: 3, cost: 2, features: ["Audio sync", "Via PiAPI"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
   "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"], estimatedTime: "5-10 min", fallbackOrder: ["piapi-kling-2.5", "piapi-veo3"] },
 };
 
@@ -291,9 +305,9 @@ export const TextToVideoForm = () => {
       // Store original prompt before translation
       const originalPrompt = cinematicPrompt;
 
-      // Translate prompt to English for better Veo3 results (keeping dialogue in original language)
+      // Translate prompt to English for better results (keeping dialogue in original language)
       let translatedPrompt = cinematicPrompt;
-      if (preferredProvider === "piapi-veo3" || preferredProvider === "auto") {
+      if (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || preferredProvider === "auto") {
         try {
           toast.info("Traduzione prompt in inglese...", { duration: 2000 });
           const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-prompt', {
@@ -339,8 +353,8 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: parseInt(duration),
             resolution: resolution,
-            aspect_ratio: (preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
-            generate_audio: preferredProvider === "piapi-veo3" ? generateAudio : undefined,
+            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
+            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3") ? generateAudio : undefined,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
           }
@@ -459,10 +473,16 @@ export const TextToVideoForm = () => {
                 <span>Auto (migliore disponibile)</span>
               </div>
             </SelectItem>
+            <SelectItem value="google-veo">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-500" />
+                <span>Google Veo 3.1 (API Diretta)</span>
+              </div>
+            </SelectItem>
             <SelectItem value="piapi-veo3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Veo 3 (Alta qualità)</span>
+                <span>Veo 3 via PiAPI</span>
               </div>
             </SelectItem>
             <SelectItem value="piapi-kling-2.5">

@@ -484,9 +484,15 @@ serve(async (req) => {
       });
     }
 
+    // ==================== GOOGLE VEO 3.1 DIRECT ====================
+    // Use Google API directly when google-veo is selected
+    if (preferredProvider === 'google-veo' && hasValidGoogleKey) {
+      console.log("Starting video generation with Google Veo 3.1 (direct API, preferred provider)");
+      // Fall through to the main Google Veo 3.1 section below
+    }
     // ==================== PiAPI PROVIDERS ====================
     // Use PiAPI for piapi-kling, piapi-hailuo, piapi-luma, piapi-wan, piapi-hunyuan
-    if (preferredProvider?.startsWith('piapi-') && hasValidPiAPIKey) {
+    else if (preferredProvider?.startsWith('piapi-') && hasValidPiAPIKey) {
       const modelKey = preferredProvider.replace('piapi-', '') as keyof typeof PIAPI_MODELS;
       const modelConfig = PIAPI_MODELS[modelKey] || PIAPI_MODELS["kling-2.1"];
       
@@ -611,7 +617,7 @@ serve(async (req) => {
     }
 
     // ==================== FREEPIK PROVIDER ====================
-    if (preferredProvider === "freepik" && type === "image_to_video" && end_image) {
+    else if (preferredProvider === "freepik" && type === "image_to_video" && end_image) {
       const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
       if (!FREEPIK_API_KEY) {
         console.log("Freepik API key not set, falling back to other providers");
