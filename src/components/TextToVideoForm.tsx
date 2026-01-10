@@ -1,158 +1,34 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Sparkles, AlertCircle, Zap, Star, DollarSign, Clock, Wallet, RefreshCw } from "lucide-react";
+import { Wallet, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
 import { ProviderComparisonDialog } from "@/components/ProviderComparisonDialog";
 import { useProviderPreference } from "@/hooks/useProviderPreference";
+import { VideoProviderSelect } from "@/components/VideoProviderSelect";
+import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
+import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 
 interface PiAPIBalance {
   credits: number;
   equivalent_in_usd: number;
   account_name: string;
 }
-// Durate supportate per ogni provider
-const PROVIDER_DURATIONS: Record<string, { value: string; label: string }[]> = {
-  auto: [
-    { value: "5", label: "5 secondi" },
-    { value: "10", label: "10 secondi" },
-  ],
-  "google-veo": [
-    { value: "4", label: "4 secondi" },
-    { value: "6", label: "6 secondi" },
-    { value: "8", label: "8 secondi" },
-  ],
-  "piapi-kling-2.5": [
-    { value: "5", label: "5 secondi" },
-    { value: "10", label: "10 secondi" },
-  ],
-  "piapi-kling-2.6": [
-    { value: "5", label: "5 secondi" },
-    { value: "10", label: "10 secondi" },
-  ],
-  "piapi-hailuo": [
-    { value: "4", label: "4 secondi" },
-    { value: "6", label: "6 secondi" },
-  ],
-  "piapi-luma": [
-    { value: "5", label: "5 secondi" },
-  ],
-  "piapi-wan": [
-    { value: "5", label: "5 secondi" },
-  ],
-  "piapi-hunyuan": [
-    { value: "5", label: "5 secondi" },
-  ],
-  "piapi-veo3": [
-    { value: "4", label: "4 secondi" },
-    { value: "6", label: "6 secondi" },
-    { value: "8", label: "8 secondi" },
-  ],
-  "piapi-sora2": [
-    { value: "4", label: "4 secondi" },
-    { value: "8", label: "8 secondi" },
-    { value: "12", label: "12 secondi" },
-  ],
+
+// Lista delle API key mancanti che richiedono configurazione
+const REQUIRED_API_KEYS: Record<string, string> = {
+  'GOOGLE_AI_API_KEY': 'Google AI',
+  'PIAPI_API_KEY': 'PiAPI',
+  'AIML_API_KEY': 'AI/ML API',
+  'FREEPIK_API_KEY': 'Freepik',
 };
-
-// Aspect ratio supportati per provider
-const PROVIDER_ASPECT_RATIOS: Record<string, { value: string; label: string }[]> = {
-  "google-veo": [
-    { value: "16:9", label: "16:9 (Orizzontale)" },
-    { value: "9:16", label: "9:16 (Verticale)" },
-  ],
-  "piapi-sora2": [
-    { value: "16:9", label: "16:9 (Orizzontale)" },
-    { value: "9:16", label: "9:16 (Verticale)" },
-  ],
-  "piapi-veo3": [
-    { value: "16:9", label: "16:9 (Orizzontale)" },
-    { value: "9:16", label: "9:16 (Verticale)" },
-  ],
-};
-
-// Risoluzioni supportate per ogni provider
-const PROVIDER_RESOLUTIONS: Record<string, { value: string; label: string }[]> = {
-  auto: [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "google-veo": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-kling-2.5": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-kling-2.6": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-hailuo": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-luma": [
-    { value: "720p", label: "720p (HD)" },
-  ],
-  "piapi-wan": [
-    { value: "480p", label: "480p (Standard)" },
-    { value: "720p", label: "720p (HD)" },
-  ],
-  "piapi-hunyuan": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-veo3": [
-    { value: "720p", label: "720p (HD)" },
-    { value: "1080p", label: "1080p (Full HD)" },
-  ],
-  "piapi-sora2": [
-    { value: "720p", label: "720p (HD)" },
-  ],
-};
-
-// Caratteristiche dei provider
-interface ProviderInfo {
-  name: string;
-  color: string;
-  speed: 1 | 2 | 3; // 1=lento, 2=medio, 3=veloce
-  quality: 1 | 2 | 3; // 1=base, 2=buona, 3=eccellente
-  cost: 1 | 2 | 3; // 1=economico, 2=medio, 3=costoso
-  features: string[];
-  estimatedTime: string; // Stima tempo in minuti
-  fallbackOrder: string[]; // Provider di fallback in ordine di priorità
-}
-
-const PROVIDER_INFO: Record<string, ProviderInfo> = {
-  auto: { name: "Auto", color: "bg-accent", speed: 2, quality: 3, cost: 2, features: ["Selezione automatica", "Fallback auto"], estimatedTime: "2-5 min", fallbackOrder: ["google-veo", "piapi-kling-2.5", "piapi-hailuo"] },
-  "google-veo": { name: "Google Veo 3.1", color: "bg-blue-500", speed: 2, quality: 3, cost: 2, features: ["API Diretta", "Audio nativo", "Alta qualità"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-kling-2.5": { name: "Kling 2.5", color: "bg-orange-500", speed: 2, quality: 3, cost: 2, features: ["Ottimo rapporto Q/P"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.6", "piapi-hailuo"] },
-  "piapi-kling-2.6": { name: "Kling 2.6", color: "bg-orange-600", speed: 2, quality: 3, cost: 2, features: ["Motion control", "Nuovo"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-hailuo": { name: "Hailuo", color: "bg-pink-500", speed: 3, quality: 2, cost: 1, features: ["Veloce", "Economico"], estimatedTime: "1-2 min", fallbackOrder: ["piapi-wan", "piapi-kling-2.5"] },
-  "piapi-luma": { name: "Luma", color: "bg-cyan-500", speed: 2, quality: 3, cost: 2, features: ["Cinematico"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-wan": { name: "Wan", color: "bg-violet-500", speed: 2, quality: 2, cost: 1, features: ["Scene naturali"], estimatedTime: "2-3 min", fallbackOrder: ["piapi-hailuo", "piapi-kling-2.5"] },
-  "piapi-hunyuan": { name: "Hunyuan", color: "bg-amber-500", speed: 2, quality: 3, cost: 2, features: ["Volti realistici"], estimatedTime: "2-4 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-veo3": { name: "Veo 3 (PiAPI)", color: "bg-emerald-500", speed: 2, quality: 3, cost: 2, features: ["Audio sync", "Via PiAPI"], estimatedTime: "3-5 min", fallbackOrder: ["piapi-kling-2.5", "piapi-hailuo"] },
-  "piapi-sora2": { name: "Sora 2", color: "bg-red-500", speed: 1, quality: 3, cost: 3, features: ["OpenAI", "Fino a 20s"], estimatedTime: "5-10 min", fallbackOrder: ["piapi-kling-2.5", "piapi-veo3"] },
-};
-
-const RatingDots = ({ value, max = 3, color }: { value: number; max?: number; color: string }) => (
-  <div className="flex gap-0.5">
-    {Array.from({ length: max }).map((_, i) => (
-      <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < value ? color : "bg-muted-foreground/30"}`} />
-    ))}
-  </div>
-);
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
@@ -193,20 +69,32 @@ export const TextToVideoForm = () => {
     }
   }, []);
 
+  // Provider corrente
+  const currentProvider = VIDEO_PROVIDERS[preferredProvider as VideoProviderType] || VIDEO_PROVIDERS.auto;
+
+  // Check if API key is missing for selected provider
+  const isMissingApiKey = useMemo(() => {
+    if (preferredProvider === 'auto') return false;
+    const requiredKey = currentProvider.requiresApiKey;
+    if (!requiredKey) return false;
+    // We can't check secrets client-side, so just show banner for certain providers
+    return false; // Will be shown based on provider group
+  }, [preferredProvider, currentProvider]);
+
   // Aggiorna durata e risoluzione quando cambia il provider
   useEffect(() => {
-    const availableDurations = PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto;
+    const availableDurations = currentProvider.durations;
     const currentDurationValid = availableDurations.some(d => d.value === duration);
-    if (!currentDurationValid) {
+    if (!currentDurationValid && availableDurations.length > 0) {
       setDuration(availableDurations[0].value);
     }
     
-    const availableResolutions = PROVIDER_RESOLUTIONS[preferredProvider] || PROVIDER_RESOLUTIONS.auto;
+    const availableResolutions = currentProvider.resolutions;
     const currentResolutionValid = availableResolutions.some(r => r.value === resolution);
-    if (!currentResolutionValid) {
+    if (!currentResolutionValid && availableResolutions.length > 0) {
       setResolution(availableResolutions[0].value);
     }
-  }, [preferredProvider]);
+  }, [preferredProvider, currentProvider]);
 
   const handlePresetChange = (preset: ScenePreset) => {
     setSelectedPreset(preset.id);
@@ -442,160 +330,48 @@ export const TextToVideoForm = () => {
         </Alert>
       )}
 
-      <Alert className="border-primary/30 bg-primary/5">
-        <AlertCircle className="h-4 w-4 text-primary" />
-        <AlertDescription>
-          Genera video ad alta qualità usando vari modelli AI. 
-          La generazione richiede qualche minuto.
-        </AlertDescription>
-      </Alert>
-
-      {/* Provider Selection */}
+      {/* Provider Selection with VideoProviderSelect */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Provider AI</Label>
           <ProviderComparisonDialog
-            providers={PROVIDER_INFO}
+            providers={Object.fromEntries(
+              Object.entries(VIDEO_PROVIDERS).map(([k, v]) => [k, {
+                name: v.name,
+                color: v.color,
+                speed: v.speed,
+                quality: v.quality,
+                cost: v.cost,
+                features: v.features,
+                estimatedTime: v.estimatedTime,
+                fallbackOrder: v.fallbackOrder,
+              }])
+            )}
             selectedProvider={preferredProvider}
             onSelectProvider={setPreferredProvider}
-            durations={PROVIDER_DURATIONS}
-            resolutions={PROVIDER_RESOLUTIONS}
+            durations={Object.fromEntries(
+              Object.entries(VIDEO_PROVIDERS).map(([k, v]) => [k, v.durations])
+            )}
+            resolutions={Object.fromEntries(
+              Object.entries(VIDEO_PROVIDERS).map(([k, v]) => [k, v.resolutions])
+            )}
           />
         </div>
-        <Select value={preferredProvider} onValueChange={setPreferredProvider}>
-          <SelectTrigger>
-            <SelectValue placeholder="Seleziona provider" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-accent" />
-                <span>Auto (migliore disponibile)</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="google-veo">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Google Veo 3.1 (API Diretta)</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-veo3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Veo 3 via PiAPI</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-kling-2.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-orange-500" />
-                <span>PiAPI Kling 2.5</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-kling-2.6">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-orange-600" />
-                <span>PiAPI Kling 2.6</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-hailuo">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-pink-500" />
-                <span>PiAPI Hailuo</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-luma">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-cyan-500" />
-                <span>PiAPI Luma</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-wan">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-violet-500" />
-                <span>PiAPI Wan</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-hunyuan">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span>PiAPI Hunyuan</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="piapi-sora2">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-500" />
-                <span>PiAPI Sora 2</span>
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        
-        {/* Provider Info Badges */}
-        {PROVIDER_INFO[preferredProvider] && (
-          <div className="flex flex-wrap items-center gap-3 mt-2">
-            <div className="flex items-center gap-1.5 text-xs">
-              <Zap className="w-3 h-3 text-yellow-500" />
-              <span className="text-muted-foreground">Velocità:</span>
-              <RatingDots value={PROVIDER_INFO[preferredProvider].speed} color="bg-yellow-500" />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <Star className="w-3 h-3 text-blue-500" />
-              <span className="text-muted-foreground">Qualità:</span>
-              <RatingDots value={PROVIDER_INFO[preferredProvider].quality} color="bg-blue-500" />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <DollarSign className="w-3 h-3 text-green-500" />
-              <span className="text-muted-foreground">Costo:</span>
-              <RatingDots value={PROVIDER_INFO[preferredProvider].cost} color="bg-green-500" />
-            </div>
-            <div className="flex items-center gap-1.5 text-xs border-l pl-3">
-              <Clock className="w-3 h-3 text-purple-500" />
-              <span className="text-muted-foreground">Tempo stimato:</span>
-              <span className="font-medium text-purple-600">{PROVIDER_INFO[preferredProvider].estimatedTime}</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Feature badges + Fallback info */}
-        {PROVIDER_INFO[preferredProvider] && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {PROVIDER_INFO[preferredProvider].features.map((feature, i) => (
-              <Badge key={i} variant="secondary" className="text-xs px-2 py-0">
-                {feature}
-              </Badge>
-            ))}
-            {PROVIDER_INFO[preferredProvider].fallbackOrder.length > 0 && (
-              <Badge variant="outline" className="text-xs px-2 py-0 border-dashed">
-                Fallback: {PROVIDER_INFO[preferredProvider].fallbackOrder.slice(0, 2).map(p => PROVIDER_INFO[p]?.name || p).join(" → ")}
-              </Badge>
-            )}
-          </div>
-        )}
+        <VideoProviderSelect
+          value={preferredProvider as VideoProviderType}
+          onValueChange={(v) => setPreferredProvider(v)}
+          filterType="text_to_video"
+          showDetails={true}
+        />
       </div>
 
-      {/* API Indicator */}
-      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-        PROVIDER_INFO[preferredProvider]?.color ? `${PROVIDER_INFO[preferredProvider].color}/10 border-current/30` :
-        preferredProvider?.startsWith("piapi-") ? "bg-orange-500/10 border-orange-500/30" :
-        "bg-emerald-500/10 border-emerald-500/30"
-      }`}>
-        <div className={`w-3 h-3 rounded-full animate-pulse ${
-          PROVIDER_INFO[preferredProvider]?.color || (preferredProvider?.startsWith("piapi-") ? "bg-orange-500" : "bg-emerald-500")
-        }`} />
-        <div className="flex-1">
-          <p className="text-sm font-medium">
-            {PROVIDER_INFO[preferredProvider]?.name || 
-             (preferredProvider?.startsWith("piapi-") 
-              ? `PiAPI ${preferredProvider.replace("piapi-", "").toUpperCase()}` 
-              : preferredProvider === "veo" ? "Google Veo 3.1" : "Auto")}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {preferredProvider?.startsWith("piapi-") 
-              ? "Video generation via PiAPI gateway" 
-              : "Google Veo con audio sincronizzato"}
-          </p>
-        </div>
-      </div>
+      {/* API Key Missing Banner */}
+      {currentProvider.requiresApiKey && currentProvider.group === 'aiml' && (
+        <ApiKeyMissingBanner
+          apiName="AI/ML API"
+          description="Per usare i modelli AI/ML (Runway, Kling, Veo) configura la chiave API"
+        />
+      )}
 
       <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
@@ -738,7 +514,7 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(PROVIDER_DURATIONS[preferredProvider] || PROVIDER_DURATIONS.auto).map((d) => (
+              {currentProvider.durations.map((d) => (
                 <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
               ))}
             </SelectContent>
@@ -752,15 +528,15 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(PROVIDER_RESOLUTIONS[preferredProvider] || PROVIDER_RESOLUTIONS.auto).map((r) => (
+              {currentProvider.resolutions.map((r) => (
                 <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Aspect Ratio for Sora2 and Veo3 */}
-        {(preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") && (
+        {/* Aspect Ratio for providers that support it */}
+        {currentProvider.aspectRatios && currentProvider.aspectRatios.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
             <Select value={aspectRatio} onValueChange={setAspectRatio}>
@@ -768,7 +544,7 @@ export const TextToVideoForm = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(PROVIDER_ASPECT_RATIOS[preferredProvider] || []).map((ar) => (
+                {currentProvider.aspectRatios.map((ar) => (
                   <SelectItem key={ar.value} value={ar.value}>{ar.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -776,12 +552,12 @@ export const TextToVideoForm = () => {
           </div>
         )}
 
-        {/* Generate Audio toggle for Veo3 */}
-        {preferredProvider === "piapi-veo3" && (
+        {/* Generate Audio toggle for providers that support it */}
+        {currentProvider.supportsAudio && (
           <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
             <div className="space-y-0.5">
               <Label htmlFor="generate-audio" className="text-sm font-medium">Genera Audio</Label>
-              <p className="text-xs text-muted-foreground">Veo 3.1 può generare audio sincronizzato</p>
+              <p className="text-xs text-muted-foreground">{currentProvider.name} può generare audio sincronizzato</p>
             </div>
             <Switch
               id="generate-audio"

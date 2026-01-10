@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle, Bell, BellOff, Eraser } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Trash2, Wrench, RefreshCw, AlertTriangle, Bell, BellOff, Eraser, Filter, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import { useVideoPolling } from "@/hooks/useVideoPolling";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -13,7 +13,10 @@ import { VideoGenerationCard } from "@/components/VideoGenerationCard";
 import { StoryboardVideoBatchCard } from "@/components/StoryboardVideoBatchCard";
 import { VideoQueueMonitor } from "@/components/VideoQueueMonitor";
 import { VideoTextRemover } from "@/components/VideoTextRemover";
+import { ProviderBadge } from "@/components/ProviderBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { VIDEO_PROVIDERS, VideoProviderType, PROVIDER_COSTS, getProviderGroup, getGroupLabel } from "@/lib/videoProviderConfig";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,10 +58,12 @@ type VideoGeneration = {
   sequence_order: number | null;
   dialogue_text?: string | null;
   audio_url?: string | null;
+  provider?: string | null;
 };
 
 export default function History() {
   const [generations, setGenerations] = useState<VideoGeneration[]>([]);
+  const [allGenerations, setAllGenerations] = useState<VideoGeneration[]>([]);
   const [batches, setBatches] = useState<Map<string, VideoBatch>>(new Map());
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,8 +72,44 @@ export default function History() {
   const [isRepairing, setIsRepairing] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [failedCount, setFailedCount] = useState(0);
+  const [providerFilter, setProviderFilter] = useState<string>("all");
   
   const { isSupported: pushSupported, isEnabled: pushEnabled, requestPermission } = usePushNotifications();
+
+  // Calculate cost summary for filtered provider
+  const costSummary = useMemo(() => {
+    const filteredGens = providerFilter === "all" 
+      ? allGenerations 
+      : allGenerations.filter(g => {
+          const group = getProviderGroup(g.provider || '');
+          return providerFilter === group || g.provider === providerFilter;
+        });
+    
+    const completedVideos = filteredGens.filter(g => g.status === "completed");
+    let totalCost = 0;
+    
+    completedVideos.forEach(g => {
+      const provider = g.provider as VideoProviderType;
+      const providerCost = PROVIDER_COSTS[provider];
+      const costPerSecond = providerCost?.perSecond || 0.02;
+      totalCost += costPerSecond * g.duration;
+    });
+    
+    return {
+      count: completedVideos.length,
+      totalCost: totalCost.toFixed(2),
+      avgCost: completedVideos.length > 0 ? (totalCost / completedVideos.length).toFixed(3) : "0"
+    };
+  }, [allGenerations, providerFilter]);
+
+  // Get unique providers from generations
+  const availableProviders = useMemo(() => {
+    const providers = new Set<string>();
+    allGenerations.forEach(g => {
+      if (g.provider) providers.add(g.provider);
+    });
+    return Array.from(providers);
+  }, [allGenerations]);
 
   const handleDeleteAll = async () => {
     setIsDeletingAll(true);
@@ -231,7 +272,7 @@ export default function History() {
       let query = supabase
         .from("video_generations")
         .select(
-          "id, type, prompt, duration, resolution, motion_intensity, image_name, status, created_at, prediction_id, video_url, error_message, batch_id, sequence_order, image_url"
+          "id, type, prompt, duration, resolution, motion_intensity, image_name, status, created_at, prediction_id, video_url, error_message, batch_id, sequence_order, image_url, provider"
         )
         .order("created_at", { ascending: false });
 
@@ -250,6 +291,7 @@ export default function History() {
       }));
 
       setGenerations(normalizedData);
+      setAllGenerations(normalizedData);
 
       // Fetch batch info
       const batchIds = [...new Set((data || []).filter((g: any) => g.batch_id).map((g: any) => g.batch_id))];
@@ -434,6 +476,35 @@ export default function History() {
                   </AlertDialogContent>
                 </AlertDialog>
               )}
+            </div>
+          </div>
+
+          {/* Provider Filter & Cost Summary */}
+          <div className="mb-6 flex flex-wrap gap-4 items-center justify-between p-4 rounded-lg bg-muted/30 border">
+            <div className="flex items-center gap-3">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              <Select value={providerFilter} onValueChange={setProviderFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filtra per provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti i provider</SelectItem>
+                  <SelectItem value="google">🔵 Google</SelectItem>
+                  <SelectItem value="aiml">🟣 AI/ML API</SelectItem>
+                  <SelectItem value="piapi">🟠 PiAPI</SelectItem>
+                  <SelectItem value="freepik">🟣 Freepik</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-green-500" />
+                <span className="text-muted-foreground">Costo stimato:</span>
+                <span className="font-bold text-green-600">${costSummary.totalCost}</span>
+              </div>
+              <div className="text-muted-foreground">
+                ({costSummary.count} video completati, ~${costSummary.avgCost}/video)
+              </div>
             </div>
           </div>
 
