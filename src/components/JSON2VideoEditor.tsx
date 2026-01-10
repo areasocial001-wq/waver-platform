@@ -122,6 +122,7 @@ interface SavedProject {
   created_at: string;
   updated_at: string;
   rendered_url?: string;
+  thumbnail_url?: string;
 }
 
 interface JSON2VideoEditorProps {
@@ -437,7 +438,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
 
       const { data, error } = await supabase
         .from("json2video_projects")
-        .select("id, name, description, created_at, updated_at, rendered_url")
+        .select("id, name, description, created_at, updated_at, rendered_url, thumbnail_url")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false });
 
@@ -449,6 +450,46 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
     } finally {
       setIsLoadingProjects(false);
     }
+  };
+
+  // Generate thumbnail from video
+  const generateThumbnail = async (videoUrl: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.src = videoUrl;
+      video.muted = true;
+      
+      video.onloadeddata = () => {
+        video.currentTime = 1; // Seek to 1 second for better frame
+      };
+      
+      video.onseeked = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = 320;
+          canvas.height = 180;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            resolve(dataUrl);
+          } else {
+            resolve(null);
+          }
+        } catch (error) {
+          console.error("Error generating thumbnail:", error);
+          resolve(null);
+        }
+      };
+      
+      video.onerror = () => {
+        resolve(null);
+      };
+      
+      // Timeout fallback
+      setTimeout(() => resolve(null), 5000);
+    });
   };
 
   const saveProject = async (saveAsNew = false) => {
@@ -465,6 +506,29 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
         return;
       }
 
+      // Generate thumbnail from first clip
+      let thumbnailUrl: string | null = null;
+      if (clips.length > 0) {
+        const thumbnailDataUrl = await generateThumbnail(clips[0].src);
+        if (thumbnailDataUrl) {
+          // Upload thumbnail to storage
+          const base64Data = thumbnailDataUrl.split(",")[1];
+          const thumbnailBlob = base64ToBlob(base64Data, "image/jpeg");
+          const fileName = `thumbnails/${Date.now()}-${projectName.slice(0, 20).replace(/\s/g, "-")}.jpg`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from("generated-videos")
+            .upload(fileName, thumbnailBlob, { contentType: "image/jpeg" });
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from("generated-videos")
+              .getPublicUrl(fileName);
+            thumbnailUrl = urlData.publicUrl;
+          }
+        }
+      }
+
       const projectData = {
         name: projectName,
         description: projectDescription,
@@ -477,6 +541,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
         transition: JSON.parse(JSON.stringify(transition)),
         resolution: resolution,
         rendered_url: renderedUrl,
+        thumbnail_url: thumbnailUrl,
         user_id: user.id,
       };
 
@@ -999,31 +1064,48 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                 <p>Nessun progetto salvato</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {savedProjects.map((project) => (
                   <div
                     key={project.id}
-                    className="p-4 rounded-lg border hover:border-primary transition-colors cursor-pointer group"
+                    className="rounded-lg border hover:border-primary transition-colors cursor-pointer group overflow-hidden"
                     onClick={() => loadProject(project.id)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium">{project.name}</h4>
-                        {project.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1">{project.description}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Modificato: {new Date(project.updated_at).toLocaleDateString("it-IT")}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {project.rendered_url && (
-                          <Badge variant="secondary" className="text-xs">Renderizzato</Badge>
-                        )}
+                    {/* Thumbnail */}
+                    <div className="aspect-video bg-muted relative overflow-hidden">
+                      {project.thumbnail_url ? (
+                        <img 
+                          src={project.thumbnail_url} 
+                          alt={project.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Film className="h-8 w-8 text-muted-foreground opacity-50" />
+                        </div>
+                      )}
+                      {project.rendered_url && (
+                        <Badge variant="secondary" className="absolute top-2 right-2 text-xs">
+                          Renderizzato
+                        </Badge>
+                      )}
+                    </div>
+                    {/* Info */}
+                    <div className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-medium truncate">{project.name}</h4>
+                          {project.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1">{project.description}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(project.updated_at).toLocaleDateString("it-IT")}
+                          </p>
+                        </div>
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           onClick={(e) => {
                             e.stopPropagation();
                             deleteProject(project.id);
