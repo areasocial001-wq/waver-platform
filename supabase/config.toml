@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.talking-avatar]
 verify_jwt = true
+
+[functions.json2video]
+verify_jwt = true
