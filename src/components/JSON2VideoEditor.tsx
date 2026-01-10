@@ -12,11 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { 
   Film, Music, Type, Subtitles, Play, Loader2, Download, Trash2, 
   Plus, Settings, Wand2, Volume2, Image, Clock, Palette, GripVertical,
-  Eye, Clapperboard, Sparkles, Monitor
+  Eye, Clapperboard, Sparkles, Monitor, Save, FolderOpen, Zap, Waves,
+  Music2, Mic, CloudLightning
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -104,10 +105,60 @@ interface AudioTrack {
   fadeOut: number;
 }
 
+interface SoundEffect {
+  id: string;
+  name: string;
+  src: string;
+  clipId?: string; // If attached to specific clip, or null for global
+  startTime: number;
+  volume: number;
+  category: 'transition' | 'ambient' | 'sfx';
+}
+
+interface SavedProject {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  rendered_url?: string;
+}
+
 interface JSON2VideoEditorProps {
   videoUrls?: string[];
   onComplete?: (videoUrl: string) => void;
+  projectId?: string;
 }
+
+// Predefined sound effects library
+const soundEffectsLibrary: { name: string; category: 'transition' | 'ambient' | 'sfx'; prompt: string }[] = [
+  { name: "Whoosh", category: "transition", prompt: "Smooth whoosh transition sound effect, cinematic" },
+  { name: "Impact", category: "transition", prompt: "Deep impact hit sound effect, dramatic" },
+  { name: "Swoosh", category: "transition", prompt: "Fast swoosh transition sound, modern" },
+  { name: "Glitch", category: "transition", prompt: "Digital glitch transition sound effect" },
+  { name: "Rise", category: "transition", prompt: "Rising tension sound effect, building" },
+  { name: "Click", category: "sfx", prompt: "Soft click sound effect, UI" },
+  { name: "Pop", category: "sfx", prompt: "Bubble pop sound effect, playful" },
+  { name: "Ding", category: "sfx", prompt: "Notification ding sound, pleasant" },
+  { name: "Success", category: "sfx", prompt: "Success celebration chime sound" },
+  { name: "Error", category: "sfx", prompt: "Subtle error buzz sound effect" },
+  { name: "Ambience City", category: "ambient", prompt: "Urban city ambient background noise, traffic" },
+  { name: "Nature Forest", category: "ambient", prompt: "Forest nature ambient sounds, birds, wind" },
+  { name: "Rain", category: "ambient", prompt: "Gentle rain ambient sound, relaxing" },
+  { name: "Office", category: "ambient", prompt: "Office background ambient noise, typing, murmur" },
+];
+
+// AI Music generation prompts
+const musicPrompts = [
+  { name: "Epico Cinematografico", prompt: "Epic cinematic orchestral music, dramatic, inspiring, heroic, trailer music", duration: 30 },
+  { name: "Corporate Upbeat", prompt: "Upbeat corporate background music, positive, motivational, business presentation", duration: 20 },
+  { name: "Chill Lo-Fi", prompt: "Chill lo-fi hip hop beats, relaxing, study music, mellow", duration: 30 },
+  { name: "Tech Innovation", prompt: "Modern technology innovation music, futuristic, inspiring, electronic", duration: 25 },
+  { name: "Emotional Piano", prompt: "Emotional piano music, touching, sentimental, documentary style", duration: 30 },
+  { name: "Energetic Pop", prompt: "Energetic upbeat pop music, fun, youthful, social media vibe", duration: 20 },
+  { name: "Ambient Atmospheric", prompt: "Ambient atmospheric soundscape, ethereal, dreamy, cinematic background", duration: 30 },
+  { name: "Action Intense", prompt: "Intense action music, fast-paced, adrenaline, thriller", duration: 25 },
+];
 
 const defaultClip = (src: string): VideoClip => ({
   id: crypto.randomUUID(),
@@ -297,23 +348,44 @@ function SortableClip({ clip, index, isSelected, onSelect, onRemove }: SortableC
   );
 }
 
-export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2VideoEditorProps) {
+export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId: initialProjectId }: JSON2VideoEditorProps) {
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [subtitles, setSubtitles] = useState<SubtitleSettings>(defaultSubtitles);
   const [intro, setIntro] = useState<IntroOutro>(defaultIntro);
   const [outro, setOutro] = useState<IntroOutro>({ ...defaultIntro, text: "" });
   const [audioTrack, setAudioTrack] = useState<AudioTrack | null>(null);
+  const [soundEffects, setSoundEffects] = useState<SoundEffect[]>([]);
   const [resolution, setResolution] = useState<string>("full-hd");
   const [transition, setTransition] = useState({ type: "fade", duration: 0.5 });
   
   const [isRendering, setIsRendering] = useState(false);
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [renderProjectId, setRenderProjectId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Project management state
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(initialProjectId || null);
+  const [projectName, setProjectName] = useState<string>("");
+  const [projectDescription, setProjectDescription] = useState<string>("");
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+
+  // AI Music generation state
+  const [isGeneratingMusic, setIsGeneratingMusic] = useState(false);
+  const [musicPrompt, setMusicPrompt] = useState("");
+  const [musicDuration, setMusicDuration] = useState(30);
+  const [showMusicDialog, setShowMusicDialog] = useState(false);
+
+  // Sound effects generation state
+  const [isGeneratingSfx, setIsGeneratingSfx] = useState(false);
+  const [sfxGeneratingId, setSfxGeneratingId] = useState<string | null>(null);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -330,6 +402,13 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
     }
   }, [videoUrls]);
 
+  // Load project if initialProjectId is provided
+  useEffect(() => {
+    if (initialProjectId) {
+      loadProject(initialProjectId);
+    }
+  }, [initialProjectId]);
+
   const selectedClip = clips.find(c => c.id === selectedClipId);
 
   // Handle drag end for reordering
@@ -344,6 +423,260 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
       });
       toast.success("Ordine clips aggiornato");
     }
+  };
+
+  // ============ PROJECT MANAGEMENT ============
+  const loadSavedProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi essere autenticato per caricare i progetti");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("json2video_projects")
+        .select("id, name, description, created_at, updated_at, rendered_url")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      setSavedProjects(data || []);
+    } catch (error) {
+      console.error("Error loading projects:", error);
+      toast.error("Errore nel caricamento dei progetti");
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  const saveProject = async (saveAsNew = false) => {
+    if (!projectName.trim()) {
+      toast.error("Inserisci un nome per il progetto");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Devi essere autenticato per salvare");
+        return;
+      }
+
+      const projectData = {
+        name: projectName,
+        description: projectDescription,
+        clips: JSON.parse(JSON.stringify(clips)),
+        subtitles: JSON.parse(JSON.stringify(subtitles)),
+        intro: JSON.parse(JSON.stringify(intro)),
+        outro: JSON.parse(JSON.stringify(outro)),
+        audio_track: audioTrack ? JSON.parse(JSON.stringify(audioTrack)) : null,
+        sound_effects: JSON.parse(JSON.stringify(soundEffects)),
+        transition: JSON.parse(JSON.stringify(transition)),
+        resolution: resolution,
+        rendered_url: renderedUrl,
+        user_id: user.id,
+      };
+
+      if (currentProjectId && !saveAsNew) {
+        // Update existing
+        const { error } = await supabase
+          .from("json2video_projects")
+          .update(projectData)
+          .eq("id", currentProjectId);
+        
+        if (error) throw error;
+        toast.success("Progetto aggiornato!");
+      } else {
+        // Create new
+        const { data, error } = await supabase
+          .from("json2video_projects")
+          .insert(projectData)
+          .select("id")
+          .single();
+        
+        if (error) throw error;
+        setCurrentProjectId(data.id);
+        toast.success("Progetto salvato!");
+      }
+      setShowSaveDialog(false);
+    } catch (error) {
+      console.error("Error saving project:", error);
+      toast.error("Errore nel salvataggio");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadProject = async (id: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("json2video_projects")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) throw error;
+      if (!data) {
+        toast.error("Progetto non trovato");
+        return;
+      }
+
+      setClips((data.clips as unknown as VideoClip[]) || []);
+      setSubtitles((data.subtitles as unknown as SubtitleSettings) || defaultSubtitles);
+      setIntro((data.intro as unknown as IntroOutro) || defaultIntro);
+      setOutro((data.outro as unknown as IntroOutro) || { ...defaultIntro, text: "" });
+      setAudioTrack((data.audio_track as unknown as AudioTrack) || null);
+      setSoundEffects((data.sound_effects as unknown as SoundEffect[]) || []);
+      setTransition((data.transition as unknown as { type: string; duration: number }) || { type: "fade", duration: 0.5 });
+      setResolution(data.resolution || "full-hd");
+      setRenderedUrl(data.rendered_url || null);
+      setProjectName(data.name);
+      setProjectDescription(data.description || "");
+      setCurrentProjectId(id);
+      
+      toast.success(`Progetto "${data.name}" caricato!`);
+      setShowLoadDialog(false);
+    } catch (error) {
+      console.error("Error loading project:", error);
+      toast.error("Errore nel caricamento del progetto");
+    }
+  };
+
+  const deleteProject = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from("json2video_projects")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      setSavedProjects(savedProjects.filter(p => p.id !== id));
+      if (currentProjectId === id) {
+        setCurrentProjectId(null);
+        setProjectName("");
+      }
+      toast.success("Progetto eliminato");
+    } catch (error) {
+      console.error("Error deleting project:", error);
+      toast.error("Errore nell'eliminazione");
+    }
+  };
+
+  // ============ AI MUSIC GENERATION ============
+  const generateAIMusic = async (prompt: string, duration: number) => {
+    setIsGeneratingMusic(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-music", {
+        body: {
+          prompt,
+          category: "music",
+          duration: Math.min(duration, 30),
+        },
+      });
+
+      if (error) throw error;
+      if (!data.audioContent) throw new Error("No audio content returned");
+
+      // Convert base64 to blob and upload to storage
+      const audioBlob = base64ToBlob(data.audioContent, "audio/mp3");
+      const fileName = `ai-music/${Date.now()}-${prompt.slice(0, 20).replace(/\s/g, "-")}.mp3`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("generated-videos")
+        .upload(fileName, audioBlob, { contentType: "audio/mp3" });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("generated-videos")
+        .getPublicUrl(fileName);
+
+      setAudioTrack({
+        src: urlData.publicUrl,
+        volume: 0.5,
+        fadeIn: 2,
+        fadeOut: 3,
+      });
+
+      toast.success("Musica AI generata con successo!");
+      setShowMusicDialog(false);
+    } catch (error) {
+      console.error("Error generating AI music:", error);
+      toast.error("Errore nella generazione della musica AI");
+    } finally {
+      setIsGeneratingMusic(false);
+    }
+  };
+
+  // ============ SOUND EFFECTS ============
+  const generateSoundEffect = async (sfxPrompt: string, name: string, category: 'transition' | 'ambient' | 'sfx') => {
+    setSfxGeneratingId(name);
+    setIsGeneratingSfx(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("elevenlabs-music", {
+        body: {
+          prompt: sfxPrompt,
+          category: "sfx",
+          duration: category === "ambient" ? 10 : 5,
+        },
+      });
+
+      if (error) throw error;
+      if (!data.audioContent) throw new Error("No audio content returned");
+
+      const audioBlob = base64ToBlob(data.audioContent, "audio/mp3");
+      const fileName = `sfx/${Date.now()}-${name.replace(/\s/g, "-")}.mp3`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("generated-videos")
+        .upload(fileName, audioBlob, { contentType: "audio/mp3" });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("generated-videos")
+        .getPublicUrl(fileName);
+
+      const newSfx: SoundEffect = {
+        id: crypto.randomUUID(),
+        name,
+        src: urlData.publicUrl,
+        startTime: 0,
+        volume: 0.7,
+        category,
+      };
+
+      setSoundEffects([...soundEffects, newSfx]);
+      toast.success(`Effetto sonoro "${name}" generato!`);
+    } catch (error) {
+      console.error("Error generating sound effect:", error);
+      toast.error("Errore nella generazione dell'effetto sonoro");
+    } finally {
+      setIsGeneratingSfx(false);
+      setSfxGeneratingId(null);
+    }
+  };
+
+  const removeSoundEffect = (id: string) => {
+    setSoundEffects(soundEffects.filter(sfx => sfx.id !== id));
+  };
+
+  const updateSoundEffect = (id: string, updates: Partial<SoundEffect>) => {
+    setSoundEffects(soundEffects.map(sfx => sfx.id === id ? { ...sfx, ...updates } : sfx));
+  };
+
+  // Helper function to convert base64 to Blob
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    return new Blob([byteArray], { type: mimeType });
   };
 
   // Apply transition preset
@@ -483,7 +816,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
       if (error) throw error;
       if (!data.success) throw new Error(data.error || "Render failed");
 
-      setProjectId(data.projectId);
+      setRenderProjectId(data.projectId);
       toast.info("Rendering avviato...");
       
       // Start polling for status
@@ -552,12 +885,35 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Film className="h-6 w-6" />
             JSON2Video Editor
+            {currentProjectId && (
+              <Badge variant="outline" className="ml-2">{projectName}</Badge>
+            )}
           </h2>
           <p className="text-muted-foreground">
             Concatena video, aggiungi sottotitoli, audio e transizioni
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {/* Project Management Buttons */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              loadSavedProjects();
+              setShowLoadDialog(true);
+            }}
+          >
+            <FolderOpen className="mr-2 h-4 w-4" />
+            Apri
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowSaveDialog(true)}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Salva
+          </Button>
           <Button 
             variant="outline" 
             onClick={() => setShowPreview(!showPreview)}
@@ -581,6 +937,179 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
           </Button>
         </div>
       </div>
+
+      {/* Save Project Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Salva Progetto</DialogTitle>
+            <DialogDescription>
+              Salva il progetto per riprenderlo successivamente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Nome Progetto *</Label>
+              <Input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Il mio video..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Descrizione</Label>
+              <Textarea
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="Descrivi il progetto..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            {currentProjectId && (
+              <Button variant="outline" onClick={() => saveProject(true)} disabled={isSaving}>
+                Salva come Nuovo
+              </Button>
+            )}
+            <Button onClick={() => saveProject(false)} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {currentProjectId ? "Aggiorna" : "Salva"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Load Project Dialog */}
+      <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Carica Progetto</DialogTitle>
+            <DialogDescription>
+              Seleziona un progetto salvato da caricare
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[400px] mt-4">
+            {isLoadingProjects ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : savedProjects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <FolderOpen className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>Nessun progetto salvato</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {savedProjects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="p-4 rounded-lg border hover:border-primary transition-colors cursor-pointer group"
+                    onClick={() => loadProject(project.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-medium">{project.name}</h4>
+                        {project.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">{project.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Modificato: {new Date(project.updated_at).toLocaleDateString("it-IT")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {project.rendered_url && (
+                          <Badge variant="secondary" className="text-xs">Renderizzato</Badge>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteProject(project.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Music Dialog */}
+      <Dialog open={showMusicDialog} onOpenChange={setShowMusicDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CloudLightning className="h-5 w-5" />
+              Genera Musica AI
+            </DialogTitle>
+            <DialogDescription>
+              Genera automaticamente una colonna sonora con ElevenLabs AI
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Prompt personalizzato</Label>
+              <Textarea
+                value={musicPrompt}
+                onChange={(e) => setMusicPrompt(e.target.value)}
+                placeholder="Descrivi lo stile musicale desiderato..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Durata (secondi): {musicDuration}s</Label>
+              <Slider
+                value={[musicDuration]}
+                min={10}
+                max={30}
+                step={5}
+                onValueChange={([v]) => setMusicDuration(v)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {musicPrompts.map((mp) => (
+                <button
+                  key={mp.name}
+                  onClick={() => {
+                    setMusicPrompt(mp.prompt);
+                    setMusicDuration(mp.duration);
+                  }}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    musicPrompt === mp.prompt ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                  }`}
+                >
+                  <span className="text-sm font-medium">{mp.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => generateAIMusic(musicPrompt, musicDuration)}
+              disabled={isGeneratingMusic || !musicPrompt}
+            >
+              {isGeneratingMusic ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generando...
+                </>
+              ) : (
+                <>
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Genera Musica
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Transition Presets */}
       <Card>
@@ -1148,132 +1677,248 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
 
               {/* Audio settings */}
               <TabsContent value="audio" className="space-y-4 mt-4">
-                <div className="space-y-4">
-                  {/* Local audio upload */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Music className="h-4 w-4" />
-                      Carica Audio Locale
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="file"
-                        accept="audio/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          
-                          if (file.size > 50 * 1024 * 1024) {
-                            toast.error("File troppo grande (max 50MB)");
-                            return;
-                          }
-                          
-                          // Upload to Supabase storage
-                          const fileName = `audio/${Date.now()}-${file.name}`;
-                          const { data, error } = await supabase.storage
-                            .from("generated-videos")
-                            .upload(fileName, file, {
-                              contentType: file.type,
-                              upsert: true,
-                            });
-                          
-                          if (error) {
-                            toast.error("Errore upload: " + error.message);
-                            return;
-                          }
-                          
-                          const { data: urlData } = supabase.storage
-                            .from("generated-videos")
-                            .getPublicUrl(fileName);
-                          
-                          setAudioTrack({
-                            src: urlData.publicUrl,
-                            volume: 0.5,
-                            fadeIn: 0,
-                            fadeOut: 2,
-                          });
-                          toast.success("Audio caricato!");
-                        }}
-                        className="flex-1"
-                      />
-                      {audioTrack && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setAudioTrack(null)}
+                <Accordion type="single" collapsible defaultValue="background">
+                  {/* AI Music Generation */}
+                  <AccordionItem value="ai-music">
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2">
+                        <CloudLightning className="h-4 w-4" />
+                        Genera Musica AI
+                        {audioTrack && <Badge variant="secondary">Attivo</Badge>}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 pt-2">
+                        <p className="text-sm text-muted-foreground">
+                          Genera automaticamente una colonna sonora con ElevenLabs AI
+                        </p>
+                        <Button 
+                          onClick={() => setShowMusicDialog(true)}
+                          className="w-full"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Wand2 className="mr-2 h-4 w-4" />
+                          Apri Generatore Musica AI
                         </Button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Oppure inserisci un URL diretto sotto
-                    </p>
-                  </div>
-
-                  {/* URL input */}
-                  <div className="space-y-2">
-                    <Label>URL Audio di Sottofondo</Label>
-                    <Input
-                      placeholder="https://... (MP3, WAV)"
-                      value={audioTrack?.src || ""}
-                      onChange={(e) => setAudioTrack(e.target.value ? { 
-                        src: e.target.value, 
-                        volume: audioTrack?.volume || 0.5,
-                        fadeIn: audioTrack?.fadeIn || 0,
-                        fadeOut: audioTrack?.fadeOut || 2,
-                      } : null)}
-                    />
-                  </div>
-
-                  {audioTrack && (
-                    <>
-                      {/* Audio preview */}
-                      <div className="space-y-2">
-                        <Label>Anteprima Audio</Label>
-                        <audio 
-                          controls 
-                          src={audioTrack.src} 
-                          className="w-full h-10"
-                        />
                       </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-                      <div className="space-y-2">
-                        <Label>Volume</Label>
-                        <div className="flex items-center gap-2">
-                          <Volume2 className="h-4 w-4" />
-                          <Slider
-                            value={[audioTrack.volume]}
-                            min={0}
-                            max={2}
-                            step={0.1}
-                            onValueChange={([v]) => setAudioTrack({ ...audioTrack, volume: v })}
-                          />
-                          <span className="text-sm w-10">{Math.round(audioTrack.volume * 100)}%</span>
-                        </div>
+                  {/* Background Audio */}
+                  <AccordionItem value="background">
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2">
+                        <Music className="h-4 w-4" />
+                        Audio di Sottofondo
+                        {audioTrack && <Badge variant="secondary">Attivo</Badge>}
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4">
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 pt-2">
+                        {/* Local audio upload */}
                         <div className="space-y-2">
-                          <Label>Fade In (sec)</Label>
-                          <Input
-                            type="number"
-                            value={audioTrack.fadeIn}
-                            onChange={(e) => setAudioTrack({ ...audioTrack, fadeIn: Number(e.target.value) })}
-                          />
+                          <Label>Carica Audio Locale</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              type="file"
+                              accept="audio/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                
+                                if (file.size > 50 * 1024 * 1024) {
+                                  toast.error("File troppo grande (max 50MB)");
+                                  return;
+                                }
+                                
+                                const fileName = `audio/${Date.now()}-${file.name}`;
+                                const { error } = await supabase.storage
+                                  .from("generated-videos")
+                                  .upload(fileName, file, {
+                                    contentType: file.type,
+                                    upsert: true,
+                                  });
+                                
+                                if (error) {
+                                  toast.error("Errore upload: " + error.message);
+                                  return;
+                                }
+                                
+                                const { data: urlData } = supabase.storage
+                                  .from("generated-videos")
+                                  .getPublicUrl(fileName);
+                                
+                                setAudioTrack({
+                                  src: urlData.publicUrl,
+                                  volume: 0.5,
+                                  fadeIn: 0,
+                                  fadeOut: 2,
+                                });
+                                toast.success("Audio caricato!");
+                              }}
+                              className="flex-1"
+                            />
+                            {audioTrack && (
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setAudioTrack(null)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
+
+                        {/* URL input */}
                         <div className="space-y-2">
-                          <Label>Fade Out (sec)</Label>
+                          <Label>URL Audio</Label>
                           <Input
-                            type="number"
-                            value={audioTrack.fadeOut}
-                            onChange={(e) => setAudioTrack({ ...audioTrack, fadeOut: Number(e.target.value) })}
+                            placeholder="https://... (MP3, WAV)"
+                            value={audioTrack?.src || ""}
+                            onChange={(e) => setAudioTrack(e.target.value ? { 
+                              src: e.target.value, 
+                              volume: audioTrack?.volume || 0.5,
+                              fadeIn: audioTrack?.fadeIn || 0,
+                              fadeOut: audioTrack?.fadeOut || 2,
+                            } : null)}
                           />
                         </div>
+
+                        {audioTrack && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>Anteprima</Label>
+                              <audio 
+                                controls 
+                                src={audioTrack.src} 
+                                className="w-full h-10"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Volume: {Math.round(audioTrack.volume * 100)}%</Label>
+                              <Slider
+                                value={[audioTrack.volume]}
+                                min={0}
+                                max={2}
+                                step={0.1}
+                                onValueChange={([v]) => setAudioTrack({ ...audioTrack, volume: v })}
+                              />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Fade In (sec)</Label>
+                                <Input
+                                  type="number"
+                                  value={audioTrack.fadeIn}
+                                  onChange={(e) => setAudioTrack({ ...audioTrack, fadeIn: Number(e.target.value) })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Fade Out (sec)</Label>
+                                <Input
+                                  type="number"
+                                  value={audioTrack.fadeOut}
+                                  onChange={(e) => setAudioTrack({ ...audioTrack, fadeOut: Number(e.target.value) })}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
-                    </>
-                  )}
-                </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  {/* Sound Effects */}
+                  <AccordionItem value="sfx">
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-2">
+                        <Waves className="h-4 w-4" />
+                        Effetti Sonori ({soundEffects.length})
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="space-y-4 pt-2">
+                        <p className="text-sm text-muted-foreground">
+                          Genera effetti sonori AI per transizioni e momenti chiave
+                        </p>
+                        
+                        {/* SFX Library */}
+                        <div className="space-y-2">
+                          <Label>Libreria Effetti Sonori</Label>
+                          <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto">
+                            {soundEffectsLibrary.map((sfx) => (
+                              <button
+                                key={sfx.name}
+                                onClick={() => generateSoundEffect(sfx.prompt, sfx.name, sfx.category)}
+                                disabled={isGeneratingSfx}
+                                className="p-2 rounded border text-left text-sm hover:border-primary transition-colors disabled:opacity-50 flex items-center justify-between"
+                              >
+                                <span>{sfx.name}</span>
+                                {sfxGeneratingId === sfx.name ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    {sfx.category}
+                                  </Badge>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Active Sound Effects */}
+                        {soundEffects.length > 0 && (
+                          <div className="space-y-2">
+                            <Label>Effetti Attivi</Label>
+                            <div className="space-y-2">
+                              {soundEffects.map((sfx) => (
+                                <div key={sfx.id} className="p-3 rounded-lg border space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="secondary">{sfx.category}</Badge>
+                                      <span className="text-sm font-medium">{sfx.name}</span>
+                                    </div>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => removeSoundEffect(sfx.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  <audio controls src={sfx.src} className="w-full h-8" />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1">
+                                      <Label className="text-xs">Inizio (sec)</Label>
+                                      <Input
+                                        type="number"
+                                        value={sfx.startTime}
+                                        onChange={(e) => updateSoundEffect(sfx.id, { startTime: Number(e.target.value) })}
+                                        className="h-8"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label className="text-xs">Volume: {Math.round(sfx.volume * 100)}%</Label>
+                                      <Slider
+                                        value={[sfx.volume]}
+                                        min={0}
+                                        max={1}
+                                        step={0.1}
+                                        onValueChange={([v]) => updateSoundEffect(sfx.id, { volume: v })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </TabsContent>
 
               {/* Intro/Outro settings */}

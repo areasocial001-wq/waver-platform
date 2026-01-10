@@ -146,6 +146,63 @@ export type Database = {
         }
         Relationships: []
       }
+      json2video_projects: {
+        Row: {
+          audio_track: Json | null
+          clips: Json
+          created_at: string
+          description: string | null
+          id: string
+          intro: Json | null
+          name: string
+          outro: Json | null
+          rendered_url: string | null
+          resolution: string | null
+          sound_effects: Json | null
+          subtitles: Json | null
+          thumbnail_url: string | null
+          transition: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_track?: Json | null
+          clips?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          intro?: Json | null
+          name: string
+          outro?: Json | null
+          rendered_url?: string | null
+          resolution?: string | null
+          sound_effects?: Json | null
+          subtitles?: Json | null
+          thumbnail_url?: string | null
+          transition?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_track?: Json | null
+          clips?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          intro?: Json | null
+          name?: string
+          outro?: Json | null
+          rendered_url?: string | null
+          resolution?: string | null
+          sound_effects?: Json | null
+          subtitles?: Json | null
+          thumbnail_url?: string | null
+          transition?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       motion_presets: {
         Row: {
           category: string
