@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
 import ProviderSettings from "@/components/ProviderSettings";
+import ProviderPriceComparison from "@/components/ProviderPriceComparison";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Zap, Bell, Shield } from "lucide-react";
+import { Settings, Zap, Bell, Shield, DollarSign } from "lucide-react";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
@@ -34,23 +35,31 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="providers" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="providers" className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                Provider AI
+                <span className="hidden sm:inline">Provider</span>
+              </TabsTrigger>
+              <TabsTrigger value="pricing" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden sm:inline">Prezzi</span>
               </TabsTrigger>
               <TabsTrigger value="notifications" className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
-                Notifiche
+                <span className="hidden sm:inline">Notifiche</span>
               </TabsTrigger>
               <TabsTrigger value="api" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                API & Soglie
+                <span className="hidden sm:inline">API</span>
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="providers">
               <ProviderSettings />
+            </TabsContent>
+
+            <TabsContent value="pricing">
+              <ProviderPriceComparison />
             </TabsContent>
 
             <TabsContent value="notifications">
