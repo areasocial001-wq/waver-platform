@@ -17,9 +17,11 @@ import {
   Film, Music, Type, Subtitles, Play, Loader2, Download, Trash2, 
   Plus, Settings, Wand2, Volume2, Image, Clock, Palette, GripVertical,
   Eye, Clapperboard, Sparkles, Monitor, Save, FolderOpen, Zap, Waves,
-  Music2, Mic, CloudLightning
+  Music2, Mic, CloudLightning, Settings2
 } from "lucide-react";
 import { ActiveProviderIndicator } from "@/components/ActiveProviderIndicator";
+import { QuickProviderSwitch } from "@/components/QuickProviderSwitch";
+import { ProjectCostEstimator } from "@/components/ProjectCostEstimator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -960,9 +962,32 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
           <p className="text-muted-foreground text-sm">
             Concatena video, aggiungi sottotitoli, audio e transizioni
           </p>
-          <ActiveProviderIndicator 
-            operations={['video_generation', 'music_generation', 'sound_effects', 'text_to_speech']}
-          />
+          <div className="flex items-center gap-2 flex-wrap">
+            <ActiveProviderIndicator 
+              operations={['video_generation', 'music_generation', 'sound_effects', 'text_to_speech']}
+            />
+            <QuickProviderSwitch 
+              operations={['video_generation', 'music_generation', 'sound_effects', 'text_to_speech']}
+              trigger={
+                <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  Cambia
+                </Button>
+              }
+            />
+            <ProjectCostEstimator
+              compact
+              operations={{
+                video_clips: clips.length,
+                music_tracks: audioTrack ? 1 : 0,
+                sound_effects: soundEffects.length,
+                voiceovers: clips.filter(c => c.textOverlays.length > 0).length,
+                voiceover_characters: clips.reduce((acc, c) => 
+                  acc + c.textOverlays.reduce((sum, t) => sum + t.text.length, 0), 0
+                ),
+              }}
+            />
+          </div>
         </div>
         <div className="flex gap-2 flex-wrap">
           {/* Project Management Buttons */}
