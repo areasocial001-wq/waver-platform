@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,10 +15,28 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Film, Music, Type, Subtitles, Play, Loader2, Download, Trash2, 
-  Plus, Settings, Wand2, Volume2, Image, Clock, Palette
+  Plus, Settings, Wand2, Volume2, Image, Clock, Palette, GripVertical,
+  Eye, Clapperboard, Sparkles, Monitor
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface VideoClip {
   id: string;
@@ -130,6 +148,155 @@ const defaultIntro: IntroOutro = {
   fontFamily: "Oswald Bold",
 };
 
+// Transition presets
+interface TransitionPreset {
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  transition: { type: string; duration: number };
+  subtitles?: Partial<SubtitleSettings>;
+  intro?: Partial<IntroOutro>;
+}
+
+const transitionPresets: TransitionPreset[] = [
+  {
+    name: "Cinematografico",
+    description: "Transizioni eleganti per video professionali",
+    icon: <Clapperboard className="h-5 w-5" />,
+    transition: { type: "crossfade", duration: 1.5 },
+    subtitles: {
+      style: "classic",
+      fontFamily: "Oswald Bold",
+      fontSize: 80,
+      wordColor: "#FFFFFF",
+      lineColor: "#CCCCCC",
+      position: "bottom-center",
+    },
+    intro: {
+      animation: "fade",
+      duration: 4,
+      backgroundColor: "#000000",
+      textColor: "#FFFFFF",
+    },
+  },
+  {
+    name: "Social Media",
+    description: "Dinamico e accattivante per TikTok/Instagram",
+    icon: <Sparkles className="h-5 w-5" />,
+    transition: { type: "zoom", duration: 0.3 },
+    subtitles: {
+      style: "boxed-word",
+      fontFamily: "Permanent Marker",
+      fontSize: 100,
+      wordColor: "#FFFF00",
+      lineColor: "#FF00FF",
+      allCaps: true,
+      position: "center-center",
+    },
+    intro: {
+      animation: "zoom",
+      duration: 2,
+      backgroundColor: "#FF0080",
+      textColor: "#FFFFFF",
+    },
+  },
+  {
+    name: "Presentazione",
+    description: "Pulito e professionale per business",
+    icon: <Monitor className="h-5 w-5" />,
+    transition: { type: "wipe-left", duration: 0.8 },
+    subtitles: {
+      style: "classic-progressive",
+      fontFamily: "Arial Bold",
+      fontSize: 70,
+      wordColor: "#000000",
+      lineColor: "#333333",
+      boxColor: "#FFFFFF",
+      position: "bottom-center",
+    },
+    intro: {
+      animation: "slide",
+      duration: 3,
+      backgroundColor: "#1E40AF",
+      textColor: "#FFFFFF",
+    },
+  },
+];
+
+// Sortable clip component
+interface SortableClipProps {
+  clip: VideoClip;
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+}
+
+function SortableClip({ clip, index, isSelected, onSelect, onRemove }: SortableClipProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: clip.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+        isSelected 
+          ? "border-primary bg-primary/5" 
+          : "border-border hover:border-primary/50"
+      } ${isDragging ? "shadow-lg" : ""}`}
+      onClick={onSelect}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            className="cursor-grab active:cursor-grabbing touch-none"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <Badge variant="secondary">{index + 1}</Badge>
+          <span className="text-sm truncate max-w-[120px]">
+            {clip.src.split("/").pop() || "Video"}
+          </span>
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+      {clip.textOverlays.length > 0 && (
+        <div className="mt-1 ml-6 flex gap-1">
+          <Badge variant="outline" className="text-xs">
+            <Type className="h-3 w-3 mr-1" />
+            {clip.textOverlays.length} testi
+          </Badge>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2VideoEditorProps) {
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -144,6 +311,17 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
   const [projectId, setProjectId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [renderedUrl, setRenderedUrl] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Initialize clips from videoUrls
   useEffect(() => {
@@ -153,6 +331,62 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
   }, [videoUrls]);
 
   const selectedClip = clips.find(c => c.id === selectedClipId);
+
+  // Handle drag end for reordering
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setClips((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+      toast.success("Ordine clips aggiornato");
+    }
+  };
+
+  // Apply transition preset
+  const applyPreset = (preset: TransitionPreset) => {
+    setTransition(preset.transition);
+    if (preset.subtitles) {
+      setSubtitles({ ...subtitles, ...preset.subtitles });
+    }
+    if (preset.intro) {
+      setIntro({ ...intro, ...preset.intro });
+      setOutro({ ...outro, ...preset.intro });
+    }
+    toast.success(`Preset "${preset.name}" applicato`);
+  };
+
+  // Calculate total duration for preview
+  const totalDuration = useMemo(() => {
+    let duration = 0;
+    if (intro.enabled) duration += intro.duration;
+    clips.forEach((clip, i) => {
+      duration += clip.duration || 5; // Default 5 sec per clip
+      if (i < clips.length - 1 && transition.type !== "none") {
+        duration -= transition.duration * 0.5; // Overlap
+      }
+    });
+    if (outro.enabled) duration += outro.duration;
+    return duration;
+  }, [clips, intro, outro, transition]);
+
+  // Preview playback
+  useEffect(() => {
+    if (showPreview && previewVideoRef.current) {
+      previewVideoRef.current.play().catch(() => {});
+    }
+  }, [showPreview, previewIndex]);
+
+  const handlePreviewVideoEnd = () => {
+    if (previewIndex < clips.length - 1) {
+      setPreviewIndex(previewIndex + 1);
+    } else {
+      setPreviewIndex(0);
+    }
+  };
 
   const addClip = (url: string) => {
     setClips([...clips, defaultClip(url)]);
@@ -313,7 +547,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Film className="h-6 w-6" />
@@ -323,20 +557,154 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
             Concatena video, aggiungi sottotitoli, audio e transizioni
           </p>
         </div>
-        <Button onClick={startRender} disabled={isRendering || clips.length === 0}>
-          {isRendering ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Rendering... {progress}%
-            </>
-          ) : (
-            <>
-              <Wand2 className="mr-2 h-4 w-4" />
-              Genera Video
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowPreview(!showPreview)}
+            disabled={clips.length === 0}
+          >
+            <Eye className="mr-2 h-4 w-4" />
+            {showPreview ? "Nascondi" : "Anteprima"}
+          </Button>
+          <Button onClick={startRender} disabled={isRendering || clips.length === 0}>
+            {isRendering ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Rendering... {progress}%
+              </>
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-4 w-4" />
+                Genera Video
+              </>
+            )}
+          </Button>
+        </div>
       </div>
+
+      {/* Transition Presets */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Preset Stile
+          </CardTitle>
+          <CardDescription>Scegli un preset per applicare automaticamente transizioni e stili</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {transitionPresets.map((preset) => (
+              <button
+                key={preset.name}
+                onClick={() => applyPreset(preset)}
+                className="p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all text-left group"
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                    {preset.icon}
+                  </div>
+                  <span className="font-medium">{preset.name}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{preset.description}</p>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Live Preview */}
+      {showPreview && clips.length > 0 && (
+        <Card className="border-primary/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Anteprima Live
+              </span>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">
+                  Clip {previewIndex + 1} / {clips.length}
+                </Badge>
+                <Badge variant="secondary">
+                  ~{totalDuration.toFixed(1)}s totali
+                </Badge>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Video preview */}
+              <div className="aspect-video bg-black rounded-lg overflow-hidden relative">
+                <video
+                  ref={previewVideoRef}
+                  key={clips[previewIndex]?.src}
+                  src={clips[previewIndex]?.src}
+                  className="w-full h-full object-contain"
+                  controls
+                  muted={clips[previewIndex]?.muted}
+                  onEnded={handlePreviewVideoEnd}
+                />
+                {/* Transition indicator */}
+                {transition.type !== "none" && (
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-black/70">
+                      Transizione: {transition.type} ({transition.duration}s)
+                    </Badge>
+                  </div>
+                )}
+                {/* Intro/Outro indicator */}
+                {intro.enabled && previewIndex === 0 && (
+                  <div className="absolute bottom-2 left-2">
+                    <Badge variant="secondary">Intro: {intro.text || "(testo intro)"}</Badge>
+                  </div>
+                )}
+              </div>
+
+              {/* Timeline preview */}
+              <div className="space-y-2">
+                <Label className="text-sm text-muted-foreground">Timeline</Label>
+                <div className="flex gap-1 items-center overflow-x-auto pb-2">
+                  {intro.enabled && (
+                    <>
+                      <div className="flex-shrink-0 px-3 py-2 bg-primary/20 rounded text-xs font-medium border border-primary/30">
+                        Intro ({intro.duration}s)
+                      </div>
+                      <div className="text-muted-foreground">→</div>
+                    </>
+                  )}
+                  {clips.map((clip, i) => (
+                    <React.Fragment key={clip.id}>
+                      <div 
+                        className={`flex-shrink-0 px-3 py-2 rounded text-xs font-medium cursor-pointer transition-colors ${
+                          i === previewIndex 
+                            ? "bg-primary text-primary-foreground" 
+                            : "bg-muted hover:bg-muted/80"
+                        }`}
+                        onClick={() => setPreviewIndex(i)}
+                      >
+                        Clip {i + 1} ({clip.duration || 5}s)
+                      </div>
+                      {i < clips.length - 1 && transition.type !== "none" && (
+                        <div className="flex-shrink-0 text-xs text-muted-foreground px-1">
+                          ⟷
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                  {outro.enabled && (
+                    <>
+                      <div className="text-muted-foreground">→</div>
+                      <div className="flex-shrink-0 px-3 py-2 bg-secondary/20 rounded text-xs font-medium border border-secondary/30">
+                        Outro ({outro.duration}s)
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Progress bar */}
       {isRendering && (
@@ -382,11 +750,14 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left panel - Clips list */}
+        {/* Left panel - Clips list with drag & drop */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
-              <span>Video Clips ({clips.length})</span>
+              <span className="flex items-center gap-2">
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
+                Video Clips ({clips.length})
+              </span>
               <Dialog>
                 <DialogTrigger asChild>
                   <Button size="sm" variant="outline">
@@ -414,57 +785,42 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
                 </DialogContent>
               </Dialog>
             </CardTitle>
+            <CardDescription className="text-xs">
+              Trascina per riordinare i clips
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[400px]">
-              <div className="space-y-2">
-                {clips.map((clip, index) => (
-                  <div
-                    key={clip.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedClipId === clip.id 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover:border-primary/50"
-                    }`}
-                    onClick={() => setSelectedClipId(clip.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{index + 1}</Badge>
-                        <span className="text-sm truncate max-w-[150px]">
-                          {clip.src.split("/").pop() || "Video"}
-                        </span>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeClip(clip.id);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {clip.textOverlays.length > 0 && (
-                      <div className="mt-1 flex gap-1">
-                        <Badge variant="outline" className="text-xs">
-                          <Type className="h-3 w-3 mr-1" />
-                          {clip.textOverlays.length} testi
-                        </Badge>
-                      </div>
-                    )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={clips.map(c => c.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {clips.map((clip, index) => (
+                      <SortableClip
+                        key={clip.id}
+                        clip={clip}
+                        index={index}
+                        isSelected={selectedClipId === clip.id}
+                        onSelect={() => setSelectedClipId(clip.id)}
+                        onRemove={() => removeClip(clip.id)}
+                      />
+                    ))}
                   </div>
-                ))}
-                {clips.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Film className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Nessun video clip</p>
-                    <p className="text-xs">Aggiungi clip per iniziare</p>
-                  </div>
-                )}
-              </div>
+                </SortableContext>
+              </DndContext>
+              {clips.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Film className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>Nessun video clip</p>
+                  <p className="text-xs">Aggiungi clip per iniziare</p>
+                </div>
+              )}
             </ScrollArea>
           </CardContent>
         </Card>
