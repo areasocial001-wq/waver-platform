@@ -31,7 +31,7 @@ interface GenerationResult {
   generationId?: string;
 }
 
-type Provider = 'veo' | 'kling' | 'freepik';
+type Provider = 'google-veo' | 'aiml-runway' | 'aiml-kling' | 'piapi-kling-2.5' | 'freepik';
 
 interface ProviderConfig {
   id: Provider;
@@ -43,17 +43,31 @@ interface ProviderConfig {
 
 const PROVIDERS: ProviderConfig[] = [
   {
-    id: 'veo',
+    id: 'google-veo',
     name: 'Google Veo 3.1',
-    description: 'Alta qualità, audio nativo',
+    description: 'Alta qualità, audio nativo (API diretta)',
     estimatedTime: '~90s',
     supportedDurations: [4, 6, 8],
   },
   {
-    id: 'kling',
-    name: 'Kling 2.1',
-    description: 'Transizioni fluide, supporto end-frame',
-    estimatedTime: '~4min',
+    id: 'aiml-runway',
+    name: 'AI/ML: Runway Gen-3',
+    description: 'Gen-3 Alpha Turbo via gateway AI/ML',
+    estimatedTime: '~2-4min',
+    supportedDurations: [5, 10],
+  },
+  {
+    id: 'aiml-kling',
+    name: 'AI/ML: Kling v1.6 Pro',
+    description: 'Kling premium via gateway AI/ML',
+    estimatedTime: '~3-5min',
+    supportedDurations: [5, 10],
+  },
+  {
+    id: 'piapi-kling-2.5',
+    name: 'PiAPI: Kling 2.5',
+    description: 'Transizioni fluide, buon rapporto qualità/prezzo',
+    estimatedTime: '~3-5min',
     supportedDurations: [5, 10],
   },
 ];
