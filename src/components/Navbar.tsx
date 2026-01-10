@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -28,6 +28,7 @@ export const Navbar = () => {
   const isFreepikPage = location.pathname === "/freepik";
   const isApiMonitoringPage = location.pathname === "/api-monitoring";
   const isVideoEditorPage = location.pathname === "/video-editor";
+  const isSettingsPage = location.pathname === "/settings";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -71,7 +72,7 @@ export const Navbar = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.email}
           </span>
-          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage ? (
+          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage ? (
             <Button
               variant="outline"
               size="sm"
@@ -136,6 +137,15 @@ export const Navbar = () => {
               >
                 <Film className="w-4 h-4 mr-2" />
                 Editor
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/settings")}
+                className="bg-card hover:bg-accent text-foreground border-border"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
               </Button>
             </>
           )}
