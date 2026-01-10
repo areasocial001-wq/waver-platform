@@ -36,9 +36,11 @@ interface GenerationResult {
 // Providers disponibili per multi-model generation
 const MULTI_MODEL_PROVIDERS: VideoProviderType[] = [
   'google-veo',
-  'aiml-runway',
-  'aiml-kling',
-  'aiml-veo',
+  'aiml-runway-gen4-turbo',
+  'aiml-kling-v2.6-pro',
+  'aiml-veo3.1-t2v',
+  'aiml-luma-ray-2',
+  'aiml-sora-2-t2v',
   'piapi-kling-2.5',
   'piapi-kling-2.6',
   'piapi-hailuo',
