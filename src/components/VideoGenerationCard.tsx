@@ -411,13 +411,23 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
           )}
 
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {formatDistanceToNow(new Date(generation.created_at), {
-                addSuffix: true,
-                locale: it,
-              })}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatDistanceToNow(new Date(generation.created_at), {
+                  addSuffix: true,
+                  locale: it,
+                })}
+              </span>
+              {generation.provider && (
+                <Badge 
+                  variant="secondary" 
+                  className="text-[10px] px-1.5 py-0 h-5 font-medium uppercase tracking-wide"
+                >
+                  {generation.provider}
+                </Badge>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <span className="capitalize">{generation.type.replace("_", " ")}</span>
               
