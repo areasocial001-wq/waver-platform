@@ -42,7 +42,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Qualità professionale, bassa latenza'
       },
       { 
-        provider: 'AIML (Suno)', 
+        provider: 'AI/ML (Suno)', 
         logo: '🤖', 
         price: '$0.50',
         unit: '/track (30s)',
@@ -51,7 +51,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Modello Suno v4, ottima creatività'
       },
       { 
-        provider: 'AIML (Udio)', 
+        provider: 'AI/ML (Udio)', 
         logo: '🤖', 
         price: '$0.40',
         unit: '/track (30s)',
@@ -86,7 +86,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'SFX professionale, fino a 22s'
       },
       { 
-        provider: 'AIML', 
+        provider: 'AI/ML', 
         logo: '🤖', 
         price: '$0.05',
         unit: '/effetto',
@@ -112,7 +112,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Voci ultra-realistiche, 30+ lingue'
       },
       { 
-        provider: 'AIML (ElevenLabs)', 
+        provider: 'AI/ML (ElevenLabs)', 
         logo: '🤖', 
         price: '$0.35',
         unit: '/1K caratteri',
@@ -121,7 +121,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Stesso modello via gateway'
       },
       { 
-        provider: 'AIML (OpenAI)', 
+        provider: 'AI/ML (OpenAI)', 
         logo: '🤖', 
         price: '$0.015',
         unit: '/1K caratteri',
@@ -147,7 +147,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Kling v1.6 Pro, alta qualità'
       },
       { 
-        provider: 'AIML (Runway)', 
+        provider: 'AI/ML (Runway)', 
         logo: '🤖', 
         price: '$0.50',
         unit: '/5s video',
@@ -156,16 +156,16 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Gen-3 Alpha Turbo'
       },
       { 
-        provider: 'AIML (Kling)', 
+        provider: 'AI/ML (Kling)', 
         logo: '🤖', 
         price: '$0.80',
         unit: '/5s video',
         quality: 'high',
         speed: 'medium',
-        notes: 'Kling via AIML gateway'
+        notes: 'Kling via gateway AI/ML'
       },
       { 
-        provider: 'AIML (Veo)', 
+        provider: 'AI/ML (Veo)', 
         logo: '🤖', 
         price: '$1.20',
         unit: '/5s video',
@@ -181,7 +181,7 @@ const PRICING_DATA: OperationPricing[] = [
     label: 'Generazione Immagini',
     providers: [
       { 
-        provider: 'AIML (FLUX)', 
+        provider: 'AI/ML (FLUX)', 
         logo: '🤖', 
         price: '$0.06',
         unit: '/immagine',
@@ -191,7 +191,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'FLUX 1.1 Pro, fotorealistico'
       },
       { 
-        provider: 'AIML (DALL-E 3)', 
+        provider: 'AI/ML (DALL-E 3)', 
         logo: '🤖', 
         price: '$0.04',
         unit: '/immagine',
@@ -200,7 +200,7 @@ const PRICING_DATA: OperationPricing[] = [
         notes: 'Ottimo per illustrazioni'
       },
       { 
-        provider: 'AIML (SDXL)', 
+        provider: 'AI/ML (SDXL)', 
         logo: '🤖', 
         price: '$0.02',
         unit: '/immagine',
@@ -448,8 +448,8 @@ export default function ProviderPriceComparison() {
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
           <p>
-            I prezzi sono indicativi e basati sulle tariffe pubblicate a gennaio 2026. 
-            Consulta i siti ufficiali per i prezzi aggiornati. AIML API offre prezzi variabili 
+            I prezzi sono indicativi e basati sulle tariffe pubblicate a gennaio 2026.
+            Consulta i siti ufficiali per i prezzi aggiornati. AI/ML API offre prezzi variabili
             in base al modello selezionato.
           </p>
         </div>

@@ -48,7 +48,7 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   },
   aiml: {
     id: 'aiml',
-    name: 'AIML API',
+    name: 'AI/ML API',
     description: 'Gateway unificato per 400+ modelli AI',
     logo: '🤖',
     supportedOperations: [
