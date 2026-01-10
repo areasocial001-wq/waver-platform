@@ -19,6 +19,7 @@ import {
   Eye, Clapperboard, Sparkles, Monitor, Save, FolderOpen, Zap, Waves,
   Music2, Mic, CloudLightning
 } from "lucide-react";
+import { ActiveProviderIndicator } from "@/components/ActiveProviderIndicator";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -946,17 +947,22 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Film className="h-6 w-6" />
-            JSON2Video Editor
-            {currentProjectId && (
-              <Badge variant="outline" className="ml-2">{projectName}</Badge>
-            )}
-          </h2>
-          <p className="text-muted-foreground">
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <Film className="h-6 w-6" />
+              JSON2Video Editor
+              {currentProjectId && (
+                <Badge variant="outline" className="ml-2">{projectName}</Badge>
+              )}
+            </h2>
+          </div>
+          <p className="text-muted-foreground text-sm">
             Concatena video, aggiungi sottotitoli, audio e transizioni
           </p>
+          <ActiveProviderIndicator 
+            operations={['video_generation', 'music_generation', 'sound_effects', 'text_to_speech']}
+          />
         </div>
         <div className="flex gap-2 flex-wrap">
           {/* Project Management Buttons */}
