@@ -35,7 +35,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
   const [transitionPrompt, setTransitionPrompt] = useState("");
   const [transitionStyle, setTransitionStyle] = useState("smooth");
   const [transitionSpeed, setTransitionSpeed] = useState<"fast" | "normal" | "slow">("normal");
-  const [videoProvider, setVideoProvider] = useState<"auto" | "kling" | "veo">("auto");
+  const [videoProvider, setVideoProvider] = useState<string>("auto");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
@@ -331,22 +331,41 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: Sto
           {/* Video Provider */}
           <div className="space-y-2">
             <Label>Provider Video</Label>
-            <Select value={videoProvider} onValueChange={(v) => setVideoProvider(v as "auto" | "kling" | "veo")}>
+            <Select value={videoProvider} onValueChange={setVideoProvider}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">🤖 Automatico (Kling/Veo)</SelectItem>
-                <SelectItem value="kling">🎬 Kling 2.1 - Transizioni fluide, end-frame</SelectItem>
-                <SelectItem value="veo">🌟 Google Veo 3.1 - Alta qualità, incluso</SelectItem>
+                <SelectItem value="auto">🤖 Automatico (migliore disponibile)</SelectItem>
+                
+                {/* Google Veo */}
+                <SelectItem value="google-veo">🌟 Google Veo 3.1 - Alta qualità, incluso</SelectItem>
+                
+                {/* AI/ML API Models */}
+                <SelectItem value="aiml-runway">🎬 AI/ML: Runway Gen-3 Alpha Turbo</SelectItem>
+                <SelectItem value="aiml-kling">🎬 AI/ML: Kling v1.6 Pro</SelectItem>
+                <SelectItem value="aiml-veo">🎬 AI/ML: Google Veo 3.1</SelectItem>
+                
+                {/* PiAPI Models */}
+                <SelectItem value="piapi-kling-2.6">🎥 PiAPI: Kling 2.6</SelectItem>
+                <SelectItem value="piapi-kling-2.5">🎥 PiAPI: Kling 2.5</SelectItem>
+                <SelectItem value="piapi-kling-2.1">🎥 PiAPI: Kling 2.1</SelectItem>
+                <SelectItem value="piapi-hailuo">🎥 PiAPI: Hailuo</SelectItem>
+                <SelectItem value="piapi-luma">🎥 PiAPI: Luma</SelectItem>
+                <SelectItem value="piapi-wan">🎥 PiAPI: Wan</SelectItem>
+                <SelectItem value="piapi-hunyuan">🎥 PiAPI: Hunyuan</SelectItem>
+                <SelectItem value="piapi-veo3">🎥 PiAPI: Veo 3</SelectItem>
+                <SelectItem value="piapi-sora2">🎥 PiAPI: Sora 2</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
               {videoProvider === "auto" 
-                ? "Selezione automatica del miglior provider disponibile (Kling per transizioni, Veo per singole)."
-                : videoProvider === "kling" 
-                  ? "Kling 2.1: Ottimo per transizioni con supporto end-frame. Richiede API key separata."
-                  : "Google Veo 3.1: Alta qualità, incluso con Lovable AI. Nessun costo extra."}
+                ? "Selezione automatica del miglior provider disponibile."
+                : videoProvider === "google-veo" 
+                  ? "Google Veo 3.1: Alta qualità, incluso con Lovable AI."
+                  : videoProvider.startsWith("aiml-")
+                    ? "AI/ML API: Gateway unificato per modelli video premium. Richiede AIML_API_KEY."
+                    : "PiAPI: Accesso diretto ai modelli video più recenti. Richiede PIAPI_API_KEY."}
             </p>
           </div>
 

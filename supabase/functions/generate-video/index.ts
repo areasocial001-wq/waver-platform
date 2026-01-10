@@ -49,18 +49,21 @@ serve(async (req) => {
   try {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
+    const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
     
     const hasValidGoogleKey = GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.trim().length > 0;
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
+    const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY or PIAPI_API_KEY");
+    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey) {
+      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, or AIML_API_KEY");
     }
     
     console.log("API credentials check:", {
       hasGoogleKey: hasValidGoogleKey,
-      hasPiAPIKey: hasValidPiAPIKey
+      hasPiAPIKey: hasValidPiAPIKey,
+      hasAIMLKey: hasValidAIMLKey
     });
 
     body = await req.json();
@@ -77,6 +80,77 @@ serve(async (req) => {
     // Check if it's a polling request
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
+      
+      // AI/ML API polling (format: aiml:model:task_id)
+      if (body.operationId.startsWith('aiml:')) {
+        if (!hasValidAIMLKey) {
+          throw new Error("AIML_API_KEY is not configured");
+        }
+        
+        const parts = body.operationId.split(':');
+        const taskId = parts.slice(2).join(':');
+        console.log("Polling AI/ML API task:", taskId);
+        
+        const aimlResponse = await fetch(`https://api.aimlapi.com/v2/generate/status/${taskId}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${AIML_API_KEY}`,
+          },
+        });
+
+        if (!aimlResponse.ok) {
+          const error = await aimlResponse.text();
+          throw new Error(`AI/ML API error: ${aimlResponse.status} - ${error}`);
+        }
+
+        const aimlData = await aimlResponse.json();
+        console.log("AI/ML API task status:", aimlData);
+        
+        const taskStatus = aimlData.status;
+        
+        if (taskStatus === "completed" || taskStatus === "succeeded") {
+          const videoUrl = aimlData.video_url || aimlData.output?.video_url || aimlData.result?.video_url;
+          
+          if (!videoUrl) {
+            console.error("AI/ML API completed but no video URL found:", aimlData);
+            throw new Error("Video completed but URL not found in response");
+          }
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (taskStatus === "failed" || taskStatus === "error") {
+          const errorMsg = aimlData.error || aimlData.message || "Unknown error";
+          throw new Error(`AI/ML API generation failed: ${errorMsg}`);
+        } else {
+          // Still processing
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
       
       // PiAPI polling (format: piapi:model:task_id)
       if (body.operationId.startsWith('piapi:')) {
@@ -566,6 +640,124 @@ serve(async (req) => {
         message: "Kling 2.6 Motion Control video generation started"
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ==================== AI/ML API PROVIDERS ====================
+    // Use AI/ML API for aiml-runway, aiml-kling, aiml-veo
+    if (preferredProvider?.startsWith('aiml-') && hasValidAIMLKey) {
+      const modelKey = preferredProvider.replace('aiml-', '') as 'runway' | 'kling' | 'veo';
+      const AIML_VIDEO_MODELS: Record<string, string> = {
+        runway: 'runway/gen-3-alpha-turbo',
+        kling: 'kling-ai/kling-v1.6-pro',
+        veo: 'google/veo-3.1',
+      };
+      const modelId = AIML_VIDEO_MODELS[modelKey] || AIML_VIDEO_MODELS['kling'];
+      
+      console.log(`Starting AI/ML API video generation with model: ${modelKey} (${modelId})`);
+      
+      const startImageData = start_image || image || image_url;
+      
+      // Build AI/ML API request
+      const aimlPayload: Record<string, unknown> = {
+        model: modelId,
+        prompt: prompt || "Smooth cinematic video",
+        duration: duration || 5,
+      };
+      
+      // Add image for image-to-video
+      if (type === "image_to_video" && startImageData) {
+        // AI/ML API accepts URLs, upload large base64 to storage first
+        if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
+          aimlPayload.image_url = startImageData;
+        } else {
+          const imgData = await getImageUrlForPiAPI(startImageData, "aiml-img");
+          if (imgData.url) {
+            aimlPayload.image_url = imgData.url;
+          } else {
+            // For smaller images, upload anyway to get URL
+            const url = await uploadToStorageAndGetUrl(startImageData, "aiml-img");
+            aimlPayload.image_url = url;
+          }
+        }
+      }
+      
+      console.log("Calling AI/ML API for video generation:", { model: modelId, hasImage: !!aimlPayload.image_url });
+      
+      const aimlResponse = await fetch("https://api.aimlapi.com/v2/generate/video", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${AIML_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(aimlPayload),
+      });
+
+      if (!aimlResponse.ok) {
+        const error = await aimlResponse.text();
+        console.error("AI/ML API error:", error);
+        throw new Error(`AI/ML API error: ${aimlResponse.status} - ${error}`);
+      }
+
+      const aimlData = await aimlResponse.json();
+      console.log("AI/ML API task started:", aimlData);
+      
+      const taskId = aimlData.id || aimlData.task_id;
+      if (!taskId) {
+        // If completed immediately
+        if (aimlData.video_url) {
+          if (generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: aimlData.video_url,
+                provider: `aiml-${modelKey}`
+              })
+              .eq('id', generationId);
+          }
+          
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: aimlData.video_url,
+            provider: `aiml-${modelKey}`
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+        throw new Error("AI/ML API did not return a task ID or video URL");
+      }
+
+      // Save task ID to database for polling
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `aiml:${modelKey}:${taskId}`,
+            provider: `aiml-${modelKey}`
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `aiml:${modelKey}:${taskId}`,
+        provider: `aiml-${modelKey}`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
       });
     }
 
