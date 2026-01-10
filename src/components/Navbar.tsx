@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -27,6 +27,7 @@ export const Navbar = () => {
   const isContentGeneratorPage = location.pathname === "/content-generator";
   const isFreepikPage = location.pathname === "/freepik";
   const isApiMonitoringPage = location.pathname === "/api-monitoring";
+  const isVideoEditorPage = location.pathname === "/video-editor";
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -70,7 +71,7 @@ export const Navbar = () => {
           <span className="text-sm text-muted-foreground hidden sm:inline">
             {user.email}
           </span>
-          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage ? (
+          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage ? (
             <Button
               variant="outline"
               size="sm"
@@ -126,6 +127,15 @@ export const Navbar = () => {
               >
                 <Activity className="w-4 h-4 mr-2" />
                 API
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/video-editor")}
+                className="bg-card hover:bg-accent text-foreground border-border"
+              >
+                <Film className="w-4 h-4 mr-2" />
+                Editor
               </Button>
             </>
           )}

@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { VideoGenerationCard } from "./VideoGenerationCard";
-import { Video, Clock, Trash2 } from "lucide-react";
+import { Video, Clock, Trash2, Film, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,7 @@ interface StoryboardVideoBatchCardProps {
 
 export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo, onDelete }: StoryboardVideoBatchCardProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const navigate = useNavigate();
 
   const handleDeleteBatch = async () => {
     setIsDeleting(true);
@@ -91,11 +93,16 @@ export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo, onDelete 
   const completedCount = videos.filter(v => v.status === "completed").length;
   const totalCount = videos.length;
   const totalDuration = videos.reduce((sum, v) => sum + v.duration, 0);
+  const allCompleted = completedCount === totalCount && totalCount > 0;
 
   const statusColor = 
     completedCount === totalCount ? "bg-green-500/10 text-green-500 border-green-500/20" :
     videos.some(v => v.status === "failed") ? "bg-red-500/10 text-red-500 border-red-500/20" :
     "bg-blue-500/10 text-blue-500 border-blue-500/20";
+
+  const handleOpenEditor = () => {
+    navigate(`/video-editor?batchId=${batchId}`);
+  };
 
   const transitionIcons: Record<string, string> = {
     smooth: "🌊",
@@ -143,6 +150,18 @@ export const StoryboardVideoBatchCard = ({ batchId, videos, batchInfo, onDelete 
             <Badge variant="outline" className={statusColor}>
               {completedCount}/{totalCount} completati
             </Badge>
+            {allCompleted && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenEditor}
+                className="gap-1 bg-primary/10 hover:bg-primary/20 text-primary border-primary/30"
+              >
+                <Film className="h-4 w-4" />
+                Concatena Video
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
