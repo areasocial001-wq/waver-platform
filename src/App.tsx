@@ -13,6 +13,7 @@ import ContentGenerator from "./pages/ContentGenerator";
 import FreepikPage from "./pages/FreepikPage";
 import ApiMonitoring from "./pages/ApiMonitoring";
 import TalkingAvatarPage from "./pages/TalkingAvatar";
+import JSON2VideoPage from "./pages/JSON2VideoPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/freepik" element={<FreepikPage />} />
             <Route path="/api-monitoring" element={<ApiMonitoring />} />
             <Route path="/talking-avatar" element={<TalkingAvatarPage />} />
+            <Route path="/video-editor" element={<JSON2VideoPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

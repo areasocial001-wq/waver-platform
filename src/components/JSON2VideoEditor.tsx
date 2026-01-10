@@ -793,6 +793,69 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
               {/* Audio settings */}
               <TabsContent value="audio" className="space-y-4 mt-4">
                 <div className="space-y-4">
+                  {/* Local audio upload */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Music className="h-4 w-4" />
+                      Carica Audio Locale
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="audio/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          
+                          if (file.size > 50 * 1024 * 1024) {
+                            toast.error("File troppo grande (max 50MB)");
+                            return;
+                          }
+                          
+                          // Upload to Supabase storage
+                          const fileName = `audio/${Date.now()}-${file.name}`;
+                          const { data, error } = await supabase.storage
+                            .from("generated-videos")
+                            .upload(fileName, file, {
+                              contentType: file.type,
+                              upsert: true,
+                            });
+                          
+                          if (error) {
+                            toast.error("Errore upload: " + error.message);
+                            return;
+                          }
+                          
+                          const { data: urlData } = supabase.storage
+                            .from("generated-videos")
+                            .getPublicUrl(fileName);
+                          
+                          setAudioTrack({
+                            src: urlData.publicUrl,
+                            volume: 0.5,
+                            fadeIn: 0,
+                            fadeOut: 2,
+                          });
+                          toast.success("Audio caricato!");
+                        }}
+                        className="flex-1"
+                      />
+                      {audioTrack && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setAudioTrack(null)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Oppure inserisci un URL diretto sotto
+                    </p>
+                  </div>
+
+                  {/* URL input */}
                   <div className="space-y-2">
                     <Label>URL Audio di Sottofondo</Label>
                     <Input
@@ -809,6 +872,16 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete }: JSON2Vi
 
                   {audioTrack && (
                     <>
+                      {/* Audio preview */}
+                      <div className="space-y-2">
+                        <Label>Anteprima Audio</Label>
+                        <audio 
+                          controls 
+                          src={audioTrack.src} 
+                          className="w-full h-10"
+                        />
+                      </div>
+
                       <div className="space-y-2">
                         <Label>Volume</Label>
                         <div className="flex items-center gap-2">
