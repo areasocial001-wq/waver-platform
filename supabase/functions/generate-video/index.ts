@@ -408,11 +408,96 @@ serve(async (req) => {
       return data;
     };
 
+    // Helper to upload base64 to storage and get URL (for large images)
+    const uploadToStorageAndGetUrl = async (base64Data: string, prefix: string = "temp"): Promise<string> => {
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+      // Extract mime type and raw base64
+      let mimeType = 'image/jpeg';
+      let rawBase64 = base64Data;
+      
+      if (base64Data.startsWith('data:')) {
+        const mimeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
+        if (mimeMatch) {
+          mimeType = mimeMatch[1];
+          rawBase64 = base64Data.split(',')[1];
+        }
+      }
+
+      // Convert base64 to Uint8Array
+      const binaryString = atob(rawBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      // Generate unique filename
+      const ext = mimeType.split('/')[1] || 'jpg';
+      const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+      const filePath = `temp-images/${fileName}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabaseClient.storage
+        .from('generated-videos')
+        .upload(filePath, bytes, {
+          contentType: mimeType,
+          upsert: true
+        });
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw new Error(`Failed to upload image: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseClient.storage
+        .from('generated-videos')
+        .getPublicUrl(filePath);
+
+      console.log("Uploaded image to storage:", urlData.publicUrl);
+      return urlData.publicUrl;
+    };
+
+    // Helper to check if base64 is too large (>2MB)
+    const isBase64TooLarge = (base64: string): boolean => {
+      const rawBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
+      // Base64 increases size by ~33%, so 2MB raw = ~2.66MB base64
+      // PiAPI limit seems to be around 10MB total payload, be conservative
+      return rawBase64.length > 2_000_000; // ~1.5MB raw image
+    };
+
+    // Helper to get image URL for PiAPI (upload if too large)
+    const getImageUrlForPiAPI = async (imageData: string, prefix: string = "img"): Promise<{ url?: string; base64?: string }> => {
+      if (!imageData) return {};
+      
+      if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
+        // Already a URL
+        return { url: imageData };
+      }
+      
+      // Check if base64 is too large
+      if (isBase64TooLarge(imageData)) {
+        console.log("Image is too large for direct base64, uploading to storage...");
+        const url = await uploadToStorageAndGetUrl(imageData, prefix);
+        return { url };
+      }
+      
+      // Small enough for direct base64
+      return { base64: extractBase64(imageData) };
+    };
+
     // ==================== KLING 2.6 MOTION CONTROL ====================
     if (motion_control && motion_video && hasValidPiAPIKey) {
       console.log("Starting Kling 2.6 Motion Control generation");
       
       const startImageData = start_image || image || image_url;
+      
+      // Handle large images by uploading to storage
+      const startImgData = await getImageUrlForPiAPI(startImageData, "motion-start");
+      const motionVideoData = await getImageUrlForPiAPI(motion_video, "motion-video");
       
       // Build motion control payload for PIAPI
       const motionControlPayload: any = {
@@ -420,10 +505,10 @@ serve(async (req) => {
         task_type: "motion_control",
         input: {
           prompt: prompt || "Smooth motion transfer",
-          image_url: startImageData.startsWith('data:') ? undefined : startImageData,
-          image: startImageData.startsWith('data:') ? extractBase64(startImageData) : undefined,
-          motion_video_url: motion_video.startsWith('data:') ? undefined : motion_video,
-          motion_video: motion_video.startsWith('data:') ? extractBase64(motion_video) : undefined,
+          image_url: startImgData.url,
+          image: startImgData.base64,
+          motion_video_url: motionVideoData.url,
+          motion_video: motionVideoData.base64,
           character_orientation: character_orientation || "video",
           keep_original_sound: keep_original_sound !== false,
           model_name: "kling-v2-6",
@@ -546,21 +631,22 @@ serve(async (req) => {
         piApiPayload.input.mode = modelConfig.mode;
       }
       
-      // Add images for image-to-video
+      // Add images for image-to-video (handle large images by uploading to storage)
       if (type === "image_to_video" && startImageData) {
-        // PiAPI accepts base64 or URLs
-        if (startImageData.startsWith('data:')) {
-          piApiPayload.input.image = extractBase64(startImageData);
-        } else {
-          piApiPayload.input.image_url = startImageData;
+        const startImgData = await getImageUrlForPiAPI(startImageData, "start");
+        if (startImgData.url) {
+          piApiPayload.input.image_url = startImgData.url;
+        } else if (startImgData.base64) {
+          piApiPayload.input.image = startImgData.base64;
         }
         
         // Add end image if provided (for transitions)
         if (end_image) {
-          if (end_image.startsWith('data:')) {
-            piApiPayload.input.tail_image = extractBase64(end_image);
-          } else {
-            piApiPayload.input.tail_image_url = end_image;
+          const endImgData = await getImageUrlForPiAPI(end_image, "end");
+          if (endImgData.url) {
+            piApiPayload.input.tail_image_url = endImgData.url;
+          } else if (endImgData.base64) {
+            piApiPayload.input.tail_image = endImgData.base64;
           }
         }
       }
@@ -713,18 +799,21 @@ serve(async (req) => {
         piApiPayload.input.mode = modelConfig.mode;
       }
       
+      // Handle large images by uploading to storage
       if (type === "image_to_video" && startImageData) {
-        if (startImageData.startsWith('data:')) {
-          piApiPayload.input.image = extractBase64(startImageData);
-        } else {
-          piApiPayload.input.image_url = startImageData;
+        const startImgData = await getImageUrlForPiAPI(startImageData, "start");
+        if (startImgData.url) {
+          piApiPayload.input.image_url = startImgData.url;
+        } else if (startImgData.base64) {
+          piApiPayload.input.image = startImgData.base64;
         }
         
         if (end_image) {
-          if (end_image.startsWith('data:')) {
-            piApiPayload.input.tail_image = extractBase64(end_image);
-          } else {
-            piApiPayload.input.tail_image_url = end_image;
+          const endImgData = await getImageUrlForPiAPI(end_image, "end");
+          if (endImgData.url) {
+            piApiPayload.input.tail_image_url = endImgData.url;
+          } else if (endImgData.base64) {
+            piApiPayload.input.tail_image = endImgData.base64;
           }
         }
       }
