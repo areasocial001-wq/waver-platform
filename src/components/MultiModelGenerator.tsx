@@ -10,7 +10,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Play, Pause, RotateCcw, Video, Check, X, Clock, Sparkles, Download, FileText } from 'lucide-react';
+import { Loader2, Play, Pause, RotateCcw, Check, X, Clock, Sparkles, FileText } from 'lucide-react';
+import { VIDEO_PROVIDERS, VideoProviderType, getGroupLabel } from '@/lib/videoProviderConfig';
+import { ProviderBadge } from '@/components/ProviderBadge';
 
 interface MultiModelGeneratorProps {
   open: boolean;
@@ -31,45 +33,16 @@ interface GenerationResult {
   generationId?: string;
 }
 
-type Provider = 'google-veo' | 'aiml-runway' | 'aiml-kling' | 'piapi-kling-2.5' | 'freepik';
-
-interface ProviderConfig {
-  id: Provider;
-  name: string;
-  description: string;
-  estimatedTime: string;
-  supportedDurations: number[];
-}
-
-const PROVIDERS: ProviderConfig[] = [
-  {
-    id: 'google-veo',
-    name: 'Google Veo 3.1',
-    description: 'Alta qualità, audio nativo (API diretta)',
-    estimatedTime: '~90s',
-    supportedDurations: [4, 6, 8],
-  },
-  {
-    id: 'aiml-runway',
-    name: 'AI/ML: Runway Gen-3',
-    description: 'Gen-3 Alpha Turbo via gateway AI/ML',
-    estimatedTime: '~2-4min',
-    supportedDurations: [5, 10],
-  },
-  {
-    id: 'aiml-kling',
-    name: 'AI/ML: Kling v1.6 Pro',
-    description: 'Kling premium via gateway AI/ML',
-    estimatedTime: '~3-5min',
-    supportedDurations: [5, 10],
-  },
-  {
-    id: 'piapi-kling-2.5',
-    name: 'PiAPI: Kling 2.5',
-    description: 'Transizioni fluide, buon rapporto qualità/prezzo',
-    estimatedTime: '~3-5min',
-    supportedDurations: [5, 10],
-  },
+// Providers disponibili per multi-model generation
+const MULTI_MODEL_PROVIDERS: VideoProviderType[] = [
+  'google-veo',
+  'aiml-runway',
+  'aiml-kling',
+  'aiml-veo',
+  'piapi-kling-2.5',
+  'piapi-kling-2.6',
+  'piapi-hailuo',
+  'freepik',
 ];
 
 export const MultiModelGenerator = ({
@@ -81,13 +54,13 @@ export const MultiModelGenerator = ({
   onResultsUpdate,
   onOpenReport,
 }: MultiModelGeneratorProps) => {
-  const [selectedProviders, setSelectedProviders] = useState<Provider[]>(['veo', 'kling']);
+  const [selectedProviders, setSelectedProviders] = useState<VideoProviderType[]>(['google-veo', 'piapi-kling-2.5']);
   const [prompt, setPrompt] = useState(optimizedPrompt || panelCaption || '');
   const [duration, setDuration] = useState('5');
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState<GenerationResult[]>([]);
 
-  const toggleProvider = (provider: Provider) => {
+  const toggleProvider = (provider: VideoProviderType) => {
     setSelectedProviders(prev =>
       prev.includes(provider)
         ? prev.filter(p => p !== provider)
@@ -113,7 +86,7 @@ export const MultiModelGenerator = ({
 
     setIsGenerating(true);
     const initialResults = selectedProviders.map(provider => {
-      const providerInfo = PROVIDERS.find(p => p.id === provider);
+      const providerInfo = VIDEO_PROVIDERS[provider];
       return {
         provider,
         providerName: providerInfo?.name || provider,
@@ -125,7 +98,7 @@ export const MultiModelGenerator = ({
 
     // Start all generations in parallel
     const generationPromises = selectedProviders.map(async (provider) => {
-      const providerInfo = PROVIDERS.find(p => p.id === provider);
+      const providerInfo = VIDEO_PROVIDERS[provider];
       try {
         // Update status to processing
         setResults(prev => {
@@ -149,6 +122,7 @@ export const MultiModelGenerator = ({
             image_url: imageUrl,
             duration: parseInt(duration),
             status: 'processing',
+            provider: provider,
           })
           .select()
           .single();
@@ -218,10 +192,6 @@ export const MultiModelGenerator = ({
     toast.success('Generazione avviata! Controlla lo storico per i risultati.');
   };
 
-  const getProviderInfo = (providerId: string) => {
-    return PROVIDERS.find(p => p.id === providerId);
-  };
-
   const getStatusIcon = (status: GenerationResult['status']) => {
     switch (status) {
       case 'pending':
@@ -277,35 +247,41 @@ export const MultiModelGenerator = ({
             {/* Provider Selection */}
             <div className="space-y-3">
               <Label>Seleziona Provider</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {PROVIDERS.map((provider) => (
-                  <Card
-                    key={provider.id}
-                    className={`p-4 cursor-pointer transition-all ${
-                      selectedProviders.includes(provider.id)
-                        ? 'ring-2 ring-primary bg-primary/5'
-                        : 'hover:bg-muted/50'
-                    }`}
-                    onClick={() => toggleProvider(provider.id)}
-                  >
-                    <div className="flex items-start gap-3">
-                      <Checkbox
-                        checked={selectedProviders.includes(provider.id)}
-                        onCheckedChange={() => toggleProvider(provider.id)}
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{provider.name}</p>
-                        <p className="text-xs text-muted-foreground">{provider.description}</p>
-                        <div className="flex gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {provider.estimatedTime}
-                          </Badge>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {MULTI_MODEL_PROVIDERS.map((providerId) => {
+                  const provider = VIDEO_PROVIDERS[providerId];
+                  return (
+                    <Card
+                      key={providerId}
+                      className={`p-4 cursor-pointer transition-all ${
+                        selectedProviders.includes(providerId)
+                          ? 'ring-2 ring-primary bg-primary/5'
+                          : 'hover:bg-muted/50'
+                      }`}
+                      onClick={() => toggleProvider(providerId)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={selectedProviders.includes(providerId)}
+                          onCheckedChange={() => toggleProvider(providerId)}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{provider.name}</p>
+                            <ProviderBadge providerId={providerId} size="sm" showGroup />
+                          </div>
+                          <p className="text-xs text-muted-foreground">{provider.description}</p>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {provider.estimatedTime}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 
@@ -436,12 +412,12 @@ export const MultiModelGenerator = ({
                   'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
                 }`}>
                   {results.map((result) => {
-                    const provider = getProviderInfo(result.provider);
+                    const provider = VIDEO_PROVIDERS[result.provider as VideoProviderType];
                     return (
                       <Card key={result.provider} className="p-4 flex flex-col">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm">{provider?.name}</p>
+                            <p className="font-medium text-sm">{provider?.name || result.providerName}</p>
                             {getStatusIcon(result.status)}
                           </div>
                           <Badge
@@ -487,32 +463,6 @@ export const MultiModelGenerator = ({
                             </div>
                           )}
                         </div>
-
-                        {/* Download button for completed videos */}
-                        {result.status === 'completed' && result.videoUrl && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-3"
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(result.videoUrl!);
-                                const blob = await response.blob();
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = `video-${result.provider}-${Date.now()}.mp4`;
-                                a.click();
-                                URL.revokeObjectURL(url);
-                              } catch (error) {
-                                toast.error('Errore durante il download');
-                              }
-                            }}
-                          >
-                            <Download className="h-4 w-4 mr-1" />
-                            Scarica
-                          </Button>
-                        )}
                       </Card>
                     );
                   })}

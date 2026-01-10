@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AddVoiceoverDialog } from "./AddVoiceoverDialog";
 import { VideoAudioCombiner } from "./VideoAudioCombiner";
+import { ProviderBadge } from "./ProviderBadge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -420,12 +421,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                 })}
               </span>
               {generation.provider && (
-                <Badge 
-                  variant="secondary" 
-                  className="text-[10px] px-1.5 py-0 h-5 font-medium uppercase tracking-wide"
-                >
-                  {generation.provider}
-                </Badge>
+                <ProviderBadge providerId={generation.provider} size="sm" />
               )}
             </div>
             <div className="flex items-center gap-2">
