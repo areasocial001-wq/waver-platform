@@ -501,7 +501,13 @@ serve(async (req) => {
     };
 
     // Helper to upload base64 to storage and get URL (for large images)
-    const uploadToStorageAndGetUrl = async (base64Data: string, prefix: string = "temp"): Promise<string> => {
+    // NOTE: third-party providers may not be able to access our public storage URLs depending on bucket/policies.
+    // In those cases we can return a signed URL instead.
+    const uploadToStorageAndGetUrl = async (
+      base64Data: string,
+      prefix: string = "temp",
+      opts: { signed?: boolean; signedExpiresInSec?: number } = {}
+    ): Promise<string> => {
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -510,7 +516,7 @@ serve(async (req) => {
       // Extract mime type and raw base64
       let mimeType = 'image/jpeg';
       let rawBase64 = base64Data;
-      
+
       if (base64Data.startsWith('data:')) {
         const mimeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
         if (mimeMatch) {
@@ -536,7 +542,7 @@ serve(async (req) => {
         .from('generated-videos')
         .upload(filePath, bytes, {
           contentType: mimeType,
-          upsert: true
+          upsert: true,
         });
 
       if (uploadError) {
@@ -544,13 +550,63 @@ serve(async (req) => {
         throw new Error(`Failed to upload image: ${uploadError.message}`);
       }
 
-      // Get public URL
+      // Signed URL (preferred for external providers)
+      if (opts.signed) {
+        const expiresIn = opts.signedExpiresInSec ?? 60 * 60; // 1h
+        const { data: signedData, error: signedErr } = await supabaseClient.storage
+          .from('generated-videos')
+          .createSignedUrl(filePath, expiresIn);
+
+        if (signedErr) {
+          console.warn("createSignedUrl failed, falling back to public URL:", signedErr);
+        } else if (signedData?.signedUrl) {
+          console.log("Uploaded image to storage (signed URL):", signedData.signedUrl);
+          return signedData.signedUrl;
+        }
+      }
+
+      // Public URL
       const { data: urlData } = supabaseClient.storage
         .from('generated-videos')
         .getPublicUrl(filePath);
 
-      console.log("Uploaded image to storage:", urlData.publicUrl);
+      console.log("Uploaded image to storage (public URL):", urlData.publicUrl);
       return urlData.publicUrl;
+    };
+
+    // If a provider can't fetch our public storage URL, try converting it to a signed URL.
+    const tryConvertPublicStorageUrlToSigned = async (
+      url: string,
+      opts: { expiresInSec?: number } = {}
+    ): Promise<string | null> => {
+      try {
+        const marker = '/storage/v1/object/public/generated-videos/';
+        const idx = url.indexOf(marker);
+        if (idx === -1) return null;
+
+        const objectPath = url.substring(idx + marker.length);
+        if (!objectPath) return null;
+
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        const expiresIn = opts.expiresInSec ?? 60 * 60; // 1h
+        const { data, error } = await supabaseClient.storage
+          .from('generated-videos')
+          .createSignedUrl(objectPath, expiresIn);
+
+        if (error) {
+          console.warn('Failed to create signed URL from public URL:', error);
+          return null;
+        }
+
+        return data?.signedUrl ?? null;
+      } catch (e) {
+        console.warn('tryConvertPublicStorageUrlToSigned error:', e);
+        return null;
+      }
     };
 
     // Helper to check if base64 is too large (>2MB)
@@ -782,18 +838,29 @@ serve(async (req) => {
       
       // Add image for image-to-video
       if (type === "image_to_video" && startImageData) {
-        // AI/ML API accepts URLs, upload large base64 to storage first
+        // AI/ML API expects a URL. If we receive base64, upload it and use a signed URL.
         if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
-          aimlPayload.image_url = startImageData;
-        } else {
-          const imgData = await getImageUrlForPiAPI(startImageData, "aiml-img");
-          if (imgData.url) {
-            aimlPayload.image_url = imgData.url;
-          } else {
-            // For smaller images, upload anyway to get URL
-            const url = await uploadToStorageAndGetUrl(startImageData, "aiml-img");
-            aimlPayload.image_url = url;
+          // If it's our public storage URL, AI/ML API may fail to fetch it: try signing.
+          let resolvedUrl = startImageData;
+          try {
+            const headOk = await fetch(resolvedUrl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
+            if (!headOk) {
+              const signed = await tryConvertPublicStorageUrlToSigned(resolvedUrl, { expiresInSec: 60 * 60 });
+              if (signed) {
+                console.log('[AI/ML API] Replacing public storage URL with signed URL');
+                resolvedUrl = signed;
+              }
+            }
+          } catch (e) {
+            console.warn('[AI/ML API] HEAD check failed, continuing with URL:', e);
           }
+          aimlPayload.image_url = resolvedUrl;
+        } else {
+          const signedUrl = await uploadToStorageAndGetUrl(startImageData, "aiml-img", {
+            signed: true,
+            signedExpiresInSec: 60 * 60,
+          });
+          aimlPayload.image_url = signedUrl;
         }
       }
       
