@@ -584,8 +584,12 @@ serve(async (req) => {
         const idx = url.indexOf(marker);
         if (idx === -1) return null;
 
-        const objectPath = url.substring(idx + marker.length);
+        let objectPath = url.substring(idx + marker.length);
         if (!objectPath) return null;
+        // Strip query string if present
+        if (objectPath.includes('?')) {
+          objectPath = objectPath.split('?')[0];
+        }
 
         const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -602,6 +606,9 @@ serve(async (req) => {
           return null;
         }
 
+        if (data?.signedUrl) {
+          console.log('[AI/ML API] Created signed URL for storage object:', objectPath);
+        }
         return data?.signedUrl ?? null;
       } catch (e) {
         console.warn('tryConvertPublicStorageUrlToSigned error:', e);
@@ -840,21 +847,14 @@ serve(async (req) => {
       if (type === "image_to_video" && startImageData) {
         // AI/ML API expects a URL. If we receive base64, upload it and use a signed URL.
         if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
-          // If it's our public storage URL, AI/ML API may fail to fetch it: try signing.
-          let resolvedUrl = startImageData;
-          try {
-            const headOk = await fetch(resolvedUrl, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
-            if (!headOk) {
-              const signed = await tryConvertPublicStorageUrlToSigned(resolvedUrl, { expiresInSec: 60 * 60 });
-              if (signed) {
-                console.log('[AI/ML API] Replacing public storage URL with signed URL');
-                resolvedUrl = signed;
-              }
-            }
-          } catch (e) {
-            console.warn('[AI/ML API] HEAD check failed, continuing with URL:', e);
+          // If it's our storage URL, ALWAYS prefer a signed URL (some providers can't fetch the public endpoint).
+          const signed = await tryConvertPublicStorageUrlToSigned(startImageData, { expiresInSec: 60 * 60 });
+          if (signed) {
+            console.log('[AI/ML API] Using signed URL for image_url');
+            aimlPayload.image_url = signed;
+          } else {
+            aimlPayload.image_url = startImageData;
           }
-          aimlPayload.image_url = resolvedUrl;
         } else {
           const signedUrl = await uploadToStorageAndGetUrl(startImageData, "aiml-img", {
             signed: true,
