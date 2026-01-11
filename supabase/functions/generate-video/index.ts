@@ -146,7 +146,18 @@ serve(async (req) => {
             status: 200,
           });
         } else if (taskStatus === "failed" || taskStatus === "error") {
-          const errorMsg = aimlData.error || aimlData.message || "Unknown error";
+          // Properly serialize error object to string
+          let errorMsg = "Unknown error";
+          if (aimlData.error) {
+            if (typeof aimlData.error === 'object') {
+              errorMsg = JSON.stringify(aimlData.error);
+            } else {
+              errorMsg = String(aimlData.error);
+            }
+          } else if (aimlData.message) {
+            errorMsg = String(aimlData.message);
+          }
+          console.error(`[AI/ML API POLL] Generation failed:`, errorMsg);
           throw new Error(`AI/ML API generation failed: ${errorMsg}`);
         } else {
           // Still processing
