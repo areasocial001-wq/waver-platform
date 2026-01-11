@@ -91,7 +91,7 @@ serve(async (req) => {
         const taskId = parts.slice(2).join(':');
         console.log("Polling AI/ML API task:", taskId);
         
-        const aimlResponse = await fetch(`https://api.aimlapi.com/v2/generate/status/${taskId}`, {
+        const aimlResponse = await fetch(`https://api.aimlapi.com/v2/video/generations?generation_id=${taskId}`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${AIML_API_KEY}`,
@@ -684,7 +684,7 @@ serve(async (req) => {
       
       console.log("Calling AI/ML API for video generation:", { model: modelId, hasImage: !!aimlPayload.image_url });
       
-      const aimlResponse = await fetch("https://api.aimlapi.com/v2/generate/video", {
+      const aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${AIML_API_KEY}`,
