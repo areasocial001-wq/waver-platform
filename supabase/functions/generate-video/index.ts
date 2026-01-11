@@ -123,12 +123,20 @@ serve(async (req) => {
         const taskStatus = aimlData.status;
         
         if (taskStatus === "completed" || taskStatus === "succeeded") {
-          const videoUrl = aimlData.video_url || aimlData.output?.video_url || aimlData.result?.video_url;
+          // Check all possible video URL locations in the response
+          const videoUrl = aimlData.video_url || 
+                          aimlData.video?.url || 
+                          aimlData.output?.video_url || 
+                          aimlData.result?.video_url ||
+                          aimlData.output?.url ||
+                          aimlData.result?.url;
           
           if (!videoUrl) {
             console.error("AI/ML API completed but no video URL found:", aimlData);
             throw new Error("Video completed but URL not found in response");
           }
+          
+          console.log(`[AI/ML API POLL] Video URL found: ${videoUrl}`);
           
           if (body.generationId) {
             const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
