@@ -12,6 +12,7 @@ import { useProviderPreference } from "@/hooks/useProviderPreference";
 import { VideoProviderSelect } from "@/components/VideoProviderSelect";
 import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
+import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -29,8 +30,14 @@ export const ImageToVideoForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
 
+  // Fetch API key status from backend
+  const { status: apiKeyStatus } = useApiKeyStatus();
+
   // Provider corrente
   const currentProvider = VIDEO_PROVIDERS[preferredProvider as VideoProviderType] || VIDEO_PROVIDERS.auto;
+
+  // Check if API key is missing for selected provider based on actual backend status
+  const isMissingAimlKey = currentProvider.group === 'aiml' && !apiKeyStatus.hasAIMLKey;
 
   // Aggiorna durata quando cambia il provider
   useEffect(() => {
@@ -347,7 +354,7 @@ export const ImageToVideoForm = () => {
       </div>
 
       {/* API Key Missing Banner */}
-      {currentProvider.requiresApiKey && currentProvider.group === 'aiml' && (
+      {isMissingAimlKey && (
         <ApiKeyMissingBanner
           apiName="AI/ML API"
           description="Per usare i modelli AI/ML (Runway, Kling, Veo) configura la chiave API"

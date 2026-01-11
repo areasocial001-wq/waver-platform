@@ -15,6 +15,7 @@ import { useProviderPreference } from "@/hooks/useProviderPreference";
 import { VideoProviderSelect } from "@/components/VideoProviderSelect";
 import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
+import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 
 interface PiAPIBalance {
   credits: number;
@@ -47,6 +48,9 @@ export const TextToVideoForm = () => {
   const [videoTitle, setVideoTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch API key status from backend
+  const { status: apiKeyStatus } = useApiKeyStatus();
+
   // Fetch PiAPI balance on mount and when provider changes
   const fetchPiapiBalance = async () => {
     setIsLoadingBalance(true);
@@ -72,14 +76,8 @@ export const TextToVideoForm = () => {
   // Provider corrente
   const currentProvider = VIDEO_PROVIDERS[preferredProvider as VideoProviderType] || VIDEO_PROVIDERS.auto;
 
-  // Check if API key is missing for selected provider
-  const isMissingApiKey = useMemo(() => {
-    if (preferredProvider === 'auto') return false;
-    const requiredKey = currentProvider.requiresApiKey;
-    if (!requiredKey) return false;
-    // We can't check secrets client-side, so just show banner for certain providers
-    return false; // Will be shown based on provider group
-  }, [preferredProvider, currentProvider]);
+  // Check if API key is missing for selected provider based on actual backend status
+  const isMissingAimlKey = currentProvider.group === 'aiml' && !apiKeyStatus.hasAIMLKey;
 
   // Aggiorna durata e risoluzione quando cambia il provider
   useEffect(() => {
@@ -367,7 +365,7 @@ export const TextToVideoForm = () => {
       </div>
 
       {/* API Key Missing Banner */}
-      {currentProvider.requiresApiKey && currentProvider.group === 'aiml' && (
+      {isMissingAimlKey && (
         <ApiKeyMissingBanner
           apiName="AI/ML API"
           description="Per usare i modelli AI/ML (Runway, Kling, Veo) configura la chiave API"

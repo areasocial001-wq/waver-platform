@@ -72,7 +72,14 @@ serve(async (req) => {
     // Handle health check requests
     if (body.healthCheck) {
       return new Response(
-        JSON.stringify({ status: 'ok', service: 'generate-video', hasPiAPIKey: hasValidPiAPIKey }),
+        JSON.stringify({ 
+          status: 'ok', 
+          service: 'generate-video', 
+          hasGoogleKey: hasValidGoogleKey,
+          hasPiAPIKey: hasValidPiAPIKey,
+          hasAIMLKey: hasValidAIMLKey,
+          hasFreepikKey: !!Deno.env.get("FREEPIK_API_KEY")?.trim()
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
