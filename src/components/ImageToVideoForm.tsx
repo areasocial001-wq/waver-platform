@@ -242,14 +242,15 @@ export const ImageToVideoForm = () => {
           : "Il video verrà generato. Attendi qualche istante..."
       });
 
-      // Generate video synchronously
+      // Generate video synchronously - include modelId for AI/ML API providers
       const requestBody: any = {
         type: "image_to_video",
         prompt: cinematicPrompt,
         start_image: startImagePreview,
         duration: parseInt(duration),
         generationId: generationData.id,
-        preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
+        preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
+        modelId: currentProvider.modelId, // Pass model ID for AI/ML API
       };
 
       // Add end image if provided

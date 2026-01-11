@@ -131,7 +131,8 @@ export const MultiModelGenerator = ({
 
         if (insertError) throw insertError;
 
-        // Call video generation
+        // Call video generation - pass modelId from config
+        const providerConfig = VIDEO_PROVIDERS[provider as VideoProviderType];
         const { data, error } = await supabase.functions.invoke('generate-video', {
           body: {
             type: 'image_to_video',
@@ -140,6 +141,7 @@ export const MultiModelGenerator = ({
             duration: parseInt(duration),
             generationId: genRecord.id,
             preferredProvider: provider,
+            modelId: providerConfig?.modelId, // Pass model ID for AI/ML API
           },
         });
 
