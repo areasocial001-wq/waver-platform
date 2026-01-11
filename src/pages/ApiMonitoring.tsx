@@ -8,6 +8,7 @@ import { UsageCharts } from "@/components/UsageCharts";
 import { LogViewer } from "@/components/LogViewer";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiAnalyticsDashboard } from "@/components/ApiAnalyticsDashboard";
+import { AIMLApiMonitor } from "@/components/AIMLApiMonitor";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 import { Activity } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,8 +40,9 @@ export default function ApiMonitoring() {
           </div>
 
           <Tabs defaultValue="status" className="space-y-6">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-lg grid-cols-4">
               <TabsTrigger value="status">Stato</TabsTrigger>
+              <TabsTrigger value="aiml">AI/ML API</TabsTrigger>
               <TabsTrigger value="analytics">Analytics</TabsTrigger>
               <TabsTrigger value="settings">Impostazioni</TabsTrigger>
             </TabsList>
@@ -62,6 +64,10 @@ export default function ApiMonitoring() {
 
               {/* Logs */}
               <LogViewer />
+            </TabsContent>
+
+            <TabsContent value="aiml" className="space-y-6">
+              <AIMLApiMonitor />
             </TabsContent>
 
             <TabsContent value="analytics" className="space-y-6">
