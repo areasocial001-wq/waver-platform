@@ -88,8 +88,14 @@ serve(async (req) => {
         }
         
         const parts = body.operationId.split(':');
+        const modelKey = parts[1];
         const taskId = parts.slice(2).join(':');
-        console.log("Polling AI/ML API task:", taskId);
+        
+        console.log(`[AI/ML API POLL] ========================================`);
+        console.log(`[AI/ML API POLL] Task ID: ${taskId}`);
+        console.log(`[AI/ML API POLL] Model Key: ${modelKey}`);
+        console.log(`[AI/ML API POLL] Endpoint: https://api.aimlapi.com/v2/video/generations?generation_id=${taskId}`);
+        console.log(`[AI/ML API POLL] ========================================`);
         
         const aimlResponse = await fetch(`https://api.aimlapi.com/v2/video/generations?generation_id=${taskId}`, {
           method: "GET",
@@ -100,11 +106,12 @@ serve(async (req) => {
 
         if (!aimlResponse.ok) {
           const error = await aimlResponse.text();
+          console.error(`[AI/ML API POLL] Error response: ${aimlResponse.status} - ${error}`);
           throw new Error(`AI/ML API error: ${aimlResponse.status} - ${error}`);
         }
 
         const aimlData = await aimlResponse.json();
-        console.log("AI/ML API task status:", aimlData);
+        console.log(`[AI/ML API POLL] Response:`, JSON.stringify(aimlData, null, 2));
         
         const taskStatus = aimlData.status;
         
@@ -644,17 +651,114 @@ serve(async (req) => {
     }
 
     // ==================== AI/ML API PROVIDERS ====================
-    // Use AI/ML API for aiml-runway, aiml-kling, aiml-veo
+    // Use AI/ML API for all aiml-* providers with dynamic model IDs
     if (preferredProvider?.startsWith('aiml-') && hasValidAIMLKey) {
-      const modelKey = preferredProvider.replace('aiml-', '') as 'runway' | 'kling' | 'veo';
-      const AIML_VIDEO_MODELS: Record<string, string> = {
-        runway: 'runway/gen-3-alpha-turbo',
-        kling: 'kling-ai/kling-v1.6-pro',
-        veo: 'google/veo-3.1',
+      // AI/ML API Model ID mapping - verified from official documentation
+      // https://docs.aimlapi.com/api-references/video-models
+      const AIML_MODEL_IDS: Record<string, { t2v: string; i2v: string }> = {
+        // Runway models
+        'runway-gen3-turbo': { t2v: 'gen3a_turbo', i2v: 'gen3a_turbo' },
+        'runway-gen4-turbo': { t2v: 'runway/gen4_turbo', i2v: 'runway/gen4_turbo' },
+        'runway-gen4-aleph': { t2v: 'runway/gen4_aleph', i2v: 'runway/gen4_aleph' },
+        'runway-act-two': { t2v: 'runway/act_two', i2v: 'runway/act_two' },
+        // Kling v1
+        'kling-v1-std': { t2v: 'kling-video/v1/standard/text-to-video', i2v: 'kling-video/v1/standard/image-to-video' },
+        'kling-v1-pro': { t2v: 'kling-video/v1/pro/text-to-video', i2v: 'kling-video/v1/pro/image-to-video' },
+        // Kling v1.6
+        'kling-v1.6-std': { t2v: 'kling-video/v1.6/standard/text-to-video', i2v: 'kling-video/v1.6/standard/image-to-video' },
+        'kling-v1.6-pro': { t2v: 'kling-video/v1.6/pro/text-to-video', i2v: 'kling-video/v1.6/pro/image-to-video' },
+        'kling-v1.6-pro-effects': { t2v: 'klingai/kling-video-v1.6-pro-effects', i2v: 'klingai/kling-video-v1.6-pro-effects' },
+        'kling-v1.6-multi-i2v': { t2v: 'kling-video/v1.6/standard/multi-image-to-video', i2v: 'kling-video/v1.6/standard/multi-image-to-video' },
+        // Kling v2
+        'kling-v2-master': { t2v: 'klingai/v2-master-text-to-video', i2v: 'klingai/v2-master-image-to-video' },
+        'kling-v2.1-std': { t2v: 'kling-video/v2.1/standard/text-to-video', i2v: 'kling-video/v2.1/standard/image-to-video' },
+        'kling-v2.1-pro': { t2v: 'kling-video/v2.1/pro/text-to-video', i2v: 'kling-video/v2.1/pro/image-to-video' },
+        'kling-v2.1-master': { t2v: 'klingai/v2.1-master-text-to-video', i2v: 'klingai/v2.1-master-image-to-video' },
+        'kling-v2.5-turbo-pro': { t2v: 'klingai/v2.5-turbo/pro/text-to-video', i2v: 'klingai/v2.5-turbo/pro/image-to-video' },
+        'kling-v2.6-pro': { t2v: 'klingai/video-v2-6-pro-text-to-video', i2v: 'klingai/video-v2-6-pro-image-to-video' },
+        'kling-o1': { t2v: 'klingai/video-o1-image-to-video', i2v: 'klingai/video-o1-image-to-video' },
+        // Luma Ray
+        'luma-ray-1.6': { t2v: 'luma/ray-1.6', i2v: 'luma/ray-1.6' },
+        'luma-ray-2': { t2v: 'luma/ray-2', i2v: 'luma/ray-2' },
+        'luma-ray-flash-2': { t2v: 'luma/ray-flash-2', i2v: 'luma/ray-flash-2' },
+        // Sora (OpenAI)
+        'sora-2-t2v': { t2v: 'sora-2-t2v', i2v: 'sora-2-t2v' },
+        'sora-2-i2v': { t2v: 'sora-2-i2v', i2v: 'sora-2-i2v' },
+        'sora-2-pro-t2v': { t2v: 'sora-2-pro-t2v', i2v: 'sora-2-pro-t2v' },
+        'sora-2-pro-i2v': { t2v: 'sora-2-pro-i2v', i2v: 'sora-2-pro-i2v' },
+        // MiniMax
+        'minimax-video-01': { t2v: 'video-01', i2v: 'video-01' },
+        'minimax-hailuo-02': { t2v: 'minimax/hailuo-02', i2v: 'minimax/hailuo-02' },
+        'minimax-hailuo-2.3': { t2v: 'minimax/hailuo-2.3', i2v: 'minimax/hailuo-2.3' },
+        'minimax-hailuo-2.3-fast': { t2v: 'minimax/hailuo-2.3-fast', i2v: 'minimax/hailuo-2.3-fast' },
+        // PixVerse
+        'pixverse-v5-t2v': { t2v: 'pixverse/v5/text-to-video', i2v: 'pixverse/v5/text-to-video' },
+        'pixverse-v5-i2v': { t2v: 'pixverse/v5/image-to-video', i2v: 'pixverse/v5/image-to-video' },
+        'pixverse-v5-transition': { t2v: 'pixverse/v5/transition', i2v: 'pixverse/v5/transition' },
+        'pixverse-v5.5-t2v': { t2v: 'pixverse/v5-5-text-to-video', i2v: 'pixverse/v5-5-text-to-video' },
+        'pixverse-v5.5-i2v': { t2v: 'pixverse/v5-5-image-to-video', i2v: 'pixverse/v5-5-image-to-video' },
+        // Google Veo
+        'veo2-t2v': { t2v: 'veo2', i2v: 'veo2' },
+        'veo2-i2v': { t2v: 'veo2/image-to-video', i2v: 'veo2/image-to-video' },
+        'veo3': { t2v: 'google/veo3', i2v: 'google/veo3' },
+        'veo3-i2v': { t2v: 'google/veo-3.0-i2v', i2v: 'google/veo-3.0-i2v' },
+        'veo3-fast': { t2v: 'google/veo-3.0-fast', i2v: 'google/veo-3.0-fast' },
+        'veo3-i2v-fast': { t2v: 'google/veo-3.0-i2v-fast', i2v: 'google/veo-3.0-i2v-fast' },
+        'veo3.1-t2v': { t2v: 'google/veo-3.1-t2v', i2v: 'google/veo-3.1-t2v' },
+        'veo3.1-i2v': { t2v: 'google/veo-3.1-i2v', i2v: 'google/veo-3.1-i2v' },
+        'veo3.1-t2v-fast': { t2v: 'google/veo-3.1-t2v-fast', i2v: 'google/veo-3.1-t2v-fast' },
+        'veo3.1-i2v-fast': { t2v: 'google/veo-3.1-i2v-fast', i2v: 'google/veo-3.1-i2v-fast' },
+        'veo3.1-ref-to-video': { t2v: 'google/veo-3.1-reference-to-video', i2v: 'google/veo-3.1-reference-to-video' },
+        'veo3.1-first-last-i2v': { t2v: 'google/veo-3.1-first-last-image-to-video', i2v: 'google/veo-3.1-first-last-image-to-video' },
+        // Alibaba Wan
+        'wan-2.1-t2v': { t2v: 'alibaba/wan-2.1-t2v', i2v: 'alibaba/wan-2.1-t2v' },
+        'wan-2.1-i2v': { t2v: 'alibaba/wan-2.1-i2v', i2v: 'alibaba/wan-2.1-i2v' },
+        'wan-2.5-t2v': { t2v: 'alibaba/wan-2.5-t2v', i2v: 'alibaba/wan-2.5-t2v' },
+        'wan-2.6-t2v': { t2v: 'alibaba/wan-2.6-t2v', i2v: 'alibaba/wan-2.6-t2v' },
+        'wan-2.6-i2v': { t2v: 'alibaba/wan-2.6-i2v', i2v: 'alibaba/wan-2.6-i2v' },
+        'wan-2.6-r2v': { t2v: 'alibaba/wan-2-6-r2v', i2v: 'alibaba/wan-2-6-r2v' },
+        // ByteDance Seedance
+        'seedance-lite-t2v': { t2v: 'bytedance/seedance-1-0-lite-t2v', i2v: 'bytedance/seedance-1-0-lite-t2v' },
+        'seedance-lite-i2v': { t2v: 'bytedance/seedance-1-0-lite-i2v', i2v: 'bytedance/seedance-1-0-lite-i2v' },
+        'seedance-pro-t2v': { t2v: 'bytedance/seedance-1-0-pro-t2v', i2v: 'bytedance/seedance-1-0-pro-t2v' },
+        'seedance-pro-i2v': { t2v: 'bytedance/seedance-1-0-pro-i2v', i2v: 'bytedance/seedance-1-0-pro-i2v' },
+        'omnihuman': { t2v: 'bytedance/omnihuman', i2v: 'bytedance/omnihuman' },
+        'omnihuman-1.5': { t2v: 'bytedance/omnihuman/v1.5', i2v: 'bytedance/omnihuman/v1.5' },
+        // Krea
+        'krea-wan-14b-t2v': { t2v: 'krea/krea-wan-14b/text-to-video', i2v: 'krea/krea-wan-14b/text-to-video' },
+        'krea-wan-14b-v2v': { t2v: 'krea/krea-wan-14b/video-to-video', i2v: 'krea/krea-wan-14b/video-to-video' },
+        // Kandinsky
+        'kandinsky5-t2v': { t2v: 'sber-ai/kandinsky5-t2v', i2v: 'sber-ai/kandinsky5-t2v' },
+        'kandinsky5-distill-t2v': { t2v: 'sber-ai/kandinsky5-distill-t2v', i2v: 'sber-ai/kandinsky5-distill-t2v' },
+        // VEED Fabric
+        'veed-fabric-1.0': { t2v: 'veed/fabric-1.0', i2v: 'veed/fabric-1.0' },
+        'veed-fabric-1.0-fast': { t2v: 'veed/fabric-1.0-fast', i2v: 'veed/fabric-1.0-fast' },
       };
-      const modelId = AIML_VIDEO_MODELS[modelKey] || AIML_VIDEO_MODELS['kling'];
       
-      console.log(`Starting AI/ML API video generation with model: ${modelKey} (${modelId})`);
+      // Extract model key from provider (e.g., "aiml-kling-v2.6-pro" -> "kling-v2.6-pro")
+      const modelKey = preferredProvider.replace('aiml-', '');
+      const isI2V = type === "image_to_video";
+      const modelConfig = AIML_MODEL_IDS[modelKey];
+      
+      // Use provided modelId from request body, or look up from mapping, or use default
+      let modelId = body.modelId;
+      if (!modelId && modelConfig) {
+        modelId = isI2V ? modelConfig.i2v : modelConfig.t2v;
+      }
+      if (!modelId) {
+        // Fallback to default
+        modelId = isI2V ? 'kling-video/v1.6/pro/image-to-video' : 'kling-video/v1.6/pro/text-to-video';
+        console.warn(`[AI/ML API] Unknown model key "${modelKey}", using fallback: ${modelId}`);
+      }
+      
+      console.log(`[AI/ML API] ========================================`);
+      console.log(`[AI/ML API] Starting video generation`);
+      console.log(`[AI/ML API] Provider: ${preferredProvider}`);
+      console.log(`[AI/ML API] Model Key: ${modelKey}`);
+      console.log(`[AI/ML API] Model ID: ${modelId}`);
+      console.log(`[AI/ML API] Type: ${type}`);
+      console.log(`[AI/ML API] Duration: ${duration || 5}s`);
+      console.log(`[AI/ML API] ========================================`);
       
       const startImageData = start_image || image || image_url;
       
@@ -682,7 +786,7 @@ serve(async (req) => {
         }
       }
       
-      console.log("Calling AI/ML API for video generation:", { model: modelId, hasImage: !!aimlPayload.image_url });
+      console.log(`[AI/ML API] Request payload:`, JSON.stringify(aimlPayload, null, 2));
       
       const aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
         method: "POST",
@@ -693,14 +797,23 @@ serve(async (req) => {
         body: JSON.stringify(aimlPayload),
       });
 
+      const responseText = await aimlResponse.text();
+      console.log(`[AI/ML API] Response status: ${aimlResponse.status}`);
+      console.log(`[AI/ML API] Response body: ${responseText}`);
+
       if (!aimlResponse.ok) {
-        const error = await aimlResponse.text();
-        console.error("AI/ML API error:", error);
-        throw new Error(`AI/ML API error: ${aimlResponse.status} - ${error}`);
+        console.error(`[AI/ML API] Error: ${aimlResponse.status} - ${responseText}`);
+        throw new Error(`AI/ML API error: ${aimlResponse.status} - ${responseText}`);
       }
 
-      const aimlData = await aimlResponse.json();
-      console.log("AI/ML API task started:", aimlData);
+      let aimlData;
+      try {
+        aimlData = JSON.parse(responseText);
+      } catch (e) {
+        console.error(`[AI/ML API] Failed to parse response as JSON:`, responseText);
+        throw new Error(`AI/ML API returned invalid JSON: ${responseText}`);
+      }
+      console.log(`[AI/ML API] Task started:`, JSON.stringify(aimlData, null, 2));
       
       const taskId = aimlData.id || aimlData.task_id;
       if (!taskId) {

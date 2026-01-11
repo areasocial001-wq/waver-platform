@@ -233,7 +233,7 @@ export const TextToVideoForm = () => {
         description: "Il video verrà generato. Attendi qualche istante..."
       });
 
-      // Generate video synchronously
+      // Generate video synchronously - include modelId for AI/ML API providers
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: {
@@ -244,7 +244,8 @@ export const TextToVideoForm = () => {
             aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
             generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3") ? generateAudio : undefined,
             generationId: generationData.id,
-            preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined
+            preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
+            modelId: currentProvider.modelId, // Pass model ID for AI/ML API
           }
         });
 
