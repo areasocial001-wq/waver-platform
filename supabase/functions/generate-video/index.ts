@@ -770,6 +770,101 @@ serve(async (req) => {
       }
     };
 
+    // Pre-check URL accessibility before sending to external APIs
+    const checkUrlAccessibility = async (url: string, label: string = 'URL'): Promise<{ accessible: boolean; error?: string }> => {
+      try {
+        console.log(`[URL Check] Verifying accessibility of ${label}: ${url.substring(0, 100)}...`);
+        
+        const response = await fetch(url, {
+          method: 'HEAD',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; VideoGenerator/1.0)',
+          },
+        });
+        
+        if (!response.ok) {
+          console.warn(`[URL Check] ${label} returned status ${response.status}`);
+          return { 
+            accessible: false, 
+            error: `URL returned status ${response.status}: ${response.statusText}` 
+          };
+        }
+        
+        console.log(`[URL Check] ${label} is accessible (status ${response.status})`);
+        return { accessible: true };
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        console.warn(`[URL Check] ${label} accessibility check failed:`, errorMsg);
+        return { 
+          accessible: false, 
+          error: `Failed to verify URL: ${errorMsg}` 
+        };
+      }
+    };
+
+    // Validate and fix URL before sending to AI/ML API
+    const ensureAccessibleUrl = async (
+      url: string, 
+      label: string = 'image'
+    ): Promise<string> => {
+      // First check if the URL is accessible
+      const check = await checkUrlAccessibility(url, label);
+      
+      if (check.accessible) {
+        return url;
+      }
+      
+      console.log(`[URL Fix] ${label} URL not accessible, attempting to fix...`);
+      
+      // If it's a public storage URL, try to convert to signed
+      if (url.includes('/object/public/')) {
+        const signedUrl = await tryConvertPublicStorageUrlToSigned(url, { expiresInSec: 60 * 60 });
+        if (signedUrl) {
+          // Verify the signed URL is accessible
+          const signedCheck = await checkUrlAccessibility(signedUrl, `signed ${label}`);
+          if (signedCheck.accessible) {
+            console.log(`[URL Fix] Successfully converted to accessible signed URL`);
+            return signedUrl;
+          }
+        }
+      }
+      
+      // If it's already a signed URL that's not accessible, it might be expired
+      if (url.includes('/object/sign/') || url.includes('token=')) {
+        // Try to extract the object path and create a fresh signed URL
+        const signMarker = '/storage/v1/object/sign/generated-videos/';
+        const signIdx = url.indexOf(signMarker);
+        if (signIdx !== -1) {
+          let objectPath = url.substring(signIdx + signMarker.length);
+          // Strip query string
+          if (objectPath.includes('?')) {
+            objectPath = objectPath.split('?')[0];
+          }
+          
+          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const supabaseClient = createClient(supabaseUrl, supabaseKey);
+          
+          const { data, error } = await supabaseClient.storage
+            .from('generated-videos')
+            .createSignedUrl(objectPath, 60 * 60);
+          
+          if (!error && data?.signedUrl) {
+            const freshCheck = await checkUrlAccessibility(data.signedUrl, `fresh signed ${label}`);
+            if (freshCheck.accessible) {
+              console.log(`[URL Fix] Created fresh signed URL for expired token`);
+              return data.signedUrl;
+            }
+          }
+        }
+      }
+      
+      // Return original URL with warning - let the API handle the error
+      console.warn(`[URL Fix] Could not fix ${label} URL, proceeding with original`);
+      return url;
+    };
+
     // Helper to check if base64 is too large (>2MB)
     const isBase64TooLarge = (base64: string): boolean => {
       const rawBase64 = base64.includes(',') ? base64.split(',')[1] : base64;
@@ -997,18 +1092,25 @@ serve(async (req) => {
       
       const startImageData = start_image || image || image_url;
 
-      const getAimlImageUrl = async (img: string): Promise<string> => {
+      const getAimlImageUrl = async (img: string, label: string = 'image'): Promise<string> => {
         // AI/ML API expects a URL. If we receive base64, upload it and use a signed URL.
         if (img.startsWith('http://') || img.startsWith('https://')) {
           // If it's our storage URL, ALWAYS prefer a signed URL (some providers can't fetch the public endpoint).
           const signed = await tryConvertPublicStorageUrlToSigned(img, { expiresInSec: 60 * 60 });
-          return signed || img;
+          const urlToUse = signed || img;
+          
+          // Pre-check URL accessibility before sending to AI/ML API
+          const accessibleUrl = await ensureAccessibleUrl(urlToUse, label);
+          return accessibleUrl;
         }
 
-        return await uploadToStorageAndGetUrl(img, "aiml-img", {
+        const uploadedUrl = await uploadToStorageAndGetUrl(img, "aiml-img", {
           signed: true,
           signedExpiresInSec: 60 * 60,
         });
+        
+        // Verify the uploaded URL is accessible
+        return await ensureAccessibleUrl(uploadedUrl, label);
       };
 
       const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
