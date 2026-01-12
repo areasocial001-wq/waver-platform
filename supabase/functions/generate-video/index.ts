@@ -1116,8 +1116,16 @@ serve(async (req) => {
 
       const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
       const isPixVerseTransition = modelId === 'pixverse/v5/transition';
-      // Veo first-last model uses image_url and last_image_url (NOT first_frame_url/last_frame_url)
-      const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video-fast';
+      // Veo first-last model uses first_image_url and last_image_url (same as PixVerse)
+      // Also normalize the model name to include -fast suffix if missing
+      const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video-fast' ||
+                            modelId === 'google/veo-3.1-first-last-image-to-video';
+      
+      // Ensure Veo first-last uses the correct model ID (must be -fast version)
+      if (isVeoFirstLast && modelId === 'google/veo-3.1-first-last-image-to-video') {
+        console.log('[AI/ML API] Correcting model ID to include -fast suffix');
+        modelId = 'google/veo-3.1-first-last-image-to-video-fast';
+      }
 
       // Sanitize duration for this model (server-side validation)
       const sanitizedDuration = sanitizeDuration(modelId, duration || 5);
@@ -1162,7 +1170,7 @@ serve(async (req) => {
             throw new Error("PixVerse Transition requires both start and end images");
           }
         } else if (isVeoFirstLast) {
-          // Veo 3.1 first-last-i2v uses image_url and last_image_url (verified from AI/ML API docs)
+          // Veo 3.1 first-last-i2v uses first_image_url and last_image_url (same pattern as PixVerse)
           // CRITICAL: Always upload images with signed URLs for this model
           let veoStartUrl = startUrl;
           if (startUrl.includes('/object/public/')) {
@@ -1170,12 +1178,12 @@ serve(async (req) => {
             const signedUrl = await tryConvertPublicStorageUrlToSigned(startUrl, { expiresInSec: 60 * 60 });
             if (signedUrl) {
               veoStartUrl = signedUrl;
-              console.log('[AI/ML API] Converted public URL to signed URL for image_url');
+              console.log('[AI/ML API] Converted public URL to signed URL for first_image_url');
             } else {
               console.warn('[AI/ML API] Could not convert public URL to signed, may fail');
             }
           }
-          aimlPayload.image_url = veoStartUrl;
+          aimlPayload.first_image_url = veoStartUrl;
           
           if (end_image) {
             const endUrl = await getAimlImageUrl(end_image);
@@ -1191,6 +1199,9 @@ serve(async (req) => {
               }
             }
             aimlPayload.last_image_url = veoEndUrl;
+          } else {
+            // Veo first-last requires both start and end images
+            throw new Error("Veo 3.1 First-Last Frame requires both start and end images");
           }
         } else {
           // Most other AI/ML API video models accept a single image URL for I2V
