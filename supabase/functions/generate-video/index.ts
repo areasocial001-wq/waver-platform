@@ -767,7 +767,8 @@ serve(async (req) => {
         'kling-v2.6-pro': { t2v: 'klingai/video-v2-6-pro-text-to-video', i2v: 'klingai/video-v2-6-pro-image-to-video' },
         'kling-o1': { t2v: 'klingai/video-o1-image-to-video', i2v: 'klingai/video-o1-image-to-video' },
         // Luma Ray
-        'luma-ray-1.6': { t2v: 'luma/ray-1.6', i2v: 'luma/ray-1.6' },
+        // Note: official model id uses hyphen (ray-1-6), not dot.
+        'luma-ray-1.6': { t2v: 'luma/ray-1-6', i2v: 'luma/ray-1-6' },
         'luma-ray-2': { t2v: 'luma/ray-2', i2v: 'luma/ray-2' },
         'luma-ray-flash-2': { t2v: 'luma/ray-flash-2', i2v: 'luma/ray-flash-2' },
         // Sora (OpenAI)
@@ -834,6 +835,12 @@ serve(async (req) => {
       if (!modelId && modelConfig) {
         modelId = isI2V ? modelConfig.i2v : modelConfig.t2v;
       }
+
+      // Normalize a few known IDs (docs use hyphens, some UI values may still use dots)
+      if (modelId === 'luma/ray-1.6') {
+        modelId = 'luma/ray-1-6';
+      }
+
       if (!modelId) {
         // Fallback to default
         modelId = isI2V ? 'kling-video/v1.6/pro/image-to-video' : 'kling-video/v1.6/pro/text-to-video';
@@ -850,32 +857,49 @@ serve(async (req) => {
       console.log(`[AI/ML API] ========================================`);
       
       const startImageData = start_image || image || image_url;
-      
+
+      const getAimlImageUrl = async (img: string): Promise<string> => {
+        // AI/ML API expects a URL. If we receive base64, upload it and use a signed URL.
+        if (img.startsWith('http://') || img.startsWith('https://')) {
+          // If it's our storage URL, ALWAYS prefer a signed URL (some providers can't fetch the public endpoint).
+          const signed = await tryConvertPublicStorageUrlToSigned(img, { expiresInSec: 60 * 60 });
+          return signed || img;
+        }
+
+        return await uploadToStorageAndGetUrl(img, "aiml-img", {
+          signed: true,
+          signedExpiresInSec: 60 * 60,
+        });
+      };
+
+      const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
+
       // Build AI/ML API request
       const aimlPayload: Record<string, unknown> = {
         model: modelId,
         prompt: prompt || "Smooth cinematic video",
         duration: duration || 5,
       };
-      
+
       // Add image for image-to-video
       if (type === "image_to_video" && startImageData) {
-        // AI/ML API expects a URL. If we receive base64, upload it and use a signed URL.
-        if (startImageData.startsWith('http://') || startImageData.startsWith('https://')) {
-          // If it's our storage URL, ALWAYS prefer a signed URL (some providers can't fetch the public endpoint).
-          const signed = await tryConvertPublicStorageUrlToSigned(startImageData, { expiresInSec: 60 * 60 });
-          if (signed) {
-            console.log('[AI/ML API] Using signed URL for image_url');
-            aimlPayload.image_url = signed;
-          } else {
-            aimlPayload.image_url = startImageData;
+        const startUrl = await getAimlImageUrl(startImageData);
+
+        if (isLumaRay) {
+          // Luma Ray models use keyframes (frame0/start, frame1/end)
+          const keyframes: Record<string, unknown> = {
+            frame0: { type: 'image', url: startUrl },
+          };
+
+          if (end_image) {
+            const endUrl = await getAimlImageUrl(end_image);
+            keyframes.frame1 = { type: 'image', url: endUrl };
           }
+
+          aimlPayload.keyframes = keyframes;
         } else {
-          const signedUrl = await uploadToStorageAndGetUrl(startImageData, "aiml-img", {
-            signed: true,
-            signedExpiresInSec: 60 * 60,
-          });
-          aimlPayload.image_url = signedUrl;
+          // Most other AI/ML API video models accept a single image URL for I2V
+          aimlPayload.image_url = startUrl;
         }
       }
       
