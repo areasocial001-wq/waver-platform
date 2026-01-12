@@ -21,7 +21,9 @@ export const ImageToVideoForm = () => {
   const [endImage, setEndImage] = useState<File | null>(null);
   const [endImagePreview, setEndImagePreview] = useState<string>("");
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState("6");
+  const [duration, setDuration] = useState<number>(6);
+  const [resolution, setResolution] = useState("720p");
+  const [aspectRatio, setAspectRatio] = useState("16:9");
   const [motion, setMotion] = useState("medium");
   const [cameraMovement, setCameraMovement] = useState<string>("none");
   const [composition, setComposition] = useState<string>("medium");
@@ -42,8 +44,13 @@ export const ImageToVideoForm = () => {
     supportsEndFrame, 
     requiresEndFrame,
     durationOptions,
+    resolutionOptions,
+    aspectRatioOptions,
     getValidDuration,
-    defaultDuration
+    getValidResolution,
+    defaultDuration,
+    defaultResolution,
+    defaultAspectRatio
   } = useModelCapabilities(preferredProvider as VideoProviderType);
 
   // Check if API key is missing for selected provider based on actual backend status
@@ -60,16 +67,29 @@ export const ImageToVideoForm = () => {
     }
   }, [supportsEndFrame, endImage]);
 
-  // Aggiorna durata quando cambia il provider
+  // Aggiorna durata, resolution e aspect ratio quando cambia il provider
   useEffect(() => {
-    const validDuration = getValidDuration(parseInt(duration));
-    if (validDuration.toString() !== duration) {
-      setDuration(validDuration.toString());
+    const validDuration = getValidDuration(duration);
+    if (validDuration !== duration) {
+      setDuration(validDuration);
       toast.info("Durata adattata", {
         description: `Il provider supporta ${validDuration}s`
       });
     }
-  }, [preferredProvider, getValidDuration, duration]);
+    
+    const validResolution = getValidResolution(resolution);
+    if (validResolution !== resolution) {
+      setResolution(validResolution);
+    }
+    
+    // Adjust aspect ratio if not supported
+    if (aspectRatioOptions) {
+      const validRatios = aspectRatioOptions.map(r => r.value);
+      if (!validRatios.includes(aspectRatio)) {
+        setAspectRatio(defaultAspectRatio || validRatios[0]);
+      }
+    }
+  }, [preferredProvider, getValidDuration, getValidResolution, duration, resolution, aspectRatio, aspectRatioOptions, defaultAspectRatio]);
 
   // Compress and resize image to prevent Out of Memory errors and PiAPI size limits
   const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.6): Promise<string> => {
@@ -263,8 +283,9 @@ export const ImageToVideoForm = () => {
           user_id: user.id,
           type: "image_to_video",
           prompt: description,
-          duration: parseInt(duration),
+          duration: duration,
           motion_intensity: motion,
+          resolution: resolution,
           image_name: isSequential ? `${startImage.name} → ${endImage.name}` : startImage.name,
           image_url: startImagePreview,
           status: "processing"
@@ -285,7 +306,9 @@ export const ImageToVideoForm = () => {
         type: "image_to_video",
         prompt: cinematicPrompt,
         start_image: startImagePreview,
-        duration: parseInt(duration),
+        duration: duration,
+        resolution: resolution,
+        aspect_ratio: aspectRatio,
         generationId: generationData.id,
         preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
         modelId: currentProvider.modelId, // Pass model ID for AI/ML API
@@ -641,13 +664,13 @@ export const ImageToVideoForm = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
           <Label htmlFor="i2v-duration">Durata</Label>
-          <Select value={duration} onValueChange={setDuration}>
+          <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
             <SelectTrigger id="i2v-duration">
-              <SelectValue />
+              <SelectValue placeholder="Seleziona durata" />
             </SelectTrigger>
             <SelectContent>
-              {currentProvider.durations.map((d) => (
-                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+              {durationOptions.map((d) => (
+                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -655,12 +678,12 @@ export const ImageToVideoForm = () => {
 
         <div className="space-y-2">
           <Label htmlFor="i2v-resolution">Risoluzione</Label>
-          <Select value={motion} onValueChange={setMotion}>
+          <Select value={resolution} onValueChange={setResolution}>
             <SelectTrigger id="i2v-resolution">
-              <SelectValue />
+              <SelectValue placeholder="Seleziona risoluzione" />
             </SelectTrigger>
             <SelectContent>
-              {currentProvider.resolutions.map((r) => (
+              {resolutionOptions.map((r) => (
                 <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
               ))}
             </SelectContent>
@@ -671,7 +694,7 @@ export const ImageToVideoForm = () => {
           <Label htmlFor="motion">Intensità Movimento</Label>
           <Select value={motion} onValueChange={setMotion}>
             <SelectTrigger id="motion">
-              <SelectValue />
+              <SelectValue placeholder="Seleziona intensità" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="low">Bassa</SelectItem>
@@ -681,6 +704,23 @@ export const ImageToVideoForm = () => {
           </Select>
         </div>
       </div>
+
+      {/* Aspect Ratio Selector - Only show if provider supports it */}
+      {aspectRatioOptions && aspectRatioOptions.length > 0 && (
+        <div className="space-y-2">
+          <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
+          <Select value={aspectRatio} onValueChange={setAspectRatio}>
+            <SelectTrigger id="aspect-ratio">
+              <SelectValue placeholder="Seleziona aspect ratio" />
+            </SelectTrigger>
+            <SelectContent>
+              {aspectRatioOptions.map((ar) => (
+                <SelectItem key={ar.value} value={ar.value}>{ar.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Button 
         onClick={handleGenerate}
@@ -736,6 +776,16 @@ export const ImageToVideoForm = () => {
               <span className="text-muted-foreground">Durata:</span>
               <span className="font-medium">{duration}s</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Risoluzione:</span>
+              <span className="font-medium">{resolution}</span>
+            </div>
+            {aspectRatioOptions && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Aspect Ratio:</span>
+                <span className="font-medium">{aspectRatio}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Movimento:</span>
               <span className="font-medium capitalize">{motion}</span>
