@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Sparkles, X } from "lucide-react";
+import { Upload, Sparkles, X, Info, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
@@ -13,6 +13,7 @@ import { VideoProviderSelect } from "@/components/VideoProviderSelect";
 import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
+import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -36,17 +37,39 @@ export const ImageToVideoForm = () => {
   // Provider corrente
   const currentProvider = VIDEO_PROVIDERS[preferredProvider as VideoProviderType] || VIDEO_PROVIDERS.auto;
 
+  // Get model capabilities for the current provider
+  const { 
+    supportsEndFrame, 
+    requiresEndFrame,
+    durationOptions,
+    getValidDuration,
+    defaultDuration
+  } = useModelCapabilities(preferredProvider as VideoProviderType);
+
   // Check if API key is missing for selected provider based on actual backend status
   const isMissingAimlKey = currentProvider.group === 'aiml' && !apiKeyStatus.hasAIMLKey;
 
+  // Clear end image if provider doesn't support end frames
+  useEffect(() => {
+    if (!supportsEndFrame && endImage) {
+      setEndImage(null);
+      setEndImagePreview("");
+      toast.info("End frame rimosso", {
+        description: "Il provider selezionato non supporta keyframes."
+      });
+    }
+  }, [supportsEndFrame, endImage]);
+
   // Aggiorna durata quando cambia il provider
   useEffect(() => {
-    const availableDurations = currentProvider.durations;
-    const currentDurationValid = availableDurations.some(d => d.value === duration);
-    if (!currentDurationValid && availableDurations.length > 0) {
-      setDuration(availableDurations[0].value);
+    const validDuration = getValidDuration(parseInt(duration));
+    if (validDuration.toString() !== duration) {
+      setDuration(validDuration.toString());
+      toast.info("Durata adattata", {
+        description: `Il provider supporta ${validDuration}s`
+      });
     }
-  }, [preferredProvider, currentProvider]);
+  }, [preferredProvider, getValidDuration, duration]);
 
   // Compress and resize image to prevent Out of Memory errors and PiAPI size limits
   const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.6): Promise<string> => {
@@ -151,6 +174,14 @@ export const ImageToVideoForm = () => {
   const handleGenerate = async () => {
     if (!startImage) {
       toast.error("Carica almeno lo start frame per procedere");
+      return;
+    }
+
+    // Validate end frame for transition models
+    if (requiresEndFrame && !endImage) {
+      toast.error("End frame obbligatorio", {
+        description: "Questo modello richiede sia start che end frame per la transizione."
+      });
       return;
     }
 
@@ -403,47 +434,93 @@ export const ImageToVideoForm = () => {
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label>End Frame (Opzionale)</Label>
-          {!endImagePreview ? (
-            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-accent/50 transition-colors">
-              <input
-                type="file"
-                id="end-image-upload"
-                className="hidden"
-                accept="image/*"
-                onChange={(e) => handleImageChange(e, 'end')}
-              />
-              <label
-                htmlFor="end-image-upload"
-                className="cursor-pointer flex flex-col items-center gap-2"
-              >
+        {/* End Frame - Only show if provider supports keyframes */}
+        {supportsEndFrame ? (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              End Frame {requiresEndFrame ? "(Obbligatorio)" : "(Opzionale)"}
+              {requiresEndFrame && (
+                <span className="text-xs text-destructive font-medium">*</span>
+              )}
+            </Label>
+            {!endImagePreview ? (
+              <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                requiresEndFrame ? "border-primary/50 hover:border-primary" : "border-border hover:border-accent/50"
+              }`}>
+                <input
+                  type="file"
+                  id="end-image-upload"
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleImageChange(e, 'end')}
+                />
+                <label
+                  htmlFor="end-image-upload"
+                  className="cursor-pointer flex flex-col items-center gap-2"
+                >
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {requiresEndFrame ? "Carica end frame (richiesto)" : "Carica end frame"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {requiresEndFrame 
+                      ? "Transizione tra due frame" 
+                      : "Per video keyframe start→end"
+                    }
+                  </p>
+                </label>
+              </div>
+            ) : (
+              <div className="relative rounded-lg overflow-hidden border border-border">
+                <img
+                  src={endImagePreview}
+                  alt="End Frame"
+                  className="w-full h-auto max-h-64 object-contain bg-muted"
+                />
+                <button
+                  onClick={() => removeImage('end')}
+                  className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">End Frame</Label>
+            <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center bg-muted/30">
+              <div className="flex flex-col items-center gap-2 opacity-50">
                 <Upload className="w-10 h-10 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Carica end frame
+                  Non supportato
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Per transizione sequenziale
+                  Seleziona Luma Ray, PixVerse o Veo 3.1
                 </p>
-              </label>
+              </div>
             </div>
-          ) : (
-            <div className="relative rounded-lg overflow-hidden border border-border">
-              <img
-                src={endImagePreview}
-                alt="End Frame"
-                className="w-full h-auto max-h-64 object-contain bg-muted"
-              />
-              <button
-                onClick={() => removeImage('end')}
-                className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Keyframe-capable provider info */}
+      {supportsEndFrame && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+          <Info className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+          <div className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Modalità Keyframe attiva:</span>{" "}
+            {requiresEndFrame 
+              ? "Questo modello crea transizioni fluide tra due frame. Carica entrambe le immagini."
+              : "Puoi caricare un end frame opzionale per controllare dove termina il video."
+            }
+          </div>
+        </div>
+      )}
 
       <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
@@ -607,12 +684,19 @@ export const ImageToVideoForm = () => {
 
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || !startImage}
+        disabled={isLoading || !startImage || (requiresEndFrame && !endImage)}
         className="w-full bg-gradient-accent text-accent-foreground hover:opacity-90 shadow-glow-accent transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {isLoading ? "Preparazione..." : endImage ? "Genera Video Sequenziale" : "Genera Video da Immagine"}
+        {isLoading 
+          ? "Preparazione..." 
+          : requiresEndFrame && !endImage
+            ? "Carica entrambi i frame"
+            : endImage 
+              ? "Genera Video Keyframe" 
+              : "Genera Video da Immagine"
+        }
       </Button>
 
       {startImage && (
@@ -623,7 +707,14 @@ export const ImageToVideoForm = () => {
           <div className="text-sm space-y-1">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Modalità:</span>
-              <span className="font-medium">{endImage ? "Transizione Sequenziale" : "Animazione Singola"}</span>
+              <span className="font-medium">
+                {supportsEndFrame && endImage 
+                  ? "Keyframe (Start→End)" 
+                  : endImage 
+                    ? "Transizione Sequenziale" 
+                    : "Animazione Singola"
+                }
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Start Frame:</span>
@@ -633,6 +724,12 @@ export const ImageToVideoForm = () => {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">End Frame:</span>
                 <span className="font-medium">{endImage.name}</span>
+              </div>
+            )}
+            {supportsEndFrame && !endImage && (
+              <div className="flex justify-between text-muted-foreground/70 italic">
+                <span>End Frame:</span>
+                <span>Non impostato (opzionale)</span>
               </div>
             )}
             <div className="flex justify-between">
