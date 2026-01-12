@@ -610,7 +610,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
   'aiml-veo3.1-first-last-i2v': {
-    durations: STANDARD_DURATIONS, // Uses 5, 10 seconds only (not VEO_DURATIONS)
+    durations: VEO_DURATIONS, // 4, 6, 8 seconds per API docs
     resolutions: STANDARD_RESOLUTIONS,
     aspectRatios: STANDARD_ASPECT_RATIOS,
     supportsTextToVideo: false,
@@ -618,9 +618,10 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsAudio: true,
     requiresStartFrame: true,
     supportsEndFrame: true,
-    defaultDuration: 5,
+    requiresEndFrame: true, // Both start and end images required
+    defaultDuration: 8, // API default is 8
     defaultAspectRatio: '16:9',
-    defaultResolution: '720p',
+    defaultResolution: '1080p', // API default is 1080p
   },
 
   // ============ AI/ML API - ALIBABA WAN ============
