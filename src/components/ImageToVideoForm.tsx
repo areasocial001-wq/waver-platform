@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Sparkles, X, Info, ArrowRight } from "lucide-react";
+import { Upload, Sparkles, X, Info, ArrowRight, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
@@ -16,6 +16,7 @@ import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
+import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -566,9 +567,20 @@ export const ImageToVideoForm = () => {
       <ScenePresets value={selectedPreset} onChange={handlePresetChange} />
 
       <div className="space-y-2">
-        <Label htmlFor="i2v-prompt">
-          {endImage ? "Descrizione della Transizione (Opzionale)" : "Descrizione del Movimento (Opzionale)"}
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="i2v-prompt">
+            {endImage ? "Descrizione della Transizione (Opzionale)" : "Descrizione del Movimento (Opzionale)"}
+          </Label>
+          <PromptBuilderWizard 
+            onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
+            trigger={
+              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                <Wand2 className="h-3.5 w-3.5" />
+                Wizard
+              </Button>
+            }
+          />
+        </div>
         <Textarea
           id="i2v-prompt"
           placeholder={

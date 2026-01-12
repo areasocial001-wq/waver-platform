@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Wallet, RefreshCw, Sparkles } from "lucide-react";
+import { Wallet, RefreshCw, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,7 @@ import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
+import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 interface PiAPIBalance {
   credits: number;
   equivalent_in_usd: number;
@@ -416,7 +417,18 @@ export const TextToVideoForm = () => {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="prompt">Descrizione del Video</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="prompt">Descrizione del Video</Label>
+          <PromptBuilderWizard 
+            onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
+            trigger={
+              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                <Wand2 className="h-3.5 w-3.5" />
+                Wizard
+              </Button>
+            }
+          />
+        </div>
         <Textarea
           id="prompt"
           placeholder="Descrivi il video che vuoi creare in dettaglio..."
