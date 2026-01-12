@@ -16,6 +16,7 @@ import { VideoProviderSelect } from "@/components/VideoProviderSelect";
 import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
+import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 
 interface PiAPIBalance {
   credits: number;
@@ -33,7 +34,7 @@ const REQUIRED_API_KEYS: Record<string, string> = {
 
 export const TextToVideoForm = () => {
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState("6");
+  const [duration, setDuration] = useState(6);
   const [resolution, setResolution] = useState("720p");
   const [cameraMovement, setCameraMovement] = useState<string>("none");
   const [composition, setComposition] = useState<string>("medium");
@@ -50,6 +51,9 @@ export const TextToVideoForm = () => {
 
   // Fetch API key status from backend
   const { status: apiKeyStatus } = useApiKeyStatus();
+
+  // Use model capabilities hook for validated constraints
+  const capabilities = useModelCapabilities(preferredProvider as VideoProviderType);
 
   // Fetch PiAPI balance on mount and when provider changes
   const fetchPiapiBalance = async () => {
@@ -79,20 +83,30 @@ export const TextToVideoForm = () => {
   // Check if API key is missing for selected provider based on actual backend status
   const isMissingAimlKey = currentProvider.group === 'aiml' && !apiKeyStatus.hasAIMLKey;
 
-  // Aggiorna durata e risoluzione quando cambia il provider
+  // Auto-adjust form values when provider changes using capability constraints
   useEffect(() => {
-    const availableDurations = currentProvider.durations;
-    const currentDurationValid = availableDurations.some(d => d.value === duration);
-    if (!currentDurationValid && availableDurations.length > 0) {
-      setDuration(availableDurations[0].value);
+    // Validate and adjust duration
+    const validDuration = capabilities.getValidDuration(duration);
+    if (validDuration !== duration) {
+      setDuration(validDuration);
+      toast.info(`Durata adattata a ${validDuration}s per ${currentProvider.shortName}`);
     }
     
-    const availableResolutions = currentProvider.resolutions;
-    const currentResolutionValid = availableResolutions.some(r => r.value === resolution);
-    if (!currentResolutionValid && availableResolutions.length > 0) {
-      setResolution(availableResolutions[0].value);
+    // Validate and adjust resolution
+    const validResolution = capabilities.getValidResolution(resolution);
+    if (validResolution !== resolution) {
+      setResolution(validResolution);
     }
-  }, [preferredProvider, currentProvider]);
+    
+    // Validate and adjust aspect ratio
+    if (capabilities.aspectRatioOptions && aspectRatio) {
+      const validRatios = capabilities.aspectRatioOptions.map(r => r.value);
+      if (!validRatios.includes(aspectRatio)) {
+        const newRatio = capabilities.defaultAspectRatio || validRatios[0];
+        setAspectRatio(newRatio);
+      }
+    }
+  }, [preferredProvider, capabilities]);
 
   const handlePresetChange = (preset: ScenePreset) => {
     setSelectedPreset(preset.id);
@@ -218,7 +232,7 @@ export const TextToVideoForm = () => {
           prompt: translatedPrompt,
           original_prompt: originalPrompt,
           dialogue_text: dialogueText || null,
-          duration: parseInt(duration),
+          duration: duration,
           resolution: resolution,
           status: "processing"
         })
@@ -237,7 +251,7 @@ export const TextToVideoForm = () => {
           body: {
             type: "text_to_video",
             prompt: translatedPrompt,
-            duration: parseInt(duration),
+            duration: duration,
             resolution: resolution,
             aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
             generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3") ? generateAudio : undefined,
@@ -508,13 +522,13 @@ export const TextToVideoForm = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="duration">Durata</Label>
-          <Select value={duration} onValueChange={setDuration}>
+          <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
             <SelectTrigger id="duration">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {currentProvider.durations.map((d) => (
-                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+              {capabilities.durationOptions.map((d) => (
+                <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -527,7 +541,7 @@ export const TextToVideoForm = () => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {currentProvider.resolutions.map((r) => (
+              {capabilities.resolutionOptions.map((r) => (
                 <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
               ))}
             </SelectContent>
@@ -535,7 +549,7 @@ export const TextToVideoForm = () => {
         </div>
 
         {/* Aspect Ratio for providers that support it */}
-        {currentProvider.aspectRatios && currentProvider.aspectRatios.length > 0 && (
+        {capabilities.aspectRatioOptions && capabilities.aspectRatioOptions.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="aspect-ratio">Aspect Ratio</Label>
             <Select value={aspectRatio} onValueChange={setAspectRatio}>
@@ -543,7 +557,7 @@ export const TextToVideoForm = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {currentProvider.aspectRatios.map((ar) => (
+                {capabilities.aspectRatioOptions.map((ar) => (
                   <SelectItem key={ar.value} value={ar.value}>{ar.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -552,7 +566,7 @@ export const TextToVideoForm = () => {
         )}
 
         {/* Generate Audio toggle for providers that support it */}
-        {currentProvider.supportsAudio && (
+        {capabilities.supportsAudio && (
           <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/20">
             <div className="space-y-0.5">
               <Label htmlFor="generate-audio" className="text-sm font-medium">Genera Audio</Label>
