@@ -1133,16 +1133,56 @@ serve(async (req) => {
         }
       };
       
+      // PiAPI duration constraints by model
+      const PIAPI_DURATION_CONSTRAINTS: Record<string, number[]> = {
+        'kling': [5, 10],
+        'hailuo': [6],
+        'luma': [5],
+        'wan': [4, 8],
+        'hunyuan': [5, 10],
+        'skyreels': [5, 10],
+        'framepack': [5, 10],
+        'veo3': [4, 6, 8],
+        'sora2': [5, 10, 15, 20],
+      };
+      
+      // Get valid durations for this PiAPI model
+      const getValidPiAPIDurations = (model: string): number[] => {
+        return PIAPI_DURATION_CONSTRAINTS[model] || [5, 10];
+      };
+      
+      // Sanitize duration for PiAPI
+      const sanitizePiAPIDuration = (model: string, requestedDuration: number): number => {
+        const validDurations = getValidPiAPIDurations(model);
+        if (validDurations.includes(requestedDuration)) {
+          return requestedDuration;
+        }
+        // Find closest valid duration
+        let closest = validDurations[0];
+        let minDiff = Math.abs(requestedDuration - closest);
+        for (const d of validDurations) {
+          const diff = Math.abs(requestedDuration - d);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = d;
+          }
+        }
+        console.log(`[PiAPI Duration Sanitizer] Adjusted duration from ${requestedDuration}s to ${closest}s for model ${model}`);
+        return closest;
+      };
+      
       // Add duration and model-specific parameters
       if (modelConfig.model === "veo3") {
-        piApiPayload.input.duration = `${duration || 8}s`;
+        const sanitizedDuration = sanitizePiAPIDuration("veo3", duration || 8);
+        piApiPayload.input.duration = `${sanitizedDuration}s`;
         piApiPayload.input.generate_audio = generate_audio !== false; // Default true
         // Veo3 supports aspect_ratio
         if (aspect_ratio) {
           piApiPayload.input.aspect_ratio = aspect_ratio;
         }
       } else if (modelConfig.model === "sora2") {
-        piApiPayload.input.duration = duration || 4;
+        const sanitizedDuration = sanitizePiAPIDuration("sora2", duration || 4);
+        piApiPayload.input.duration = sanitizedDuration;
         // Sora2 supports aspect_ratio and resolution
         if (aspect_ratio) {
           piApiPayload.input.aspect_ratio = aspect_ratio;
@@ -1151,7 +1191,8 @@ serve(async (req) => {
           piApiPayload.input.resolution = resolution;
         }
       } else {
-        piApiPayload.input.duration = duration || 5;
+        const sanitizedDuration = sanitizePiAPIDuration(modelConfig.model, duration || 5);
+        piApiPayload.input.duration = sanitizedDuration;
       }
       
       // Add model-specific parameters
