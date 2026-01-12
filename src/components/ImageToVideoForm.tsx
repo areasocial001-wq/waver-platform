@@ -17,6 +17,7 @@ import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
+import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -571,15 +572,21 @@ export const ImageToVideoForm = () => {
           <Label htmlFor="i2v-prompt">
             {endImage ? "Descrizione della Transizione (Opzionale)" : "Descrizione del Movimento (Opzionale)"}
           </Label>
-          <PromptBuilderWizard 
-            onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
-            trigger={
-              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
-                <Wand2 className="h-3.5 w-3.5" />
-                Wizard
-              </Button>
-            }
-          />
+          <div className="flex items-center gap-1.5">
+            <PromptTemplatesLibrary 
+              currentPrompt={prompt}
+              onApplyTemplate={(p) => setPrompt(p)}
+            />
+            <PromptBuilderWizard 
+              onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
+              trigger={
+                <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Wizard
+                </Button>
+              }
+            />
+          </div>
         </div>
         <Textarea
           id="i2v-prompt"
