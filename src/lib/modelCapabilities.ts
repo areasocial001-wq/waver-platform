@@ -610,7 +610,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
   'aiml-veo3.1-first-last-i2v': {
-    durations: VEO_DURATIONS,
+    durations: STANDARD_DURATIONS, // Uses 5, 10 seconds only (not VEO_DURATIONS)
     resolutions: STANDARD_RESOLUTIONS,
     aspectRatios: STANDARD_ASPECT_RATIOS,
     supportsTextToVideo: false,
@@ -618,7 +618,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsAudio: true,
     requiresStartFrame: true,
     supportsEndFrame: true,
-    defaultDuration: 6,
+    defaultDuration: 5,
     defaultAspectRatio: '16:9',
     defaultResolution: '720p',
   },

@@ -1033,7 +1033,8 @@ serve(async (req) => {
         'veo3.1-t2v-fast': { t2v: 'google/veo-3.1-t2v-fast', i2v: 'google/veo-3.1-t2v-fast' },
         'veo3.1-i2v-fast': { t2v: 'google/veo-3.1-i2v-fast', i2v: 'google/veo-3.1-i2v-fast' },
         'veo3.1-ref-to-video': { t2v: 'google/veo-3.1-reference-to-video', i2v: 'google/veo-3.1-reference-to-video' },
-        'veo3.1-first-last-i2v': { t2v: 'google/veo-3.1-first-last-image-to-video', i2v: 'google/veo-3.1-first-last-image-to-video' },
+        'veo3.1-first-last-i2v': { t2v: 'google/veo-3.1-first-last-image-to-video-fast', i2v: 'google/veo-3.1-first-last-image-to-video-fast' },
+        'veo3.1-first-last-i2v-fast': { t2v: 'google/veo-3.1-first-last-image-to-video-fast', i2v: 'google/veo-3.1-first-last-image-to-video-fast' },
         // Alibaba Wan
         'wan-2.1-t2v': { t2v: 'alibaba/wan-2.1-t2v', i2v: 'alibaba/wan-2.1-t2v' },
         'wan-2.1-i2v': { t2v: 'alibaba/wan-2.1-i2v', i2v: 'alibaba/wan-2.1-i2v' },
@@ -1115,8 +1116,8 @@ serve(async (req) => {
 
       const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
       const isPixVerseTransition = modelId === 'pixverse/v5/transition';
-      const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video' || 
-                            modelId === 'google/veo-3.1-first-last-image-to-video-fast';
+      // Veo first-last model uses image_url and last_image_url (NOT first_frame_url/last_frame_url)
+      const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video-fast';
 
       // Sanitize duration for this model (server-side validation)
       const sanitizedDuration = sanitizeDuration(modelId, duration || 5);
@@ -1161,7 +1162,7 @@ serve(async (req) => {
             throw new Error("PixVerse Transition requires both start and end images");
           }
         } else if (isVeoFirstLast) {
-          // Veo 3.1 first-last-i2v uses first_frame_url for start and last_frame_url for end
+          // Veo 3.1 first-last-i2v uses image_url and last_image_url (verified from AI/ML API docs)
           // CRITICAL: Always upload images with signed URLs for this model
           let veoStartUrl = startUrl;
           if (startUrl.includes('/object/public/')) {
@@ -1169,27 +1170,27 @@ serve(async (req) => {
             const signedUrl = await tryConvertPublicStorageUrlToSigned(startUrl, { expiresInSec: 60 * 60 });
             if (signedUrl) {
               veoStartUrl = signedUrl;
-              console.log('[AI/ML API] Converted public URL to signed URL for first_frame_url');
+              console.log('[AI/ML API] Converted public URL to signed URL for image_url');
             } else {
               console.warn('[AI/ML API] Could not convert public URL to signed, may fail');
             }
           }
-          aimlPayload.first_frame_url = veoStartUrl;
+          aimlPayload.image_url = veoStartUrl;
           
           if (end_image) {
             const endUrl = await getAimlImageUrl(end_image);
-            // Also ensure last frame URL is signed
+            // Also ensure last image URL is signed
             let veoEndUrl = endUrl;
             if (endUrl.includes('/object/public/')) {
               const signedEndUrl = await tryConvertPublicStorageUrlToSigned(endUrl, { expiresInSec: 60 * 60 });
               if (signedEndUrl) {
                 veoEndUrl = signedEndUrl;
-                console.log('[AI/ML API] Converted public URL to signed URL for last_frame_url');
+                console.log('[AI/ML API] Converted public URL to signed URL for last_image_url');
               } else {
-                console.warn('[AI/ML API] Could not convert public URL to signed for last_frame, may fail');
+                console.warn('[AI/ML API] Could not convert public URL to signed for last_image, may fail');
               }
             }
-            aimlPayload.last_frame_url = veoEndUrl;
+            aimlPayload.last_image_url = veoEndUrl;
           }
         } else {
           // Most other AI/ML API video models accept a single image URL for I2V
