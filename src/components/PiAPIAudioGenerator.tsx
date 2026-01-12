@@ -46,7 +46,7 @@ const AUDIO_MODELS: ModelConfig[] = [
 ];
 
 const STYLE_PRESETS = [
-  { value: "", label: "Nessuno stile" },
+  { value: "none", label: "Nessuno stile" },
   { value: "pop", label: "Pop" },
   { value: "rock", label: "Rock" },
   { value: "electronic", label: "Electronic/EDM" },
@@ -62,7 +62,7 @@ export function PiAPIAudioGenerator() {
   const [prompt, setPrompt] = useState("");
   const [selectedModel, setSelectedModel] = useState<AudioModel>("udio");
   const [duration, setDuration] = useState(30);
-  const [style, setStyle] = useState("");
+  const [style, setStyle] = useState("none");
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -112,7 +112,7 @@ export function PiAPIAudioGenerator() {
           prompt,
           model: selectedModel,
           duration,
-          style: style || undefined,
+          style: style !== "none" ? style : undefined,
         }
       });
 
