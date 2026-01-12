@@ -873,6 +873,9 @@ serve(async (req) => {
       };
 
       const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
+      const isPixVerseTransition = modelId === 'pixverse/v5/transition';
+      const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video' || 
+                            modelId === 'google/veo-3.1-first-last-image-to-video-fast';
 
       // Build AI/ML API request
       const aimlPayload: Record<string, unknown> = {
@@ -880,6 +883,11 @@ serve(async (req) => {
         prompt: prompt || "Smooth cinematic video",
         duration: duration || 5,
       };
+
+      // Add aspect_ratio if provided (for models that support it)
+      if (aspect_ratio) {
+        aimlPayload.aspect_ratio = aspect_ratio;
+      }
 
       // Add image for image-to-video
       if (type === "image_to_video" && startImageData) {
@@ -897,6 +905,25 @@ serve(async (req) => {
           }
 
           aimlPayload.keyframes = keyframes;
+        } else if (isPixVerseTransition) {
+          // PixVerse Transition requires both first_image_url and last_image_url
+          aimlPayload.first_image_url = startUrl;
+          
+          if (end_image) {
+            const endUrl = await getAimlImageUrl(end_image);
+            aimlPayload.last_image_url = endUrl;
+          } else {
+            // PixVerse Transition requires end image - error if not provided
+            throw new Error("PixVerse Transition requires both start and end images");
+          }
+        } else if (isVeoFirstLast) {
+          // Veo 3.1 first-last-i2v uses image_url for start and last_image_url for end
+          aimlPayload.image_url = startUrl;
+          
+          if (end_image) {
+            const endUrl = await getAimlImageUrl(end_image);
+            aimlPayload.last_image_url = endUrl;
+          }
         } else {
           // Most other AI/ML API video models accept a single image URL for I2V
           aimlPayload.image_url = startUrl;
