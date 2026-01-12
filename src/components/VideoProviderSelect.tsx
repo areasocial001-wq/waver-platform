@@ -1,18 +1,26 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Zap, Star, DollarSign } from "lucide-react";
+import { Clock, Zap, Star, DollarSign, Info, Timer, Maximize2, Image, Film } from "lucide-react";
 import { 
   VIDEO_PROVIDERS, 
   VideoProviderType, 
   PROVIDER_DISPLAY_ORDER,
   getGroupLabel
 } from "@/lib/videoProviderConfig";
+import { getModelCapabilities } from "@/lib/modelCapabilities";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface VideoProviderSelectProps {
   value: VideoProviderType;
   onValueChange: (value: VideoProviderType) => void;
   filterType?: 'text_to_video' | 'image_to_video';
   showDetails?: boolean;
+  showCapabilities?: boolean;
   className?: string;
 }
 
@@ -29,8 +37,10 @@ export function VideoProviderSelect({
   onValueChange, 
   filterType,
   showDetails = true,
+  showCapabilities = true,
   className = ''
 }: VideoProviderSelectProps) {
+  const capabilities = getModelCapabilities(value);
   // Filtra provider in base al tipo
   const filteredProviders = PROVIDER_DISPLAY_ORDER.filter(id => {
     const provider = VIDEO_PROVIDERS[id];
@@ -127,6 +137,105 @@ export function VideoProviderSelect({
                   {feature}
                 </Badge>
               ))}
+            </div>
+          )}
+
+          {/* Model Capabilities Info */}
+          {showCapabilities && (
+            <div className="mt-3 pt-3 border-t border-border/50">
+              <TooltipProvider>
+                <div className="flex items-center gap-1 mb-2">
+                  <Info className="w-3 h-3 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                    Limiti modello
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Durations */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-background/50 cursor-help">
+                        <Timer className="w-3 h-3 text-blue-500" />
+                        <span className="text-[10px] text-muted-foreground">
+                          {capabilities.durations.map(d => `${d.value}s`).join(', ')}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs font-medium mb-1">Durate supportate</p>
+                      <p className="text-xs text-muted-foreground">
+                        Questo modello supporta solo le durate elencate. Valori diversi verranno automaticamente corretti.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Resolutions */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-background/50 cursor-help">
+                        <Maximize2 className="w-3 h-3 text-green-500" />
+                        <span className="text-[10px] text-muted-foreground">
+                          {capabilities.resolutions.map(r => r.value).join(', ')}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs font-medium mb-1">Risoluzioni supportate</p>
+                      <p className="text-xs text-muted-foreground">
+                        Le risoluzioni disponibili per questo modello.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Aspect Ratios (if available) */}
+                  {capabilities.aspectRatios && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 p-1.5 rounded bg-background/50 cursor-help">
+                          <Film className="w-3 h-3 text-purple-500" />
+                          <span className="text-[10px] text-muted-foreground truncate">
+                            {capabilities.aspectRatios.slice(0, 3).map(a => a.value).join(', ')}
+                            {capabilities.aspectRatios.length > 3 && '...'}
+                          </span>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <p className="text-xs font-medium mb-1">Aspect Ratio supportati</p>
+                        <p className="text-xs text-muted-foreground">
+                          {capabilities.aspectRatios.map(a => a.label).join(', ')}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {/* Input Types */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-background/50 cursor-help">
+                        <Image className="w-3 h-3 text-orange-500" />
+                        <span className="text-[10px] text-muted-foreground">
+                          {[
+                            capabilities.supportsTextToVideo && 'T2V',
+                            capabilities.supportsImageToVideo && 'I2V',
+                            capabilities.supportsEndFrame && 'Keyframe',
+                          ].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p className="text-xs font-medium mb-1">Modalità input</p>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        {capabilities.supportsTextToVideo && <p>• T2V: Testo a Video</p>}
+                        {capabilities.supportsImageToVideo && <p>• I2V: Immagine a Video</p>}
+                        {capabilities.supportsEndFrame && <p>• Keyframe: Supporta frame finale</p>}
+                        {capabilities.requiresEndFrame && <p>• Richiede frame iniziale e finale</p>}
+                        {capabilities.supportsMotionControl && <p>• Motion Control disponibile</p>}
+                        {capabilities.supportsAudio && <p>• Genera audio</p>}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
             </div>
           )}
         </div>

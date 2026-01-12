@@ -39,6 +39,85 @@ const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   "sora2": { model: "sora2", task_type_txt2video: "sora2-video", task_type_img2video: "sora2-video" },
 };
 
+// Server-side model duration constraints (fallback safety layer)
+// Maps model patterns to valid duration values
+const MODEL_DURATION_CONSTRAINTS: Record<string, number[]> = {
+  // Runway
+  'runway': [5, 10],
+  'gen-3': [5, 10],
+  'gen-4': [5, 10],
+  // Kling
+  'kling': [5, 10],
+  // Luma Ray 1.6 only supports 5s
+  'luma/ray-1-6': [5],
+  'luma/ray-1.6': [5],
+  // Luma Ray 2 supports 5, 10
+  'luma/ray-2': [5, 10],
+  'luma/ray-flash-2': [5],
+  // Sora
+  'sora': [5, 10, 15, 20],
+  // MiniMax/Hailuo (fixed 6s)
+  'minimax': [6],
+  'hailuo': [6],
+  // PixVerse
+  'pixverse': [5, 10],
+  // Veo
+  'veo': [4, 6, 8],
+  // Seedance
+  'seedance': [5, 10],
+  'bytedance/seedance': [5, 10],
+  // WAN
+  'wan': [4, 8],
+  'alibaba/wan': [4, 8],
+  // Kandinsky
+  'kandinsky': [5, 10],
+  // VEED Fabric
+  'veed': [5, 10],
+  'fabric': [5, 10],
+  // Krea
+  'krea': [4, 8],
+  // OmniHuman
+  'omnihuman': [5, 10],
+  // Default fallback
+  'default': [5, 10],
+};
+
+// Get valid durations for a model ID
+function getValidDurations(modelId: string): number[] {
+  const lowerModelId = modelId.toLowerCase();
+  for (const [pattern, durations] of Object.entries(MODEL_DURATION_CONSTRAINTS)) {
+    if (pattern !== 'default' && lowerModelId.includes(pattern.toLowerCase())) {
+      return durations;
+    }
+  }
+  return MODEL_DURATION_CONSTRAINTS['default'];
+}
+
+// Sanitize duration to nearest valid value
+function sanitizeDuration(modelId: string, requestedDuration: number): number {
+  const validDurations = getValidDurations(modelId);
+  
+  // If already valid, return as-is
+  if (validDurations.includes(requestedDuration)) {
+    return requestedDuration;
+  }
+  
+  // Find closest valid duration
+  let closest = validDurations[0];
+  let minDiff = Math.abs(requestedDuration - closest);
+  
+  for (const duration of validDurations) {
+    const diff = Math.abs(requestedDuration - duration);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = duration;
+    }
+  }
+  
+  console.log(`[Duration Sanitizer] Adjusted duration from ${requestedDuration}s to ${closest}s for model ${modelId}`);
+  return closest;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -877,11 +956,14 @@ serve(async (req) => {
       const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video' || 
                             modelId === 'google/veo-3.1-first-last-image-to-video-fast';
 
+      // Sanitize duration for this model (server-side validation)
+      const sanitizedDuration = sanitizeDuration(modelId, duration || 5);
+
       // Build AI/ML API request
       const aimlPayload: Record<string, unknown> = {
         model: modelId,
         prompt: prompt || "Smooth cinematic video",
-        duration: duration || 5,
+        duration: sanitizedDuration,
       };
 
       // Add aspect_ratio if provided (for models that support it)
