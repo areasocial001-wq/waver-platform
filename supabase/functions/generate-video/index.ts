@@ -118,6 +118,66 @@ function sanitizeDuration(modelId: string, requestedDuration: number): number {
   return closest;
 }
 
+// Content policy violation detection and user-friendly error formatting
+interface ContentPolicyError {
+  isContentPolicy: boolean;
+  userMessage: string;
+  technicalDetails?: string;
+}
+
+function parseContentPolicyError(errorMessage: string): ContentPolicyError {
+  const lowerError = errorMessage.toLowerCase();
+  
+  // Check for content policy violations
+  const contentPolicyIndicators = [
+    'content_policy_violation',
+    'content policy',
+    'content checker',
+    'flagged',
+    'inappropriate',
+    'safety filter',
+    'moderation',
+    'prohibited content',
+    'violates our policies',
+    'not allowed',
+    'blocked by content filter',
+    'nsfw',
+    'adult content',
+    'violence',
+    'harmful content'
+  ];
+  
+  const isContentPolicy = contentPolicyIndicators.some(indicator => 
+    lowerError.includes(indicator)
+  );
+  
+  if (isContentPolicy) {
+    // Try to extract specific details from the error
+    let category = 'content guidelines';
+    
+    if (lowerError.includes('violence') || lowerError.includes('destruction') || lowerError.includes('harm')) {
+      category = 'violence or destruction';
+    } else if (lowerError.includes('adult') || lowerError.includes('nsfw') || lowerError.includes('sexual')) {
+      category = 'adult content';
+    } else if (lowerError.includes('hate') || lowerError.includes('discriminat')) {
+      category = 'hate speech or discrimination';
+    } else if (lowerError.includes('illegal') || lowerError.includes('weapon')) {
+      category = 'illegal activities or weapons';
+    }
+    
+    return {
+      isContentPolicy: true,
+      userMessage: `Your prompt was flagged by the content safety filter for potential ${category}. Please modify your prompt to avoid violent, destructive, or otherwise sensitive content and try again.`,
+      technicalDetails: errorMessage
+    };
+  }
+  
+  return {
+    isContentPolicy: false,
+    userMessage: errorMessage
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -1784,14 +1844,22 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error in generate-video function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Failed to generate video";
+    const rawErrorMessage = error instanceof Error ? error.message : "Failed to generate video";
     
-    const isRetryable = errorMessage.includes("overloaded") || 
-                        errorMessage.includes("rate limit") ||
-                        errorMessage.includes("quota") ||
-                        errorMessage.includes("temporarily") ||
-                        errorMessage.includes("RESOURCE_EXHAUSTED") ||
-                        errorMessage.includes("429");
+    // Parse content policy violations for user-friendly messages
+    const contentPolicyResult = parseContentPolicyError(rawErrorMessage);
+    const errorMessage = contentPolicyResult.isContentPolicy 
+      ? contentPolicyResult.userMessage 
+      : rawErrorMessage;
+    
+    // Content policy violations are not retryable
+    const isRetryable = !contentPolicyResult.isContentPolicy && (
+                        rawErrorMessage.includes("overloaded") || 
+                        rawErrorMessage.includes("rate limit") ||
+                        rawErrorMessage.includes("quota") ||
+                        rawErrorMessage.includes("temporarily") ||
+                        rawErrorMessage.includes("RESOURCE_EXHAUSTED") ||
+                        rawErrorMessage.includes("429"));
     
     if (body?.generationId) {
       try {
