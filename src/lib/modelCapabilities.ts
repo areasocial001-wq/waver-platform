@@ -88,7 +88,7 @@ const MINIMAX_DURATIONS: DurationOption[] = [
 
 const SEEDANCE_DURATIONS: DurationOption[] = [
   { value: 5, label: '5 secondi' },
-  { value: 8, label: '8 secondi' },
+  { value: 10, label: '10 secondi' },
 ];
 
 const WAN_DURATIONS: DurationOption[] = [
