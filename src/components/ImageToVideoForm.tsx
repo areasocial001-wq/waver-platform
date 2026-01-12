@@ -15,6 +15,7 @@ import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
+import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -586,6 +587,12 @@ export const ImageToVideoForm = () => {
           }
         </p>
       </div>
+
+      {/* Prompt Safety Checker */}
+      <PromptSafetyChecker 
+        prompt={prompt} 
+        onAcceptRewrite={(newPrompt) => setPrompt(newPrompt)}
+      />
 
       <div className="space-y-4 p-4 rounded-lg bg-accent/10 border border-accent/30">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">

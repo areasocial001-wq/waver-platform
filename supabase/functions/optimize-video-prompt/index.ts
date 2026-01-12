@@ -6,14 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Input validation schema - accepts both URLs and base64 data URLs
-const requestSchema = z.object({
+// Input validation schema for image analysis
+const imageRequestSchema = z.object({
   imageUrl: z.string().refine(
     (val) => val.startsWith('data:image/') || val.startsWith('http://') || val.startsWith('https://'),
     'URL immagine non valido (deve essere un URL http/https o un data URL base64)'
   ),
   caption: z.string().max(500, 'Didascalia troppo lunga').optional(),
   customContext: z.string().max(1000, 'Contesto troppo lungo').optional(),
+});
+
+// Input validation schema for safety rewrite
+const safetyRewriteSchema = z.object({
+  action: z.literal('safety_rewrite'),
+  prompt: z.string().min(1, 'Prompt richiesto').max(2000, 'Prompt troppo lungo'),
+  flaggedCategories: z.array(z.string()).optional(),
 });
 
 serve(async (req) => {
@@ -24,8 +31,100 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
-    // Validate input
-    const parseResult = requestSchema.safeParse(body);
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
+    }
+
+    // Check if this is a safety rewrite request
+    if (body.action === 'safety_rewrite') {
+      const parseResult = safetyRewriteSchema.safeParse(body);
+      if (!parseResult.success) {
+        return new Response(
+          JSON.stringify({ error: parseResult.error.errors[0].message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      const { prompt, flaggedCategories } = parseResult.data;
+      
+      console.log('Rewriting prompt for safety:', prompt.slice(0, 100), '...');
+      console.log('Flagged categories:', flaggedCategories);
+      
+      const safetySystemPrompt = `You are an expert at rewriting video generation prompts to avoid content policy violations while preserving the creative intent.
+
+Your task is to rewrite prompts that may be flagged by AI content safety filters. You must:
+1. Remove or replace violent, destructive, or harmful elements
+2. Keep the core creative vision and narrative intent
+3. Use softer, more abstract language for dramatic moments
+4. Focus on atmosphere, emotion, and visual beauty rather than explicit action
+5. Maintain the same language as the original prompt
+
+Examples of safe rewrites:
+- "Godzilla crushes the house" → "A massive silhouette appears on the horizon as the characters look up in awe"
+- "Explosion destroys the building" → "A dramatic flash of light illuminates the scene, revealing dust and shadows"
+- "Monster attacks the city" → "A colossal creature emerges from the mist, towering over the skyline"
+
+Respond with ONLY the rewritten prompt, no explanations or formatting.`;
+
+      const categoryContext = flaggedCategories && flaggedCategories.length > 0
+        ? `\n\nThis prompt was flagged for: ${flaggedCategories.join(', ')}. Pay special attention to addressing these concerns.`
+        : '';
+
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: safetySystemPrompt },
+            { role: 'user', content: `Rewrite this prompt to be safe for AI video generation while preserving the creative intent:
+
+"${prompt}"${categoryContext}` }
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('AI Gateway error:', response.status, errorText);
+        
+        if (response.status === 429) {
+          return new Response(
+            JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        if (response.status === 402) {
+          return new Response(
+            JSON.stringify({ error: 'Payment required. Please add credits to your workspace.' }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
+        throw new Error(`AI Gateway error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const optimizedPrompt = data.choices?.[0]?.message?.content?.trim();
+
+      if (!optimizedPrompt) {
+        throw new Error('No response from AI');
+      }
+
+      console.log('Rewritten prompt:', optimizedPrompt.slice(0, 100), '...');
+
+      return new Response(
+        JSON.stringify({ optimizedPrompt }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Original image analysis flow
+    const parseResult = imageRequestSchema.safeParse(body);
     if (!parseResult.success) {
       return new Response(
         JSON.stringify({ error: parseResult.error.errors[0].message }),
@@ -34,11 +133,6 @@ serve(async (req) => {
     }
     
     const { imageUrl, caption, customContext } = parseResult.data;
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
-    }
 
     console.log('Analyzing image and generating optimized prompts...');
 
