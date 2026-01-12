@@ -20,6 +20,7 @@ import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
+import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
 interface PiAPIBalance {
   credits: number;
   equivalent_in_usd: number;
@@ -419,15 +420,21 @@ export const TextToVideoForm = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="prompt">Descrizione del Video</Label>
-          <PromptBuilderWizard 
-            onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
-            trigger={
-              <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
-                <Wand2 className="h-3.5 w-3.5" />
-                Wizard
-              </Button>
-            }
-          />
+          <div className="flex items-center gap-1.5">
+            <PromptTemplatesLibrary 
+              currentPrompt={prompt}
+              onApplyTemplate={(p) => setPrompt(p)}
+            />
+            <PromptBuilderWizard 
+              onPromptGenerated={(generatedPrompt) => setPrompt(generatedPrompt)}
+              trigger={
+                <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Wizard
+                </Button>
+              }
+            />
+          </div>
         </div>
         <Textarea
           id="prompt"
