@@ -1059,12 +1059,35 @@ serve(async (req) => {
             throw new Error("PixVerse Transition requires both start and end images");
           }
         } else if (isVeoFirstLast) {
-          // Veo 3.1 first-last-i2v uses image_url for start and last_image_url for end
-          aimlPayload.image_url = startUrl;
+          // Veo 3.1 first-last-i2v uses first_frame_url for start and last_frame_url for end
+          // CRITICAL: Always upload images with signed URLs for this model
+          let veoStartUrl = startUrl;
+          if (startUrl.includes('/object/public/')) {
+            // Force convert to signed URL since public URLs may not be accessible
+            const signedUrl = await tryConvertPublicStorageUrlToSigned(startUrl, { expiresInSec: 60 * 60 });
+            if (signedUrl) {
+              veoStartUrl = signedUrl;
+              console.log('[AI/ML API] Converted public URL to signed URL for first_frame_url');
+            } else {
+              console.warn('[AI/ML API] Could not convert public URL to signed, may fail');
+            }
+          }
+          aimlPayload.first_frame_url = veoStartUrl;
           
           if (end_image) {
             const endUrl = await getAimlImageUrl(end_image);
-            aimlPayload.last_image_url = endUrl;
+            // Also ensure last frame URL is signed
+            let veoEndUrl = endUrl;
+            if (endUrl.includes('/object/public/')) {
+              const signedEndUrl = await tryConvertPublicStorageUrlToSigned(endUrl, { expiresInSec: 60 * 60 });
+              if (signedEndUrl) {
+                veoEndUrl = signedEndUrl;
+                console.log('[AI/ML API] Converted public URL to signed URL for last_frame_url');
+              } else {
+                console.warn('[AI/ML API] Could not convert public URL to signed for last_frame, may fail');
+              }
+            }
+            aimlPayload.last_frame_url = veoEndUrl;
           }
         } else {
           // Most other AI/ML API video models accept a single image URL for I2V
