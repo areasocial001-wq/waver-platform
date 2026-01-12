@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
+import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 
 interface PiAPIBalance {
   credits: number;
@@ -48,6 +49,11 @@ export const TextToVideoForm = () => {
   const [generateAudio, setGenerateAudio] = useState(true);
   const [videoTitle, setVideoTitle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Track original values before auto-correction for warning display
+  const [originalDuration, setOriginalDuration] = useState<number | null>(null);
+  const [originalResolution, setOriginalResolution] = useState<string | null>(null);
+  const [originalAspectRatio, setOriginalAspectRatio] = useState<string | null>(null);
 
   // Fetch API key status from backend
   const { status: apiKeyStatus } = useApiKeyStatus();
@@ -88,14 +94,20 @@ export const TextToVideoForm = () => {
     // Validate and adjust duration
     const validDuration = capabilities.getValidDuration(duration);
     if (validDuration !== duration) {
+      setOriginalDuration(duration);
       setDuration(validDuration);
       toast.info(`Durata adattata a ${validDuration}s per ${currentProvider.shortName}`);
+    } else {
+      setOriginalDuration(null);
     }
     
     // Validate and adjust resolution
     const validResolution = capabilities.getValidResolution(resolution);
     if (validResolution !== resolution) {
+      setOriginalResolution(resolution);
       setResolution(validResolution);
+    } else {
+      setOriginalResolution(null);
     }
     
     // Validate and adjust aspect ratio
@@ -521,7 +533,16 @@ export const TextToVideoForm = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="duration">Durata</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="duration">Durata</Label>
+            {originalDuration !== null && (
+              <AutoCorrectionBadge
+                originalValue={`${originalDuration}s`}
+                correctedValue={`${duration}s`}
+                label="Durata"
+              />
+            )}
+          </div>
           <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
             <SelectTrigger id="duration">
               <SelectValue />
@@ -535,7 +556,16 @@ export const TextToVideoForm = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="resolution">Risoluzione</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="resolution">Risoluzione</Label>
+            {originalResolution !== null && (
+              <AutoCorrectionBadge
+                originalValue={originalResolution}
+                correctedValue={resolution}
+                label="Risoluzione"
+              />
+            )}
+          </div>
           <Select value={resolution} onValueChange={setResolution}>
             <SelectTrigger id="resolution">
               <SelectValue />

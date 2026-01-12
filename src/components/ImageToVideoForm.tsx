@@ -14,6 +14,7 @@ import { ApiKeyMissingBanner } from "@/components/ApiKeyMissingBanner";
 import { VIDEO_PROVIDERS, VideoProviderType } from "@/lib/videoProviderConfig";
 import { useApiKeyStatus } from "@/hooks/useApiKeyStatus";
 import { useModelCapabilities } from "@/hooks/useModelCapabilities";
+import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -32,6 +33,11 @@ export const ImageToVideoForm = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const [isLoading, setIsLoading] = useState(false);
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
+  
+  // Track original values before auto-correction for warning display
+  const [originalDuration, setOriginalDuration] = useState<number | null>(null);
+  const [originalResolution, setOriginalResolution] = useState<string | null>(null);
+  const [originalAspectRatio, setOriginalAspectRatio] = useState<string | null>(null);
 
   // Fetch API key status from backend
   const { status: apiKeyStatus } = useApiKeyStatus();
@@ -71,23 +77,34 @@ export const ImageToVideoForm = () => {
   useEffect(() => {
     const validDuration = getValidDuration(duration);
     if (validDuration !== duration) {
+      setOriginalDuration(duration);
       setDuration(validDuration);
       toast.info("Durata adattata", {
         description: `Il provider supporta ${validDuration}s`
       });
+    } else {
+      setOriginalDuration(null);
     }
     
     const validResolution = getValidResolution(resolution);
     if (validResolution !== resolution) {
+      setOriginalResolution(resolution);
       setResolution(validResolution);
+    } else {
+      setOriginalResolution(null);
     }
     
     // Adjust aspect ratio if not supported
     if (aspectRatioOptions) {
       const validRatios = aspectRatioOptions.map(r => r.value);
       if (!validRatios.includes(aspectRatio)) {
+        setOriginalAspectRatio(aspectRatio);
         setAspectRatio(defaultAspectRatio || validRatios[0]);
+      } else {
+        setOriginalAspectRatio(null);
       }
+    } else {
+      setOriginalAspectRatio(null);
     }
   }, [preferredProvider, getValidDuration, getValidResolution, duration, resolution, aspectRatio, aspectRatioOptions, defaultAspectRatio]);
 
@@ -663,7 +680,16 @@ export const ImageToVideoForm = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="i2v-duration">Durata</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="i2v-duration">Durata</Label>
+            {originalDuration !== null && (
+              <AutoCorrectionBadge
+                originalValue={`${originalDuration}s`}
+                correctedValue={`${duration}s`}
+                label="Durata"
+              />
+            )}
+          </div>
           <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
             <SelectTrigger id="i2v-duration">
               <SelectValue placeholder="Seleziona durata" />
@@ -677,7 +703,16 @@ export const ImageToVideoForm = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="i2v-resolution">Risoluzione</Label>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="i2v-resolution">Risoluzione</Label>
+            {originalResolution !== null && (
+              <AutoCorrectionBadge
+                originalValue={originalResolution}
+                correctedValue={resolution}
+                label="Risoluzione"
+              />
+            )}
+          </div>
           <Select value={resolution} onValueChange={setResolution}>
             <SelectTrigger id="i2v-resolution">
               <SelectValue placeholder="Seleziona risoluzione" />
