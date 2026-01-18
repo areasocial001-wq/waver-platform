@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, Play, Download, Loader2 } from "lucide-react";
+import { Volume2, Play, Download, Loader2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,12 +17,14 @@ interface AddVoiceoverDialogProps {
 }
 
 const VOICE_OPTIONS = [
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Femminile, Naturale)", lang: "it" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (Maschile, Profondo)", lang: "en" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel (Maschile, Narratore)", lang: "en" },
-  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily (Femminile, Dolce)", lang: "en" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam (Maschile, Giovane)", lang: "en" },
-  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda (Femminile, Elegante)", lang: "en" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Femminile, Naturale)", lang: "it", description: "Voce femminile naturale, ottima per italiano" },
+  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (Maschile, Profondo)", lang: "en", description: "Voce maschile profonda e autorevole" },
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel (Maschile, Narratore)", lang: "en", description: "Perfetta per narrazioni e documentari" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily (Femminile, Dolce)", lang: "en", description: "Voce dolce e rassicurante" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam (Maschile, Giovane)", lang: "en", description: "Voce giovane e dinamica" },
+  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda (Femminile, Elegante)", lang: "en", description: "Voce elegante e sofisticata" },
+  { id: "9BWtsMINqrJLrRacOk9x", name: "Aria (Femminile, Espressiva)", lang: "en", description: "Voce espressiva e coinvolgente" },
+  { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger (Maschile, Caldo)", lang: "en", description: "Voce calda e avvolgente" },
 ];
 
 export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: AddVoiceoverDialogProps) => {
@@ -29,6 +32,10 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
   const [text, setText] = useState(dialogueText || "");
   const [voiceId, setVoiceId] = useState(VOICE_OPTIONS[0].id);
   const [speed, setSpeed] = useState([1.0]);
+  const [stability, setStability] = useState([0.5]);
+  const [similarityBoost, setSimilarityBoost] = useState([0.75]);
+  const [style, setStyle] = useState([0.5]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -64,7 +71,10 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
         body: JSON.stringify({ 
           text, 
           voiceId, 
-          speed: speed[0] 
+          speed: speed[0],
+          stability: stability[0],
+          similarityBoost: similarityBoost[0],
+          style: style[0],
         }),
       });
 
@@ -171,7 +181,10 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
               <SelectContent>
                 {VOICE_OPTIONS.map((voice) => (
                   <SelectItem key={voice.id} value={voice.id}>
-                    {voice.name}
+                    <div className="flex flex-col">
+                      <span>{voice.name}</span>
+                      <span className="text-xs text-muted-foreground">{voice.description}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -189,6 +202,77 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
               className="w-full"
             />
           </div>
+
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full gap-2">
+                <Settings2 className="h-4 w-4" />
+                Impostazioni Avanzate
+                {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Stabilità: {(stability[0] * 100).toFixed(0)}%</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {stability[0] < 0.3 ? "Più espressivo" : stability[0] > 0.7 ? "Più stabile" : "Bilanciato"}
+                  </span>
+                </div>
+                <Slider
+                  value={stability}
+                  onValueChange={setStability}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Valori bassi = più variazione emotiva, alti = più costante
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Somiglianza: {(similarityBoost[0] * 100).toFixed(0)}%</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {similarityBoost[0] < 0.5 ? "Più naturale" : similarityBoost[0] > 0.8 ? "Più fedele" : "Bilanciato"}
+                  </span>
+                </div>
+                <Slider
+                  value={similarityBoost}
+                  onValueChange={setSimilarityBoost}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quanto la voce deve aderire al timbro originale
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label>Stile/Espressività: {(style[0] * 100).toFixed(0)}%</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {style[0] < 0.3 ? "Neutro" : style[0] > 0.7 ? "Molto espressivo" : "Moderato"}
+                  </span>
+                </div>
+                <Slider
+                  value={style}
+                  onValueChange={setStyle}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Quanto enfatizzare lo stile espressivo della voce
+                </p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
           <Button 
             onClick={handleGenerate} 
