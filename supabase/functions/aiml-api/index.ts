@@ -233,12 +233,25 @@ serve(async (req) => {
       const data = await response.json();
       console.log('AIML STT response:', JSON.stringify(data));
       
-      // Handle different response structures from AIML API
-      const transcriptionText = data.text || data.transcription || data.result?.text || '';
+      // Handle Deepgram-style response structure from AIML API
+      // Response format: { results: { channels: [{ alternatives: [{ transcript, words }] }] } }
+      let transcriptionText = '';
+      let words = [];
+      
+      if (data.results?.channels?.[0]?.alternatives?.[0]) {
+        const alternative = data.results.channels[0].alternatives[0];
+        transcriptionText = alternative.transcript || '';
+        words = alternative.words || [];
+      } else {
+        // Fallback to other possible formats
+        transcriptionText = data.text || data.transcription || data.result?.text || '';
+        words = data.words || data.result?.words || [];
+      }
       
       return new Response(JSON.stringify({
         text: transcriptionText,
-        segments: data.segments || data.result?.segments,
+        words: words,
+        duration: data.metadata?.duration,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
