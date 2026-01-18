@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback } from "react";
+import { useScribe, CommitStrategy } from "@elevenlabs/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, 
   FileText, 
@@ -13,7 +15,12 @@ import {
   Download,
   Video,
   Languages,
-  Users
+  Users,
+  Mic,
+  MicOff,
+  Save,
+  Pencil,
+  CheckCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,9 +63,28 @@ export function VideoTranscriber() {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState<TranscriptionResult | null>(null);
   const [progress, setProgress] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedText, setEditedText] = useState("");
+  
+  // Realtime transcription state
+  const [realtimeText, setRealtimeText] = useState("");
+  const [committedSegments, setCommittedSegments] = useState<string[]>([]);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ElevenLabs Scribe hook for realtime transcription
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data: { text: string }) => {
+      setRealtimeText(data.text);
+    },
+    onCommittedTranscript: (data: { text: string }) => {
+      setCommittedSegments(prev => [...prev, data.text]);
+      setRealtimeText("");
+    },
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,6 +96,7 @@ export function VideoTranscriber() {
       setVideoFile(file);
       setVideoUrl(URL.createObjectURL(file));
       setTranscription(null);
+      setIsEditing(false);
     }
   };
 
@@ -190,6 +217,7 @@ export function VideoTranscriber() {
       };
 
       setTranscription(result);
+      setEditedText(result.text);
       toast.success("Trascrizione completata!");
 
       // Cleanup: delete the uploaded audio file
@@ -206,17 +234,82 @@ export function VideoTranscriber() {
     }
   };
 
+  // Realtime transcription functions
+  const handleStartRealtime = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-scribe-token');
+      
+      if (error || !data?.token) {
+        throw new Error(error?.message || "Errore nel recupero del token");
+      }
+
+      await scribe.connect({
+        token: data.token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      
+      toast.success("Registrazione avviata");
+    } catch (error) {
+      console.error("Realtime start error:", error);
+      toast.error("Errore avvio registrazione: " + (error as Error).message);
+    }
+  };
+
+  const handleStopRealtime = () => {
+    scribe.disconnect();
+    toast.success("Registrazione terminata");
+  };
+
+  const handleSaveRealtimeTranscription = () => {
+    const fullText = [...committedSegments, realtimeText].filter(Boolean).join(" ");
+    if (fullText) {
+      setTranscription({ text: fullText });
+      setEditedText(fullText);
+      toast.success("Trascrizione salvata!");
+    }
+  };
+
+  const handleClearRealtime = () => {
+    setCommittedSegments([]);
+    setRealtimeText("");
+  };
+
+  // Editing functions
+  const handleStartEditing = () => {
+    setIsEditing(true);
+    setEditedText(transcription?.text || "");
+  };
+
+  const handleSaveEdit = () => {
+    if (transcription) {
+      setTranscription({ ...transcription, text: editedText });
+      setIsEditing(false);
+      toast.success("Modifiche salvate!");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedText(transcription?.text || "");
+    setIsEditing(false);
+  };
+
   const handleCopyText = () => {
-    if (transcription?.text) {
-      navigator.clipboard.writeText(transcription.text);
+    const textToCopy = isEditing ? editedText : (transcription?.text || "");
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
       toast.success("Testo copiato negli appunti!");
     }
   };
 
   const handleDownloadText = () => {
-    if (!transcription?.text) return;
+    const textToDownload = transcription?.text;
+    if (!textToDownload) return;
     
-    const blob = new Blob([transcription.text], { type: 'text/plain' });
+    const blob = new Blob([textToDownload], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -289,6 +382,8 @@ export function VideoTranscriber() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const fullRealtimeText = [...committedSegments, realtimeText].filter(Boolean).join(" ");
+
   return (
     <Card className="border-primary/20">
       <CardHeader>
@@ -297,103 +392,190 @@ export function VideoTranscriber() {
           Video Transcriber
         </CardTitle>
         <CardDescription>
-          Estrai il testo parlato dal tuo video usando AI speech-to-text
+          Estrai il testo parlato dal tuo video o usa il microfono per trascrizione in tempo reale
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Video Upload */}
-        <div className="space-y-2">
-          <Label>1. Carica il video</Label>
-          <div 
-            className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="video/*"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-            {videoUrl ? (
-              <video 
-                ref={videoRef}
-                src={videoUrl} 
-                className="max-h-64 mx-auto rounded-lg"
-                controls
-              />
-            ) : (
-              <div className="py-8">
-                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">
-                  Clicca per caricare un video o trascina qui
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Formati supportati: MP4, WebM, MOV, AVI
-                </p>
+        <Tabs defaultValue="video" className="w-full">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="video" className="flex items-center gap-2">
+              <Video className="w-4 h-4" />
+              Da Video
+            </TabsTrigger>
+            <TabsTrigger value="realtime" className="flex items-center gap-2">
+              <Mic className="w-4 h-4" />
+              Tempo Reale
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Video Transcription Tab */}
+          <TabsContent value="video" className="space-y-6 mt-4">
+            {/* Video Upload */}
+            <div className="space-y-2">
+              <Label>1. Carica il video</Label>
+              <div 
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {videoUrl ? (
+                  <video 
+                    ref={videoRef}
+                    src={videoUrl} 
+                    className="max-h-64 mx-auto rounded-lg"
+                    controls
+                  />
+                ) : (
+                  <div className="py-8">
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      Clicca per caricare un video o trascina qui
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Formati supportati: MP4, WebM, MOV, AVI
+                    </p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Languages className="w-4 h-4" />
-              Lingua
-            </Label>
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger>
-                <SelectValue placeholder="Seleziona lingua" />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.value} value={lang.value}>
-                    {lang.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Riconoscimento speaker
-            </Label>
-            <div className="flex items-center space-x-2 pt-2">
-              <Switch
-                id="diarization"
-                checked={enableDiarization}
-                onCheckedChange={setEnableDiarization}
-              />
-              <Label htmlFor="diarization" className="text-sm text-muted-foreground">
-                Identifica diversi speaker
-              </Label>
             </div>
-          </div>
-        </div>
 
-        {/* Transcribe Button */}
-        <Button
-          onClick={handleTranscribe}
-          disabled={!videoFile || isTranscribing}
-          className="w-full"
-          size="lg"
-        >
-          {isTranscribing ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              {progress || "Trascrizione..."}
-            </>
-          ) : (
-            <>
-              <Video className="w-4 h-4 mr-2" />
-              Trascrivi Video
-            </>
-          )}
-        </Button>
+            {/* Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Languages className="w-4 h-4" />
+                  Lingua
+                </Label>
+                <Select value={language} onValueChange={setLanguage}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleziona lingua" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LANGUAGES.map((lang) => (
+                      <SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Riconoscimento speaker
+                </Label>
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch
+                    id="diarization"
+                    checked={enableDiarization}
+                    onCheckedChange={setEnableDiarization}
+                  />
+                  <Label htmlFor="diarization" className="text-sm text-muted-foreground">
+                    Identifica diversi speaker
+                  </Label>
+                </div>
+              </div>
+            </div>
+
+            {/* Transcribe Button */}
+            <Button
+              onClick={handleTranscribe}
+              disabled={!videoFile || isTranscribing}
+              className="w-full"
+              size="lg"
+            >
+              {isTranscribing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  {progress || "Trascrizione..."}
+                </>
+              ) : (
+                <>
+                  <Video className="w-4 h-4 mr-2" />
+                  Trascrivi Video
+                </>
+              )}
+            </Button>
+          </TabsContent>
+
+          {/* Realtime Transcription Tab */}
+          <TabsContent value="realtime" className="space-y-6 mt-4">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center gap-4">
+                {!scribe.isConnected ? (
+                  <Button
+                    onClick={handleStartRealtime}
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <Mic className="w-5 h-5" />
+                    Avvia Registrazione
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleStopRealtime}
+                    variant="destructive"
+                    size="lg"
+                    className="gap-2"
+                  >
+                    <MicOff className="w-5 h-5" />
+                    Ferma Registrazione
+                  </Button>
+                )}
+              </div>
+
+              {scribe.isConnected && (
+                <div className="flex items-center justify-center gap-2 text-sm text-green-500">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  Registrazione in corso...
+                </div>
+              )}
+            </div>
+
+            {/* Realtime transcription display */}
+            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border min-h-[200px]">
+              <div className="flex items-center justify-between">
+                <Label>Trascrizione in tempo reale</Label>
+                <div className="flex gap-2">
+                  {fullRealtimeText && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={handleSaveRealtimeTranscription}>
+                        <Save className="w-4 h-4 mr-1" />
+                        Salva
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleClearRealtime}>
+                        Cancella
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-[120px] text-foreground">
+                {committedSegments.map((segment, i) => (
+                  <span key={i} className="text-foreground">
+                    {segment}{" "}
+                  </span>
+                ))}
+                {realtimeText && (
+                  <span className="text-primary/70 italic">{realtimeText}</span>
+                )}
+                {!fullRealtimeText && !scribe.isConnected && (
+                  <p className="text-muted-foreground text-center py-8">
+                    Premi "Avvia Registrazione" per iniziare la trascrizione in tempo reale
+                  </p>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
 
         {/* Transcription Result */}
         {transcription && (
@@ -401,28 +583,47 @@ export function VideoTranscriber() {
             <div className="flex items-center justify-between">
               <Label>Trascrizione</Label>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={handleCopyText}>
-                  <Copy className="w-4 h-4 mr-1" />
-                  Copia
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadText}>
-                  <Download className="w-4 h-4 mr-1" />
-                  TXT
-                </Button>
-                {transcription.words && transcription.words.length > 0 && (
-                  <Button variant="outline" size="sm" onClick={handleDownloadSRT}>
-                    <Download className="w-4 h-4 mr-1" />
-                    SRT
-                  </Button>
+                {!isEditing ? (
+                  <>
+                    <Button variant="outline" size="sm" onClick={handleStartEditing}>
+                      <Pencil className="w-4 h-4 mr-1" />
+                      Modifica
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCopyText}>
+                      <Copy className="w-4 h-4 mr-1" />
+                      Copia
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDownloadText}>
+                      <Download className="w-4 h-4 mr-1" />
+                      TXT
+                    </Button>
+                    {transcription.words && transcription.words.length > 0 && (
+                      <Button variant="outline" size="sm" onClick={handleDownloadSRT}>
+                        <Download className="w-4 h-4 mr-1" />
+                        SRT
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Button variant="default" size="sm" onClick={handleSaveEdit}>
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Salva
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleCancelEdit}>
+                      Annulla
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
 
             <Textarea
-              value={transcription.text}
-              readOnly
+              value={isEditing ? editedText : transcription.text}
+              onChange={(e) => setEditedText(e.target.value)}
+              readOnly={!isEditing}
               rows={8}
-              className="resize-none bg-background"
+              className={`resize-none ${isEditing ? 'bg-background border-primary' : 'bg-background'}`}
             />
 
             {transcription.language && (
@@ -432,7 +633,7 @@ export function VideoTranscriber() {
             )}
 
             {/* Word timestamps preview */}
-            {transcription.words && transcription.words.length > 0 && (
+            {transcription.words && transcription.words.length > 0 && !isEditing && (
               <div className="space-y-2">
                 <Label className="text-sm">Timeline parole</Label>
                 <div className="max-h-48 overflow-y-auto space-y-1 text-xs">
