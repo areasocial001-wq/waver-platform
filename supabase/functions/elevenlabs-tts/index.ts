@@ -11,6 +11,9 @@ const requestSchema = z.object({
   text: z.string().min(1, 'Testo obbligatorio').max(5000, 'Testo troppo lungo'),
   voiceId: z.string().max(100).optional(),
   speed: z.number().min(0.5).max(2.0).optional(),
+  stability: z.number().min(0).max(1).optional(),
+  similarityBoost: z.number().min(0).max(1).optional(),
+  style: z.number().min(0).max(1).optional(),
 });
 
 serve(async (req) => {
@@ -38,7 +41,7 @@ serve(async (req) => {
       );
     }
     
-    const { text, voiceId, speed } = parseResult.data;
+    const { text, voiceId, speed, stability, similarityBoost, style } = parseResult.data;
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 
     if (!ELEVENLABS_API_KEY) {
@@ -48,9 +51,15 @@ serve(async (req) => {
     // Default to a natural Italian voice if not specified
     const selectedVoiceId = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah - natural multilingual voice
 
+    // Use provided values or sensible defaults
+    const voiceStability = stability ?? 0.5;
+    const voiceSimilarity = similarityBoost ?? 0.75;
+    const voiceStyle = style ?? 0.5;
+    const voiceSpeed = Math.max(0.7, Math.min(1.2, speed ?? 1.0));
+
     console.log('Generating TTS for text:', text.substring(0, 100) + '...');
     console.log('Using voice ID:', selectedVoiceId);
-    console.log('Speed:', speed || 1.0);
+    console.log('Settings - Speed:', voiceSpeed, 'Stability:', voiceStability, 'Similarity:', voiceSimilarity, 'Style:', voiceStyle);
 
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
@@ -65,11 +74,11 @@ serve(async (req) => {
           model_id: 'eleven_multilingual_v2',
           output_format: 'mp3_44100_128',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.5,
+            stability: voiceStability,
+            similarity_boost: voiceSimilarity,
+            style: voiceStyle,
             use_speaker_boost: true,
-            speed: Math.max(0.7, Math.min(1.2, speed || 1.0)), // Clamp between 0.7 and 1.2
+            speed: voiceSpeed,
           },
         }),
       }
