@@ -6,10 +6,11 @@ import { ImageToVideoForm } from "./ImageToVideoForm";
 import { ImageGenerationForm } from "./ImageGenerationForm";
 import { StoryboardEditor } from "./StoryboardEditor";
 import { VideoToAudioForm } from "./VideoToAudioForm";
+import { VideoTranscriber } from "./VideoTranscriber";
 import { PiAPIAudioGenerator } from "./PiAPIAudioGenerator";
 import { MotionControlForm } from "./MotionControlForm";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
-import { Video, Image, Sparkles, Layout, Volume2, Music, Wand2 } from "lucide-react";
+import { Video, Image, Sparkles, Layout, Volume2, Music, Wand2, FileText } from "lucide-react";
 
 export const GenerateSection = () => {
   return (
@@ -28,7 +29,7 @@ export const GenerateSection = () => {
         </div>
 
         <Tabs defaultValue="text" className="w-full">
-          <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-7 mb-8 bg-card/50 border border-border p-1">
+          <TabsList className="grid w-full max-w-6xl mx-auto grid-cols-8 mb-8 bg-card/50 border border-border p-1">
             <TabsTrigger 
               value="text" 
               className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -56,6 +57,13 @@ export const GenerateSection = () => {
             >
               <Volume2 className="w-4 h-4" />
               <span className="hidden md:inline">Video to Audio</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="transcribe" 
+              className="flex items-center gap-2 data-[state=inactive]:bg-muted data-[state=inactive]:text-foreground data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground"
+            >
+              <FileText className="w-4 h-4" />
+              <span className="hidden md:inline">Trascrivi</span>
             </TabsTrigger>
             <TabsTrigger 
               value="piapi-audio" 
@@ -146,6 +154,10 @@ export const GenerateSection = () => {
                 <VideoToAudioForm />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="transcribe">
+            <VideoTranscriber />
           </TabsContent>
 
           <TabsContent value="piapi-audio">
