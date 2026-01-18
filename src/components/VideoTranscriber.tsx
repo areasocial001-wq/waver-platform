@@ -208,12 +208,20 @@ export function VideoTranscriber() {
       if (error) throw error;
       if (data.error) throw new Error(data.error);
 
-      // Parse the transcription result
+      console.log('Transcription response:', data);
+
+      // Parse the transcription result - handle various response formats
+      const transcriptionText = data.text || data.transcription || data.result?.text || '';
+      
+      if (!transcriptionText) {
+        throw new Error("La trascrizione non ha restituito testo. Prova con un video con audio più chiaro.");
+      }
+      
       const result: TranscriptionResult = {
-        text: data.text || data.transcription || '',
-        words: data.words,
-        language: data.language,
-        duration: data.duration
+        text: transcriptionText,
+        words: data.words || data.result?.words,
+        language: data.language || data.result?.language,
+        duration: data.duration || data.result?.duration
       };
 
       setTranscription(result);
