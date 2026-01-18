@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Volume2, Play, Download, Loader2, Settings2, ChevronDown, ChevronUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Volume2, Play, Download, Loader2, Settings2, ChevronDown, ChevronUp, Copy, Save, Trash2, Headphones } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,20 @@ interface AddVoiceoverDialogProps {
   videoId: string;
   dialogueText?: string | null;
   onVoiceoverAdded?: (audioUrl: string) => void;
+}
+
+interface VoiceSettings {
+  voiceId: string;
+  speed: number;
+  stability: number;
+  similarityBoost: number;
+  style: number;
+}
+
+interface VoicePreset {
+  id: string;
+  name: string;
+  settings: VoiceSettings;
 }
 
 const VOICE_OPTIONS = [
@@ -27,6 +42,21 @@ const VOICE_OPTIONS = [
   { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger (Maschile, Caldo)", lang: "en", description: "Voce calda e avvolgente" },
 ];
 
+const PRESETS_STORAGE_KEY = "voice-presets";
+
+const getStoredPresets = (): VoicePreset[] => {
+  try {
+    const stored = localStorage.getItem(PRESETS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const savePresetsToStorage = (presets: VoicePreset[]) => {
+  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+};
+
 export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: AddVoiceoverDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [text, setText] = useState(dialogueText || "");
@@ -37,24 +67,137 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
   const [style, setStyle] = useState([0.5]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPreviewGenerating, setIsPreviewGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [previewAudioUrl, setPreviewAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useState<HTMLAudioElement | null>(null);
+  
+  // Preset management
+  const [presets, setPresets] = useState<VoicePreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [showPresetInput, setShowPresetInput] = useState(false);
+  
+  // Original settings from video
+  const [originalSettings, setOriginalSettings] = useState<VoiceSettings | null>(null);
+  const [hasOriginalSettings, setHasOriginalSettings] = useState(false);
 
-  const handleGenerate = async () => {
-    if (!text.trim()) {
+  // Load presets and original settings when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setPresets(getStoredPresets());
+      loadOriginalSettings();
+    }
+  }, [isOpen, videoId]);
+
+  const loadOriginalSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("video_generations")
+        .select("voice_settings, dialogue_text")
+        .eq("id", videoId)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.voice_settings && typeof data.voice_settings === 'object' && !Array.isArray(data.voice_settings)) {
+        const vs = data.voice_settings as Record<string, unknown>;
+        const settings: VoiceSettings = {
+          voiceId: typeof vs.voiceId === 'string' ? vs.voiceId : VOICE_OPTIONS[0].id,
+          speed: typeof vs.speed === 'number' ? vs.speed : 1.0,
+          stability: typeof vs.stability === 'number' ? vs.stability : 0.5,
+          similarityBoost: typeof vs.similarityBoost === 'number' ? vs.similarityBoost : 0.75,
+          style: typeof vs.style === 'number' ? vs.style : 0.5,
+        };
+        setOriginalSettings(settings);
+        setHasOriginalSettings(true);
+      } else {
+        setHasOriginalSettings(false);
+      }
+      
+      if (data?.dialogue_text && !dialogueText) {
+        setText(data.dialogue_text);
+      }
+    } catch (error) {
+      console.error("Error loading original settings:", error);
+    }
+  };
+
+  const applySettings = (settings: VoiceSettings) => {
+    setVoiceId(settings.voiceId);
+    setSpeed([settings.speed]);
+    setStability([settings.stability]);
+    setSimilarityBoost([settings.similarityBoost]);
+    setStyle([settings.style]);
+    setShowAdvanced(true);
+  };
+
+  const copyOriginalSettings = () => {
+    if (originalSettings) {
+      applySettings(originalSettings);
+      toast.success("Impostazioni originali applicate!");
+    }
+  };
+
+  const getCurrentSettings = (): VoiceSettings => ({
+    voiceId,
+    speed: speed[0],
+    stability: stability[0],
+    similarityBoost: similarityBoost[0],
+    style: style[0],
+  });
+
+  const savePreset = () => {
+    if (!newPresetName.trim()) {
+      toast.error("Inserisci un nome per il preset");
+      return;
+    }
+
+    const newPreset: VoicePreset = {
+      id: Date.now().toString(),
+      name: newPresetName.trim(),
+      settings: getCurrentSettings(),
+    };
+
+    const updatedPresets = [...presets, newPreset];
+    setPresets(updatedPresets);
+    savePresetsToStorage(updatedPresets);
+    setNewPresetName("");
+    setShowPresetInput(false);
+    toast.success(`Preset "${newPreset.name}" salvato!`);
+  };
+
+  const deletePreset = (presetId: string) => {
+    const updatedPresets = presets.filter(p => p.id !== presetId);
+    setPresets(updatedPresets);
+    savePresetsToStorage(updatedPresets);
+    toast.success("Preset eliminato");
+  };
+
+  const applyPreset = (preset: VoicePreset) => {
+    applySettings(preset.settings);
+    toast.success(`Preset "${preset.name}" applicato!`);
+  };
+
+  const generateAudio = async (isPreview: boolean = false) => {
+    const textToGenerate = isPreview ? text.substring(0, 200) : text;
+    
+    if (!textToGenerate.trim()) {
       toast.error("Inserisci il testo per il voiceover");
       return;
     }
 
-    setIsGenerating(true);
-    setAudioUrl(null);
+    if (isPreview) {
+      setIsPreviewGenerating(true);
+      setPreviewAudioUrl(null);
+    } else {
+      setIsGenerating(true);
+      setAudioUrl(null);
+    }
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       
-      // Get auth token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         toast.error("Devi effettuare l'accesso");
@@ -69,7 +212,7 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
           "Authorization": `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ 
-          text, 
+          text: textToGenerate, 
           voiceId, 
           speed: speed[0],
           stability: stability[0],
@@ -87,16 +230,31 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
       
       if (data.audioContent) {
         const url = `data:audio/mpeg;base64,${data.audioContent}`;
-        setAudioUrl(url);
-        toast.success("Audio generato con successo!");
+        if (isPreview) {
+          setPreviewAudioUrl(url);
+          // Auto-play preview
+          const audio = new Audio(url);
+          audio.play();
+          toast.success("Anteprima generata!");
+        } else {
+          setAudioUrl(url);
+          toast.success("Audio generato con successo!");
+        }
       }
     } catch (error) {
       console.error("Error generating voiceover:", error);
       toast.error(error instanceof Error ? error.message : "Errore nella generazione");
     } finally {
-      setIsGenerating(false);
+      if (isPreview) {
+        setIsPreviewGenerating(false);
+      } else {
+        setIsGenerating(false);
+      }
     }
   };
+
+  const handleGenerate = () => generateAudio(false);
+  const handlePreview = () => generateAudio(true);
 
   const handlePlay = () => {
     if (audioUrl) {
@@ -111,12 +269,19 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
     if (!audioUrl) return;
 
     try {
-      // Update the video generation with the audio URL
+      const currentSettings = getCurrentSettings();
       const { error } = await supabase
         .from("video_generations")
         .update({ 
           audio_url: audioUrl,
-          dialogue_text: text 
+          dialogue_text: text,
+          voice_settings: {
+            voiceId: currentSettings.voiceId,
+            speed: currentSettings.speed,
+            stability: currentSettings.stability,
+            similarityBoost: currentSettings.similarityBoost,
+            style: currentSettings.style,
+          },
         })
         .eq("id", videoId);
 
@@ -140,6 +305,10 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
     }
   };
 
+  const getVoiceName = (id: string) => {
+    return VOICE_OPTIONS.find(v => v.id === id)?.name || id;
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -148,7 +317,7 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
           Aggiungi Voiceover
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Genera Voiceover con ElevenLabs</DialogTitle>
           <DialogDescription>
@@ -157,6 +326,54 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Original Settings Button */}
+          {hasOriginalSettings && originalSettings && (
+            <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Impostazioni Originali Disponibili</p>
+                  <p className="text-xs text-muted-foreground">
+                    Voce: {getVoiceName(originalSettings.voiceId)} • 
+                    Velocità: {originalSettings.speed.toFixed(1)}x
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={copyOriginalSettings} className="gap-2">
+                  <Copy className="h-4 w-4" />
+                  Usa Originali
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Preset Selector */}
+          {presets.length > 0 && (
+            <div className="space-y-2">
+              <Label>Preset Salvati</Label>
+              <div className="flex flex-wrap gap-2">
+                {presets.map((preset) => (
+                  <div key={preset.id} className="flex items-center gap-1 bg-muted rounded-md">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => applyPreset(preset)}
+                      className="h-8"
+                    >
+                      {preset.name}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deletePreset(preset.id)}
+                      className="h-8 px-2 hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="voiceover-text">Testo da pronunciare</Label>
             <Textarea
@@ -271,26 +488,78 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
                   Quanto enfatizzare lo stile espressivo della voce
                 </p>
               </div>
+
+              {/* Save Preset */}
+              <div className="pt-2 border-t">
+                {showPresetInput ? (
+                  <div className="flex gap-2">
+                    <Input
+                      value={newPresetName}
+                      onChange={(e) => setNewPresetName(e.target.value)}
+                      placeholder="Nome preset..."
+                      className="flex-1"
+                      onKeyDown={(e) => e.key === 'Enter' && savePreset()}
+                    />
+                    <Button size="sm" onClick={savePreset}>
+                      <Save className="h-4 w-4" />
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowPresetInput(false)}>
+                      Annulla
+                    </Button>
+                  </div>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setShowPresetInput(true)}
+                    className="w-full gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Salva come Preset
+                  </Button>
+                )}
+              </div>
             </CollapsibleContent>
           </Collapsible>
 
-          <Button 
-            onClick={handleGenerate} 
-            disabled={isGenerating || !text.trim()}
-            className="w-full"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generazione in corso...
-              </>
-            ) : (
-              <>
-                <Volume2 className="h-4 w-4 mr-2" />
-                Genera Audio
-              </>
-            )}
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline"
+              onClick={handlePreview} 
+              disabled={isPreviewGenerating || isGenerating || !text.trim()}
+              className="flex-1"
+            >
+              {isPreviewGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Anteprima...
+                </>
+              ) : (
+                <>
+                  <Headphones className="h-4 w-4 mr-2" />
+                  Anteprima (primi 200 car.)
+                </>
+              )}
+            </Button>
+            <Button 
+              onClick={handleGenerate} 
+              disabled={isGenerating || isPreviewGenerating || !text.trim()}
+              className="flex-1"
+            >
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generazione...
+                </>
+              ) : (
+                <>
+                  <Volume2 className="h-4 w-4 mr-2" />
+                  Genera Completo
+                </>
+              )}
+            </Button>
+          </div>
 
           {audioUrl && (
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
