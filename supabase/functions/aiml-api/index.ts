@@ -210,15 +210,16 @@ serve(async (req) => {
     if (operation === 'stt') {
       const parsed = sttRequestSchema.parse(body);
       
-      const response = await fetch(`${AIML_BASE_URL}/generate/audio/transcribe`, {
+      // Use the correct AIML API v1 STT endpoint
+      const response = await fetch('https://api.aimlapi.com/v1/stt', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${AIML_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'openai/whisper-large-v3',
-          audio_url: parsed.audio_url,
+          model: '#g1_whisper-large',
+          url: parsed.audio_url,
           language: parsed.language,
         }),
       });
@@ -230,7 +231,10 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      return new Response(JSON.stringify(data), {
+      return new Response(JSON.stringify({
+        text: data.text || data.transcription,
+        segments: data.segments,
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
