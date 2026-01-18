@@ -231,9 +231,14 @@ serve(async (req) => {
       }
 
       const data = await response.json();
+      console.log('AIML STT response:', JSON.stringify(data));
+      
+      // Handle different response structures from AIML API
+      const transcriptionText = data.text || data.transcription || data.result?.text || '';
+      
       return new Response(JSON.stringify({
-        text: data.text || data.transcription,
-        segments: data.segments,
+        text: transcriptionText,
+        segments: data.segments || data.result?.segments,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
