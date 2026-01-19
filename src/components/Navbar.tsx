@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
+import { AudioExtractorDialog } from "./AudioExtractorDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,6 +158,18 @@ export const Navbar = () => {
                   >
                     <Mic className="w-4 h-4 mr-2" />
                     Clona Voce
+                  </Button>
+                }
+              />
+              <AudioExtractorDialog
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-card hover:bg-accent text-foreground border-border"
+                  >
+                    <Music className="w-4 h-4 mr-2" />
+                    Estrai Audio
                   </Button>
                 }
               />
