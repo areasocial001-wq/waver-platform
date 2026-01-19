@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -19,11 +19,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
+  const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
+  const [audioExtractorOpen, setAudioExtractorOpen] = useState(false);
+  
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
   const isContentGeneratorPage = location.pathname === "/content-generator";
@@ -31,6 +42,7 @@ export const Navbar = () => {
   const isApiMonitoringPage = location.pathname === "/api-monitoring";
   const isVideoEditorPage = location.pathname === "/video-editor";
   const isSettingsPage = location.pathname === "/settings";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -56,25 +68,31 @@ export const Navbar = () => {
 
   return (
     <nav className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-2">
+        {/* Logo */}
         <button 
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0"
         >
           <Sparkles className="w-6 h-6 text-primary" />
-          <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent hidden sm:block">
             AI Production Hub
           </h1>
         </button>
         
-        <div className="flex items-center gap-3">
-          {/* API Status Widget */}
-          <ApiStatusNavWidget />
+        {/* Right side controls */}
+        <div className="flex items-center gap-2 overflow-hidden">
+          {/* API Status Widget - hidden on mobile */}
+          <div className="hidden md:block">
+            <ApiStatusNavWidget />
+          </div>
           
-          <span className="text-sm text-muted-foreground hidden sm:inline">
+          {/* Email - hidden on small screens */}
+          <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
             {user.email}
           </span>
-          {isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage ? (
+          
+          {isSubPage ? (
             <Button
               variant="outline"
               size="sm"
@@ -86,96 +104,120 @@ export const Navbar = () => {
             </Button>
           ) : (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/my-storyboards")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <Layout className="w-4 h-4 mr-2" />
-                Storyboard
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/history")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <History className="w-4 h-4 mr-2" />
-                Storico
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/content-generator")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                AI Content
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/freepik")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                Freepik
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/api-monitoring")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <Activity className="w-4 h-4 mr-2" />
-                API
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/video-editor")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <Film className="w-4 h-4 mr-2" />
-                Editor
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate("/settings")}
-                className="bg-card hover:bg-accent text-foreground border-border"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
-              <VoiceCloneDialog
-                trigger={
+              {/* Primary navigation - visible on larger screens */}
+              <div className="hidden xl:flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/my-storyboards")}
+                  className="bg-card hover:bg-accent text-foreground border-border"
+                >
+                  <Layout className="w-4 h-4 mr-2" />
+                  Storyboard
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/history")}
+                  className="bg-card hover:bg-accent text-foreground border-border"
+                >
+                  <History className="w-4 h-4 mr-2" />
+                  Storico
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/video-editor")}
+                  className="bg-card hover:bg-accent text-foreground border-border"
+                >
+                  <Film className="w-4 h-4 mr-2" />
+                  Editor
+                </Button>
+              </div>
+
+              {/* Audio Tools Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     variant="default"
                     size="sm"
                     className="bg-primary hover:bg-primary/90"
                   >
                     <Mic className="w-4 h-4 mr-2" />
-                    Clona Voce
+                    Audio
+                    <ChevronDown className="w-3 h-3 ml-1" />
                   </Button>
-                }
-              />
-              <AudioExtractorDialog
-                trigger={
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>Strumenti Audio</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setVoiceCloneOpen(true)}>
+                    <Mic className="w-4 h-4 mr-2" />
+                    Clona Voce
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setAudioExtractorOpen(true)}>
+                    <Music className="w-4 h-4 mr-2" />
+                    Estrai Audio
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* More menu for other items */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
                     size="sm"
                     className="bg-card hover:bg-accent text-foreground border-border"
                   >
-                    <Music className="w-4 h-4 mr-2" />
-                    Estrai Audio
+                    <MoreHorizontal className="w-4 h-4" />
+                    <span className="hidden sm:inline ml-2">Altro</span>
                   </Button>
-                }
-              />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>Navigazione</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {/* Show on smaller screens */}
+                  <div className="xl:hidden">
+                    <DropdownMenuItem onClick={() => navigate("/my-storyboards")}>
+                      <Layout className="w-4 h-4 mr-2" />
+                      Storyboard
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/history")}>
+                      <History className="w-4 h-4 mr-2" />
+                      Storico
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/video-editor")}>
+                      <Film className="w-4 h-4 mr-2" />
+                      Editor
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </div>
+                  
+                  <DropdownMenuItem onClick={() => navigate("/content-generator")}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    AI Content
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/freepik")}>
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Freepik
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/api-monitoring")}>
+                    <Activity className="w-4 h-4 mr-2" />
+                    API Monitor
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/settings")}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Impostazioni
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
           
+          {/* Logout Button */}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button
@@ -183,8 +225,8 @@ export const Navbar = () => {
                 size="sm"
                 className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/30 hover:border-destructive/50 transition-colors"
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Esci
+                <LogOut className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Esci</span>
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -208,6 +250,18 @@ export const Navbar = () => {
           </AlertDialog>
         </div>
       </div>
+      
+      {/* Voice Clone Dialog */}
+      <VoiceCloneDialog
+        open={voiceCloneOpen}
+        onOpenChange={setVoiceCloneOpen}
+      />
+      
+      {/* Audio Extractor Dialog */}
+      <AudioExtractorDialog
+        open={audioExtractorOpen}
+        onOpenChange={setAudioExtractorOpen}
+      />
     </nav>
   );
 };
