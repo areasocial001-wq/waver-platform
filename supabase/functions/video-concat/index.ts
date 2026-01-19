@@ -408,6 +408,7 @@ serve(async (req) => {
         const output: any = {
           format: 'mp4',
           resolution: mapResolution(resolution),
+          fps: 24, // Force 24 fps to prevent slowdown
         };
         
         if (aspectSize) {
