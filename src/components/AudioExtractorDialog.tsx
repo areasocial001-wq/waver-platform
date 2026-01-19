@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Music, Upload, Download, Loader2, Play, FileAudio, Video } from "lucide-react";
+import { Music, Upload, Download, Loader2, Play, FileAudio, Video, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { VoiceCloneDialog } from "./VoiceCloneDialog";
 
 interface AudioExtractorDialogProps {
   trigger?: React.ReactNode;
@@ -43,6 +44,8 @@ export const AudioExtractorDialog = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
   const [loadingFFmpeg, setLoadingFFmpeg] = useState(false);
+  const [showVoiceClone, setShowVoiceClone] = useState(false);
+  const [extractedAudioFile, setExtractedAudioFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ffmpegRef = useRef<FFmpeg | null>(null);
@@ -158,6 +161,12 @@ export const AudioExtractorDialog = ({
       const uint8Array = new Uint8Array(data as Uint8Array);
       const blob = new Blob([uint8Array], { type: format?.mimeType || "audio/mpeg" });
       const url = URL.createObjectURL(blob);
+      
+      // Create a File object for voice cloning
+      const audioFile = new File([blob], `extracted-audio.${audioFormat}`, { 
+        type: format?.mimeType || "audio/mpeg" 
+      });
+      setExtractedAudioFile(audioFile);
       
       setExtractedAudioUrl(url);
       onAudioExtracted?.(url);
@@ -336,13 +345,31 @@ export const AudioExtractorDialog = ({
                 <Play className="w-4 h-4 mr-2" />
                 {isPlaying ? "Stop" : "Riproduci"}
               </Button>
-              <Button onClick={downloadAudio} className="flex-1">
+              <Button variant="outline" onClick={downloadAudio} className="flex-1">
                 <Download className="w-4 h-4 mr-2" />
                 Scarica
               </Button>
             </div>
+            
+            {/* Use for Voice Cloning */}
+            <Button 
+              onClick={() => setShowVoiceClone(true)} 
+              className="w-full"
+              variant="default"
+            >
+              <Mic className="w-4 h-4 mr-2" />
+              Usa per Clonare Voce
+            </Button>
           </div>
         )}
+        
+        {/* Voice Clone Dialog with extracted audio */}
+        <VoiceCloneDialog
+          open={showVoiceClone}
+          onOpenChange={setShowVoiceClone}
+          initialAudioFile={extractedAudioFile}
+          initialAudioUrl={extractedAudioUrl || undefined}
+        />
       </div>
     </DialogContent>
   );

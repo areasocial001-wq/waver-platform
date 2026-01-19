@@ -35,17 +35,28 @@ interface VoiceCloneDialogProps {
   trigger?: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  initialAudioFile?: File | null;
+  initialAudioUrl?: string | null;
 }
 
-export const VoiceCloneDialog = ({ trigger, open, onOpenChange }: VoiceCloneDialogProps) => {
+export const VoiceCloneDialog = ({ 
+  trigger, 
+  open, 
+  onOpenChange,
+  initialAudioFile,
+  initialAudioUrl 
+}: VoiceCloneDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
   const [isCloning, setIsCloning] = useState(false);
   const [cloneVoiceName, setCloneVoiceName] = useState("");
   const [cloneAudioFile, setCloneAudioFile] = useState<File | null>(null);
+  const [cloneAudioUrl, setCloneAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const controlledOpen = open !== undefined ? open : isOpen;
   const setControlledOpen = onOpenChange || setIsOpen;
@@ -53,8 +64,40 @@ export const VoiceCloneDialog = ({ trigger, open, onOpenChange }: VoiceCloneDial
   useEffect(() => {
     if (controlledOpen) {
       setClonedVoices(getStoredClonedVoices());
+      
+      // Set initial audio if provided
+      if (initialAudioFile) {
+        setCloneAudioFile(initialAudioFile);
+        setCloneAudioUrl(URL.createObjectURL(initialAudioFile));
+      } else if (initialAudioUrl) {
+        setCloneAudioUrl(initialAudioUrl);
+        // Convert URL to File
+        fetch(initialAudioUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], "extracted-audio.mp3", { type: "audio/mpeg" });
+            setCloneAudioFile(file);
+          })
+          .catch(console.error);
+      }
     }
-  }, [controlledOpen]);
+  }, [controlledOpen, initialAudioFile, initialAudioUrl]);
+
+  const previewAudio = () => {
+    if (!cloneAudioUrl) return;
+    
+    if (isPreviewPlaying && previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      setIsPreviewPlaying(false);
+      return;
+    }
+    
+    const audio = new Audio(cloneAudioUrl);
+    previewAudioRef.current = audio;
+    audio.onended = () => setIsPreviewPlaying(false);
+    audio.play();
+    setIsPreviewPlaying(true);
+  };
 
   const handleCloneVoice = async () => {
     if (!cloneVoiceName.trim()) {
@@ -249,12 +292,28 @@ export const VoiceCloneDialog = ({ trigger, open, onOpenChange }: VoiceCloneDial
                   className="hidden"
                 />
                 {cloneAudioFile ? (
-                  <div className="flex items-center justify-center gap-2 text-primary">
-                    <Volume2 className="w-5 h-5" />
-                    <span className="font-medium">{cloneAudioFile.name}</span>
-                    <span className="text-muted-foreground text-sm">
-                      ({(cloneAudioFile.size / 1024 / 1024).toFixed(2)} MB)
-                    </span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-primary">
+                      <Volume2 className="w-5 h-5" />
+                      <span className="font-medium">{cloneAudioFile.name}</span>
+                      <span className="text-muted-foreground text-sm">
+                        ({(cloneAudioFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    {cloneAudioUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          previewAudio();
+                        }}
+                      >
+                        <Play className="w-4 h-4 mr-1" />
+                        {isPreviewPlaying ? "Stop" : "Anteprima"}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-2">
