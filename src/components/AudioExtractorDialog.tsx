@@ -1,13 +1,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Music, Upload, Download, Loader2, Play, FileAudio, Video, Mic } from "lucide-react";
 import { toast } from "sonner";
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
 
 interface AudioExtractorDialogProps {
@@ -18,15 +15,6 @@ interface AudioExtractorDialogProps {
   onAudioExtracted?: (audioUrl: string) => void;
 }
 
-type AudioFormat = "mp3" | "wav" | "aac" | "ogg";
-
-const AUDIO_FORMATS: { value: AudioFormat; label: string; mimeType: string }[] = [
-  { value: "mp3", label: "MP3 (Consigliato)", mimeType: "audio/mpeg" },
-  { value: "wav", label: "WAV (Alta qualità)", mimeType: "audio/wav" },
-  { value: "aac", label: "AAC", mimeType: "audio/aac" },
-  { value: "ogg", label: "OGG", mimeType: "audio/ogg" },
-];
-
 export const AudioExtractorDialog = ({ 
   trigger, 
   open, 
@@ -36,52 +24,19 @@ export const AudioExtractorDialog = ({
 }: AudioExtractorDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>(initialVideoUrl || "");
-  const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
+  const [videoUrl] = useState<string>(initialVideoUrl || "");
   const [isExtracting, setIsExtracting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [extractedAudioUrl, setExtractedAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isFFmpegLoaded, setIsFFmpegLoaded] = useState(false);
-  const [loadingFFmpeg, setLoadingFFmpeg] = useState(false);
   const [showVoiceClone, setShowVoiceClone] = useState(false);
   const [extractedAudioFile, setExtractedAudioFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ffmpegRef = useRef<FFmpeg | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const controlledOpen = open !== undefined ? open : isOpen;
   const setControlledOpen = onOpenChange || setIsOpen;
-
-  const loadFFmpeg = async () => {
-    if (ffmpegRef.current && isFFmpegLoaded) return;
-    
-    setLoadingFFmpeg(true);
-    try {
-      const ffmpeg = new FFmpeg();
-      ffmpegRef.current = ffmpeg;
-
-      ffmpeg.on("progress", ({ progress }) => {
-        setProgress(Math.round(progress * 100));
-      });
-
-      // Load FFmpeg with CDN
-      const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
-      await ffmpeg.load({
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-      });
-
-      setIsFFmpegLoaded(true);
-      toast.success("FFmpeg caricato!");
-    } catch (error) {
-      console.error("Error loading FFmpeg:", error);
-      toast.error("Errore nel caricamento di FFmpeg");
-    } finally {
-      setLoadingFFmpeg(false);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,28 +46,74 @@ export const AudioExtractorDialog = ({
         toast.error("Formato non supportato. Usa MP4, WebM, MOV, AVI o MKV");
         return;
       }
-      if (file.size > 500 * 1024 * 1024) {
-        toast.error("File troppo grande. Max 500MB");
+      if (file.size > 100 * 1024 * 1024) {
+        toast.error("File troppo grande. Max 100MB per l'estrazione browser");
         return;
       }
       setVideoFile(file);
-      setVideoUrl("");
       setExtractedAudioUrl(null);
     }
   };
 
+  // Convert AudioBuffer to WAV Blob
+  const audioBufferToWav = (buffer: AudioBuffer): Blob => {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+    
+    const bytesPerSample = bitDepth / 8;
+    const blockAlign = numChannels * bytesPerSample;
+    
+    const dataLength = buffer.length * blockAlign;
+    const bufferLength = 44 + dataLength;
+    
+    const arrayBuffer = new ArrayBuffer(bufferLength);
+    const view = new DataView(arrayBuffer);
+    
+    // WAV header
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i++) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, bufferLength - 8, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitDepth, true);
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+    
+    // Write audio data
+    const channels: Float32Array[] = [];
+    for (let i = 0; i < numChannels; i++) {
+      channels.push(buffer.getChannelData(i));
+    }
+    
+    let offset = 44;
+    for (let i = 0; i < buffer.length; i++) {
+      for (let channel = 0; channel < numChannels; channel++) {
+        const sample = Math.max(-1, Math.min(1, channels[channel][i]));
+        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+        view.setInt16(offset, intSample, true);
+        offset += 2;
+      }
+    }
+    
+    return new Blob([arrayBuffer], { type: 'audio/wav' });
+  };
+
   const extractAudio = async () => {
     if (!videoFile && !videoUrl) {
-      toast.error("Seleziona un video o inserisci un URL");
-      return;
-    }
-
-    if (!isFFmpegLoaded) {
-      await loadFFmpeg();
-    }
-
-    if (!ffmpegRef.current) {
-      toast.error("FFmpeg non disponibile");
+      toast.error("Seleziona un video");
       return;
     }
 
@@ -121,63 +122,43 @@ export const AudioExtractorDialog = ({
     setExtractedAudioUrl(null);
 
     try {
-      const ffmpeg = ffmpegRef.current;
-      const inputFileName = "input.mp4";
-      const outputFileName = `output.${audioFormat}`;
-
-      // Load video file
-      if (videoFile) {
-        await ffmpeg.writeFile(inputFileName, await fetchFile(videoFile));
-      } else if (videoUrl) {
-        const response = await fetch(videoUrl);
-        const blob = await response.blob();
-        await ffmpeg.writeFile(inputFileName, await fetchFile(blob));
-      }
-
-      // Extract audio based on format
-      let ffmpegArgs: string[];
-      switch (audioFormat) {
-        case "mp3":
-          ffmpegArgs = ["-i", inputFileName, "-vn", "-acodec", "libmp3lame", "-q:a", "2", outputFileName];
-          break;
-        case "wav":
-          ffmpegArgs = ["-i", inputFileName, "-vn", "-acodec", "pcm_s16le", outputFileName];
-          break;
-        case "aac":
-          ffmpegArgs = ["-i", inputFileName, "-vn", "-acodec", "aac", "-b:a", "192k", outputFileName];
-          break;
-        case "ogg":
-          ffmpegArgs = ["-i", inputFileName, "-vn", "-acodec", "libvorbis", "-q:a", "4", outputFileName];
-          break;
-        default:
-          ffmpegArgs = ["-i", inputFileName, "-vn", "-acodec", "libmp3lame", "-q:a", "2", outputFileName];
-      }
-
-      await ffmpeg.exec(ffmpegArgs);
-
-      // Read output file
-      const data = await ffmpeg.readFile(outputFileName);
-      const format = AUDIO_FORMATS.find(f => f.value === audioFormat);
-      const uint8Array = new Uint8Array(data as Uint8Array);
-      const blob = new Blob([uint8Array], { type: format?.mimeType || "audio/mpeg" });
-      const url = URL.createObjectURL(blob);
+      toast.info("Estrazione audio in corso...");
+      setProgress(10);
+      
+      const fileToProcess = videoFile || await fetch(videoUrl).then(r => r.blob()).then(b => new File([b], 'video.mp4'));
+      
+      setProgress(20);
+      
+      // Use Web Audio API to decode and extract audio
+      const audioContext = new AudioContext();
+      const arrayBuffer = await fileToProcess.arrayBuffer();
+      
+      setProgress(40);
+      
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      setProgress(70);
+      
+      // Convert to WAV
+      const wavBlob = audioBufferToWav(audioBuffer);
+      const url = URL.createObjectURL(wavBlob);
+      
+      setProgress(90);
       
       // Create a File object for voice cloning
-      const audioFile = new File([blob], `extracted-audio.${audioFormat}`, { 
-        type: format?.mimeType || "audio/mpeg" 
-      });
+      const audioFile = new File([wavBlob], `extracted-audio.wav`, { type: 'audio/wav' });
       setExtractedAudioFile(audioFile);
       
       setExtractedAudioUrl(url);
       onAudioExtracted?.(url);
+      
+      setProgress(100);
       toast.success("Audio estratto con successo!");
-
-      // Cleanup
-      await ffmpeg.deleteFile(inputFileName);
-      await ffmpeg.deleteFile(outputFileName);
+      
+      await audioContext.close();
     } catch (error) {
       console.error("Error extracting audio:", error);
-      toast.error("Errore nell'estrazione dell'audio");
+      toast.error("Errore nell'estrazione. Assicurati che il video contenga audio.");
     } finally {
       setIsExtracting(false);
       setProgress(0);
@@ -205,7 +186,7 @@ export const AudioExtractorDialog = ({
 
     const link = document.createElement("a");
     link.href = extractedAudioUrl;
-    link.download = `audio-extracted.${audioFormat}`;
+    link.download = `audio-extracted.wav`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -220,33 +201,11 @@ export const AudioExtractorDialog = ({
           Estrai Audio dal Video
         </DialogTitle>
         <DialogDescription>
-          Carica un video o inserisci un URL per estrarre la traccia audio
+          Carica un video per estrarre la traccia audio (formato WAV)
         </DialogDescription>
       </DialogHeader>
 
       <div className="space-y-6">
-        {/* Load FFmpeg */}
-        {!isFFmpegLoaded && (
-          <Button 
-            onClick={loadFFmpeg} 
-            disabled={loadingFFmpeg}
-            variant="outline" 
-            className="w-full"
-          >
-            {loadingFFmpeg ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Caricamento FFmpeg...
-              </>
-            ) : (
-              <>
-                <FileAudio className="w-4 h-4 mr-2" />
-                Carica FFmpeg per iniziare
-              </>
-            )}
-          </Button>
-        )}
-
         {/* Video Input */}
         <div className="space-y-4">
           <div className="space-y-2">
@@ -258,7 +217,7 @@ export const AudioExtractorDialog = ({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".mp4,.webm,.mov,.avi,.mkv,video/*"
+                accept=".mp4,.webm,.mov,video/*"
                 onChange={handleFileChange}
                 className="hidden"
               />
@@ -274,31 +233,14 @@ export const AudioExtractorDialog = ({
                 <div className="space-y-2">
                   <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
                   <p className="text-muted-foreground">
-                    Clicca per selezionare o trascina un video
+                    Clicca per selezionare un video
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Max 500MB • MP4, WebM, MOV, AVI, MKV
+                    Max 100MB • MP4, WebM, MOV
                   </p>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Audio Format */}
-          <div className="space-y-2">
-            <Label>Formato Audio</Label>
-            <Select value={audioFormat} onValueChange={(v) => setAudioFormat(v as AudioFormat)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AUDIO_FORMATS.map((format) => (
-                  <SelectItem key={format.value} value={format.value}>
-                    {format.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Progress */}
@@ -315,7 +257,7 @@ export const AudioExtractorDialog = ({
           {/* Extract Button */}
           <Button
             onClick={extractAudio}
-            disabled={isExtracting || (!videoFile && !videoUrl) || !isFFmpegLoaded}
+            disabled={isExtracting || !videoFile}
             className="w-full"
           >
             {isExtracting ? (
@@ -337,7 +279,7 @@ export const AudioExtractorDialog = ({
           <div className="p-4 bg-card border rounded-lg space-y-3">
             <div className="flex items-center gap-2 text-primary">
               <FileAudio className="w-5 h-5" />
-              <span className="font-medium">Audio Estratto</span>
+              <span className="font-medium">Audio Estratto (WAV)</span>
             </div>
             
             <div className="flex gap-2">
