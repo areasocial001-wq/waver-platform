@@ -1036,7 +1036,7 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
             </Select>
           </div>
 
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1">
             <Label className="text-xs">Risoluzione</Label>
             <Select
               value={nodeData.resolution || "hd"}
@@ -1052,6 +1052,23 @@ const VideoConcatNode = memo(({ data, id }: NodeProps) => {
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs">Framerate</Label>
+          <Select
+            value={nodeData.fps || "24"}
+            onValueChange={(value) => handleChange("fps", value)}
+          >
+            <SelectTrigger className="h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24">24 fps (Cinema)</SelectItem>
+              <SelectItem value="30">30 fps (Standard)</SelectItem>
+              <SelectItem value="60">60 fps (Fluido)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Intro/Outro Section */}

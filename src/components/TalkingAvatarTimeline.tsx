@@ -84,6 +84,7 @@ export function TalkingAvatarTimeline({
   const [exportProgress, setExportProgress] = useState(0);
   const [draggedClipId, setDraggedClipId] = useState<string | null>(null);
   const [musicVolume, setMusicVolume] = useState(30); // Background music volume (0-100)
+  const [selectedFps, setSelectedFps] = useState<string>('24'); // Output framerate
 
   // Calculate total timeline duration
   const totalDuration = useMemo(() => {
@@ -192,6 +193,7 @@ export function TalkingAvatarTimeline({
                    selectedTransition === 'slide-right' ? 'wipe' : 
                    selectedTransition === 'zoom' ? 'fade' : selectedTransition,
         transitionDuration: TRANSITIONS.find(t => t.id === selectedTransition)?.duration || 0.5,
+        fps: selectedFps,
       };
 
       // Add background music if available
@@ -231,7 +233,7 @@ export function TalkingAvatarTimeline({
       setIsExporting(false);
       setExportProgress(0);
     }
-  }, [clips, selectedTransition, backgroundMusicUrl, backgroundMusicEmotion, musicVolume, clipEffects]);
+  }, [clips, selectedTransition, selectedFps, backgroundMusicUrl, backgroundMusicEmotion, musicVolume, clipEffects]);
 
   // Move clip left/right
   const moveClip = useCallback((clipId: string, direction: 'left' | 'right') => {
@@ -314,6 +316,16 @@ export function TalkingAvatarTimeline({
               {TRANSITIONS.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
+            </select>
+
+            <select
+              value={selectedFps}
+              onChange={(e) => setSelectedFps(e.target.value)}
+              className="text-sm bg-background border rounded px-2 py-1"
+            >
+              <option value="24">24 fps</option>
+              <option value="30">30 fps</option>
+              <option value="60">60 fps</option>
             </select>
             
             <Button 

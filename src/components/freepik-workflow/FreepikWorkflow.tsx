@@ -476,6 +476,7 @@ const FreepikWorkflowInner = () => {
             transitionDuration: concatData?.transitionDuration || 0.5,
             resolution: concatData?.resolution || "hd",
             aspectRatio: concatData?.aspectRatio || "16:9",
+            fps: concatData?.fps || "24",
             audioUrl: audioUrl,
             audioVolume: audioNodeData?.volume || 100,
             intro: concatData?.intro,

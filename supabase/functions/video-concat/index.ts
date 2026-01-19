@@ -42,6 +42,7 @@ const requestSchema = z.object({
   transitionDuration: z.number().min(0).max(5).default(0.5),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
+  fps: z.enum(['24', '30', '60']).default('24'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
   intro: introOutroSchema.optional(),
@@ -265,7 +266,7 @@ serve(async (req) => {
     
     const { 
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, 
-      resolution, aspectRatio, audioUrl, audioVolume, intro, outro 
+      resolution, aspectRatio, fps, audioUrl, audioVolume, intro, outro 
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
@@ -408,7 +409,7 @@ serve(async (req) => {
         const output: any = {
           format: 'mp4',
           resolution: mapResolution(resolution),
-          fps: 24, // Force 24 fps to prevent slowdown
+          fps: parseInt(fps), // Use user-selected framerate
         };
         
         if (aspectSize) {
