@@ -151,6 +151,9 @@ export const VoiceCloneDialog = ({
       setClonedVoices(updatedClonedVoices);
       saveClonedVoices(updatedClonedVoices);
       
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent("cloned-voices-updated"));
+      
       setCloneVoiceName("");
       setCloneAudioFile(null);
       if (fileInputRef.current) {
