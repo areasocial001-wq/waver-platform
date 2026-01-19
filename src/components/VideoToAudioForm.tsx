@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors, Zap } from "lucide-react";
+import { Loader2, Upload, Volume2, Download, Play, Pause, RefreshCw, Scissors, Zap, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AudioWaveform } from "./AudioWaveform";
@@ -13,25 +13,11 @@ import { AudioEqualizer, EqualizerSettings, DEFAULT_EQUALIZER_SETTINGS } from ".
 import { VideoExporter } from "./VideoExporter";
 import { AudioEffects, AudioEffectsSettings, DEFAULT_EFFECTS_SETTINGS } from "./AudioEffects";
 import { AudioMixer, AudioMixerSettings, DEFAULT_MIXER_SETTINGS } from "./AudioMixer";
+import { useVoiceOptions, DEFAULT_VOICE_OPTIONS } from "@/hooks/useVoiceOptions";
 
 // Constants for optimal speed calculation
 // Baseline: ~15 characters per second at 1.0x speed for comfortable speech
 const CHARS_PER_SECOND_BASELINE = 15;
-
-interface VoiceOption {
-  id: string;
-  name: string;
-  description: string;
-}
-
-const VOICE_OPTIONS: VoiceOption[] = [
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", description: "Voce femminile naturale, multilingue" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", description: "Voce maschile profonda e autorevole" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", description: "Voce maschile calda e narrativa" },
-  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", description: "Voce femminile giovane e dinamica" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", description: "Voce maschile chiara e professionale" },
-  { id: "XrExE9yKIg1WjnnlVkGX", name: "Matilda", description: "Voce femminile matura e rassicurante" },
-];
 
 const formatTime = (seconds: number): string => {
   const mins = Math.floor(seconds / 60);
@@ -41,11 +27,12 @@ const formatTime = (seconds: number): string => {
 };
 
 export function VideoToAudioForm() {
+  const { voiceOptions, hasClonedVoices } = useVoiceOptions();
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>("");
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [text, setText] = useState("");
-  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+  const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_OPTIONS[0].id);
   const [speed, setSpeed] = useState(1.0);
   const [isAutoSpeed, setIsAutoSpeed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -448,13 +435,40 @@ export function VideoToAudioForm() {
           {/* Voice and Speed Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{videoUrl ? "4" : "3"}. Seleziona la voce</Label>
+              <Label className="flex items-center gap-2">
+                {videoUrl ? "4" : "3"}. Seleziona la voce
+                {hasClonedVoices && (
+                  <span className="text-xs text-primary flex items-center gap-1">
+                    <Mic className="w-3 h-3" />
+                    Voci clonate disponibili
+                  </span>
+                )}
+              </Label>
               <Select value={selectedVoice} onValueChange={setSelectedVoice}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleziona una voce" />
                 </SelectTrigger>
                 <SelectContent>
-                  {VOICE_OPTIONS.map((voice) => (
+                  {hasClonedVoices && (
+                    <>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                        <Mic className="w-3 h-3" />
+                        Voci Clonate
+                      </div>
+                      {voiceOptions.filter(v => v.isCloned).map((voice) => (
+                        <SelectItem key={voice.id} value={voice.id}>
+                          <div className="flex flex-col">
+                            <span className="font-medium text-primary">{voice.name}</span>
+                            <span className="text-xs text-muted-foreground">{voice.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                        Voci Predefinite
+                      </div>
+                    </>
+                  )}
+                  {voiceOptions.filter(v => !v.isCloned).map((voice) => (
                     <SelectItem key={voice.id} value={voice.id}>
                       <div className="flex flex-col">
                         <span className="font-medium">{voice.name}</span>

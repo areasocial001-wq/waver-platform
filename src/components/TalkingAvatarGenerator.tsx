@@ -22,6 +22,7 @@ import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT, EFFECT_PRESETS } from './ClipEffectsPanel';
 import { TransitionSelector, TRANSITION_TYPES } from './TransitionSelector';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
+import { useVoiceOptions, DEFAULT_VOICE_OPTIONS } from '@/hooks/useVoiceOptions';
 import { 
   User, 
   Upload, 
@@ -41,7 +42,8 @@ import {
   Save,
   FolderOpen,
   Music,
-  Loader2
+  Loader2,
+  Mic
 } from 'lucide-react';
 
 interface ReferenceImage {
@@ -60,15 +62,6 @@ interface GeneratedVideo {
   createdAt: Date;
 }
 
-// Voice options for TTS
-const VOICE_OPTIONS = [
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Sarah', description: 'Femminile, calda' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', description: 'Maschile, profonda' },
-  { id: 'pFZP5JQG7iQjIQuC4Bku', name: 'Lily', description: 'Femminile, giovane' },
-  { id: 'TX3LPaxmHKxFdv7VOQHJ', name: 'Liam', description: 'Maschile, energico' },
-  { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel', description: 'Maschile, narratore' },
-];
-
 // Expression presets
 const EXPRESSION_PRESETS = [
   { id: 'happy', name: 'Felice', emoji: '😊', promptSuffix: 'with a warm happy smile, joyful expression' },
@@ -82,6 +75,9 @@ const EXPRESSION_PRESETS = [
 ];
 
 export function TalkingAvatarGenerator() {
+  // Voice options hook
+  const { voiceOptions, hasClonedVoices } = useVoiceOptions();
+  
   // Tab state
   const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'timeline'>('single');
   
@@ -121,7 +117,7 @@ export function TalkingAvatarGenerator() {
   // Audio state
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [useTTS, setUseTTS] = useState(true);
-  const [selectedVoice, setSelectedVoice] = useState(VOICE_OPTIONS[0].id);
+  const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_OPTIONS[0].id);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   
   // Generation settings
@@ -974,13 +970,37 @@ export function TalkingAvatarGenerator() {
                     {useTTS ? (
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <Label>Voce</Label>
+                          <Label className="flex items-center gap-2">
+                            Voce
+                            {hasClonedVoices && (
+                              <span className="text-xs text-primary flex items-center gap-1">
+                                <Mic className="w-3 h-3" />
+                                Clonate disponibili
+                              </span>
+                            )}
+                          </Label>
                           <Select value={selectedVoice} onValueChange={setSelectedVoice}>
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {VOICE_OPTIONS.map((voice) => (
+                              {hasClonedVoices && (
+                                <>
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                                    <Mic className="w-3 h-3" />
+                                    Voci Clonate
+                                  </div>
+                                  {voiceOptions.filter(v => v.isCloned).map((voice) => (
+                                    <SelectItem key={voice.id} value={voice.id}>
+                                      <span className="text-primary">{voice.name}</span>
+                                    </SelectItem>
+                                  ))}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                                    Predefinite
+                                  </div>
+                                </>
+                              )}
+                              {voiceOptions.filter(v => !v.isCloned).map((voice) => (
                                 <SelectItem key={voice.id} value={voice.id}>
                                   {voice.name} - {voice.description}
                                 </SelectItem>
@@ -1227,13 +1247,34 @@ export function TalkingAvatarGenerator() {
 
                 {/* Voice Selection */}
                 <div className="space-y-2 pt-4 border-t">
-                  <Label>Voce TTS</Label>
+                  <Label className="flex items-center gap-2">
+                    Voce TTS
+                    {hasClonedVoices && (
+                      <Mic className="w-3 h-3 text-primary" />
+                    )}
+                  </Label>
                   <Select value={selectedVoice} onValueChange={setSelectedVoice}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {VOICE_OPTIONS.map((voice) => (
+                      {hasClonedVoices && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                            <Mic className="w-3 h-3" />
+                            Voci Clonate
+                          </div>
+                          {voiceOptions.filter(v => v.isCloned).map((voice) => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              <span className="text-primary">{voice.name}</span>
+                            </SelectItem>
+                          ))}
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                            Predefinite
+                          </div>
+                        </>
+                      )}
+                      {voiceOptions.filter(v => !v.isCloned).map((voice) => (
                         <SelectItem key={voice.id} value={voice.id}>
                           {voice.name}
                         </SelectItem>
