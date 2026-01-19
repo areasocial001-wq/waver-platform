@@ -1,0 +1,375 @@
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Mic, Upload, Loader2, Trash2, Play, Volume2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+interface ClonedVoice {
+  id: string;
+  name: string;
+  isCloned: true;
+  createdAt?: string;
+}
+
+const CLONED_VOICES_KEY = "cloned-voices";
+
+const getStoredClonedVoices = (): ClonedVoice[] => {
+  try {
+    const stored = localStorage.getItem(CLONED_VOICES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveClonedVoices = (voices: ClonedVoice[]) => {
+  localStorage.setItem(CLONED_VOICES_KEY, JSON.stringify(voices));
+};
+
+interface VoiceCloneDialogProps {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export const VoiceCloneDialog = ({ trigger, open, onOpenChange }: VoiceCloneDialogProps) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
+  const [isCloning, setIsCloning] = useState(false);
+  const [cloneVoiceName, setCloneVoiceName] = useState("");
+  const [cloneAudioFile, setCloneAudioFile] = useState<File | null>(null);
+  const [isPlaying, setIsPlaying] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const controlledOpen = open !== undefined ? open : isOpen;
+  const setControlledOpen = onOpenChange || setIsOpen;
+
+  useEffect(() => {
+    if (controlledOpen) {
+      setClonedVoices(getStoredClonedVoices());
+    }
+  }, [controlledOpen]);
+
+  const handleCloneVoice = async () => {
+    if (!cloneVoiceName.trim()) {
+      toast.error("Inserisci un nome per la voce clonata");
+      return;
+    }
+    if (!cloneAudioFile) {
+      toast.error("Seleziona un file audio");
+      return;
+    }
+
+    setIsCloning(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Devi effettuare l'accesso");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("audio", cloneAudioFile);
+      formData.append("name", cloneVoiceName);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-clone-voice`, {
+        method: "POST",
+        headers: {
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Errore nella clonazione");
+      }
+
+      const data = await response.json();
+      
+      const newClonedVoice: ClonedVoice = {
+        id: data.voiceId,
+        name: cloneVoiceName,
+        isCloned: true,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedClonedVoices = [...clonedVoices, newClonedVoice];
+      setClonedVoices(updatedClonedVoices);
+      saveClonedVoices(updatedClonedVoices);
+      
+      setCloneVoiceName("");
+      setCloneAudioFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      
+      toast.success("Voce clonata con successo!");
+    } catch (error) {
+      console.error("Error cloning voice:", error);
+      toast.error(error instanceof Error ? error.message : "Errore nella clonazione");
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/m4a", "audio/ogg", "audio/x-m4a"];
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|m4a|ogg)$/i)) {
+        toast.error("Formato non supportato. Usa MP3, WAV, M4A o OGG");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("File troppo grande. Max 10MB");
+        return;
+      }
+      setCloneAudioFile(file);
+    }
+  };
+
+  const deleteClonedVoice = (voiceId: string) => {
+    const updatedVoices = clonedVoices.filter(v => v.id !== voiceId);
+    setClonedVoices(updatedVoices);
+    saveClonedVoices(updatedVoices);
+    toast.success("Voce clonata rimossa");
+  };
+
+  const testVoice = async (voiceId: string, voiceName: string) => {
+    if (isPlaying === voiceId) {
+      audioRef.current?.pause();
+      setIsPlaying(null);
+      return;
+    }
+
+    setIsPlaying(voiceId);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Devi effettuare l'accesso");
+        setIsPlaying(null);
+        return;
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/elevenlabs-tts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": supabaseKey,
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ 
+          text: `Ciao, questa è la voce clonata ${voiceName}. Come suona?`, 
+          voiceId,
+          speed: 1.0,
+          stability: 0.5,
+          similarityBoost: 0.75,
+          style: 0.5,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Errore nel test della voce");
+      }
+
+      const data = await response.json();
+      if (data.audioContent) {
+        const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+        audioRef.current = audio;
+        audio.onended = () => setIsPlaying(null);
+        audio.play();
+      }
+    } catch (error) {
+      console.error("Error testing voice:", error);
+      toast.error("Errore nel test della voce");
+      setIsPlaying(null);
+    }
+  };
+
+  const dialogContent = (
+    <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogHeader>
+        <DialogTitle className="flex items-center gap-2">
+          <Mic className="w-5 h-5 text-primary" />
+          Clona Voce Personalizzata
+        </DialogTitle>
+        <DialogDescription>
+          Carica un campione audio per creare una voce clonata da usare nelle tue generazioni TTS
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
+        {/* Clone New Voice Section */}
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Clona Nuova Voce
+            </CardTitle>
+            <CardDescription>
+              Carica un file audio (MP3, WAV, M4A, OGG) di almeno 30 secondi per risultati migliori
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="voice-name">Nome della Voce</Label>
+              <Input
+                id="voice-name"
+                placeholder="Es: Voce Mario"
+                value={cloneVoiceName}
+                onChange={(e) => setCloneVoiceName(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>File Audio</Label>
+              <div 
+                className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".mp3,.wav,.m4a,.ogg,audio/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                {cloneAudioFile ? (
+                  <div className="flex items-center justify-center gap-2 text-primary">
+                    <Volume2 className="w-5 h-5" />
+                    <span className="font-medium">{cloneAudioFile.name}</span>
+                    <span className="text-muted-foreground text-sm">
+                      ({(cloneAudioFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="w-8 h-8 mx-auto text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      Clicca per selezionare o trascina un file audio
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Max 10MB • MP3, WAV, M4A, OGG
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Button
+              onClick={handleCloneVoice}
+              disabled={isCloning || !cloneVoiceName.trim() || !cloneAudioFile}
+              className="w-full"
+            >
+              {isCloning ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Clonazione in corso...
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4 mr-2" />
+                  Clona Voce
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Cloned Voices List */}
+        <div className="flex-1 overflow-hidden">
+          <h3 className="font-semibold mb-3 flex items-center gap-2">
+            <Volume2 className="w-4 h-4" />
+            Voci Clonate ({clonedVoices.length})
+          </h3>
+          
+          {clonedVoices.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground border rounded-lg">
+              <Mic className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>Nessuna voce clonata</p>
+              <p className="text-sm">Clona la tua prima voce personalizzata</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2 pr-4">
+                {clonedVoices.map((voice) => (
+                  <div
+                    key={voice.id}
+                    className="flex items-center justify-between p-3 bg-card border rounded-lg"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Mic className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{voice.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {voice.createdAt 
+                            ? new Date(voice.createdAt).toLocaleDateString('it-IT')
+                            : 'Voce clonata'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => testVoice(voice.id, voice.name)}
+                        disabled={isPlaying !== null && isPlaying !== voice.id}
+                      >
+                        {isPlaying === voice.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Play className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteClonedVoice(voice.id)}
+                        className="text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+      </div>
+    </DialogContent>
+  );
+
+  if (trigger) {
+    return (
+      <Dialog open={controlledOpen} onOpenChange={setControlledOpen}>
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+        {dialogContent}
+      </Dialog>
+    );
+  }
+
+  return (
+    <Dialog open={controlledOpen} onOpenChange={setControlledOpen}>
+      {dialogContent}
+    </Dialog>
+  );
+};
