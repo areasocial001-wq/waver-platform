@@ -1117,6 +1117,8 @@ serve(async (req) => {
       const isPixVerseTransition = modelId === 'pixverse/v5/transition';
       // Veo first-last model uses image_url and last_image_url (per API docs)
       const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video';
+      // Veo 3.1 reference-to-video uses image_urls as an ARRAY (per API docs)
+      const isVeoRefToVideo = modelId === 'google/veo-3.1-reference-to-video';
       
       // Ensure Veo first-last uses the correct model ID (must NOT have -fast suffix)
       if (modelId === 'google/veo-3.1-first-last-image-to-video-fast') {
@@ -1195,6 +1197,19 @@ serve(async (req) => {
             // Veo first-last requires both start and end images
             throw new Error("Veo 3.1 First-Last Frame requires both start and end images");
           }
+        } else if (isVeoRefToVideo) {
+          // Veo 3.1 reference-to-video uses image_urls as an ARRAY
+          // https://docs.aimlapi.com/api-references/video-models/google/veo-3-1-reference-to-video
+          const imageUrlsArray: string[] = [startUrl];
+          
+          // Add end_image to the array if provided
+          if (end_image) {
+            const endUrl = await getAimlImageUrl(end_image);
+            imageUrlsArray.push(endUrl);
+          }
+          
+          aimlPayload.image_urls = imageUrlsArray;
+          console.log(`[AI/ML API] Veo ref-to-video: using image_urls array with ${imageUrlsArray.length} images`);
         } else {
           // Most other AI/ML API video models accept a single image URL for I2V
           aimlPayload.image_url = startUrl;
