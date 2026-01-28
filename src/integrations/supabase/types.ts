@@ -146,6 +146,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cloned_voices: {
+        Row: {
+          created_at: string
+          description: string | null
+          elevenlabs_voice_id: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          elevenlabs_voice_id: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          elevenlabs_voice_id?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       json2video_projects: {
         Row: {
           audio_track: Json | null

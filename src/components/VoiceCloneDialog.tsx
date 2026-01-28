@@ -8,28 +8,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-interface ClonedVoice {
-  id: string;
-  name: string;
-  isCloned: true;
-  createdAt?: string;
-}
-
-const CLONED_VOICES_KEY = "cloned-voices";
-
-const getStoredClonedVoices = (): ClonedVoice[] => {
-  try {
-    const stored = localStorage.getItem(CLONED_VOICES_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveClonedVoices = (voices: ClonedVoice[]) => {
-  localStorage.setItem(CLONED_VOICES_KEY, JSON.stringify(voices));
-};
+import { useVoiceOptions, ClonedVoice } from "@/hooks/useVoiceOptions";
 
 interface VoiceCloneDialogProps {
   trigger?: React.ReactNode;
@@ -47,13 +26,14 @@ export const VoiceCloneDialog = ({
   initialAudioUrl 
 }: VoiceCloneDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
+  const { clonedVoices, refresh: refreshVoices, isLoading } = useVoiceOptions();
   const [isCloning, setIsCloning] = useState(false);
   const [cloneVoiceName, setCloneVoiceName] = useState("");
   const [cloneAudioFile, setCloneAudioFile] = useState<File | null>(null);
   const [cloneAudioUrl, setCloneAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<string | null>(null);
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -63,7 +43,7 @@ export const VoiceCloneDialog = ({
 
   useEffect(() => {
     if (controlledOpen) {
-      setClonedVoices(getStoredClonedVoices());
+      refreshVoices();
       
       // Set initial audio if provided
       if (initialAudioFile) {
@@ -81,7 +61,7 @@ export const VoiceCloneDialog = ({
           .catch(console.error);
       }
     }
-  }, [controlledOpen, initialAudioFile, initialAudioUrl]);
+  }, [controlledOpen, initialAudioFile, initialAudioUrl, refreshVoices]);
 
   const previewAudio = () => {
     if (!cloneAudioUrl) return;
@@ -140,27 +120,34 @@ export const VoiceCloneDialog = ({
 
       const data = await response.json();
       
-      const newClonedVoice: ClonedVoice = {
-        id: data.voiceId,
-        name: cloneVoiceName,
-        isCloned: true,
-        createdAt: new Date().toISOString(),
-      };
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('cloned_voices')
+        .insert({
+          user_id: session.user.id,
+          elevenlabs_voice_id: data.voiceId,
+          name: cloneVoiceName,
+          description: "Voce clonata personalizzata",
+        });
 
-      const updatedClonedVoices = [...clonedVoices, newClonedVoice];
-      setClonedVoices(updatedClonedVoices);
-      saveClonedVoices(updatedClonedVoices);
-      
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new CustomEvent("cloned-voices-updated"));
+      if (dbError) {
+        console.error('Error saving to database:', dbError);
+        toast.error("Voce clonata ma errore nel salvataggio");
+      } else {
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent("cloned-voices-updated"));
+        
+        toast.success("Voce clonata e salvata con successo!");
+      }
       
       setCloneVoiceName("");
       setCloneAudioFile(null);
+      setCloneAudioUrl(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
       
-      toast.success("Voce clonata con successo!");
+      await refreshVoices();
     } catch (error) {
       console.error("Error cloning voice:", error);
       toast.error(error instanceof Error ? error.message : "Errore nella clonazione");
@@ -182,14 +169,29 @@ export const VoiceCloneDialog = ({
         return;
       }
       setCloneAudioFile(file);
+      setCloneAudioUrl(URL.createObjectURL(file));
     }
   };
 
-  const deleteClonedVoice = (voiceId: string) => {
-    const updatedVoices = clonedVoices.filter(v => v.id !== voiceId);
-    setClonedVoices(updatedVoices);
-    saveClonedVoices(updatedVoices);
-    toast.success("Voce clonata rimossa");
+  const deleteClonedVoice = async (voice: ClonedVoice) => {
+    setIsDeleting(voice.id);
+    try {
+      const { error } = await supabase
+        .from('cloned_voices')
+        .delete()
+        .eq('id', voice.id);
+
+      if (error) throw error;
+
+      window.dispatchEvent(new CustomEvent("cloned-voices-updated"));
+      toast.success("Voce clonata rimossa");
+      await refreshVoices();
+    } catch (error) {
+      console.error('Error deleting voice:', error);
+      toast.error("Errore nella rimozione");
+    } finally {
+      setIsDeleting(null);
+    }
   };
 
   const testVoice = async (voiceId: string, voiceName: string) => {
@@ -357,6 +359,7 @@ export const VoiceCloneDialog = ({
           <h3 className="font-semibold mb-3 flex items-center gap-2">
             <Volume2 className="w-4 h-4" />
             Voci Clonate ({clonedVoices.length})
+            {isLoading && <Loader2 className="w-3 h-3 animate-spin" />}
           </h3>
           
           {clonedVoices.length === 0 ? (
@@ -380,9 +383,7 @@ export const VoiceCloneDialog = ({
                       <div>
                         <p className="font-medium">{voice.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {voice.createdAt 
-                            ? new Date(voice.createdAt).toLocaleDateString('it-IT')
-                            : 'Voce clonata'}
+                          {new Date(voice.created_at).toLocaleDateString('it-IT')}
                         </p>
                       </div>
                     </div>
@@ -390,10 +391,10 @@ export const VoiceCloneDialog = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => testVoice(voice.id, voice.name)}
-                        disabled={isPlaying !== null && isPlaying !== voice.id}
+                        onClick={() => testVoice(voice.elevenlabs_voice_id, voice.name)}
+                        disabled={isPlaying !== null && isPlaying !== voice.elevenlabs_voice_id}
                       >
-                        {isPlaying === voice.id ? (
+                        {isPlaying === voice.elevenlabs_voice_id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
                           <Play className="w-4 h-4" />
@@ -402,10 +403,15 @@ export const VoiceCloneDialog = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => deleteClonedVoice(voice.id)}
+                        onClick={() => deleteClonedVoice(voice)}
+                        disabled={isDeleting === voice.id}
                         className="text-destructive hover:bg-destructive/10"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {isDeleting === voice.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   </div>
