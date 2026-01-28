@@ -20,6 +20,7 @@ interface VideoExporterProps {
 
 type ExportQuality = 'low' | 'medium' | 'high';
 type ExportFormat = 'webm' | 'mp4';
+type ExportFps = '24' | '30' | '60';
 
 const QUALITY_CONFIG: Record<ExportQuality, { bitrate: number; label: string }> = {
   low: { bitrate: 1000000, label: 'Bassa (1 Mbps)' },
@@ -65,6 +66,7 @@ export function VideoExporter({
   const [exportProgress, setExportProgress] = useState(0);
   const [quality, setQuality] = useState<ExportQuality>('medium');
   const [format, setFormat] = useState<ExportFormat>('webm');
+  const [fps, setFps] = useState<ExportFps>('24');
   const [supportedFormats, setSupportedFormats] = useState<ExportFormat[]>([]);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -213,8 +215,9 @@ export function VideoExporter({
         originalGain.connect(audioContext.destination);
       }
 
-      // Create video stream from canvas
-      const videoStream = canvas.captureStream(30);
+      // Create video stream from canvas with selected FPS
+      const targetFps = parseInt(fps);
+      const videoStream = canvas.captureStream(targetFps);
       
       // Combine video and audio streams
       const combinedStream = new MediaStream([
@@ -283,7 +286,9 @@ export function VideoExporter({
       }
       await Promise.all(playPromises);
 
-      // Update progress and render frames
+      // Update progress and render frames using fixed interval for consistent FPS
+      const frameInterval = 1000 / targetFps;
+      
       const renderFrame = () => {
         if (recordingComplete) return;
         
@@ -300,18 +305,27 @@ export function VideoExporter({
           mediaRecorder.stop();
           return;
         }
-
-        requestAnimationFrame(renderFrame);
       };
 
-      requestAnimationFrame(renderFrame);
+      // Use setInterval for consistent frame timing
+      const frameTimer = setInterval(renderFrame, frameInterval);
+      
+      // Initial frame
+      renderFrame();
+      
+      // Clean up timer when recording stops
+      const originalOnStop = mediaRecorder.onstop;
+      mediaRecorder.onstop = (e) => {
+        clearInterval(frameTimer);
+        if (originalOnStop) originalOnStop.call(mediaRecorder, e);
+      };
 
     } catch (error) {
       console.error('Export error:', error);
       toast.error('Errore durante l\'esportazione: ' + (error as Error).message);
       setIsExporting(false);
     }
-  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format, mixerSettings, effectsSettings]);
+  }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format, fps, mixerSettings, effectsSettings]);
 
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
@@ -367,6 +381,20 @@ export function VideoExporter({
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Framerate</Label>
+          <Select value={fps} onValueChange={(v) => setFps(v as ExportFps)}>
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="24">24 fps (Cinema)</SelectItem>
+              <SelectItem value="30">30 fps (Standard)</SelectItem>
+              <SelectItem value="60">60 fps (Fluido)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isExporting ? (
