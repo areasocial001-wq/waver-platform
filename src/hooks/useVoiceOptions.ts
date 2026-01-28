@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface VoiceOption {
   id: string;
@@ -19,49 +20,61 @@ export const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
   { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger", description: "Voce maschile calda e avvolgente" },
 ];
 
-const CLONED_VOICES_KEY = "cloned-voices";
-
-interface ClonedVoice {
+export interface ClonedVoice {
   id: string;
+  elevenlabs_voice_id: string;
   name: string;
-  isCloned: true;
-  createdAt?: string;
+  description?: string;
+  created_at: string;
 }
-
-const getStoredClonedVoices = (): ClonedVoice[] => {
-  try {
-    const stored = localStorage.getItem(CLONED_VOICES_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-};
 
 export function useVoiceOptions() {
   const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadClonedVoices = useCallback(() => {
-    setClonedVoices(getStoredClonedVoices());
+  const loadClonedVoices = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setClonedVoices([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('cloned_voices')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading cloned voices:', error);
+        setClonedVoices([]);
+      } else {
+        setClonedVoices(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading cloned voices:', error);
+      setClonedVoices([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     loadClonedVoices();
     
-    // Listen for storage changes (in case voice is cloned in another tab/component)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === CLONED_VOICES_KEY) {
-        loadClonedVoices();
-      }
-    };
-    
-    window.addEventListener("storage", handleStorageChange);
-    
-    // Also listen for custom event for same-tab updates
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      loadClonedVoices();
+    });
+
+    // Listen for custom event for updates from VoiceCloneDialog
     const handleVoicesUpdated = () => loadClonedVoices();
     window.addEventListener("cloned-voices-updated", handleVoicesUpdated);
     
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
+      subscription.unsubscribe();
       window.removeEventListener("cloned-voices-updated", handleVoicesUpdated);
     };
   }, [loadClonedVoices]);
@@ -69,9 +82,9 @@ export function useVoiceOptions() {
   const allVoiceOptions: VoiceOption[] = [
     ...DEFAULT_VOICE_OPTIONS,
     ...clonedVoices.map(v => ({
-      id: v.id,
+      id: v.elevenlabs_voice_id,
       name: `${v.name} (Clonata)`,
-      description: "Voce clonata personalizzata",
+      description: v.description || "Voce clonata personalizzata",
       isCloned: true,
     })),
   ];
@@ -81,6 +94,7 @@ export function useVoiceOptions() {
     defaultVoices: DEFAULT_VOICE_OPTIONS,
     clonedVoices,
     hasClonedVoices: clonedVoices.length > 0,
+    isLoading,
     refresh: loadClonedVoices,
   };
 }
