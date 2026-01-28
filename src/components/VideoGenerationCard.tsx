@@ -365,6 +365,12 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                       <p className="text-sm font-medium text-foreground">
                         Generazione in corso...
                       </p>
+                      {/* Model indicator during generation */}
+                      {generation.provider && (
+                        <div className="flex justify-center">
+                          <ProviderBadge providerId={generation.provider} size="sm" />
+                        </div>
+                      )}
                       <p className="text-xs text-muted-foreground">
                         Tempo trascorso: {formatElapsedTime(elapsedTime)}
                       </p>
