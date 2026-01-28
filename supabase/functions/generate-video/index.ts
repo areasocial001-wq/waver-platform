@@ -1204,8 +1204,17 @@ serve(async (req) => {
           
           // Add end_image to the array if provided
           if (end_image) {
-            const endUrl = await getAimlImageUrl(end_image);
+            const endUrl = await getAimlImageUrl(end_image, 'end_image');
             imageUrlsArray.push(endUrl);
+          }
+          
+          // Add reference_images array if provided (multiple reference images from UI)
+          if (body.reference_images && Array.isArray(body.reference_images)) {
+            console.log(`[AI/ML API] Processing ${body.reference_images.length} additional reference images`);
+            for (let i = 0; i < body.reference_images.length; i++) {
+              const refUrl = await getAimlImageUrl(body.reference_images[i], `reference_image_${i + 1}`);
+              imageUrlsArray.push(refUrl);
+            }
           }
           
           aimlPayload.image_urls = imageUrlsArray;

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Sparkles, X, Info, ArrowRight, Wand2 } from "lucide-react";
+import { Upload, Sparkles, X, Info, ArrowRight, Wand2, Plus, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
@@ -24,6 +24,8 @@ export const ImageToVideoForm = () => {
   const [startImagePreview, setStartImagePreview] = useState<string>("");
   const [endImage, setEndImage] = useState<File | null>(null);
   const [endImagePreview, setEndImagePreview] = useState<string>("");
+  // Multiple reference images for Veo 3.1 reference-to-video
+  const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([]);
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState<number>(6);
   const [resolution, setResolution] = useState("720p");
@@ -192,6 +194,45 @@ export const ImageToVideoForm = () => {
     }
   };
 
+  // Handle reference image upload for Veo 3.1 reference-to-video
+  const handleReferenceImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const maxImages = 5; // Limit to 5 reference images
+    const currentCount = referenceImages.length;
+    const availableSlots = maxImages - currentCount;
+
+    if (availableSlots <= 0) {
+      toast.error("Massimo 5 immagini di riferimento");
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, availableSlots);
+    toast.info(`Ottimizzazione ${filesToProcess.length} immagini...`);
+
+    const newImages: { file: File; preview: string }[] = [];
+    for (const file of filesToProcess) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        const compressedImage = await compressImage(file, 1280, 0.85);
+        newImages.push({ file, preview: compressedImage });
+      } catch (error) {
+        console.error("Error compressing reference image:", error);
+      }
+    }
+
+    setReferenceImages([...referenceImages, ...newImages]);
+    toast.success(`${newImages.length} immagini di riferimento caricate`);
+  };
+
+  const removeReferenceImage = (index: number) => {
+    setReferenceImages(referenceImages.filter((_, i) => i !== index));
+  };
+
+  // Check if current provider supports reference images (Veo 3.1 reference-to-video)
+  const supportsReferenceImages = currentProvider.modelId === 'google/veo-3.1-reference-to-video';
+
   const handlePresetChange = (preset: ScenePreset) => {
     setSelectedPreset(preset.id);
     setCameraMovement(preset.cameraMovement);
@@ -339,6 +380,11 @@ export const ImageToVideoForm = () => {
         requestBody.end_image = endImagePreview;
       }
 
+      // Add reference images for Veo 3.1 reference-to-video
+      if (supportsReferenceImages && referenceImages.length > 0) {
+        requestBody.reference_images = referenceImages.map(img => img.preview);
+      }
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: requestBody
@@ -381,6 +427,7 @@ export const ImageToVideoForm = () => {
       setStartImagePreview("");
       setEndImage(null);
       setEndImagePreview("");
+      setReferenceImages([]);
       setPrompt("");
     } catch (error) {
       console.error("Error saving generation:", error);
@@ -561,6 +608,70 @@ export const ImageToVideoForm = () => {
               ? "Questo modello crea transizioni fluide tra due frame. Carica entrambe le immagini."
               : "Puoi caricare un end frame opzionale per controllare dove termina il video."
             }
+          </div>
+        </div>
+      )}
+
+      {/* Reference Images for Veo 3.1 reference-to-video */}
+      {supportsReferenceImages && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label className="flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" />
+              Immagini di Riferimento (max 5)
+            </Label>
+            <span className="text-xs text-muted-foreground">
+              {referenceImages.length}/5 immagini
+            </span>
+          </div>
+          
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20">
+            <Info className="w-4 h-4 mt-0.5 text-accent shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Veo 3.1 Reference-to-Video:</span>{" "}
+              Carica più immagini di riferimento per guidare la generazione del video con maggiore coerenza visiva.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+            {referenceImages.map((img, index) => (
+              <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
+                <img
+                  src={img.preview}
+                  alt={`Reference ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => removeReferenceImage(index)}
+                  className="absolute top-1 right-1 p-1 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-background/80 text-[10px] font-medium">
+                  #{index + 1}
+                </div>
+              </div>
+            ))}
+            
+            {referenceImages.length < 5 && (
+              <div className="aspect-square">
+                <input
+                  type="file"
+                  id="reference-images-upload"
+                  className="hidden"
+                  accept="image/*"
+                  multiple
+                  onChange={handleReferenceImageUpload}
+                />
+                <label
+                  htmlFor="reference-images-upload"
+                  className="w-full h-full border-2 border-dashed border-border rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-accent/50 transition-colors"
+                >
+                  <Plus className="w-6 h-6 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Aggiungi</span>
+                </label>
+              </div>
+            )}
           </div>
         </div>
       )}
