@@ -27,7 +27,7 @@ export function createFixedFpsLoop({
   onDone,
 }: CreateFixedFpsLoopParams): FixedFpsLoop {
   const frameInterval = 1000 / fps;
-  const startTime = performance.now();
+  let startTime: number | null = null;
 
   let stopped = false;
   let frameIndex = 0;
@@ -35,6 +35,8 @@ export function createFixedFpsLoop({
 
   const tick = () => {
     if (stopped) return;
+
+    if (startTime === null) startTime = performance.now();
 
     const now = performance.now();
     const elapsedMs = now - startTime;
@@ -54,7 +56,13 @@ export function createFixedFpsLoop({
   };
 
   return {
-    start: () => tick(),
+    start: () => {
+      // reset so successive exports don't inherit timing
+      startTime = null;
+      frameIndex = 0;
+      stopped = false;
+      tick();
+    },
     stop: () => {
       stopped = true;
       if (timeoutId !== null) window.clearTimeout(timeoutId);
