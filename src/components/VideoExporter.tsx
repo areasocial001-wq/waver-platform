@@ -24,9 +24,9 @@ type ExportFormat = 'webm' | 'mp4';
 type ExportFps = '24' | '30' | '60';
 
 const QUALITY_CONFIG: Record<ExportQuality, { bitrate: number; label: string }> = {
-  low: { bitrate: 1000000, label: 'Bassa (1 Mbps)' },
-  medium: { bitrate: 2500000, label: 'Media (2.5 Mbps)' },
-  high: { bitrate: 5000000, label: 'Alta (5 Mbps)' },
+  low: { bitrate: 800_000, label: 'Bassa (800 Kbps)' },
+  medium: { bitrate: 1_500_000, label: 'Media (1.5 Mbps)' },
+  high: { bitrate: 3_000_000, label: 'Alta (3 Mbps)' },
 };
 
 const FORMAT_CONFIG: Record<ExportFormat, { 
