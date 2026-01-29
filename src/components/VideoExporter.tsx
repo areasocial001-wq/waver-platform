@@ -7,6 +7,7 @@ import { Loader2, Film, Download, AlertCircle, CheckCircle } from "lucide-react"
 import { toast } from "sonner";
 import { AudioMixerSettings } from "./AudioMixer";
 import { AudioEffectsSettings } from "./AudioEffects";
+import { createFixedFpsLoop } from "@/lib/videoExport/fixedFpsLoop";
 
 interface VideoExporterProps {
   videoUrl: string;
@@ -104,6 +105,11 @@ export function VideoExporter({
       return;
     }
 
+    if (segmentEnd <= segmentStart) {
+      toast.error("Intervallo segmento non valido");
+      return;
+    }
+
     setIsExporting(true);
     setExportProgress(0);
 
@@ -113,10 +119,13 @@ export function VideoExporter({
       video.src = videoUrl;
       video.muted = true;
       video.crossOrigin = 'anonymous';
+      video.playsInline = true;
+      video.preload = 'auto';
 
       const audio = document.createElement('audio');
       audio.src = audioUrl;
       audio.crossOrigin = 'anonymous';
+      audio.preload = 'auto';
 
       // Wait for both to load
       await Promise.all([
@@ -141,7 +150,7 @@ export function VideoExporter({
       }
 
       // Create audio context for audio capture with effects
-      const audioContext = new AudioContext();
+      const audioContext = new AudioContext({ latencyHint: 'playback' });
       
       // Set up generated audio source
       const audioSource = audioContext.createMediaElementSource(audio);
@@ -188,31 +197,17 @@ export function VideoExporter({
       
       lastNode.connect(generatedGain);
       
-      // Create destination for combined audio
+      // Create destination for combined audio (no speaker output during export to reduce load)
       const audioDestination = audioContext.createMediaStreamDestination();
       generatedGain.connect(audioDestination);
-      generatedGain.connect(audioContext.destination);
       
-      // Set up original video audio if mixer is enabled
-      let originalVideo: HTMLVideoElement | null = null;
-      let originalSource: MediaElementAudioSourceNode | null = null;
-      
+      // Mix original video audio directly from the same video element (avoid loading a second <video>)
       if (mixerSettings?.originalEnabled && mixerSettings.originalVolume > 0) {
-        originalVideo = document.createElement('video');
-        originalVideo.src = videoUrl;
-        originalVideo.crossOrigin = 'anonymous';
-        
-        await new Promise<void>((resolve, reject) => {
-          originalVideo!.onloadedmetadata = () => resolve();
-          originalVideo!.onerror = () => reject(new Error('Errore caricamento audio originale'));
-        });
-        
-        originalSource = audioContext.createMediaElementSource(originalVideo);
+        const originalSource = audioContext.createMediaElementSource(video);
         const originalGain = audioContext.createGain();
         originalGain.gain.value = mixerSettings.originalVolume / 100;
         originalSource.connect(originalGain);
         originalGain.connect(audioDestination);
-        originalGain.connect(audioContext.destination);
       }
 
       // Create video stream from canvas with selected FPS
@@ -246,6 +241,21 @@ export function VideoExporter({
       const segmentDuration = segmentEnd - segmentStart;
       let recordingComplete = false;
 
+      const stopOnce = () => {
+        if (recordingComplete) return;
+        try {
+          video.pause();
+          audio.pause();
+        } catch {
+          // ignore
+        }
+        try {
+          if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        } catch {
+          // ignore
+        }
+      };
+
       mediaRecorder.onstop = () => {
         recordingComplete = true;
         const blobType = actualFormat === 'mp4' ? 'video/mp4' : 'video/webm';
@@ -278,47 +288,45 @@ export function VideoExporter({
       });
 
       mediaRecorder.start(100);
-      
-      const playPromises = [video.play(), audio.play()];
-      if (originalVideo) {
-        originalVideo.currentTime = segmentStart;
-        playPromises.push(originalVideo.play());
-      }
-      await Promise.all(playPromises);
 
-      // Update progress and render frames using fixed interval for consistent FPS
-      const frameInterval = 1000 / targetFps;
-      
-      const renderFrame = () => {
-        if (recordingComplete) return;
-        
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
-        const elapsed = video.currentTime - segmentStart;
-        const progress = Math.min((elapsed / segmentDuration) * 100, 100);
-        setExportProgress(progress);
+      // Play sources
+      await Promise.all([video.play(), audio.play()]);
 
-        if (video.currentTime >= segmentEnd || video.ended || audio.ended) {
-          video.pause();
-          audio.pause();
-          if (originalVideo) originalVideo.pause();
-          mediaRecorder.stop();
-          return;
-        }
-      };
+      // Render frames on a fixed wall-clock schedule to avoid duration drift
+      const loop = createFixedFpsLoop({
+        fps: targetFps,
+        durationMs: segmentDuration * 1000,
+        onFrame: ({ progress01 }) => {
+          if (recordingComplete) return;
 
-      // Use setInterval for consistent frame timing
-      const frameTimer = setInterval(renderFrame, frameInterval);
-      
-      // Initial frame
-      renderFrame();
-      
-      // Clean up timer when recording stops
+          // Draw whatever frame is currently available (if decoding lags, frames may repeat,
+          // but duration + container timestamps stay stable)
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          setExportProgress(progress01 * 100);
+
+          if (video.currentTime >= segmentEnd || video.ended || audio.ended) {
+            stopOnce();
+          }
+        },
+        onDone: () => {
+          stopOnce();
+        },
+      });
+
+      // Stop if either source ends
+      audio.onended = () => stopOnce();
+      video.onended = () => stopOnce();
+
+      // Ensure timer is stopped when recorder stops
       const originalOnStop = mediaRecorder.onstop;
       mediaRecorder.onstop = (e) => {
-        clearInterval(frameTimer);
+        loop.stop();
         if (originalOnStop) originalOnStop.call(mediaRecorder, e);
       };
+
+      // Initial frame + start loop
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      loop.start();
 
     } catch (error) {
       console.error('Export error:', error);
