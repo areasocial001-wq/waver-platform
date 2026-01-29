@@ -7,7 +7,7 @@ import { Loader2, Film, Download, AlertCircle, CheckCircle } from "lucide-react"
 import { toast } from "sonner";
 import { AudioMixerSettings } from "./AudioMixer";
 import { AudioEffectsSettings } from "./AudioEffects";
-import { createFixedFpsLoop } from "@/lib/videoExport/fixedFpsLoop";
+import { createFixedFpsLoop, type FixedFpsLoop } from "@/lib/videoExport/fixedFpsLoop";
 
 interface VideoExporterProps {
   videoUrl: string;
@@ -116,6 +116,37 @@ export function VideoExporter({
     setIsExporting(true);
     setExportProgress(0);
 
+    let audioContext: AudioContext | null = null;
+    let loop: FixedFpsLoop | null = null;
+    let combinedStream: MediaStream | null = null;
+    let videoStream: MediaStream | null = null;
+    let cleanupRan = false;
+
+    const cleanup = async () => {
+      if (cleanupRan) return;
+      cleanupRan = true;
+      try {
+        loop?.stop();
+      } catch {
+        // ignore
+      }
+      try {
+        combinedStream?.getTracks().forEach((t) => t.stop());
+      } catch {
+        // ignore
+      }
+      try {
+        videoStream?.getTracks().forEach((t) => t.stop());
+      } catch {
+        // ignore
+      }
+      try {
+        await audioContext?.close();
+      } catch {
+        // ignore
+      }
+    };
+
     try {
       // Create offscreen elements
       const video = document.createElement('video');
@@ -124,6 +155,7 @@ export function VideoExporter({
       video.crossOrigin = 'anonymous';
       video.playsInline = true;
       video.preload = 'auto';
+      video.playbackRate = 1;
 
       const audio = document.createElement('audio');
       audio.src = audioUrl;
@@ -153,7 +185,7 @@ export function VideoExporter({
       }
 
       // Create audio context for audio capture with effects
-      const audioContext = new AudioContext({ latencyHint: 'playback' });
+      audioContext = new AudioContext({ latencyHint: 'playback' });
       
       // Set up generated audio source
       const audioSource = audioContext.createMediaElementSource(audio);
@@ -203,6 +235,16 @@ export function VideoExporter({
       // Create destination for combined audio (no speaker output during export to reduce load)
       const audioDestination = audioContext.createMediaStreamDestination();
       generatedGain.connect(audioDestination);
+
+      // Keep an always-alive silent signal so the audio track doesn't end early.
+      // This prevents some containers/players from truncating the whole recording when the
+      // generated audio is shorter than the selected video segment.
+      const silent = audioContext.createConstantSource();
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+      silent.connect(silentGain);
+      silentGain.connect(audioDestination);
+      silent.start();
       
       // Mix original video audio directly from the same video element (avoid loading a second <video>)
       if (mixerSettings?.originalEnabled && mixerSettings.originalVolume > 0) {
@@ -215,10 +257,10 @@ export function VideoExporter({
 
       // Create video stream from canvas with selected FPS
       const targetFps = parseInt(fps);
-      const videoStream = canvas.captureStream(targetFps);
+      videoStream = canvas.captureStream(targetFps);
       
       // Combine video and audio streams
-      const combinedStream = new MediaStream([
+      combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioDestination.stream.getAudioTracks(),
       ]);
@@ -281,9 +323,9 @@ export function VideoExporter({
         setIsExporting(false);
         setExportProgress(100);
         toast.success(`Video esportato con successo in formato ${extension.toUpperCase()}!`);
-        
-        // Cleanup
-        audioContext.close();
+
+        // Cleanup resources/tracks (important: avoids export getting slower after each run)
+        void cleanup();
       };
 
       // Start recording
@@ -302,7 +344,7 @@ export function VideoExporter({
       await Promise.all([video.play(), audio.play()]);
 
       // Render frames on a fixed wall-clock schedule to avoid duration drift
-      const loop = createFixedFpsLoop({
+      loop = createFixedFpsLoop({
         fps: targetFps,
         durationMs: segmentDuration * 1000,
         onFrame: ({ progress01 }) => {
@@ -318,7 +360,10 @@ export function VideoExporter({
             setExportProgress(progress01 * 100);
           }
 
-          if (video.currentTime >= segmentEnd || video.ended || audio.ended) {
+          // IMPORTANT: do NOT stop when audio ends.
+          // The generated audio might be shorter than the selected segment; stopping here
+          // causes early termination + perceived FPS drop/out-of-sync.
+          if (video.currentTime >= segmentEnd || video.ended) {
             stopOnce();
           }
         },
@@ -327,14 +372,17 @@ export function VideoExporter({
         },
       });
 
-      // Stop if either source ends
-      audio.onended = () => stopOnce();
+      // Stop if video ends; audio ending is allowed (we keep a silent track alive)
       video.onended = () => stopOnce();
 
       // Ensure timer is stopped when recorder stops
       const originalOnStop = mediaRecorder.onstop;
       mediaRecorder.onstop = (e) => {
-        loop.stop();
+        try {
+          loop?.stop();
+        } catch {
+          // ignore
+        }
         if (originalOnStop) originalOnStop.call(mediaRecorder, e);
       };
 
@@ -346,6 +394,7 @@ export function VideoExporter({
       console.error('Export error:', error);
       toast.error('Errore durante l\'esportazione: ' + (error as Error).message);
       setIsExporting(false);
+      void cleanup();
     }
   }, [videoUrl, audioUrl, segmentStart, segmentEnd, quality, format, fps, mixerSettings, effectsSettings]);
 
