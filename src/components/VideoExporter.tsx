@@ -36,9 +36,12 @@ const FORMAT_CONFIG: Record<ExportFormat, {
   fallbackMimeType?: string;
 }> = {
   webm: { 
-    mimeType: 'video/webm;codecs=vp9,opus', 
+    // VP8 is significantly faster to encode than VP9 in many browsers,
+    // helping maintain real-time capture FPS.
+    mimeType: 'video/webm;codecs=vp8,opus', 
     extension: 'webm', 
-    label: 'WebM (VP9)' 
+    label: 'WebM (VP8)',
+    fallbackMimeType: 'video/webm;codecs=vp9,opus',
   },
   mp4: { 
     mimeType: 'video/mp4;codecs=avc1.42E01E,mp4a.40.2', 
@@ -241,6 +244,10 @@ export function VideoExporter({
       const segmentDuration = segmentEnd - segmentStart;
       let recordingComplete = false;
 
+      // Throttle UI updates during export to avoid dropping capture frames.
+      let lastUiUpdateMs = 0;
+      const UI_UPDATE_INTERVAL_MS = 200;
+
       const stopOnce = () => {
         if (recordingComplete) return;
         try {
@@ -287,7 +294,9 @@ export function VideoExporter({
         video.onseeked = () => resolve();
       });
 
-      mediaRecorder.start(100);
+      // Using a very small timeslice causes frequent main-thread events.
+      // A larger slice reduces overhead and helps keep capture FPS stable.
+      mediaRecorder.start(1000);
 
       // Play sources
       await Promise.all([video.play(), audio.play()]);
@@ -302,7 +311,12 @@ export function VideoExporter({
           // Draw whatever frame is currently available (if decoding lags, frames may repeat,
           // but duration + container timestamps stay stable)
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          setExportProgress(progress01 * 100);
+
+          const now = performance.now();
+          if (now - lastUiUpdateMs >= UI_UPDATE_INTERVAL_MS || progress01 >= 0.999) {
+            lastUiUpdateMs = now;
+            setExportProgress(progress01 * 100);
+          }
 
           if (video.currentTime >= segmentEnd || video.ended || audio.ended) {
             stopOnce();
