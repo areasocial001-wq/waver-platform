@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -42,7 +42,8 @@ export const Navbar = () => {
   const isApiMonitoringPage = location.pathname === "/api-monitoring";
   const isVideoEditorPage = location.pathname === "/video-editor";
   const isSettingsPage = location.pathname === "/settings";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage;
+  const isExportTestPage = location.pathname === "/export-test";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage || isExportTestPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -206,6 +207,10 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/api-monitoring")}>
                     <Activity className="w-4 h-4 mr-2" />
                     API Monitor
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/export-test")}>
+                    <Gauge className="w-4 h-4 mr-2" />
+                    FPS Diagnostic
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
