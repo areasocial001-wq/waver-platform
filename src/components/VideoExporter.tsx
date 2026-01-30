@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Film, Download, AlertCircle, CheckCircle } from "lucide-react";
+import { Loader2, Film, Download, AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { AudioMixerSettings } from "./AudioMixer";
 import { AudioEffectsSettings } from "./AudioEffects";
@@ -58,6 +58,13 @@ const isFormatSupported = (format: ExportFormat): boolean => {
          (config.fallbackMimeType ? MediaRecorder.isTypeSupported(config.fallbackMimeType) : false);
 };
 
+// Detect Chromium-based browsers (Chrome, Edge, Brave, Opera, etc.)
+const isChromiumBrowser = (): boolean => {
+  const ua = navigator.userAgent;
+  // Chromium-based browsers have "Chrome" in UA but not "Firefox" or "Safari" alone
+  return /Chrome|Chromium|Brave|Edg|OPR/i.test(ua) && !/Firefox/i.test(ua);
+};
+
 export function VideoExporter({ 
   videoUrl, 
   audioUrl, 
@@ -72,20 +79,25 @@ export function VideoExporter({
   const [format, setFormat] = useState<ExportFormat>('webm');
   const [fps, setFps] = useState<ExportFps>('24');
   const [supportedFormats, setSupportedFormats] = useState<ExportFormat[]>([]);
+  const [isChromium, setIsChromium] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Check supported formats on mount
+  // Check supported formats and browser type on mount
   useEffect(() => {
     const formats: ExportFormat[] = [];
+    // WebM first as it's recommended for stable FPS
     if (isFormatSupported('webm')) formats.push('webm');
     if (isFormatSupported('mp4')) formats.push('mp4');
     setSupportedFormats(formats);
+    setIsChromium(isChromiumBrowser());
     
-    // Default to first supported format
-    if (formats.length > 0 && !formats.includes(format)) {
+    // Default to WebM for best FPS stability
+    if (formats.includes('webm')) {
+      setFormat('webm');
+    } else if (formats.length > 0) {
       setFormat(formats[0]);
     }
   }, []);
@@ -416,6 +428,7 @@ export function VideoExporter({
               <SelectContent>
                 {Object.entries(FORMAT_CONFIG).map(([key, config]) => {
                   const isSupported = supportedFormats.includes(key as ExportFormat);
+                  const isRecommended = key === 'webm';
                   return (
                     <SelectItem 
                       key={key} 
@@ -424,6 +437,11 @@ export function VideoExporter({
                     >
                       <div className="flex items-center gap-2">
                         <span>{config.label}</span>
+                        {isRecommended && (
+                          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+                            Consigliato
+                          </span>
+                        )}
                         {isSupported ? (
                           <CheckCircle className="w-3 h-3 text-green-500" />
                         ) : (
@@ -490,12 +508,23 @@ export function VideoExporter({
           </Button>
         )}
 
+        {/* Warning for MP4 on Chromium browsers */}
+        {format === 'mp4' && isChromium && (
+          <div className="flex items-start gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
+            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+            <p className="text-yellow-400">
+              <strong>Attenzione:</strong> L'encoding MP4 (H.264) su browser Chromium (Chrome, Brave, Edge) può causare cali di FPS. 
+              Per un framerate stabile a 24fps, consigliamo <strong>WebM (VP8)</strong>.
+            </p>
+          </div>
+        )}
+        
         <div className="flex items-start gap-2 p-2 bg-muted/50 rounded text-xs">
           <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
           <p className="text-muted-foreground">
             {format === 'mp4' 
               ? "MP4 offre la massima compatibilità con dispositivi e player. Richiede browser recenti (Chrome 107+, Edge 107+)."
-              : "WebM è supportato da tutti i browser moderni. Per massima compatibilità, considera MP4 se disponibile."}
+              : "WebM (VP8) garantisce FPS stabili durante l'export. Per massima compatibilità con tutti i dispositivi, considera MP4."}
           </p>
         </div>
       </div>
