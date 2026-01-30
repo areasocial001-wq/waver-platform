@@ -57,7 +57,7 @@ export default function ExportTest() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Offline frame-by-frame export - guarantees exact frame count
+  // Offline frame-by-frame export - TWO-PASS approach for correct timing
   const runOfflineExport = useCallback(async () => {
     const targetFps = parseInt(fps);
     const startTime = performance.now();
@@ -75,7 +75,6 @@ export default function ExportTest() {
       video.onerror = () => reject(new Error("Failed to load video"));
     });
 
-    // Ensure video is fully loaded
     await new Promise<void>((resolve) => {
       if (video.readyState >= 3) {
         resolve();
@@ -84,7 +83,7 @@ export default function ExportTest() {
       }
     });
 
-    const duration = Math.min(video.duration, 10); // Cap at 10s for test
+    const duration = Math.min(video.duration, 10);
     const totalFrames = Math.floor(duration * targetFps);
     const frameInterval = 1 / targetFps;
 
@@ -93,11 +92,34 @@ export default function ExportTest() {
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d", { alpha: false })!;
 
-    // Create silent audio track for valid media stream
+    // ========== PASS 1: Capture all frames to memory ==========
+    setProgress(0);
+    const frames: ImageData[] = [];
+    video.pause();
+
+    for (let i = 0; i < totalFrames; i++) {
+      const targetTime = i * frameInterval;
+      video.currentTime = targetTime;
+      await waitForSeek(video);
+      await new Promise(r => setTimeout(r, 5)); // Small delay for render
+
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      frames.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+
+      // Update progress (0-50% for capture phase)
+      if (i % 10 === 0) {
+        setProgress((i / totalFrames) * 50);
+      }
+    }
+
+    setProgress(50);
+
+    // ========== PASS 2: Playback frames at correct FPS while recording ==========
+    // Create silent audio track
     const audioContext = new AudioContext({ latencyHint: "playback" });
     const oscillator = audioContext.createOscillator();
     const gainNode = audioContext.createGain();
-    gainNode.gain.value = 0; // Silent
+    gainNode.gain.value = 0;
     oscillator.connect(gainNode);
     const audioDestination = audioContext.createMediaStreamDestination();
     gainNode.connect(audioDestination);
@@ -111,12 +133,10 @@ export default function ExportTest() {
       mimeType = format === "webm" ? "video/webm" : "video/mp4";
     }
 
-    // Create video stream from canvas - use 0 for manual frame control
-    const videoStream = canvas.captureStream(0);
-    const videoTrack = videoStream.getVideoTracks()[0];
-
+    // Use captureStream WITH fps parameter for correct timing
+    const videoStream = canvas.captureStream(targetFps);
     const combinedStream = new MediaStream([
-      videoTrack,
+      ...videoStream.getVideoTracks(),
       ...audioDestination.stream.getAudioTracks(),
     ]);
 
@@ -139,45 +159,41 @@ export default function ExportTest() {
       };
     });
 
-    // Start recording
     mediaRecorder.start();
 
-    // Frame-by-frame capture
-    video.pause();
-    let frameCount = 0;
-    let lastProgressUpdate = 0;
+    // Playback frames at exactly targetFps using precise timing
+    const frameIntervalMs = 1000 / targetFps;
+    let frameIndex = 0;
+    const playbackStart = performance.now();
 
-    for (let i = 0; i < totalFrames; i++) {
-      const targetTime = i * frameInterval;
-      
-      // Seek to exact frame time
-      video.currentTime = targetTime;
-      await waitForSeek(video);
+    await new Promise<void>((resolve) => {
+      const drawNextFrame = () => {
+        if (frameIndex >= frames.length) {
+          resolve();
+          return;
+        }
 
-      // Small delay to ensure frame is rendered
-      await new Promise(r => setTimeout(r, 10));
+        // Draw frame
+        ctx.putImageData(frames[frameIndex], 0, 0);
+        frameIndex++;
 
-      // Draw frame to canvas
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Request frame capture from canvas stream
-      if ('requestFrame' in videoTrack) {
-        (videoTrack as any).requestFrame();
-      }
+        // Update progress (50-100% for playback phase)
+        setProgress(50 + (frameIndex / frames.length) * 50);
 
-      frameCount++;
+        // Schedule next frame at exact interval
+        const elapsed = performance.now() - playbackStart;
+        const nextFrameTime = frameIndex * frameIntervalMs;
+        const delay = Math.max(0, nextFrameTime - elapsed);
+        
+        setTimeout(drawNextFrame, delay);
+      };
 
-      // Throttled progress update (every 100ms)
-      const now = performance.now();
-      if (now - lastProgressUpdate > 100) {
-        setProgress((i / totalFrames) * 100);
-        lastProgressUpdate = now;
-      }
-    }
+      drawNextFrame();
+    });
 
-    setProgress(100);
+    // Wait a bit for last frame to be captured
+    await new Promise(r => setTimeout(r, 100));
 
-    // Stop recording
     mediaRecorder.stop();
     const blob = await recordingPromise;
 
@@ -192,10 +208,10 @@ export default function ExportTest() {
 
     return {
       blob,
-      frameCount,
+      frameCount: frames.length,
       duration,
       targetFps,
-      measuredFps: frameCount / duration,
+      measuredFps: frames.length / duration,
     };
   }, [selectedFile, format, fps]);
 
