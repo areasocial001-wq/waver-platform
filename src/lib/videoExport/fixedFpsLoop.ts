@@ -1,71 +1,68 @@
-export type FixedFpsFrameInfo = {
-  frameIndex: number;
-  elapsedMs: number;
-  progress01: number;
-};
+/**
+ * Fixed FPS loop utility for frame-accurate video recording.
+ * Uses requestAnimationFrame with timing compensation to maintain target framerate.
+ */
 
-export type FixedFpsLoop = {
-  start: () => void;
-  stop: () => void;
-};
-
-type CreateFixedFpsLoopParams = {
+export interface FixedFpsLoopOptions {
   fps: number;
   durationMs: number;
-  onFrame: (info: FixedFpsFrameInfo) => void;
-  onDone?: () => void;
-};
+  onFrame: (info: { frameIndex: number; progress01: number; elapsedMs: number }) => void;
+  onDone: () => void;
+}
 
-/**
- * Fixed-FPS scheduler that avoids cumulative drift by always targeting
- * `startTime + frameIndex * frameInterval`.
- */
-export function createFixedFpsLoop({
-  fps,
-  durationMs,
-  onFrame,
-  onDone,
-}: CreateFixedFpsLoopParams): FixedFpsLoop {
-  const frameInterval = 1000 / fps;
-  let startTime: number | null = null;
+export interface FixedFpsLoop {
+  start: () => void;
+  stop: () => void;
+}
 
-  let stopped = false;
+export function createFixedFpsLoop(options: FixedFpsLoopOptions): FixedFpsLoop {
+  const { fps, durationMs, onFrame, onDone } = options;
+  const frameIntervalMs = 1000 / fps;
+  const totalFrames = Math.ceil((durationMs / 1000) * fps);
+  
   let frameIndex = 0;
-  let timeoutId: number | null = null;
+  let startTime: number | null = null;
+  let animationId: number | null = null;
+  let stopped = false;
 
-  const tick = () => {
+  const loop = (timestamp: number) => {
     if (stopped) return;
+    
+    if (startTime === null) {
+      startTime = timestamp;
+    }
 
-    if (startTime === null) startTime = performance.now();
+    const elapsedMs = timestamp - startTime;
+    const expectedFrame = Math.floor(elapsedMs / frameIntervalMs);
 
-    const now = performance.now();
-    const elapsedMs = now - startTime;
-    const progress01 = durationMs <= 0 ? 1 : Math.min(elapsedMs / durationMs, 1);
+    // Catch up if we're behind
+    while (frameIndex <= expectedFrame && frameIndex < totalFrames) {
+      const progress01 = frameIndex / totalFrames;
+      onFrame({ frameIndex, progress01, elapsedMs });
+      frameIndex++;
+    }
 
-    if (elapsedMs >= durationMs) {
-      onDone?.();
+    if (frameIndex >= totalFrames) {
+      onDone();
       return;
     }
 
-    onFrame({ frameIndex, elapsedMs, progress01 });
-    frameIndex += 1;
-
-    const nextTarget = startTime + frameIndex * frameInterval;
-    const delay = Math.max(0, nextTarget - performance.now());
-    timeoutId = window.setTimeout(tick, delay);
+    animationId = requestAnimationFrame(loop);
   };
 
   return {
     start: () => {
-      // reset so successive exports don't inherit timing
-      startTime = null;
-      frameIndex = 0;
       stopped = false;
-      tick();
+      frameIndex = 0;
+      startTime = null;
+      animationId = requestAnimationFrame(loop);
     },
     stop: () => {
       stopped = true;
-      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
     },
   };
 }
