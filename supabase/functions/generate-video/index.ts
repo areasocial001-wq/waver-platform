@@ -1242,6 +1242,117 @@ serve(async (req) => {
 
       if (!aimlResponse.ok) {
         console.error(`[AI/ML API] Error: ${aimlResponse.status} - ${responseText}`);
+        
+        // Check if it's a billing/credits error (403) - attempt fallback to PiAPI
+        if (aimlResponse.status === 403 && responseText.includes("credits")) {
+          console.log("[AI/ML API] Credits exhausted, attempting fallback to PiAPI...");
+          
+          const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
+          if (PIAPI_API_KEY) {
+            // Map AIML model to equivalent PiAPI model
+            const aimlToPiapiMap: Record<string, string> = {
+              "veo3-t2v": "veo3",
+              "veo3-i2v": "veo3",
+              "kling-2.5-t2v": "kling-2.5",
+              "kling-2.5-i2v": "kling-2.5",
+              "kling-2.6-t2v": "kling-2.6", 
+              "kling-2.6-i2v": "kling-2.6",
+            };
+            
+            const piapiModelKey = aimlToPiapiMap[modelKey] || "kling-2.5";
+            const piapiConfig = PIAPI_MODELS[piapiModelKey];
+            
+            if (piapiConfig) {
+              console.log(`[Fallback] Switching from AIML ${modelKey} to PiAPI ${piapiModelKey}`);
+              
+              const taskType = type === "image_to_video" 
+                ? piapiConfig.task_type_img2video 
+                : piapiConfig.task_type_txt2video;
+              
+              const piApiPayload: any = {
+                model: piapiConfig.model,
+                task_type: taskType,
+                input: {
+                  prompt: prompt || "",
+                }
+              };
+              
+              // Add duration using generic sanitizer
+              const sanitizedDuration = sanitizeDuration(piapiConfig.model, duration || 5);
+              piApiPayload.input.duration = sanitizedDuration;
+              
+              // Add model-specific parameters
+              if (piapiConfig.model_name) {
+                piApiPayload.input.model_name = piapiConfig.model_name;
+              }
+              if (piapiConfig.mode) {
+                piApiPayload.input.mode = piapiConfig.mode;
+              }
+              
+              // Handle image for I2V
+              if (type === "image_to_video" && startImageData) {
+                const imgData = await getImageUrlForPiAPI(startImageData, "start");
+                if (imgData.url) {
+                  piApiPayload.input.image_url = imgData.url;
+                } else if (imgData.base64) {
+                  piApiPayload.input.image = imgData.base64;
+                }
+              }
+              
+              console.log("[Fallback] PiAPI payload:", JSON.stringify(piApiPayload, null, 2));
+              
+              const piApiResponse = await fetch("https://api.piapi.ai/api/v1/task", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-api-key": PIAPI_API_KEY,
+                },
+                body: JSON.stringify(piApiPayload),
+              });
+              
+              if (piApiResponse.ok) {
+                const piApiData = await piApiResponse.json();
+                const taskId = piApiData.data?.task_id || piApiData.task_id;
+                
+                if (taskId) {
+                  console.log(`[Fallback] PiAPI task started successfully: ${taskId}`);
+                  
+                  // Update database with PiAPI task
+                  if (generationId) {
+                    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+                    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+                    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+                    await supabaseClient
+                      .from('video_generations')
+                      .update({
+                        status: 'processing',
+                        prediction_id: `piapi:${piapiModelKey}:${taskId}`,
+                        provider: `piapi-${piapiModelKey}`
+                      })
+                      .eq('id', generationId);
+                  }
+                  
+                  return new Response(JSON.stringify({ 
+                    status: "starting",
+                    operationId: `piapi:${piapiModelKey}:${taskId}`,
+                    provider: `piapi-${piapiModelKey}`,
+                    fallback: true,
+                    originalError: "AIML credits exhausted"
+                  }), {
+                    headers: { ...corsHeaders, "Content-Type": "application/json" },
+                    status: 200,
+                  });
+                }
+              } else {
+                const piError = await piApiResponse.text();
+                console.error(`[Fallback] PiAPI also failed: ${piError}`);
+              }
+            }
+          }
+        }
+        
         throw new Error(`AI/ML API error: ${aimlResponse.status} - ${responseText}`);
       }
 
