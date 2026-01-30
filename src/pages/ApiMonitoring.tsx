@@ -9,6 +9,7 @@ import { LogViewer } from "@/components/LogViewer";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiAnalyticsDashboard } from "@/components/ApiAnalyticsDashboard";
 import { AIMLApiMonitor } from "@/components/AIMLApiMonitor";
+import { ProviderCreditsWidget } from "@/components/ProviderCreditsWidget";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 import { Activity } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -48,6 +49,9 @@ export default function ApiMonitoring() {
             </TabsList>
 
             <TabsContent value="status" className="space-y-6">
+              {/* Provider Credits Widget */}
+              <ProviderCreditsWidget />
+
               {/* Full API Monitoring Dashboard */}
               <ApiMonitoringDashboard 
                 apis={apis} 
