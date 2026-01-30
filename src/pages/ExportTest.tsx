@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Play, Download, Activity, AlertCircle, CheckCircle, Zap, Clock } from "lucide-react";
+import { createFixedFpsLoop } from "@/lib/videoExport/fixedFpsLoop";
 
 type TestFile = {
   name: string;
@@ -90,11 +91,19 @@ export default function ExportTest() {
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d", { alpha: false })!;
+    const ctx = canvas.getContext(
+      "2d",
+      { alpha: false, desynchronized: true } as any,
+    ) as CanvasRenderingContext2D | null;
+    if (!ctx) throw new Error("Failed to create 2D canvas context");
 
     // ========== PASS 1: Capture all frames to memory ==========
     setProgress(0);
-    const frames: ImageData[] = [];
+    if (typeof createImageBitmap !== "function") {
+      throw new Error("createImageBitmap not supported in this browser");
+    }
+
+    const frames: ImageBitmap[] = [];
     video.pause();
 
     for (let i = 0; i < totalFrames; i++) {
@@ -104,7 +113,8 @@ export default function ExportTest() {
       await new Promise(r => setTimeout(r, 5)); // Small delay for render
 
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      frames.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+      // Store as ImageBitmap (GPU-friendly) to make pass 2 fast enough for 24fps
+      frames.push(await createImageBitmap(canvas));
 
       // Update progress (0-50% for capture phase)
       if (i % 10 === 0) {
@@ -161,34 +171,21 @@ export default function ExportTest() {
 
     mediaRecorder.start();
 
-    // Playback frames at exactly targetFps using precise timing
-    const frameIntervalMs = 1000 / targetFps;
-    let frameIndex = 0;
-    const playbackStart = performance.now();
-
+    // Playback frames at exactly targetFps using fixed-FPS loop
     await new Promise<void>((resolve) => {
-      const drawNextFrame = () => {
-        if (frameIndex >= frames.length) {
-          resolve();
-          return;
-        }
+      const durationMs = Math.round((frames.length / targetFps) * 1000);
+      const loop = createFixedFpsLoop({
+        fps: targetFps,
+        durationMs,
+        onFrame: ({ frameIndex, progress01 }) => {
+          if (frameIndex >= frames.length) return;
+          ctx.drawImage(frames[frameIndex], 0, 0, canvas.width, canvas.height);
+          setProgress(50 + progress01 * 50);
+        },
+        onDone: () => resolve(),
+      });
 
-        // Draw frame
-        ctx.putImageData(frames[frameIndex], 0, 0);
-        frameIndex++;
-
-        // Update progress (50-100% for playback phase)
-        setProgress(50 + (frameIndex / frames.length) * 50);
-
-        // Schedule next frame at exact interval
-        const elapsed = performance.now() - playbackStart;
-        const nextFrameTime = frameIndex * frameIntervalMs;
-        const delay = Math.max(0, nextFrameTime - elapsed);
-        
-        setTimeout(drawNextFrame, delay);
-      };
-
-      drawNextFrame();
+      loop.start();
     });
 
     // Wait a bit for last frame to be captured
@@ -196,6 +193,15 @@ export default function ExportTest() {
 
     mediaRecorder.stop();
     const blob = await recordingPromise;
+
+    // Release ImageBitmap memory
+    frames.forEach((b) => {
+      try {
+        b.close();
+      } catch {
+        // ignore
+      }
+    });
 
     // Cleanup
     oscillator.stop();
