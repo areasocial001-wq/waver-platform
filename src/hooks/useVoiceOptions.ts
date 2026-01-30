@@ -8,6 +8,26 @@ export interface VoiceOption {
   isCloned?: boolean;
 }
 
+// Supported languages for ElevenLabs multilingual_v2
+export interface LanguageOption {
+  code: string;
+  name: string;
+  flag: string;
+}
+
+export const SUPPORTED_LANGUAGES: LanguageOption[] = [
+  { code: "it", name: "Italiano", flag: "🇮🇹" },
+  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "es", name: "Español", flag: "🇪🇸" },
+  { code: "fr", name: "Français", flag: "🇫🇷" },
+  { code: "de", name: "Deutsch", flag: "🇩🇪" },
+  { code: "pt", name: "Português", flag: "🇵🇹" },
+  { code: "pl", name: "Polski", flag: "🇵🇱" },
+  { code: "ja", name: "日本語", flag: "🇯🇵" },
+  { code: "zh", name: "中文", flag: "🇨🇳" },
+  { code: "ko", name: "한국어", flag: "🇰🇷" },
+];
+
 // Default ElevenLabs voices
 export const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
   { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", description: "Voce femminile naturale, multilingue" },

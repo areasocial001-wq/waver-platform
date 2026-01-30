@@ -14,6 +14,7 @@ const requestSchema = z.object({
   stability: z.number().min(0).max(1).optional(),
   similarityBoost: z.number().min(0).max(1).optional(),
   style: z.number().min(0).max(1).optional(),
+  languageCode: z.string().length(2).optional(), // ISO 639-1 code (e.g., "it", "en")
 });
 
 serve(async (req) => {
@@ -41,7 +42,7 @@ serve(async (req) => {
       );
     }
     
-    const { text, voiceId, speed, stability, similarityBoost, style } = parseResult.data;
+    const { text, voiceId, speed, stability, similarityBoost, style, languageCode } = parseResult.data;
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 
     if (!ELEVENLABS_API_KEY) {
@@ -56,9 +57,13 @@ serve(async (req) => {
     const voiceSimilarity = similarityBoost ?? 0.75;
     const voiceStyle = style ?? 0.5;
     const voiceSpeed = Math.max(0.7, Math.min(1.2, speed ?? 1.0));
+    
+    // Default to Italian if no language specified
+    const selectedLanguage = languageCode || 'it';
 
     console.log('Generating TTS for text:', text.substring(0, 100) + '...');
     console.log('Using voice ID:', selectedVoiceId);
+    console.log('Language code:', selectedLanguage);
     console.log('Settings - Speed:', voiceSpeed, 'Stability:', voiceStability, 'Similarity:', voiceSimilarity, 'Style:', voiceStyle);
 
     const response = await fetch(
@@ -73,6 +78,7 @@ serve(async (req) => {
           text,
           model_id: 'eleven_multilingual_v2',
           output_format: 'mp3_44100_128',
+          language_code: selectedLanguage, // Force specific language pronunciation
           voice_settings: {
             stability: voiceStability,
             similarity_boost: voiceSimilarity,
