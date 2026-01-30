@@ -13,7 +13,8 @@ import { AudioEqualizer, EqualizerSettings, DEFAULT_EQUALIZER_SETTINGS } from ".
 import { VideoExporter } from "./VideoExporter";
 import { AudioEffects, AudioEffectsSettings, DEFAULT_EFFECTS_SETTINGS } from "./AudioEffects";
 import { AudioMixer, AudioMixerSettings, DEFAULT_MIXER_SETTINGS } from "./AudioMixer";
-import { useVoiceOptions, DEFAULT_VOICE_OPTIONS } from "@/hooks/useVoiceOptions";
+import { useVoiceOptions, DEFAULT_VOICE_OPTIONS, SUPPORTED_LANGUAGES } from "@/hooks/useVoiceOptions";
+import { Globe } from "lucide-react";
 
 // Constants for optimal speed calculation
 // Baseline: ~15 characters per second at 1.0x speed for comfortable speech
@@ -33,6 +34,7 @@ export function VideoToAudioForm() {
   const [videoDuration, setVideoDuration] = useState<number>(0);
   const [text, setText] = useState("");
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_OPTIONS[0].id);
+  const [selectedLanguage, setSelectedLanguage] = useState("it"); // Default to Italian
   const [speed, setSpeed] = useState(1.0);
   const [isAutoSpeed, setIsAutoSpeed] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -142,7 +144,7 @@ export function VideoToAudioForm() {
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-        body: { text, voiceId: selectedVoice, speed }
+        body: { text, voiceId: selectedVoice, speed, languageCode: selectedLanguage }
       });
 
       if (error) throw error;
@@ -432,15 +434,40 @@ export function VideoToAudioForm() {
             </p>
           </div>
 
-          {/* Voice and Speed Selection */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Voice, Language and Speed Selection */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
-                {videoUrl ? "4" : "3"}. Seleziona la voce
+                <Globe className="w-4 h-4" />
+                Lingua
+              </Label>
+              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleziona lingua" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      <span className="flex items-center gap-2">
+                        <span>{lang.flag}</span>
+                        <span>{lang.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Forza la pronuncia nella lingua selezionata
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Voce
                 {hasClonedVoices && (
                   <span className="text-xs text-primary flex items-center gap-1">
                     <Mic className="w-3 h-3" />
-                    Voci clonate disponibili
+                    Clonate disponibili
                   </span>
                 )}
               </Label>
