@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { RefreshCw, AlertTriangle, CheckCircle, XCircle, DollarSign, Zap } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle, XCircle, DollarSign, Zap, Bell, BellOff, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 interface ProviderStatus {
   name: string;
@@ -16,6 +22,20 @@ interface ProviderStatus {
   details?: string;
 }
 
+interface CreditThresholds {
+  piapiUsd: number;
+  elevenlabsPercent: number;
+  enabled: boolean;
+}
+
+const DEFAULT_THRESHOLDS: CreditThresholds = {
+  piapiUsd: 1.00,
+  elevenlabsPercent: 80,
+  enabled: true,
+};
+
+const STORAGE_KEY = "credit-alert-thresholds";
+
 export const ProviderCreditsWidget = () => {
   const [providers, setProviders] = useState<ProviderStatus[]>([
     { name: "AIML API", hasKey: false, status: "loading" },
@@ -26,6 +46,90 @@ export const ProviderCreditsWidget = () => {
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [thresholds, setThresholds] = useState<CreditThresholds>(DEFAULT_THRESHOLDS);
+  
+  const { isEnabled: notificationsEnabled, showNotification, requestPermission } = usePushNotifications();
+  
+  // Track which alerts have been sent to avoid spam
+  const alertsSent = useRef<Set<string>>(new Set());
+
+  // Load thresholds from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        setThresholds(JSON.parse(saved));
+      } catch {
+        // Use defaults
+      }
+    }
+  }, []);
+
+  // Save thresholds to localStorage
+  const saveThresholds = (newThresholds: CreditThresholds) => {
+    setThresholds(newThresholds);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newThresholds));
+    toast.success("Soglie salvate!");
+  };
+
+  // Check thresholds and send notifications
+  const checkThresholdsAndNotify = useCallback((results: ProviderStatus[]) => {
+    if (!thresholds.enabled || !notificationsEnabled) return;
+
+    results.forEach(provider => {
+      const alertKey = `${provider.name}-${Date.now().toString().slice(0, -5)}`; // Reset every ~30 seconds
+      
+      // AIML exhausted alert
+      if (provider.name === "AIML API" && provider.status === "exhausted") {
+        const key = "aiml-exhausted";
+        if (!alertsSent.current.has(key)) {
+          showNotification(
+            "⚠️ AIML API - Crediti Esauriti",
+            "I crediti AIML sono esauriti. Il sistema utilizzerà automaticamente PiAPI come fallback."
+          );
+          alertsSent.current.add(key);
+        }
+      }
+
+      // PiAPI low balance alert
+      if (provider.name === "PiAPI" && provider.creditsUsd !== undefined) {
+        if (provider.creditsUsd <= thresholds.piapiUsd && provider.creditsUsd > 0) {
+          const key = "piapi-low";
+          if (!alertsSent.current.has(key)) {
+            showNotification(
+              "💰 PiAPI - Crediti Bassi",
+              `Il saldo PiAPI è sceso a $${provider.creditsUsd.toFixed(2)}. Considera di ricaricare.`
+            );
+            alertsSent.current.add(key);
+          }
+        }
+        if (provider.creditsUsd <= 0) {
+          const key = "piapi-exhausted";
+          if (!alertsSent.current.has(key)) {
+            showNotification(
+              "🚨 PiAPI - Crediti Esauriti",
+              "I crediti PiAPI sono esauriti! La generazione video potrebbe non funzionare."
+            );
+            alertsSent.current.add(key);
+          }
+        }
+      }
+
+      // ElevenLabs high usage alert
+      if (provider.name === "ElevenLabs" && provider.usagePercent !== undefined) {
+        if (provider.usagePercent >= thresholds.elevenlabsPercent) {
+          const key = "elevenlabs-high";
+          if (!alertsSent.current.has(key)) {
+            showNotification(
+              "🎙️ ElevenLabs - Utilizzo Elevato",
+              `Hai utilizzato il ${provider.usagePercent}% della quota mensile ElevenLabs.`
+            );
+            alertsSent.current.add(key);
+          }
+        }
+      }
+    });
+  }, [thresholds, notificationsEnabled, showNotification]);
 
   const fetchAllBalances = useCallback(async () => {
     setIsRefreshing(true);
@@ -107,7 +211,10 @@ export const ProviderCreditsWidget = () => {
     setProviders(results);
     setLastUpdate(new Date());
     setIsRefreshing(false);
-  }, []);
+
+    // Check thresholds and send notifications
+    checkThresholdsAndNotify(results);
+  }, [checkThresholdsAndNotify]);
 
   useEffect(() => {
     fetchAllBalances();
@@ -115,6 +222,11 @@ export const ProviderCreditsWidget = () => {
     const interval = setInterval(fetchAllBalances, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchAllBalances]);
+
+  // Reset alerts when thresholds change
+  useEffect(() => {
+    alertsSent.current.clear();
+  }, [thresholds]);
 
   const getStatusIcon = (status: ProviderStatus["status"]) => {
     switch (status) {
@@ -146,6 +258,13 @@ export const ProviderCreditsWidget = () => {
     }
   };
 
+  const handleEnableNotifications = async () => {
+    const granted = await requestPermission();
+    if (granted) {
+      saveThresholds({ ...thresholds, enabled: true });
+    }
+  };
+
   return (
     <Card className="bg-card/50 border-border/50">
       <CardHeader className="pb-3">
@@ -164,14 +283,118 @@ export const ProviderCreditsWidget = () => {
               )}
             </CardDescription>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={fetchAllBalances}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Notification Settings Popover */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="sm" className="relative">
+                  {thresholds.enabled && notificationsEnabled ? (
+                    <Bell className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <BellOff className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  {thresholds.enabled && notificationsEnabled && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80" align="end">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    <h4 className="font-medium">Soglie di Allerta</h4>
+                  </div>
+
+                  {!notificationsEnabled ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Abilita le notifiche per ricevere avvisi quando i crediti scendono sotto le soglie critiche.
+                      </p>
+                      <Button onClick={handleEnableNotifications} className="w-full">
+                        <Bell className="h-4 w-4 mr-2" />
+                        Abilita Notifiche
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="alerts-enabled" className="text-sm">Notifiche Attive</Label>
+                        <Switch
+                          id="alerts-enabled"
+                          checked={thresholds.enabled}
+                          onCheckedChange={(checked) => saveThresholds({ ...thresholds, enabled: checked })}
+                        />
+                      </div>
+
+                      <div className="space-y-3 pt-2 border-t">
+                        <div className="space-y-2">
+                          <Label htmlFor="piapi-threshold" className="text-sm">
+                            PiAPI - Soglia USD
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">$</span>
+                            <Input
+                              id="piapi-threshold"
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={thresholds.piapiUsd}
+                              onChange={(e) => saveThresholds({ 
+                                ...thresholds, 
+                                piapiUsd: parseFloat(e.target.value) || 0 
+                              })}
+                              className="h-8"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Notifica quando il saldo scende sotto questa soglia
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="elevenlabs-threshold" className="text-sm">
+                            ElevenLabs - Utilizzo %
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="elevenlabs-threshold"
+                              type="number"
+                              step="5"
+                              min="0"
+                              max="100"
+                              value={thresholds.elevenlabsPercent}
+                              onChange={(e) => saveThresholds({ 
+                                ...thresholds, 
+                                elevenlabsPercent: parseInt(e.target.value) || 0 
+                              })}
+                              className="h-8"
+                            />
+                            <span className="text-muted-foreground">%</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Notifica quando l'utilizzo supera questa percentuale
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 text-xs text-muted-foreground">
+                        💡 Le notifiche per AIML esaurito sono sempre attive
+                      </div>
+                    </>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={fetchAllBalances}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -197,12 +420,21 @@ export const ProviderCreditsWidget = () => {
             <div className="flex items-center gap-2">
               {provider.usagePercent !== undefined && (
                 <div className="w-20">
-                  <Progress value={provider.usagePercent} className="h-2" />
-                  <span className="text-xs text-muted-foreground">{provider.usagePercent}%</span>
+                  <Progress 
+                    value={provider.usagePercent} 
+                    className={`h-2 ${provider.usagePercent >= thresholds.elevenlabsPercent ? '[&>div]:bg-orange-500' : ''}`} 
+                  />
+                  <span className={`text-xs ${provider.usagePercent >= thresholds.elevenlabsPercent ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                    {provider.usagePercent}%
+                  </span>
                 </div>
               )}
               {provider.creditsUsd !== undefined && (
-                <span className="text-sm font-medium text-green-500">
+                <span className={`text-sm font-medium ${
+                  provider.creditsUsd <= thresholds.piapiUsd 
+                    ? provider.creditsUsd <= 0 ? 'text-red-500' : 'text-orange-500'
+                    : 'text-green-500'
+                }`}>
                   ${provider.creditsUsd.toFixed(2)}
                 </span>
               )}
@@ -216,6 +448,12 @@ export const ProviderCreditsWidget = () => {
             <Zap className="h-3 w-3" />
             <span>Il fallback automatico a PiAPI è attivo quando AIML API esaurisce i crediti</span>
           </div>
+          {thresholds.enabled && notificationsEnabled && (
+            <div className="flex items-center gap-2 text-xs text-green-600 mt-1">
+              <Bell className="h-3 w-3" />
+              <span>Notifiche attive per soglie critiche</span>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
