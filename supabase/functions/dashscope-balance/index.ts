@@ -5,11 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Try multiple endpoints to find which region works
-const ENDPOINTS = [
-  { name: "singapore", url: "https://dashscope-intl.aliyuncs.com" },
-  { name: "beijing", url: "https://dashscope.aliyuncs.com" },
-];
+// DashScope is only available on Chinese Alibaba Cloud (aliyun.com), not international
+const DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -33,70 +30,64 @@ serve(async (req) => {
     const keyPrefix = DASHSCOPE_API_KEY.substring(0, 8);
     console.log(`Testing DashScope key starting with: ${keyPrefix}...`);
 
-    // Try each endpoint
-    const results: Record<string, unknown>[] = [];
-    
-    for (const endpoint of ENDPOINTS) {
+    // Test with Beijing endpoint (DashScope is China-only)
+    try {
+      const testResponse = await fetch(`${DASHSCOPE_BASE_URL}/api/v1/models`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${DASHSCOPE_API_KEY}`,
+        },
+      });
+
+      const responseText = await testResponse.text();
+      let responseData;
       try {
-        // Use models API which is lightweight
-        const testResponse = await fetch(`${endpoint.url}/api/v1/models`, {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${DASHSCOPE_API_KEY}`,
-          },
-        });
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = { raw: responseText.substring(0, 200) };
+      }
 
-        const responseText = await testResponse.text();
-        let responseData;
-        try {
-          responseData = JSON.parse(responseText);
-        } catch {
-          responseData = { raw: responseText.substring(0, 200) };
-        }
+      console.log(`DashScope response status: ${testResponse.status}`, responseData);
 
-        results.push({
-          region: endpoint.name,
-          status: testResponse.status,
-          ok: testResponse.ok,
-          data: responseData
-        });
-
-        // If we got a successful response, this is the right region
-        if (testResponse.ok) {
-          return new Response(JSON.stringify({ 
-            hasKey: true,
-            status: "active",
-            message: `DashScope API key is valid (${endpoint.name} region)`,
-            region: endpoint.name,
-            provider: "alibaba-dashscope",
-            models: {
-              video: ["wan2.6-i2v-flash", "wan2.5-i2v-preview", "wan2.2-i2v-plus", "wan2.1-t2v-plus"],
-              image: ["wanx2.1-t2i-turbo", "wanx2.1-t2i-plus", "flux-schnell", "flux-dev"]
-            }
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-      } catch (error) {
-        results.push({
-          region: endpoint.name,
-          error: error instanceof Error ? error.message : "Unknown error"
+      if (testResponse.ok) {
+        return new Response(JSON.stringify({ 
+          hasKey: true,
+          status: "active",
+          message: "DashScope API key is valid (China region)",
+          region: "beijing",
+          provider: "alibaba-dashscope",
+          models: {
+            video: ["wan2.6-i2v-flash", "wan2.5-i2v-preview", "wan2.2-i2v-plus", "wan2.1-t2v-plus"],
+            image: ["wanx2.1-t2i-turbo", "wanx2.1-t2i-plus", "flux-schnell", "flux-dev"]
+          }
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-    }
 
-    // No endpoint worked - return detailed error
-    const allUnauthorized = results.every(r => r.status === 401);
-    
-    return new Response(JSON.stringify({ 
-      hasKey: true,
-      status: allUnauthorized ? "invalid" : "error",
-      message: allUnauthorized ? "Invalid API key (tried all regions)" : "Could not connect to DashScope",
-      keyPrefix: `${keyPrefix}...`,
-      regionResults: results
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      // Invalid key or other error
+      return new Response(JSON.stringify({ 
+        hasKey: true,
+        status: testResponse.status === 401 ? "invalid" : "error",
+        message: testResponse.status === 401 
+          ? "Invalid API key - ensure you're using a key from Chinese Alibaba Cloud (aliyun.com), not international"
+          : `DashScope error: ${responseData?.message || responseData?.code || 'Unknown'}`,
+        keyPrefix: `${keyPrefix}...`,
+        note: "DashScope is only available on Chinese Alibaba Cloud console (dashscope.console.aliyun.com)"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (fetchError) {
+      console.error("DashScope fetch error:", fetchError);
+      return new Response(JSON.stringify({ 
+        hasKey: true,
+        status: "error",
+        message: `Connection error: ${fetchError instanceof Error ? fetchError.message : 'Unknown'}`,
+        note: "DashScope requires access to Chinese Alibaba Cloud servers"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
   } catch (error) {
     console.error("DashScope balance check error:", error);
