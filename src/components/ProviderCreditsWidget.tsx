@@ -40,7 +40,6 @@ export const ProviderCreditsWidget = () => {
   const [providers, setProviders] = useState<ProviderStatus[]>([
     { name: "AIML API", hasKey: false, status: "loading" },
     { name: "PiAPI", hasKey: false, status: "loading" },
-    { name: "DashScope", hasKey: false, status: "loading" },
     { name: "ElevenLabs", hasKey: false, status: "loading" },
     { name: "Freepik", hasKey: false, status: "loading" },
     { name: "Google AI", hasKey: false, status: "loading" },
@@ -171,23 +170,6 @@ export const ProviderCreditsWidget = () => {
         });
       } catch {
         results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error" });
-      }
-
-      // DashScope (Alibaba) Balance
-      try {
-        const { data: dashscopeData } = await supabase.functions.invoke('dashscope-balance');
-        results.push({
-          name: "DashScope",
-          hasKey: dashscopeData?.hasKey || false,
-          status: dashscopeData?.status === "active" ? "active" : 
-                  dashscopeData?.status === "exhausted" ? "exhausted" : 
-                  dashscopeData?.status === "invalid" ? "error" : "unknown",
-          details: dashscopeData?.hasKey 
-            ? (dashscopeData?.status === "active" ? "Wan Video & Image" : dashscopeData?.message) 
-            : "Non configurato"
-        });
-      } catch {
-        results.push({ name: "DashScope", hasKey: false, status: "error" });
       }
 
       // ElevenLabs Balance
