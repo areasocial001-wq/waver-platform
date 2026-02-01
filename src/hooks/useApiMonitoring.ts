@@ -39,17 +39,21 @@ const DEFAULT_THRESHOLDS: ThresholdSettings = {
   "PIAPI Video": { warning: 1500, critical: 4000 },
   "PIAPI Image": { warning: 1500, critical: 4000 },
   "PIAPI Audio": { warning: 1500, critical: 4000 },
+  "AIML API": { warning: 1500, critical: 4000 },
+  "Google AI": { warning: 1000, critical: 3000 },
 };
 
 export const useApiMonitoring = () => {
   const [apis, setApis] = useState<ApiStatus[]>([
     { name: "Replicate", status: "checking", lastCheck: null, description: "Video AI (Waver)", retryCount: 0 },
-    { name: "Freepik", status: "checking", lastCheck: null, description: "Image & Video", retryCount: 0 },
+    { name: "Freepik", status: "checking", lastCheck: null, description: "Magnific/Image/Video/Stock", retryCount: 0 },
     { name: "Shotstack", status: "checking", lastCheck: null, description: "Video Concat", retryCount: 0 },
-    { name: "ElevenLabs", status: "checking", lastCheck: null, description: "Audio/TTS/Music", retryCount: 0 },
-    { name: "PIAPI Video", status: "checking", lastCheck: null, description: "Kling/Hailuo/Luma/Sora", retryCount: 0 },
+    { name: "ElevenLabs", status: "checking", lastCheck: null, description: "TTS/Voice Clone/Music", retryCount: 0 },
+    { name: "PIAPI Video", status: "checking", lastCheck: null, description: "Kling/Hailuo/Luma/Wan", retryCount: 0 },
     { name: "PIAPI Image", status: "checking", lastCheck: null, description: "Flux/Qwen/Nano", retryCount: 0 },
     { name: "PIAPI Audio", status: "checking", lastCheck: null, description: "Udio/DiffRhythm", retryCount: 0 },
+    { name: "AIML API", status: "checking", lastCheck: null, description: "Wan/Kling/Flux/Luma", retryCount: 0 },
+    { name: "Google AI", status: "checking", lastCheck: null, description: "Gemini/Veo", retryCount: 0 },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [thresholds, setThresholds] = useState<ThresholdSettings>(DEFAULT_THRESHOLDS);
@@ -277,6 +281,21 @@ export const useApiMonitoring = () => {
           result = await supabase.functions.invoke("piapi-audio", {
             body: { healthCheck: true }
           });
+          break;
+        case "AIML API":
+          result = await supabase.functions.invoke("aiml-balance", {});
+          if (result?.data?.hasKey) {
+            result.error = null; // Clear error if key exists
+          }
+          break;
+        case "Google AI":
+          result = await supabase.functions.invoke("generate-video", {
+            body: { healthCheck: true }
+          });
+          // Check specifically for Google key
+          if (!result?.data?.hasGoogleKey) {
+            result.error = "Google AI key not configured";
+          }
           break;
       }
       
