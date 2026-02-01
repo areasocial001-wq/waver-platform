@@ -5,6 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Try multiple endpoints to find which region works
+const ENDPOINTS = [
+  { name: "singapore", url: "https://dashscope-intl.aliyuncs.com" },
+  { name: "beijing", url: "https://dashscope.aliyuncs.com" },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -23,55 +29,71 @@ serve(async (req) => {
       });
     }
 
-    // Test API key validity by making a lightweight API call
-    // DashScope doesn't have a dedicated balance endpoint, so we check key validity
-    const testResponse = await fetch("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${DASHSCOPE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "wanx2.1-t2i-turbo",
-        input: { prompt: "test" },
-        parameters: { size: "256*256", n: 1 }
-      }),
-    });
+    // Log key prefix for debugging (first 8 chars only)
+    const keyPrefix = DASHSCOPE_API_KEY.substring(0, 8);
+    console.log(`Testing DashScope key starting with: ${keyPrefix}...`);
 
-    // Check if we got an auth error
-    if (testResponse.status === 401) {
-      return new Response(JSON.stringify({ 
-        hasKey: true,
-        status: "invalid",
-        message: "Invalid API key"
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    // Try each endpoint
+    const results: Record<string, unknown>[] = [];
+    
+    for (const endpoint of ENDPOINTS) {
+      try {
+        // Use models API which is lightweight
+        const testResponse = await fetch(`${endpoint.url}/api/v1/models`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${DASHSCOPE_API_KEY}`,
+          },
+        });
+
+        const responseText = await testResponse.text();
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+        } catch {
+          responseData = { raw: responseText.substring(0, 200) };
+        }
+
+        results.push({
+          region: endpoint.name,
+          status: testResponse.status,
+          ok: testResponse.ok,
+          data: responseData
+        });
+
+        // If we got a successful response, this is the right region
+        if (testResponse.ok) {
+          return new Response(JSON.stringify({ 
+            hasKey: true,
+            status: "active",
+            message: `DashScope API key is valid (${endpoint.name} region)`,
+            region: endpoint.name,
+            provider: "alibaba-dashscope",
+            models: {
+              video: ["wan2.6-i2v-flash", "wan2.5-i2v-preview", "wan2.2-i2v-plus", "wan2.1-t2v-plus"],
+              image: ["wanx2.1-t2i-turbo", "wanx2.1-t2i-plus", "flux-schnell", "flux-dev"]
+            }
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (error) {
+        results.push({
+          region: endpoint.name,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
     }
 
-    // Check for quota exhausted
-    const data = await testResponse.json();
-    if (data.code === "Throttling.User" || data.code === "QuotaExhausted") {
-      return new Response(JSON.stringify({ 
-        hasKey: true,
-        status: "exhausted",
-        message: "Quota exhausted",
-        code: data.code
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Key is valid and has quota
+    // No endpoint worked - return detailed error
+    const allUnauthorized = results.every(r => r.status === 401);
+    
     return new Response(JSON.stringify({ 
       hasKey: true,
-      status: "active",
-      message: "DashScope API key is valid",
-      provider: "alibaba-dashscope",
-      models: {
-        video: ["wan2.6-i2v-flash", "wan2.5-i2v-preview", "wan2.2-i2v-plus", "wan2.1-t2v-plus"],
-        image: ["wanx2.1-t2i-turbo", "wanx2.1-t2i-plus", "flux-schnell", "flux-dev"]
-      }
+      status: allUnauthorized ? "invalid" : "error",
+      message: allUnauthorized ? "Invalid API key (tried all regions)" : "Could not connect to DashScope",
+      keyPrefix: `${keyPrefix}...`,
+      regionResults: results
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
