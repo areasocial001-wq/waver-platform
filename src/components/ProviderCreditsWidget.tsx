@@ -185,10 +185,11 @@ export const ProviderCreditsWidget = () => {
           usagePercent: elevenData?.usage_percentage,
           details: elevenData?.characters_remaining 
             ? `${elevenData.characters_remaining.toLocaleString()} caratteri rimanenti`
-            : undefined
+            : undefined,
+          supportedModels: ["TTS", "Voice Clone", "Music"]
         });
       } catch {
-        results.push({ name: "ElevenLabs", hasKey: false, status: "error" });
+        results.push({ name: "ElevenLabs", hasKey: false, status: "error", supportedModels: ["TTS", "Voice Clone", "Music"] });
       }
 
       // Freepik
@@ -196,7 +197,8 @@ export const ProviderCreditsWidget = () => {
         name: "Freepik",
         hasKey: healthData?.hasFreepikKey || false,
         status: healthData?.hasFreepikKey ? "active" : "unknown",
-        details: healthData?.hasFreepikKey ? "Chiave configurata" : "Non configurato"
+        details: healthData?.hasFreepikKey ? "Chiave configurata" : "Non configurato",
+        supportedModels: ["Magnific", "Image", "Video", "Stock"]
       });
 
       // Google AI
@@ -204,7 +206,8 @@ export const ProviderCreditsWidget = () => {
         name: "Google AI",
         hasKey: healthData?.hasGoogleKey || false,
         status: healthData?.hasGoogleKey ? "active" : "unknown",
-        details: healthData?.hasGoogleKey ? "Chiave configurata" : "Non configurato"
+        details: healthData?.hasGoogleKey ? "Chiave configurata" : "Non configurato",
+        supportedModels: ["Gemini", "Veo"]
       });
 
     } catch (error) {
