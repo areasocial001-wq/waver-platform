@@ -140,27 +140,45 @@ export const DiagnosticsPanel = () => {
     setIsRefreshing(true);
     await fetchPiapiBalance();
     
-    // Health check generate-video
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: { healthCheck: true }
-      });
-      
-      if (error) throw error;
-      
-      addEntry({
-        type: "success",
-        service: "generate-video",
-        message: "Servizio operativo",
-        details: `PiAPI Key: ${data.hasPiAPIKey ? '✓' : '✗'}`
-      });
-    } catch (error) {
-      addEntry({
-        type: "error",
-        service: "generate-video",
-        message: "Servizio non raggiungibile",
-        details: error instanceof Error ? error.message : "Errore sconosciuto"
-      });
+    // Health checks for all providers
+    const checks = [
+      { name: "generate-video", label: "Video Generation", body: { healthCheck: true } },
+      { name: "freepik-image", label: "Freepik", body: { healthCheck: true } },
+      { name: "elevenlabs-tts", label: "ElevenLabs", body: { healthCheck: true } },
+      { name: "piapi-image", label: "PIAPI Image", body: { healthCheck: true } },
+      { name: "piapi-audio", label: "PIAPI Audio", body: { healthCheck: true } },
+      { name: "aiml-balance", label: "AIML API", body: {} },
+    ];
+
+    for (const check of checks) {
+      try {
+        const { data, error } = await supabase.functions.invoke(check.name, {
+          body: check.body
+        });
+        
+        if (error) throw error;
+        
+        const details = [];
+        if (data?.hasPiAPIKey) details.push("PiAPI ✓");
+        if (data?.hasAIMLKey) details.push("AIML ✓");
+        if (data?.hasGoogleKey) details.push("Google ✓");
+        if (data?.hasFreepikKey) details.push("Freepik ✓");
+        if (data?.hasKey) details.push("Key ✓");
+        
+        addEntry({
+          type: "success",
+          service: check.label,
+          message: "Servizio operativo",
+          details: details.length > 0 ? details.join(", ") : undefined
+        });
+      } catch (error) {
+        addEntry({
+          type: "error",
+          service: check.label,
+          message: "Servizio non raggiungibile",
+          details: error instanceof Error ? error.message : "Errore sconosciuto"
+        });
+      }
     }
     
     setIsRefreshing(false);
