@@ -20,6 +20,7 @@ interface ProviderStatus {
   creditsUsd?: number;
   usagePercent?: number;
   details?: string;
+  supportedModels?: string[];
 }
 
 interface CreditThresholds {
@@ -151,10 +152,11 @@ export const ProviderCreditsWidget = () => {
           status: aimlData?.status === "exhausted" ? "exhausted" : 
                   aimlData?.status === "active" ? "active" : "unknown",
           credits: aimlData?.credits,
-          details: aimlData?.status === "exhausted" ? "Crediti esauriti" : undefined
+          details: aimlData?.status === "exhausted" ? "Crediti esauriti" : undefined,
+          supportedModels: ["Wan", "Kling", "Flux"]
         });
       } catch {
-        results.push({ name: "AIML API", hasKey: healthData?.hasAIMLKey || false, status: "error" });
+        results.push({ name: "AIML API", hasKey: healthData?.hasAIMLKey || false, status: "error", supportedModels: ["Wan", "Kling", "Flux"] });
       }
 
       // PiAPI Balance
@@ -166,10 +168,11 @@ export const ProviderCreditsWidget = () => {
           status: piapiData?.equivalent_in_usd > 0 ? "active" : "exhausted",
           credits: piapiData?.credits,
           creditsUsd: piapiData?.equivalent_in_usd,
-          details: `$${piapiData?.equivalent_in_usd?.toFixed(2) || '0.00'} disponibili`
+          details: `$${piapiData?.equivalent_in_usd?.toFixed(2) || '0.00'} disponibili`,
+          supportedModels: ["Wan", "Kling", "Luma"]
         });
       } catch {
-        results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error" });
+        results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error", supportedModels: ["Wan", "Kling", "Luma"] });
       }
 
       // ElevenLabs Balance
@@ -410,6 +413,19 @@ export const ProviderCreditsWidget = () => {
                   <span className="font-medium text-sm">{provider.name}</span>
                   {!provider.hasKey && (
                     <Badge variant="outline" className="text-xs">Non configurato</Badge>
+                  )}
+                  {provider.supportedModels && provider.supportedModels.length > 0 && (
+                    <div className="flex gap-1">
+                      {provider.supportedModels.map((model) => (
+                        <Badge 
+                          key={model} 
+                          variant="secondary" 
+                          className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 text-primary border-primary/20"
+                        >
+                          {model}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                 </div>
                 {provider.details && (
