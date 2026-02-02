@@ -1504,9 +1504,17 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                 <TabsTrigger value="subtitles">Sottotitoli</TabsTrigger>
                 <TabsTrigger value="audio">Audio</TabsTrigger>
                 <TabsTrigger value="intro">Intro/Outro</TabsTrigger>
-                <TabsTrigger value="ai-assets">
+                <TabsTrigger value="ai-assets" className="relative">
                   <Brain className="h-3.5 w-3.5 mr-1" />
                   AI
+                  {(aiImages.length > 0 || aiVoices.length > 0) && (
+                    <Badge 
+                      variant="secondary" 
+                      className="ml-1.5 h-5 min-w-5 px-1.5 text-xs font-semibold bg-primary text-primary-foreground"
+                    >
+                      {aiImages.length + aiVoices.length}
+                    </Badge>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="templates">
                   <FileCode className="h-3.5 w-3.5 mr-1" />
