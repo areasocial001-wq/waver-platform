@@ -1,6 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Zap, Star, DollarSign, Info, Timer, Maximize2, Image, Film } from "lucide-react";
+import { Clock, Zap, Star, DollarSign, Info, Timer, Maximize2, Image, Film, Layers } from "lucide-react";
 import { 
   VIDEO_PROVIDERS, 
   VideoProviderType, 
@@ -82,12 +82,19 @@ export function VideoProviderSelect({
               )}
               {providerIds.map(id => {
                 const provider = VIDEO_PROVIDERS[id];
+                const providerCaps = getModelCapabilities(id);
                 return (
                   <SelectItem key={id} value={id}>
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${provider.color}`} />
                       <span>{provider.name}</span>
-                      {provider.features.length > 0 && (
+                      {providerCaps.supportsEndFrame && (
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-purple-500/20 text-purple-400 border-purple-500/30">
+                          <Layers className="w-2.5 h-2.5 mr-0.5" />
+                          Interp
+                        </Badge>
+                      )}
+                      {provider.features.length > 0 && !providerCaps.supportsEndFrame && (
                         <Badge variant="outline" className="text-[10px] h-4 px-1">
                           {provider.features[0]}
                         </Badge>
@@ -217,7 +224,7 @@ export function VideoProviderSelect({
                           {[
                             capabilities.supportsTextToVideo && 'T2V',
                             capabilities.supportsImageToVideo && 'I2V',
-                            capabilities.supportsEndFrame && 'Keyframe',
+                            capabilities.supportsEndFrame && 'Interp',
                           ].filter(Boolean).join(', ')}
                         </span>
                       </div>
@@ -227,7 +234,9 @@ export function VideoProviderSelect({
                       <div className="text-xs text-muted-foreground space-y-1">
                         {capabilities.supportsTextToVideo && <p>• T2V: Testo a Video</p>}
                         {capabilities.supportsImageToVideo && <p>• I2V: Immagine a Video</p>}
-                        {capabilities.supportsEndFrame && <p>• Keyframe: Supporta frame finale</p>}
+                        {capabilities.supportsEndFrame && (
+                          <p className="text-purple-400">• Interp: Interpolazione frame (start→end)</p>
+                        )}
                         {capabilities.requiresEndFrame && <p>• Richiede frame iniziale e finale</p>}
                         {capabilities.supportsMotionControl && <p>• Motion Control disponibile</p>}
                         {capabilities.supportsAudio && <p>• Genera audio</p>}
