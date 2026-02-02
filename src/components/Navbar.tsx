@@ -222,10 +222,6 @@ export const Navbar = () => {
                     <Activity className="w-4 h-4 mr-2" />
                     API Monitor
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/export-test")}>
-                    <Gauge className="w-4 h-4 mr-2" />
-                    FPS Diagnostic
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
                     <Settings className="w-4 h-4 mr-2" />
