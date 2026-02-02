@@ -1539,6 +1539,46 @@ serve(async (req) => {
         piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality";
         
         console.log("[PiAPI SkyReels] Using Qubico/skyreels model for human-centric video generation");
+      } else if (modelConfig.model === "framepack") {
+        // Framepack specific handling - uses Qubico/framepack model
+        // Framepack is IMAGE-TO-VIDEO ONLY - optimized for smooth frame interpolation
+        piApiPayload.model = "Qubico/framepack";
+        piApiPayload.task_type = "img2video";
+        
+        // Duration (5-10 seconds supported, FPS fixed at 30)
+        const sanitizedDuration = sanitizePiAPIDuration("framepack", duration || 5);
+        piApiPayload.input.duration = sanitizedDuration;
+        
+        // Framepack uses start_image and end_image (not image_url)
+        // This will be handled in the image processing section below
+        // but we need to override the field names
+        if (startImageData) {
+          const startImgData = await getImageUrlForPiAPI(startImageData, "start");
+          if (startImgData.url) {
+            piApiPayload.input.start_image = startImgData.url;
+          } else if (startImgData.base64) {
+            piApiPayload.input.start_image = startImgData.base64;
+          }
+        }
+        
+        // End image for interpolation (key feature of Framepack)
+        if (end_image) {
+          const endImgData = await getImageUrlForPiAPI(end_image, "end");
+          if (endImgData.url) {
+            piApiPayload.input.end_image = endImgData.url;
+          } else if (endImgData.base64) {
+            piApiPayload.input.end_image = endImgData.base64;
+          }
+        }
+        
+        // Negative prompt for quality
+        piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality, artifacts";
+        
+        console.log("[PiAPI Framepack] Using Qubico/framepack model for frame interpolation");
+        
+        // Skip the generic image processing below since we handled it above
+        // Set a flag to prevent duplicate image handling
+        piApiPayload._framepackImagesHandled = true;
       } else {
         const sanitizedDuration = sanitizePiAPIDuration(modelConfig.model, duration || 5);
         piApiPayload.input.duration = sanitizedDuration;
@@ -1553,7 +1593,8 @@ serve(async (req) => {
       }
       
       // Add images for image-to-video (handle large images by uploading to storage)
-      if (type === "image_to_video" && startImageData) {
+      // Skip if Framepack already handled images (uses different field names)
+      if (type === "image_to_video" && startImageData && !piApiPayload._framepackImagesHandled) {
         const startImgData = await getImageUrlForPiAPI(startImageData, "start");
         if (startImgData.url) {
           piApiPayload.input.image_url = startImgData.url;
@@ -1571,6 +1612,9 @@ serve(async (req) => {
           }
         }
       }
+      
+      // Clean up internal flags before sending to API
+      delete piApiPayload._framepackImagesHandled;
       
       console.log("Calling PiAPI for video generation:", { model: modelConfig.model, task_type: piApiPayload.task_type });
       
