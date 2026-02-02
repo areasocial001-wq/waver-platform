@@ -7,8 +7,8 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -21,6 +21,9 @@ import { UserTemplates } from './UserTemplates';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT, EFFECT_PRESETS } from './ClipEffectsPanel';
 import { TransitionSelector, TRANSITION_TYPES } from './TransitionSelector';
+import { GenerationStatusIndicator, GenerationStep } from './GenerationStatusIndicator';
+import { LivePreviewPanel } from './LivePreviewPanel';
+import { ExternalAudioUploader } from './ExternalAudioUploader';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
 import { useVoiceOptions, DEFAULT_VOICE_OPTIONS } from '@/hooks/useVoiceOptions';
 import { 
@@ -120,11 +123,18 @@ export function TalkingAvatarGenerator() {
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_OPTIONS[0].id);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   
+  // External audio for lip sync
+  const [externalAudioUrl, setExternalAudioUrl] = useState<string | null>(null);
+  const [useLipSync, setUseLipSync] = useState(false);
+  const [externalAudioDuration, setExternalAudioDuration] = useState<number | null>(null);
+  
   // Generation settings
   const [sampleSteps, setSampleSteps] = useState(20);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
+  const [generationStep, setGenerationStep] = useState<GenerationStep>('idle');
+  const [generationError, setGenerationError] = useState<string | null>(null);
   
   // Generated videos
   const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([]);
@@ -314,28 +324,50 @@ export function TalkingAvatarGenerator() {
 
     setIsGenerating(true);
     setProgress(10);
+    setGenerationStep('preparing');
+    setGenerationError(null);
 
     try {
+      // Step 1: Prepare audio if needed
       let finalAudioUrl = audioUrl;
       if (useTTS && dialogueText.trim() && !generatedAudioUrl) {
+        setGenerationStep('generating_audio');
+        setProgress(20);
         finalAudioUrl = await generateTTSAudio();
       } else if (generatedAudioUrl) {
         finalAudioUrl = generatedAudioUrl;
       }
 
+      // Step 2: Upload image
+      setGenerationStep('uploading_image');
       setProgress(30);
 
+      // Step 3: Build prompt and send request
       const fullPrompt = buildFullPrompt();
       console.log('Generating with prompt:', fullPrompt);
 
+      // Prepare request body with optional external audio
+      const requestBody: Record<string, unknown> = {
+        action: 'generate',
+        prompt: fullPrompt,
+        imageUrl: activeImage.url,
+        audioUrl: finalAudioUrl,
+        sampleSteps,
+      };
+
+      // Add external audio for lip sync if enabled
+      if (useLipSync && externalAudioUrl) {
+        setGenerationStep('uploading_audio');
+        setProgress(35);
+        requestBody.externalAudioUrl = externalAudioUrl;
+        requestBody.useLipSync = true;
+      }
+
+      setGenerationStep('processing');
+      setProgress(40);
+
       const { data, error } = await supabase.functions.invoke('talking-avatar', {
-        body: {
-          action: 'generate',
-          prompt: fullPrompt,
-          imageUrl: activeImage.url,
-          audioUrl: finalAudioUrl,
-          sampleSteps,
-        },
+        body: requestBody,
       });
 
       if (error) throw new Error(error.message);
@@ -344,6 +376,7 @@ export function TalkingAvatarGenerator() {
       if (data.eventId) {
         setCurrentEventId(data.eventId);
         setProgress(50);
+        setGenerationStep('rendering');
         toast.info('Generazione in corso... Attendere.');
       } else if (data.videoUrl) {
         const newVideo: GeneratedVideo = {
@@ -358,6 +391,7 @@ export function TalkingAvatarGenerator() {
         setPreviewVideo(data.videoUrl);
         setIsGenerating(false);
         setProgress(100);
+        setGenerationStep('completed');
         toast.success('Video generato!');
       }
     } catch (error: any) {
@@ -365,6 +399,8 @@ export function TalkingAvatarGenerator() {
       toast.error(error.message || 'Errore durante la generazione');
       setIsGenerating(false);
       setProgress(0);
+      setGenerationStep('failed');
+      setGenerationError(error.message || 'Errore sconosciuto');
     }
   }, [
     referenceImages,
@@ -378,6 +414,8 @@ export function TalkingAvatarGenerator() {
     buildFullPrompt,
     sampleSteps,
     selectedExpression,
+    useLipSync,
+    externalAudioUrl,
   ]);
 
   // Set active reference image
@@ -1045,6 +1083,33 @@ export function TalkingAvatarGenerator() {
                         {audioUrl && <audio src={audioUrl} controls className="w-full" />}
                       </div>
                     )}
+                    
+                    {/* External Audio for Lip Sync */}
+                    <div className="pt-3 border-t space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="flex items-center gap-2">
+                          <AudioLines className="w-4 h-4" />
+                          Lip Sync con Audio Esterno
+                        </Label>
+                        <Switch checked={useLipSync} onCheckedChange={setUseLipSync} />
+                      </div>
+                      
+                      {useLipSync && (
+                        <ExternalAudioUploader
+                          audioUrl={externalAudioUrl}
+                          onAudioChange={setExternalAudioUrl}
+                          onAudioDuration={setExternalAudioDuration}
+                          disabled={isGenerating}
+                        />
+                      )}
+                      
+                      {useLipSync && externalAudioDuration && (
+                        <Badge variant="outline" className="w-full justify-center text-xs">
+                          <Clock className="w-3 h-3 mr-1" />
+                          Audio: {Math.floor(externalAudioDuration / 60)}:{Math.floor(externalAudioDuration % 60).toString().padStart(2, '0')}
+                        </Badge>
+                      )}
+                    </div>
                   </TabsContent>
                 </Tabs>
 
@@ -1065,14 +1130,13 @@ export function TalkingAvatarGenerator() {
                   </div>
                 </div>
 
-                {isGenerating && (
-                  <div className="space-y-2">
-                    <Progress value={progress} className="w-full" />
-                    <p className="text-sm text-center text-muted-foreground">
-                      Generazione... {progress}%
-                    </p>
-                  </div>
-                )}
+                {/* Generation Status Indicator */}
+                <GenerationStatusIndicator
+                  step={generationStep}
+                  progress={progress}
+                  errorMessage={generationError || undefined}
+                  estimatedTime={120}
+                />
 
                 <Button
                   className="w-full"

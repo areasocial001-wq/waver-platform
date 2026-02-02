@@ -11,8 +11,11 @@ const generateSchema = z.object({
   action: z.literal('generate').optional(),
   prompt: z.string().min(1, 'Prompt richiesto').max(2000, 'Prompt troppo lungo'),
   imageUrl: z.string().url().or(z.string().startsWith('data:')),
-  audioUrl: z.string().url().optional(),
+  audioUrl: z.string().url().or(z.string().startsWith('data:')).optional(),
   sampleSteps: z.number().int().min(10).max(50).optional(),
+  // External audio for lip sync
+  externalAudioUrl: z.string().url().or(z.string().startsWith('data:')).optional(),
+  useLipSync: z.boolean().optional(),
 });
 
 const statusSchema = z.object({
@@ -120,12 +123,18 @@ serve(async (req) => {
       );
     }
 
-    const { prompt, imageUrl, sampleSteps = 20 } = parseResult.data;
+    const { prompt, imageUrl, sampleSteps = 20, externalAudioUrl, useLipSync } = parseResult.data;
+
+    // Determine which audio to use for lip sync
+    const audioForLipSync = externalAudioUrl || parseResult.data.audioUrl;
 
     console.log("Generating talking avatar with params:", { 
       prompt: prompt.substring(0, 100), 
       imageUrl: imageUrl.substring(0, 50),
-      sampleSteps 
+      sampleSteps,
+      hasExternalAudio: !!externalAudioUrl,
+      useLipSync: !!useLipSync,
+      audioForLipSync: audioForLipSync ? audioForLipSync.substring(0, 50) : null,
     });
 
     // Prepare image for Gradio
@@ -161,6 +170,49 @@ serve(async (req) => {
       }
     }
 
+    // Prepare audio for Gradio if external audio is provided
+    let audioData = null;
+    if (audioForLipSync && useLipSync) {
+      if (audioForLipSync.startsWith('data:')) {
+        // Upload audio to Gradio
+        const base64Audio = audioForLipSync.split(',')[1];
+        const mimeType = audioForLipSync.split(';')[0].split(':')[1];
+        
+        const audioUploadResponse = await fetch(
+          'https://alexnasa-ovi-zerogpu.hf.space/gradio_api/upload',
+          {
+            method: 'POST',
+            headers: {
+              "Authorization": `Bearer ${HF_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              files: [{
+                path: `audio.${mimeType.split('/')[1] || 'mp3'}`,
+                data: base64Audio,
+              }]
+            }),
+          }
+        );
+
+        if (audioUploadResponse.ok) {
+          const audioUploadResult = await audioUploadResponse.json();
+          if (audioUploadResult && audioUploadResult[0]) {
+            audioData = audioUploadResult[0];
+            console.log("Audio uploaded for lip sync:", audioData);
+          }
+        }
+      } else {
+        // Use URL directly
+        audioData = audioForLipSync;
+      }
+    }
+
+    // Build request data based on whether we have audio
+    const requestData = audioData 
+      ? [prompt, sampleSteps, imageData, audioData]  // With audio for lip sync
+      : [prompt, sampleSteps, imageData];             // Without audio
+
     // Call Ovi Gradio API
     const response = await fetch(
       'https://alexnasa-ovi-zerogpu.hf.space/gradio_api/call/run',
@@ -171,11 +223,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          data: [
-            prompt,           // Scene prompt with dialogue
-            sampleSteps,      // Sample steps
-            imageData,        // Image reference
-          ],
+          data: requestData,
         }),
       }
     );
