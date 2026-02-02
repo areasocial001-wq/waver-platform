@@ -230,6 +230,99 @@ export type Database = {
         }
         Relationships: []
       }
+      json2video_render_notifications: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          notified_at: string | null
+          project_id: string
+          render_project_id: string
+          started_at: string
+          status: string
+          user_id: string
+          video_duration: number | null
+          video_size: number | null
+          video_url: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notified_at?: string | null
+          project_id: string
+          render_project_id: string
+          started_at?: string
+          status?: string
+          user_id: string
+          video_duration?: number | null
+          video_size?: number | null
+          video_url?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          notified_at?: string | null
+          project_id?: string
+          render_project_id?: string
+          started_at?: string
+          status?: string
+          user_id?: string
+          video_duration?: number | null
+          video_size?: number | null
+          video_url?: string | null
+        }
+        Relationships: []
+      }
+      json2video_templates: {
+        Row: {
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_public: boolean
+          name: string
+          tags: string[] | null
+          template_json: Json
+          thumbnail_url: string | null
+          updated_at: string
+          user_id: string
+          variables: Json
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          name: string
+          tags?: string[] | null
+          template_json?: Json
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id: string
+          variables?: Json
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_public?: boolean
+          name?: string
+          tags?: string[] | null
+          template_json?: Json
+          thumbnail_url?: string | null
+          updated_at?: string
+          user_id?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
       motion_presets: {
         Row: {
           category: string
