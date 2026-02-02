@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { AIImage, AIVoice } from "./JSON2VideoAIAssets";
 
 interface TemplateVariable {
   name: string;
@@ -34,9 +35,23 @@ interface Template {
   updated_at: string;
 }
 
+// Configuration interface that matches JSON2VideoEditor state
+export interface JSON2VideoConfig {
+  clips?: unknown[];
+  subtitles?: unknown;
+  intro?: unknown;
+  outro?: unknown;
+  audioTrack?: unknown | null;
+  transition?: { type: string; duration: number };
+  resolution?: string;
+  soundEffects?: unknown[];
+  aiImages?: AIImage[];
+  aiVoices?: AIVoice[];
+}
+
 interface JSON2VideoTemplateManagerProps {
-  onApplyTemplate: (templateJson: Record<string, unknown>, variables: Record<string, string | number>) => void;
-  currentConfig?: Record<string, unknown>;
+  onApplyTemplate: (config: JSON2VideoConfig) => void;
+  currentConfig?: JSON2VideoConfig;
 }
 
 const CATEGORIES = [
@@ -99,7 +114,7 @@ export default function JSON2VideoTemplateManager({
   };
 
   // Extract variables from a config string (find {{variable}} patterns)
-  const extractVariables = (config: Record<string, unknown>): string[] => {
+  const extractVariables = (config: JSON2VideoConfig): string[] => {
     const configStr = JSON.stringify(config);
     const matches = configStr.match(/\{\{(\w+)\}\}/g) || [];
     const uniqueVars = [...new Set(matches.map(m => m.replace(/\{\{|\}\}/g, '')))];
@@ -213,8 +228,8 @@ export default function JSON2VideoTemplateManager({
       templateStr = templateStr.split(placeholder).join(String(value));
     });
 
-    const processedConfig = JSON.parse(templateStr);
-    onApplyTemplate(processedConfig, variableValues);
+    const processedConfig = JSON.parse(templateStr) as JSON2VideoConfig;
+    onApplyTemplate(processedConfig);
     
     toast.success(`Template "${selectedTemplate.name}" applicato!`);
     setShowApplyDialog(false);
