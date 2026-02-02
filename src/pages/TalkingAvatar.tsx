@@ -7,7 +7,7 @@ import { UserCircle, Sparkles } from "lucide-react";
 export default function TalkingAvatarPage() {
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background dark">
         <Navbar />
         <main className="container mx-auto px-4 py-8">
           {/* Page Header - consistent with other pages */}
