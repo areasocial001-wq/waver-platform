@@ -397,6 +397,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
   // AI Assets state
   const [aiImages, setAiImages] = useState<AIImage[]>([]);
   const [aiVoices, setAiVoices] = useState<AIVoice[]>([]);
+  const [savedTemplatesCount, setSavedTemplatesCount] = useState(0);
   
   // Use webhook notifications
   const { createNotification, notifications } = useJSON2VideoNotifications();
@@ -1516,9 +1517,17 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="templates">
+                <TabsTrigger value="templates" className="relative">
                   <FileCode className="h-3.5 w-3.5 mr-1" />
                   Template
+                  {savedTemplatesCount > 0 && (
+                    <Badge 
+                      variant="secondary" 
+                      className="ml-1.5 h-5 min-w-5 px-1.5 text-xs font-semibold bg-primary text-primary-foreground"
+                    >
+                      {savedTemplatesCount}
+                    </Badge>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="settings">Output</TabsTrigger>
               </TabsList>
@@ -2253,6 +2262,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                     if (config.aiImages) setAiImages(config.aiImages);
                     if (config.aiVoices) setAiVoices(config.aiVoices);
                   }}
+                  onTemplatesCountChange={setSavedTemplatesCount}
                 />
               </TabsContent>
 
