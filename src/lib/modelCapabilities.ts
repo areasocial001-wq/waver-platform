@@ -880,11 +880,18 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
   'piapi-framepack': {
-    durations: STANDARD_DURATIONS,
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
     resolutions: STANDARD_RESOLUTIONS,
-    supportsTextToVideo: true,
+    aspectRatios: EXTENDED_ASPECT_RATIOS,
+    supportsTextToVideo: false, // Framepack is image-to-video only
     supportsImageToVideo: true,
+    supportsEndFrame: true, // Supports end frame for interpolation
+    requiresStartFrame: true,
     defaultDuration: 5,
+    defaultAspectRatio: '16:9',
     defaultResolution: '720p',
   },
   'piapi-veo3': {

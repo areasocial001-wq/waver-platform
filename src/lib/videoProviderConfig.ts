@@ -116,6 +116,7 @@ export interface VideoProviderInfo {
   supportsAudio?: boolean;
   supportsImageToVideo?: boolean;
   supportsTextToVideo?: boolean;
+  supportsEndFrame?: boolean; // Supports end frame for interpolation (e.g., Framepack)
   requiresApiKey?: string; // Nome del secret richiesto
   modelId?: string; // ID modello per API
   category?: string; // Categoria per raggruppamento UI
@@ -2203,25 +2204,33 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     name: 'PiAPI: Framepack',
     shortName: 'Framepack',
     group: 'piapi',
-    description: 'Interpolazione frame fluida',
+    description: 'Interpolazione frame fluida tra keyframe',
     color: 'bg-teal-500',
     badgeColor: 'bg-teal-500/20',
     textColor: 'text-teal-500',
     speed: 3,
-    quality: 2,
+    quality: 3,
     cost: 1,
-    features: ['Interpolazione', 'Veloce'],
+    features: ['Interpolazione', 'Start/End Frame', '30 FPS'],
     estimatedTime: '1-2 min',
-    fallbackOrder: ['piapi-hailuo', 'piapi-wan'],
+    fallbackOrder: ['piapi-skyreels', 'piapi-kling-2.5'],
     durations: [
       { value: '5', label: '5 secondi' },
+      { value: '10', label: '10 secondi' },
     ],
     resolutions: [
       { value: '720p', label: '720p (HD)' },
     ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+    ],
     supportsImageToVideo: true,
-    supportsTextToVideo: false,
+    supportsTextToVideo: false, // Framepack is image-to-video only
+    supportsEndFrame: true, // Key feature: supports start + end frame interpolation
     requiresApiKey: 'PIAPI_API_KEY',
+    modelId: 'Qubico/framepack',
     category: 'PiAPI',
   },
   'piapi-veo3': {
