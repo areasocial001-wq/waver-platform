@@ -169,10 +169,10 @@ export const ProviderCreditsWidget = () => {
           credits: piapiData?.credits,
           creditsUsd: piapiData?.equivalent_in_usd,
           details: `$${piapiData?.equivalent_in_usd?.toFixed(2) || '0.00'} disponibili`,
-          supportedModels: ["Wan", "Kling", "Luma"]
+          supportedModels: ["Wan", "Kling", "Luma", "SkyReels"]
         });
       } catch {
-        results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error", supportedModels: ["Wan", "Kling", "Luma"] });
+        results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error", supportedModels: ["Wan", "Kling", "Luma", "SkyReels"] });
       }
 
       // ElevenLabs Balance
