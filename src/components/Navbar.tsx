@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -41,9 +41,10 @@ export const Navbar = () => {
   const isFreepikPage = location.pathname === "/freepik";
   const isApiMonitoringPage = location.pathname === "/api-monitoring";
   const isVideoEditorPage = location.pathname === "/video-editor";
+  const isTalkingAvatarPage = location.pathname === "/talking-avatar";
   const isSettingsPage = location.pathname === "/settings";
   const isExportTestPage = location.pathname === "/export-test";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isSettingsPage || isExportTestPage;
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -134,6 +135,15 @@ export const Navbar = () => {
                   <Film className="w-4 h-4 mr-2" />
                   Editor
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate("/talking-avatar")}
+                  className="bg-card hover:bg-accent text-foreground border-border"
+                >
+                  <UserCircle className="w-4 h-4 mr-2" />
+                  Avatar
+                </Button>
               </div>
 
               {/* Audio Tools Dropdown */}
@@ -192,6 +202,10 @@ export const Navbar = () => {
                     <DropdownMenuItem onClick={() => navigate("/video-editor")}>
                       <Film className="w-4 h-4 mr-2" />
                       Editor
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate("/talking-avatar")}>
+                      <UserCircle className="w-4 h-4 mr-2" />
+                      Talking Avatar
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </div>
