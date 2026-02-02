@@ -590,7 +590,7 @@ export const ImageToVideoForm = () => {
                   Non supportato
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Seleziona Luma Ray, PixVerse o Veo 3.1
+                  Seleziona Luma Ray, PixVerse, Framepack o Veo 3.1
                 </p>
               </div>
             </div>
