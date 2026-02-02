@@ -4,7 +4,17 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+};
+
+// Get the webhook URL for this project
+const getWebhookUrl = () => {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (!supabaseUrl) return null;
+  // Extract project ref from URL
+  const match = supabaseUrl.match(/https:\/\/([^.]+)\./);
+  if (!match) return null;
+  return `${supabaseUrl}/functions/v1/json2video-webhook`;
 };
 
 // Subtitle settings schema
@@ -95,6 +105,32 @@ const voiceSchema = z.object({
   volume: z.number().min(0).max(10).default(1),
 });
 
+// AI-generated image element schema
+const aiImageSchema = z.object({
+  model: z.enum(['freepik-classic', 'flux-pro']).default('freepik-classic'),
+  prompt: z.string(),
+  aspectRatio: z.enum(['horizontal', 'vertical', 'squared']).default('horizontal'),
+  duration: z.number().optional(),
+  resize: z.enum(['cover', 'fit', 'contain']).default('cover'),
+  zoom: z.number().min(-10).max(10).default(0),
+  pan: z.enum(['none', 'left', 'right', 'top', 'bottom', 'top-left', 'top-right', 'bottom-left', 'bottom-right']).default('none'),
+});
+
+// AI-generated voice element schema
+const aiVoiceSchema = z.object({
+  model: z.enum(['azure', 'elevenlabs']).default('azure'),
+  text: z.string(),
+  voice: z.string().default('en-US-JennyNeural'),
+  volume: z.number().min(0).max(10).default(1),
+});
+
+// Variable definition schema
+const variableSchema = z.object({
+  name: z.string(),
+  type: z.enum(['string', 'number', 'url']).default('string'),
+  defaultValue: z.union([z.string(), z.number()]).optional(),
+});
+
 // Main request schema
 const requestSchema = z.object({
   action: z.enum(['render', 'status']).default('render'),
@@ -121,6 +157,21 @@ const requestSchema = z.object({
   // Intro/Outro
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
+
+  // AI-generated assets
+  aiImages: z.array(aiImageSchema).optional(),
+  aiVoices: z.array(aiVoiceSchema).optional(),
+
+  // Template variables (for replacement)
+  variables: z.record(z.union([z.string(), z.number()])).optional(),
+
+  // Webhook settings
+  useWebhook: z.boolean().default(false),
+  notificationId: z.string().optional(), // For tracking
+  dbProjectId: z.string().optional(), // Link to json2video_projects table
+
+  // Template ID (to load from saved templates)
+  templateId: z.string().optional(),
 });
 
 // Map resolution to JSON2Video format
@@ -453,6 +504,71 @@ serve(async (req) => {
       movie.elements = movieElements;
     }
 
+    // Add AI-generated image scenes
+    if (data.aiImages && data.aiImages.length > 0) {
+      for (const aiImage of data.aiImages) {
+        const aiScene: any = {
+          elements: [
+            {
+              type: 'image',
+              model: aiImage.model,
+              prompt: aiImage.prompt,
+              'aspect-ratio': aiImage.aspectRatio,
+              resize: aiImage.resize,
+              zoom: aiImage.zoom,
+              pan: aiImage.pan !== 'none' ? aiImage.pan : undefined,
+              duration: aiImage.duration || 5,
+            }
+          ]
+        };
+        scenes.push(aiScene);
+      }
+    }
+
+    // Add AI-generated voice to movie elements
+    if (data.aiVoices && data.aiVoices.length > 0) {
+      for (const aiVoice of data.aiVoices) {
+        movieElements.push({
+          type: 'voice',
+          model: aiVoice.model,
+          text: aiVoice.text,
+          voice: aiVoice.voice,
+          volume: aiVoice.volume,
+        });
+      }
+    }
+
+    // Apply variable replacements if provided
+    if (data.variables && Object.keys(data.variables).length > 0) {
+      const movieStr = JSON.stringify(movie);
+      let processedStr = movieStr;
+      
+      for (const [key, value] of Object.entries(data.variables)) {
+        const placeholder = `{{${key}}}`;
+        processedStr = processedStr.split(placeholder).join(String(value));
+      }
+      
+      Object.assign(movie, JSON.parse(processedStr));
+    }
+
+    // Add webhook export if enabled
+    const webhookUrl = getWebhookUrl();
+    if (data.useWebhook && webhookUrl) {
+      movie.exports = [{
+        destinations: [{
+          type: 'webhook',
+          endpoint: webhookUrl,
+        }]
+      }];
+      
+      // Include notification ID in movie for webhook identification
+      if (data.notificationId) {
+        movie.id = data.notificationId;
+      }
+      
+      console.log('Webhook configured:', webhookUrl);
+    }
+
     console.log('Movie payload:', JSON.stringify(movie, null, 2));
 
     // Submit render job
@@ -477,14 +593,33 @@ serve(async (req) => {
     const renderData = await renderResponse.json();
     console.log('JSON2Video render response:', renderData);
 
-    // Return project info for polling
+    // Create notification record if using webhook
+    if (data.useWebhook && data.notificationId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      
+      await supabase
+        .from('json2video_render_notifications')
+        .update({
+          render_project_id: renderData.project,
+          status: 'processing',
+        })
+        .eq('id', data.notificationId);
+    }
+
+    // Return project info for polling or webhook
     return new Response(
       JSON.stringify({
         success: true,
         projectId: renderData.project,
         movieId: renderData.movie?.id,
         status: 'processing',
-        message: 'Video rendering started. Poll status endpoint for updates.',
+        useWebhook: data.useWebhook,
+        notificationId: data.notificationId,
+        message: data.useWebhook 
+          ? 'Video rendering started. You will receive a realtime notification when ready.'
+          : 'Video rendering started. Poll status endpoint for updates.',
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
