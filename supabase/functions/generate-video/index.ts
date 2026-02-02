@@ -1514,6 +1514,31 @@ serve(async (req) => {
         if (resolution) {
           piApiPayload.input.resolution = resolution;
         }
+      } else if (modelConfig.model === "skyreels") {
+        // SkyReels V2 specific handling - uses Qubico/skyreels model
+        // SkyReels is IMAGE-TO-VIDEO ONLY - optimized for human-centric video generation
+        piApiPayload.model = "Qubico/skyreels";
+        piApiPayload.task_type = "img2video";
+        
+        // SkyReels specific parameters
+        piApiPayload.input.guidance_scale = 3.5; // Default optimal value
+        
+        // Aspect ratio (16:9, 9:16, 1:1 supported)
+        if (aspect_ratio && ["16:9", "9:16", "1:1"].includes(aspect_ratio)) {
+          piApiPayload.input.aspect_ratio = aspect_ratio;
+        } else {
+          piApiPayload.input.aspect_ratio = "16:9"; // Default
+        }
+        
+        // SkyReels recommends including "FPS-24" in prompt
+        if (prompt && !prompt.includes("FPS-24")) {
+          piApiPayload.input.prompt = `FPS-24, ${prompt}`;
+        }
+        
+        // Negative prompt for better results
+        piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality";
+        
+        console.log("[PiAPI SkyReels] Using Qubico/skyreels model for human-centric video generation");
       } else {
         const sanitizedDuration = sanitizePiAPIDuration(modelConfig.model, duration || 5);
         piApiPayload.input.duration = sanitizedDuration;

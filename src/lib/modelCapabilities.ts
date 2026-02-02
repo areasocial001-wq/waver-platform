@@ -871,9 +871,12 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
   'piapi-skyreels': {
     durations: STANDARD_DURATIONS,
     resolutions: STANDARD_RESOLUTIONS,
-    supportsTextToVideo: true,
+    aspectRatios: EXTENDED_ASPECT_RATIOS,
+    supportsTextToVideo: false, // SkyReels V2 is image-to-video only (human-centric)
     supportsImageToVideo: true,
+    requiresStartFrame: true,
     defaultDuration: 5,
+    defaultAspectRatio: '16:9',
     defaultResolution: '720p',
   },
   'piapi-framepack': {
