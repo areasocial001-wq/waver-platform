@@ -17,8 +17,11 @@ import {
   Film, Music, Type, Subtitles, Play, Loader2, Download, Trash2, 
   Plus, Settings, Wand2, Volume2, Image, Clock, Palette, GripVertical,
   Eye, Clapperboard, Sparkles, Monitor, Save, FolderOpen, Zap, Waves,
-  Music2, Mic, CloudLightning, Settings2
+  Music2, Mic, CloudLightning, Settings2, Brain, FileCode
 } from "lucide-react";
+import JSON2VideoTemplateManager from "@/components/JSON2VideoTemplateManager";
+import JSON2VideoAIAssets, { AIImage, AIVoice } from "@/components/JSON2VideoAIAssets";
+import { useJSON2VideoNotifications } from "@/hooks/useJSON2VideoNotifications";
 import { ActiveProviderIndicator } from "@/components/ActiveProviderIndicator";
 import { QuickProviderSwitch } from "@/components/QuickProviderSwitch";
 import { ProjectCostEstimator } from "@/components/ProjectCostEstimator";
@@ -390,6 +393,13 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
   // Sound effects generation state
   const [isGeneratingSfx, setIsGeneratingSfx] = useState(false);
   const [sfxGeneratingId, setSfxGeneratingId] = useState<string | null>(null);
+
+  // AI Assets state
+  const [aiImages, setAiImages] = useState<AIImage[]>([]);
+  const [aiVoices, setAiVoices] = useState<AIVoice[]>([]);
+  
+  // Use webhook notifications
+  const { createNotification, notifications } = useJSON2VideoNotifications();
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -871,6 +881,24 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
         intro: intro.enabled ? intro : undefined,
         outro: outro.enabled ? outro : undefined,
         audioTrack: audioTrack || undefined,
+        // AI-generated assets
+        aiImages: aiImages.length > 0 ? aiImages.map(img => ({
+          model: img.model,
+          prompt: img.prompt,
+          aspectRatio: img.aspectRatio,
+          duration: img.duration,
+          resize: img.resize,
+          zoom: img.zoom,
+          pan: img.pan !== "none" ? img.pan : undefined,
+        })) : undefined,
+        aiVoices: aiVoices.length > 0 ? aiVoices.map(v => ({
+          model: v.model,
+          text: v.text,
+          voice: v.voice,
+          volume: v.volume,
+        })) : undefined,
+        // Webhook notifications for realtime updates
+        useWebhook: true,
         draft: false,
         quality: "high",
       };
@@ -1471,11 +1499,19 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
             <Tabs defaultValue="clip">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="clip">Clip</TabsTrigger>
                 <TabsTrigger value="subtitles">Sottotitoli</TabsTrigger>
                 <TabsTrigger value="audio">Audio</TabsTrigger>
                 <TabsTrigger value="intro">Intro/Outro</TabsTrigger>
+                <TabsTrigger value="ai-assets">
+                  <Brain className="h-3.5 w-3.5 mr-1" />
+                  AI
+                </TabsTrigger>
+                <TabsTrigger value="templates">
+                  <FileCode className="h-3.5 w-3.5 mr-1" />
+                  Template
+                </TabsTrigger>
                 <TabsTrigger value="settings">Output</TabsTrigger>
               </TabsList>
 
@@ -2170,6 +2206,46 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
+              </TabsContent>
+
+              {/* AI Assets Tab */}
+              <TabsContent value="ai-assets" className="space-y-4 mt-4">
+                <JSON2VideoAIAssets
+                  aiImages={aiImages}
+                  aiVoices={aiVoices}
+                  onImagesChange={setAiImages}
+                  onVoicesChange={setAiVoices}
+                />
+              </TabsContent>
+
+              {/* Templates Tab */}
+              <TabsContent value="templates" className="space-y-4 mt-4">
+                <JSON2VideoTemplateManager
+                  currentConfig={{
+                    clips,
+                    subtitles,
+                    intro,
+                    outro,
+                    audioTrack,
+                    transition,
+                    resolution,
+                    soundEffects,
+                    aiImages,
+                    aiVoices,
+                  }}
+                  onApplyTemplate={(config) => {
+                    if (config.clips) setClips(config.clips as VideoClip[]);
+                    if (config.subtitles) setSubtitles(config.subtitles as SubtitleSettings);
+                    if (config.intro) setIntro(config.intro as IntroOutro);
+                    if (config.outro) setOutro(config.outro as IntroOutro);
+                    if (config.audioTrack !== undefined) setAudioTrack(config.audioTrack as AudioTrack | null);
+                    if (config.transition) setTransition(config.transition);
+                    if (config.resolution) setResolution(config.resolution);
+                    if (config.soundEffects) setSoundEffects(config.soundEffects as SoundEffect[]);
+                    if (config.aiImages) setAiImages(config.aiImages);
+                    if (config.aiVoices) setAiVoices(config.aiVoices);
+                  }}
+                />
               </TabsContent>
 
               {/* Output settings */}
