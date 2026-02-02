@@ -52,6 +52,7 @@ export interface JSON2VideoConfig {
 interface JSON2VideoTemplateManagerProps {
   onApplyTemplate: (config: JSON2VideoConfig) => void;
   currentConfig?: JSON2VideoConfig;
+  onTemplatesCountChange?: (count: number) => void;
 }
 
 const CATEGORIES = [
@@ -65,7 +66,8 @@ const CATEGORIES = [
 
 export default function JSON2VideoTemplateManager({ 
   onApplyTemplate, 
-  currentConfig 
+  currentConfig,
+  onTemplatesCountChange
 }: JSON2VideoTemplateManagerProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,7 +106,9 @@ export default function JSON2VideoTemplateManager({
       if (error) throw error;
       
       // Type assertion since Supabase types might not be updated yet
-      setTemplates((data as unknown as Template[]) || []);
+      const loadedTemplates = (data as unknown as Template[]) || [];
+      setTemplates(loadedTemplates);
+      onTemplatesCountChange?.(loadedTemplates.length);
     } catch (error) {
       console.error("Error loading templates:", error);
       toast.error("Errore nel caricamento dei template");
@@ -197,7 +201,9 @@ export default function JSON2VideoTemplateManager({
       if (error) throw error;
 
       toast.success("Template eliminato");
-      setTemplates(templates.filter(t => t.id !== id));
+      const newTemplates = templates.filter(t => t.id !== id);
+      setTemplates(newTemplates);
+      onTemplatesCountChange?.(newTemplates.length);
     } catch (error) {
       console.error("Error deleting template:", error);
       toast.error("Errore nell'eliminazione");
