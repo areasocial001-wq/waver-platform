@@ -23,11 +23,11 @@ const templateSchema = z.object({
 
 // PIAPI template mapping
 const PIAPI_TEMPLATES: Record<string, { model: string; task_type: string }> = {
-  "clean-upscale": { model: "upscaler", task_type: "upscale" },
-  "faceswap": { model: "faceswap", task_type: "faceswap" },
-  "effects": { model: "effects", task_type: "effects" },
-  "virtual-tryon": { model: "virtual-tryon", task_type: "tryon" },
-  "ai-hug": { model: "ai-hug", task_type: "ai-hug" },
+  "clean-upscale": { model: "Qubico/image-toolkit", task_type: "upscale" },
+  "faceswap": { model: "Qubico/image-toolkit", task_type: "face-swap" },
+  "effects": { model: "Qubico/image-toolkit", task_type: "effects" },
+  "virtual-tryon": { model: "Qubico/image-toolkit", task_type: "virtual-tryon" },
+  "ai-hug": { model: "Qubico/image-toolkit", task_type: "ai-hug" },
 };
 
 serve(async (req) => {
@@ -156,7 +156,7 @@ serve(async (req) => {
         break;
         
       case "faceswap":
-        piApiPayload.input.source_image = image.startsWith('data:') ? extractBase64(image) : image;
+        piApiPayload.input.swap_image = image.startsWith('data:') ? extractBase64(image) : image;
         if (targetImage) {
           piApiPayload.input.target_image = targetImage.startsWith('data:') ? extractBase64(targetImage) : targetImage;
         }
