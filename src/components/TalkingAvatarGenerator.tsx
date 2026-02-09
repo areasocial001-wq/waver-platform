@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TalkingAvatarTimeline, TimelineClip } from './TalkingAvatarTimeline';
 import { TalkingAvatarBatch, BatchScene } from './TalkingAvatarBatch';
 import { StoryTemplates } from './StoryTemplates';
+import { QuickFaceswap } from './QuickFaceswap';
 import { UserTemplates } from './UserTemplates';
 import { VideoPreviewPlayer } from './VideoPreviewPlayer';
 import { ClipEffectsPanel, ClipEffect, DEFAULT_EFFECT, EFFECT_PRESETS } from './ClipEffectsPanel';
@@ -786,6 +787,9 @@ export function TalkingAvatarGenerator() {
               currentScenes={batchScenes}
               onSelectTemplate={handleTemplateSelect}
             />
+
+            {/* Quick Faceswap */}
+            <QuickFaceswap />
 
             {/* Background Music Section */}
             <div className="flex items-center gap-2">
