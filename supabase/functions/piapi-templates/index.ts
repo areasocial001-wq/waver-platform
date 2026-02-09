@@ -14,10 +14,9 @@ const statusSchema = z.object({
 
 const templateSchema = z.object({
   action: z.literal('process').optional(),
-  template: z.enum(['clean-upscale', 'faceswap', 'effects', 'virtual-tryon', 'ai-hug']),
+  template: z.enum(['clean-upscale', 'faceswap', 'virtual-tryon', 'ai-hug']),
   image: z.string().min(1).max(10000000), // base64 or URL
   targetImage: z.string().max(10000000).optional(), // For faceswap, virtual-tryon
-  effectType: z.string().max(50).optional(), // For effects template
   upscaleFactor: z.enum(['2x', '4x']).optional(), // For clean-upscale
 });
 
@@ -25,9 +24,8 @@ const templateSchema = z.object({
 const PIAPI_TEMPLATES: Record<string, { model: string; task_type: string }> = {
   "clean-upscale": { model: "Qubico/image-toolkit", task_type: "upscale" },
   "faceswap": { model: "Qubico/image-toolkit", task_type: "face-swap" },
-  "effects": { model: "Qubico/image-toolkit", task_type: "effects" },
-  "virtual-tryon": { model: "Qubico/image-toolkit", task_type: "virtual-tryon" },
-  "ai-hug": { model: "Qubico/image-toolkit", task_type: "ai-hug" },
+  "virtual-tryon": { model: "kling", task_type: "ai_try_on" },
+  "ai-hug": { model: "Qubico/hug-video", task_type: "image_to_video" },
 };
 
 serve(async (req) => {
@@ -152,7 +150,8 @@ serve(async (req) => {
     switch (template) {
       case "clean-upscale":
         piApiPayload.input.image = image.startsWith('data:') ? extractBase64(image) : image;
-        piApiPayload.input.scale_factor = upscaleFactor || "2x";
+        piApiPayload.input.scale = upscaleFactor === "4x" ? 4 : 2;
+        piApiPayload.input.face_enhance = true;
         break;
         
       case "faceswap":
@@ -162,25 +161,15 @@ serve(async (req) => {
         }
         break;
         
-      case "effects":
-        piApiPayload.input.image = image.startsWith('data:') ? extractBase64(image) : image;
-        if (effectType) {
-          piApiPayload.input.effect_type = effectType;
-        }
-        break;
-        
       case "virtual-tryon":
-        piApiPayload.input.person_image = image.startsWith('data:') ? extractBase64(image) : image;
+        piApiPayload.input.model_input = image.startsWith('data:') ? extractBase64(image) : image;
         if (targetImage) {
-          piApiPayload.input.garment_image = targetImage.startsWith('data:') ? extractBase64(targetImage) : targetImage;
+          piApiPayload.input.dress_input = targetImage.startsWith('data:') ? extractBase64(targetImage) : targetImage;
         }
         break;
         
       case "ai-hug":
-        piApiPayload.input.image1 = image.startsWith('data:') ? extractBase64(image) : image;
-        if (targetImage) {
-          piApiPayload.input.image2 = targetImage.startsWith('data:') ? extractBase64(targetImage) : targetImage;
-        }
+        piApiPayload.input.image_url = image.startsWith('data:') ? extractBase64(image) : image;
         break;
     }
 
