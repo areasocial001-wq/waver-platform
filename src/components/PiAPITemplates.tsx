@@ -8,7 +8,7 @@ import { Loader2, Upload, X, Wand2, UserRoundX, Shirt, Heart, Sparkles, Download
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-type TemplateType = "clean-upscale" | "faceswap" | "effects" | "virtual-tryon" | "ai-hug";
+type TemplateType = "clean-upscale" | "faceswap" | "virtual-tryon" | "ai-hug";
 
 interface TemplateConfig {
   id: TemplateType;
@@ -39,19 +39,6 @@ const TEMPLATES: TemplateConfig[] = [
     requiresTargetImage: true,
   },
   {
-    id: "effects",
-    name: "Effects",
-    description: "Applica effetti speciali alle immagini",
-    icon: <Wand2 className="w-5 h-5" />,
-    requiresTargetImage: false,
-    options: [
-      { value: "cartoon", label: "Cartoon" },
-      { value: "sketch", label: "Sketch" },
-      { value: "painting", label: "Painting" },
-      { value: "anime", label: "Anime" },
-    ],
-  },
-  {
     id: "virtual-tryon",
     name: "Virtual Try-on",
     description: "Prova virtualmente vestiti e accessori",
@@ -61,9 +48,9 @@ const TEMPLATES: TemplateConfig[] = [
   {
     id: "ai-hug",
     name: "AI Hug",
-    description: "Crea un abbraccio virtuale tra due persone",
+    description: "Genera un video di abbraccio da una foto",
     icon: <Heart className="w-5 h-5" />,
-    requiresTargetImage: true,
+    requiresTargetImage: false,
   },
 ];
 
@@ -155,12 +142,8 @@ export function PiAPITemplates() {
         requestBody.targetImage = targetImage;
       }
 
-      if (selectedOption) {
-        if (selectedTemplate === "clean-upscale") {
-          requestBody.upscaleFactor = selectedOption;
-        } else if (selectedTemplate === "effects") {
-          requestBody.effectType = selectedOption;
-        }
+      if (selectedOption && selectedTemplate === "clean-upscale") {
+        requestBody.upscaleFactor = selectedOption;
       }
 
       const { data, error } = await supabase.functions.invoke('piapi-templates', {
@@ -218,7 +201,7 @@ export function PiAPITemplates() {
           setResultImage(null);
           setSelectedOption("");
         }}>
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             {TEMPLATES.map((template) => (
               <TabsTrigger key={template.id} value={template.id} className="flex items-center gap-1 text-xs">
                 {template.icon}
