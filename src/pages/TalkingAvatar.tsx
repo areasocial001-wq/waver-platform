@@ -1,4 +1,5 @@
 import { TalkingAvatarGenerator } from "@/components/TalkingAvatarGenerator";
+import { PiAPITemplates } from "@/components/PiAPITemplates";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,11 @@ export default function TalkingAvatarPage() {
           
           {/* Main Content */}
           <TalkingAvatarGenerator />
+          
+          {/* PIAPI Templates - Faceswap, Upscale, Effects */}
+          <div className="mt-8">
+            <PiAPITemplates />
+          </div>
         </main>
       </div>
     </AuthGuard>
