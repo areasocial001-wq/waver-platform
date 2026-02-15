@@ -189,20 +189,23 @@ serve(async (req) => {
     const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+    const VIDU_API_KEY = Deno.env.get("VIDU_API_KEY");
     
     const hasValidGoogleKey = GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.trim().length > 0;
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
+    const hasValidViduKey = VIDU_API_KEY && VIDU_API_KEY.trim().length > 0;
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, or AIML_API_KEY");
+    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey) {
+      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, or VIDU_API_KEY");
     }
     
     console.log("API credentials check:", {
       hasGoogleKey: hasValidGoogleKey,
       hasPiAPIKey: hasValidPiAPIKey,
-      hasAIMLKey: hasValidAIMLKey
+      hasAIMLKey: hasValidAIMLKey,
+      hasViduKey: hasValidViduKey,
     });
 
     body = await req.json();
@@ -463,6 +466,76 @@ serve(async (req) => {
         }
       }
       
+      // Vidu polling (format: vidu:model:task_id)
+      if (body.operationId.startsWith('vidu:')) {
+        if (!hasValidViduKey) {
+          throw new Error("VIDU_API_KEY is not configured");
+        }
+        
+        const parts = body.operationId.split(':');
+        const taskId = parts.slice(2).join(':');
+        console.log("[Vidu] Polling task:", taskId);
+        
+        const viduResponse = await fetch(`https://api.vidu.com/ent/v2/tasks/${taskId}/creations`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Token ${VIDU_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!viduResponse.ok) {
+          const error = await viduResponse.text();
+          throw new Error(`Vidu API error: ${viduResponse.status} - ${error}`);
+        }
+
+        const viduData = await viduResponse.json();
+        console.log("[Vidu] Poll result:", viduData);
+        
+        const taskStatus = viduData.state;
+        
+        if (taskStatus === "success") {
+          const videoUrl = viduData.creations?.[0]?.url;
+          
+          if (!videoUrl) {
+            console.error("Vidu completed but no video URL found:", viduData);
+            throw new Error("Video completed but URL not found in response");
+          }
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (taskStatus === "failed") {
+          throw new Error(`Vidu generation failed: ${viduData.err_code || "Unknown error"}`);
+        } else {
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
+
       // Replicate polling
       if (body.operationId.startsWith('replicate:')) {
         const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
@@ -968,6 +1041,103 @@ serve(async (req) => {
         status: "starting",
         operationId: `piapi:kling-2.6-motion:${taskId}`,
         message: "Kling 2.6 Motion Control video generation started"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ==================== VIDU PROVIDERS ====================
+    if (preferredProvider?.startsWith('vidu-') && hasValidViduKey) {
+      const viduModelKey = preferredProvider.replace('vidu-', '');
+      // Extract model name: q3-turbo-t2v -> viduq3-turbo, q2-i2v -> viduq2
+      const modelMatch = viduModelKey.match(/^(q\d+)(?:-(turbo|pro))?/);
+      const viduModel = modelMatch 
+        ? `vidu${modelMatch[1]}${modelMatch[2] ? '-' + modelMatch[2] : ''}`
+        : 'viduq3-pro';
+      
+      const isI2V = type === "image_to_video";
+      const startImageData = start_image || image || image_url;
+      
+      console.log(`[Vidu] Starting generation: model=${viduModel}, type=${type}, duration=${duration}`);
+      
+      const viduHeaders = {
+        "Content-Type": "application/json",
+        "Authorization": `Token ${VIDU_API_KEY}`,
+      };
+      
+      let viduEndpoint: string;
+      let viduPayload: any;
+      
+      if (isI2V && startImageData) {
+        viduEndpoint = 'https://api.vidu.com/ent/v2/img2video';
+        
+        // Need URL for Vidu - upload base64 if needed
+        let imageUrl = startImageData;
+        if (startImageData.startsWith('data:') || !startImageData.startsWith('http')) {
+          imageUrl = await uploadToStorageAndGetUrl(startImageData, "vidu-img", { signed: true, signedExpiresInSec: 3600 });
+        }
+        
+        viduPayload = {
+          model: viduModel,
+          image: { url: imageUrl, type: 'url' },
+          duration: sanitizeDuration(viduModel, duration || 5),
+          resolution: resolution || '720p',
+        };
+        if (prompt) viduPayload.prompt = prompt;
+        if (viduModel.startsWith('viduq3')) viduPayload.audio = true;
+      } else {
+        viduEndpoint = 'https://api.vidu.com/ent/v2/text2video';
+        viduPayload = {
+          model: viduModel,
+          prompt: prompt,
+          duration: sanitizeDuration(viduModel, duration || 5),
+          aspect_ratio: aspect_ratio || '16:9',
+          resolution: resolution || '720p',
+        };
+        if (viduModel.startsWith('viduq3')) viduPayload.audio = true;
+      }
+      
+      console.log(`[Vidu] Payload:`, JSON.stringify(viduPayload));
+      
+      const viduResponse = await fetch(viduEndpoint, {
+        method: "POST",
+        headers: viduHeaders,
+        body: JSON.stringify(viduPayload),
+      });
+
+      if (!viduResponse.ok) {
+        const error = await viduResponse.text();
+        console.error(`[Vidu] Error: ${viduResponse.status} - ${error}`);
+        throw new Error(`Vidu error: ${viduResponse.status} - ${error}`);
+      }
+
+      const viduData = await viduResponse.json();
+      console.log(`[Vidu] Response:`, JSON.stringify(viduData));
+      
+      const viduTaskId = viduData.task_id;
+      if (!viduTaskId) {
+        throw new Error("Vidu did not return a task_id");
+      }
+
+      if (generationId) {
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'processing',
+            prediction_id: `vidu:${viduModel}:${viduTaskId}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({ 
+        status: "starting",
+        operationId: `vidu:${viduModel}:${viduTaskId}`,
+        message: `Vidu ${viduModel} video generation started`
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

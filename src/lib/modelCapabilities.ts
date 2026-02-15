@@ -931,6 +931,166 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultAspectRatio: '16:9',
     defaultResolution: '720p',
   },
+
+  // ============ VIDU ============
+  'vidu-q3-turbo-t2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+      { value: 16, label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsTextToVideo: true,
+    supportsImageToVideo: false,
+    supportsAudio: true,
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '720p',
+  },
+  'vidu-q3-turbo-i2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+      { value: 16, label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsTextToVideo: false,
+    supportsImageToVideo: true,
+    supportsAudio: true,
+    defaultDuration: 5,
+    defaultResolution: '720p',
+  },
+  'vidu-q3-pro-t2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+      { value: 16, label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsTextToVideo: true,
+    supportsImageToVideo: false,
+    supportsAudio: true,
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '720p',
+  },
+  'vidu-q3-pro-i2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+      { value: 16, label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsTextToVideo: false,
+    supportsImageToVideo: true,
+    supportsAudio: true,
+    defaultDuration: 5,
+    defaultResolution: '720p',
+  },
+  'vidu-q2-t2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsTextToVideo: true,
+    supportsImageToVideo: false,
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '720p',
+  },
+  'vidu-q2-i2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsTextToVideo: false,
+    supportsImageToVideo: true,
+    defaultDuration: 5,
+    defaultResolution: '720p',
+  },
+  'vidu-q1-t2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+    ],
+    supportsTextToVideo: true,
+    supportsImageToVideo: false,
+    defaultDuration: 5,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '1080p',
+  },
+  'vidu-q1-i2v': {
+    durations: [
+      { value: 5, label: '5 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsTextToVideo: false,
+    supportsImageToVideo: true,
+    defaultDuration: 5,
+    defaultResolution: '1080p',
+  },
 };
 
 /**

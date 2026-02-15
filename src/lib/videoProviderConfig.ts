@@ -78,6 +78,15 @@ export type VideoProviderType =
   // AI/ML API - VEED Fabric
   | 'aiml-veed-fabric-1.0'
   | 'aiml-veed-fabric-1.0-fast'
+  // Vidu
+  | 'vidu-q3-turbo-t2v'
+  | 'vidu-q3-turbo-i2v'
+  | 'vidu-q3-pro-t2v'
+  | 'vidu-q3-pro-i2v'
+  | 'vidu-q2-t2v'
+  | 'vidu-q2-i2v'
+  | 'vidu-q1-t2v'
+  | 'vidu-q1-i2v'
   // PiAPI providers
   | 'piapi-kling-2.1'
   | 'piapi-kling-2.5'
@@ -93,7 +102,7 @@ export type VideoProviderType =
   // Freepik
   | 'freepik';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'auto';
+export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
@@ -2330,6 +2339,282 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     requiresApiKey: 'FREEPIK_API_KEY',
     category: 'Freepik',
   },
+
+  // ============ VIDU ============
+  'vidu-q3-turbo-t2v': {
+    id: 'vidu-q3-turbo-t2v',
+    name: 'Vidu Q3 Turbo (T2V)',
+    shortName: 'Vidu Q3 Turbo',
+    group: 'vidu',
+    description: 'Generazione veloce con audio sincronizzato',
+    color: 'bg-teal-500',
+    badgeColor: 'bg-teal-500/20',
+    textColor: 'text-teal-500',
+    speed: 3,
+    quality: 3,
+    cost: 2,
+    features: ['Turbo', 'Audio sync', 'Fino a 16s'],
+    estimatedTime: '1-3 min',
+    fallbackOrder: ['vidu-q3-pro-t2v', 'vidu-q2-t2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+      { value: '16', label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: false,
+    supportsTextToVideo: true,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq3-turbo',
+    category: 'Vidu',
+  },
+  'vidu-q3-turbo-i2v': {
+    id: 'vidu-q3-turbo-i2v',
+    name: 'Vidu Q3 Turbo (I2V)',
+    shortName: 'Vidu Q3T I2V',
+    group: 'vidu',
+    description: 'Image-to-Video veloce con audio',
+    color: 'bg-teal-500',
+    badgeColor: 'bg-teal-500/20',
+    textColor: 'text-teal-500',
+    speed: 3,
+    quality: 3,
+    cost: 2,
+    features: ['Turbo', 'Audio sync', 'I2V'],
+    estimatedTime: '1-3 min',
+    fallbackOrder: ['vidu-q3-pro-i2v', 'vidu-q2-i2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+      { value: '16', label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: false,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq3-turbo',
+    category: 'Vidu',
+  },
+  'vidu-q3-pro-t2v': {
+    id: 'vidu-q3-pro-t2v',
+    name: 'Vidu Q3 Pro (T2V)',
+    shortName: 'Vidu Q3 Pro',
+    group: 'vidu',
+    description: 'Massima qualità con audio-video sync, shot segmentation',
+    color: 'bg-teal-600',
+    badgeColor: 'bg-teal-600/20',
+    textColor: 'text-teal-600',
+    speed: 2,
+    quality: 3,
+    cost: 3,
+    features: ['Pro quality', 'Audio sync', 'Shot segmentation', 'Fino a 16s'],
+    estimatedTime: '2-5 min',
+    fallbackOrder: ['vidu-q3-turbo-t2v', 'vidu-q2-t2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+      { value: '16', label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: false,
+    supportsTextToVideo: true,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq3-pro',
+    category: 'Vidu',
+  },
+  'vidu-q3-pro-i2v': {
+    id: 'vidu-q3-pro-i2v',
+    name: 'Vidu Q3 Pro (I2V)',
+    shortName: 'Vidu Q3P I2V',
+    group: 'vidu',
+    description: 'Image-to-Video Pro con audio',
+    color: 'bg-teal-600',
+    badgeColor: 'bg-teal-600/20',
+    textColor: 'text-teal-600',
+    speed: 2,
+    quality: 3,
+    cost: 3,
+    features: ['Pro quality', 'Audio sync', 'I2V'],
+    estimatedTime: '2-5 min',
+    fallbackOrder: ['vidu-q3-turbo-i2v', 'vidu-q2-i2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+      { value: '16', label: '16 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: false,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq3-pro',
+    category: 'Vidu',
+  },
+  'vidu-q2-t2v': {
+    id: 'vidu-q2-t2v',
+    name: 'Vidu Q2 (T2V)',
+    shortName: 'Vidu Q2',
+    group: 'vidu',
+    description: 'Modello di nuova generazione, fino a 10s',
+    color: 'bg-teal-400',
+    badgeColor: 'bg-teal-400/20',
+    textColor: 'text-teal-400',
+    speed: 2,
+    quality: 3,
+    cost: 2,
+    features: ['New gen', 'Fino a 10s', '1080p'],
+    estimatedTime: '2-4 min',
+    fallbackOrder: ['vidu-q3-turbo-t2v', 'vidu-q1-t2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Standard)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+    ],
+    supportsImageToVideo: false,
+    supportsTextToVideo: true,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq2',
+    category: 'Vidu',
+  },
+  'vidu-q2-i2v': {
+    id: 'vidu-q2-i2v',
+    name: 'Vidu Q2 (I2V)',
+    shortName: 'Vidu Q2 I2V',
+    group: 'vidu',
+    description: 'Image-to-Video nuova generazione',
+    color: 'bg-teal-400',
+    badgeColor: 'bg-teal-400/20',
+    textColor: 'text-teal-400',
+    speed: 2,
+    quality: 3,
+    cost: 2,
+    features: ['New gen', 'I2V', '1080p'],
+    estimatedTime: '2-4 min',
+    fallbackOrder: ['vidu-q3-turbo-i2v', 'vidu-q1-i2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p' },
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsImageToVideo: true,
+    supportsTextToVideo: false,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq2',
+    category: 'Vidu',
+  },
+  'vidu-q1-t2v': {
+    id: 'vidu-q1-t2v',
+    name: 'Vidu Q1 (T2V)',
+    shortName: 'Vidu Q1',
+    group: 'vidu',
+    description: 'Immagini chiare, transizioni fluide, camera stabile',
+    color: 'bg-teal-300',
+    badgeColor: 'bg-teal-300/20',
+    textColor: 'text-teal-300',
+    speed: 2,
+    quality: 2,
+    cost: 1,
+    features: ['Stabile', 'Anime', '1080p'],
+    estimatedTime: '2-4 min',
+    fallbackOrder: ['vidu-q2-t2v', 'vidu-q3-turbo-t2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+    ],
+    supportsImageToVideo: false,
+    supportsTextToVideo: true,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq1',
+    category: 'Vidu',
+  },
+  'vidu-q1-i2v': {
+    id: 'vidu-q1-i2v',
+    name: 'Vidu Q1 (I2V)',
+    shortName: 'Vidu Q1 I2V',
+    group: 'vidu',
+    description: 'Image-to-Video base, economico',
+    color: 'bg-teal-300',
+    badgeColor: 'bg-teal-300/20',
+    textColor: 'text-teal-300',
+    speed: 2,
+    quality: 2,
+    cost: 1,
+    features: ['Economico', 'I2V', 'Anime'],
+    estimatedTime: '2-4 min',
+    fallbackOrder: ['vidu-q2-i2v', 'vidu-q3-turbo-i2v'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    supportsImageToVideo: true,
+    supportsTextToVideo: false,
+    requiresApiKey: 'VIDU_API_KEY',
+    modelId: 'viduq1',
+    category: 'Vidu',
+  },
 };
 
 // Helper per ottenere provider per gruppo
@@ -2352,6 +2637,7 @@ export function getGroupLabel(group: ProviderGroup): string {
     aiml: 'AI/ML API',
     piapi: 'PiAPI',
     freepik: 'Freepik',
+    vidu: 'Vidu',
   };
   return labels[group];
 }
@@ -2364,6 +2650,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
     aiml: { bg: 'bg-purple-500/20', text: 'text-purple-500' },
     piapi: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
+    vidu: { bg: 'bg-teal-500/20', text: 'text-teal-500' },
   };
   return styles[group];
 }
@@ -2378,6 +2665,7 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   if (providerId.startsWith('piapi-')) return 'piapi';
   if (providerId === 'google-veo' || providerId === 'veo') return 'google';
   if (providerId === 'freepik') return 'freepik';
+  if (providerId.startsWith('vidu-')) return 'vidu';
   return 'auto';
 }
 
@@ -2511,6 +2799,15 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'piapi-veo3': { perSecond: 0.08, perGeneration: 0.40 },
   'piapi-sora2': { perSecond: 0.15, perGeneration: 0.75 },
   freepik: { perSecond: 0.02, perGeneration: 0.10 },
+  // Vidu
+  'vidu-q3-turbo-t2v': { perSecond: 0.04, perGeneration: 0.20 },
+  'vidu-q3-turbo-i2v': { perSecond: 0.04, perGeneration: 0.20 },
+  'vidu-q3-pro-t2v': { perSecond: 0.06, perGeneration: 0.30 },
+  'vidu-q3-pro-i2v': { perSecond: 0.06, perGeneration: 0.30 },
+  'vidu-q2-t2v': { perSecond: 0.04, perGeneration: 0.20 },
+  'vidu-q2-i2v': { perSecond: 0.04, perGeneration: 0.20 },
+  'vidu-q1-t2v': { perSecond: 0.02, perGeneration: 0.10 },
+  'vidu-q1-i2v': { perSecond: 0.02, perGeneration: 0.10 },
 };
 
 // Ordine di visualizzazione per provider (raggruppati)
@@ -2605,4 +2902,13 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'piapi-sora2',
   // Freepik
   'freepik',
+  // Vidu
+  'vidu-q3-pro-t2v',
+  'vidu-q3-pro-i2v',
+  'vidu-q3-turbo-t2v',
+  'vidu-q3-turbo-i2v',
+  'vidu-q2-t2v',
+  'vidu-q2-i2v',
+  'vidu-q1-t2v',
+  'vidu-q1-i2v',
 ];
