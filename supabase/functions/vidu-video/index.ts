@@ -419,9 +419,9 @@ serve(async (req) => {
       );
     }
 
-    // ==================== ACCOUNT INFO ====================
+    // ==================== ACCOUNT / CREDITS ====================
     if (action === 'account') {
-      const response = await fetch(`${VIDU_API_BASE}/accounts/info`, {
+      const response = await fetch(`${VIDU_API_BASE}/credits?show_detail`, {
         method: 'GET',
         headers,
       });
@@ -435,8 +435,10 @@ serve(async (req) => {
       }
 
       const data = await response.json();
+      // Sum up remaining credits across all packages
+      const totalCredits = data.remains?.reduce((sum: number, r: any) => sum + (r.credit_remain || 0), 0) ?? 0;
       return new Response(
-        JSON.stringify(data),
+        JSON.stringify({ ...data, credits: totalCredits, hasKey: true }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
