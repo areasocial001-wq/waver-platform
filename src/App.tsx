@@ -15,6 +15,7 @@ import ApiMonitoring from "./pages/ApiMonitoring";
 import TalkingAvatarPage from "./pages/TalkingAvatar";
 import JSON2VideoPage from "./pages/JSON2VideoPage";
 import SettingsPage from "./pages/Settings";
+import ViduToolsPage from "./pages/ViduTools";
 
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/talking-avatar" element={<TalkingAvatarPage />} />
             <Route path="/video-editor" element={<JSON2VideoPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/vidu-tools" element={<ViduToolsPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
