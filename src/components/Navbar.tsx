@@ -44,7 +44,8 @@ export const Navbar = () => {
   const isTalkingAvatarPage = location.pathname === "/talking-avatar";
   const isSettingsPage = location.pathname === "/settings";
   const isExportTestPage = location.pathname === "/export-test";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage;
+  const isViduToolsPage = location.pathname === "/vidu-tools";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -213,6 +214,10 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/content-generator")}>
                     <FileText className="w-4 h-4 mr-2" />
                     AI Content
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/vidu-tools")}>
+                    <Film className="w-4 h-4 mr-2" />
+                    Vidu Advanced
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
