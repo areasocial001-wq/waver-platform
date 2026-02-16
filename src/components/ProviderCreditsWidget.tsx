@@ -44,6 +44,7 @@ export const ProviderCreditsWidget = () => {
     { name: "ElevenLabs", hasKey: false, status: "loading" },
     { name: "Freepik", hasKey: false, status: "loading" },
     { name: "Google AI", hasKey: false, status: "loading" },
+    { name: "Vidu", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -209,6 +210,26 @@ export const ProviderCreditsWidget = () => {
         details: healthData?.hasGoogleKey ? "Chiave configurata" : "Non configurato",
         supportedModels: ["Gemini", "Veo"]
       });
+
+      // Vidu Account Info
+      try {
+        const { data: viduData } = await supabase.functions.invoke('vidu-video', {
+          body: { action: 'account' }
+        });
+        const hasViduKey = !!viduData && !viduData.error;
+        results.push({
+          name: "Vidu",
+          hasKey: hasViduKey,
+          status: hasViduKey ? "active" : "unknown",
+          credits: viduData?.credits,
+          details: hasViduKey 
+            ? `${viduData?.credits ?? 'N/A'} crediti disponibili`
+            : "Non configurato",
+          supportedModels: ["Q3 Pro", "Q3 Turbo", "Q2", "Q1"]
+        });
+      } catch {
+        results.push({ name: "Vidu", hasKey: false, status: "error", supportedModels: ["Q3 Pro", "Q3 Turbo", "Q2", "Q1"] });
+      }
 
     } catch (error) {
       console.error("Error fetching provider balances:", error);
