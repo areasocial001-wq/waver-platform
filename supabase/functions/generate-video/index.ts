@@ -1413,9 +1413,11 @@ serve(async (req) => {
       if (!aimlResponse.ok) {
         console.error(`[AI/ML API] Error: ${aimlResponse.status} - ${responseText}`);
         
-        // Check if it's a billing/credits error (403) - attempt fallback to PiAPI
-        if (aimlResponse.status === 403 && responseText.includes("credits")) {
-          console.log("[AI/ML API] Credits exhausted, attempting fallback to PiAPI...");
+        // Check if it's a billing/credits error (403) or maintenance (500) - attempt fallback to PiAPI
+        const shouldFallback = (aimlResponse.status === 403 && responseText.includes("credits"))
+          || (aimlResponse.status === 500 && responseText.includes("maintenance"));
+        if (shouldFallback) {
+          console.log(`[AI/ML API] Error ${aimlResponse.status} detected, attempting fallback to PiAPI...`);
           
           const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
           if (PIAPI_API_KEY) {
@@ -1509,7 +1511,7 @@ serve(async (req) => {
                     operationId: `piapi:${piapiModelKey}:${taskId}`,
                     provider: `piapi-${piapiModelKey}`,
                     fallback: true,
-                    originalError: "AIML credits exhausted"
+                    originalError: `AIML unavailable (${aimlResponse.status})`
                   }), {
                     headers: { ...corsHeaders, "Content-Type": "application/json" },
                     status: 200,
