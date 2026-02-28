@@ -188,10 +188,22 @@ serve(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 
-    // Treat timeouts and upstream CDN errors as transient
+    // Extract upstream HTTP status if present
     const isTimeout = message.includes("timeout") || message.includes("abort");
     const statusMatch = message.match(/Failed to download video:\s*(\d{3})/);
     const upstreamStatus = statusMatch ? Number(statusMatch[1]) : null;
+
+    // 404/410 = source video gone permanently, stop retrying
+    const isSourceGone = upstreamStatus !== null && (upstreamStatus === 404 || upstreamStatus === 410);
+    if (isSourceGone) {
+      console.warn("Source video no longer available (permanent):", message);
+      return new Response(
+        JSON.stringify({ status: "source_not_found", retryable: false, error: message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Treat timeouts and upstream CDN errors as transient
     const isTransientUpstream =
       isTimeout || (upstreamStatus !== null && (upstreamStatus >= 500 || upstreamStatus === 429 || upstreamStatus === 408));
 
