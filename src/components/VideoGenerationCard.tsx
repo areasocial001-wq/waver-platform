@@ -553,7 +553,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => window.open(generation.video_url, "_blank", "noopener,noreferrer")}
+                        onClick={() => window.open(resolvedSignedUrl || generation.video_url, "_blank", "noopener,noreferrer")}
                       >
                         Apri in nuova scheda
                       </Button>
