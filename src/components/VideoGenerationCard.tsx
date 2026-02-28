@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2, Layers } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2, Layers, HardDrive, Cloud } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
 import { useEffect, useState, useRef } from "react";
@@ -669,6 +669,19 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
               </span>
               {generation.provider && (
                 <ProviderBadge providerId={generation.provider} size="sm" />
+              )}
+              {generation.status === "completed" && generation.video_url && (
+                isStorageRef(generation.video_url) ? (
+                  <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">
+                    <HardDrive className="w-2.5 h-2.5" />
+                    Archiviato
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">
+                    <Cloud className="w-2.5 h-2.5" />
+                    CDN
+                  </Badge>
+                )
               )}
             </div>
             <div className="flex items-center gap-2">
