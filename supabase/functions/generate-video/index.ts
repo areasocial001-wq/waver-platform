@@ -1607,6 +1607,17 @@ serve(async (req) => {
     else if (preferredProvider?.startsWith('piapi-') && hasValidPiAPIKey) {
       const modelKey = preferredProvider.replace('piapi-', '') as keyof typeof PIAPI_MODELS;
       const modelConfig = PIAPI_MODELS[modelKey] || PIAPI_MODELS["kling-2.1"];
+
+      // Guard: PiAPI veo3 and sora2 do NOT truly support image-to-video.
+      // Their task_type for i2v is the same as t2v and they ignore the image.
+      // Fallback to kling-2.5 for I2V requests targeting these models.
+      const piapiNoI2V = ['veo3', 'sora2'];
+      if (type === 'image_to_video' && piapiNoI2V.includes(modelConfig.model)) {
+        console.warn(`[PiAPI Guard] Model ${modelConfig.model} does not support image-to-video. Falling back to kling-2.5`);
+        const fallbackConfig = PIAPI_MODELS["kling-2.5"];
+        // Re-enter this block with the corrected model
+        Object.assign(modelConfig, fallbackConfig);
+      }
       
       console.log(`Starting PiAPI generation with model: ${modelKey}`, modelConfig);
       
