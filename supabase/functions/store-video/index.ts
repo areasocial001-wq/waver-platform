@@ -13,7 +13,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const fetchVideoWithRetry = async (
   videoUrl: string,
   headers: Record<string, string>,
-  maxAttempts = 3,
+  maxAttempts = 2,
 ) => {
   let lastError: Error | null = null;
 
@@ -22,7 +22,7 @@ const fetchVideoWithRetry = async (
 
     try {
       const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort("timeout"), 12000);
+      timeoutId = setTimeout(() => controller.abort("timeout"), 8000);
 
       const response = await fetch(videoUrl, { headers, signal: controller.signal });
       clearTimeout(timeoutId);
@@ -40,7 +40,7 @@ const fetchVideoWithRetry = async (
         break;
       }
 
-      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 4000);
       console.warn(
         `Download attempt ${attempt}/${maxAttempts} failed with ${response.status}. Retrying in ${waitMs}ms`,
       );
@@ -53,7 +53,7 @@ const fetchVideoWithRetry = async (
         break;
       }
 
-      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 4000);
       console.warn(
         `Download attempt ${attempt}/${maxAttempts} failed with network/timeout error. Retrying in ${waitMs}ms`,
       );
@@ -188,11 +188,12 @@ serve(async (req) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 
-    // Upstream CDN glitches are transient: return 200 so client can retry without surfacing hard failures.
+    // Treat timeouts and upstream CDN errors as transient
+    const isTimeout = message.includes("timeout") || message.includes("abort");
     const statusMatch = message.match(/Failed to download video:\s*(\d{3})/);
     const upstreamStatus = statusMatch ? Number(statusMatch[1]) : null;
     const isTransientUpstream =
-      upstreamStatus !== null && (upstreamStatus >= 500 || upstreamStatus === 429 || upstreamStatus === 408);
+      isTimeout || (upstreamStatus !== null && (upstreamStatus >= 500 || upstreamStatus === 429 || upstreamStatus === 408));
 
     if (isTransientUpstream) {
       console.warn("Transient source error in store-video:", message);
