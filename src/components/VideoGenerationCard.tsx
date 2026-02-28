@@ -165,7 +165,9 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     if (!generation.video_url) return;
 
     const proxyUrl = getProxyUrl(generation.video_url);
-    if (!hasTriedProxyFallback && currentVideoUrl !== proxyUrl) {
+    const canFallbackToProxy = !isExternalCdnVideo(generation.video_url);
+
+    if (canFallbackToProxy && !hasTriedProxyFallback && currentVideoUrl !== proxyUrl) {
       setHasTriedProxyFallback(true);
       setCurrentVideoUrl(proxyUrl);
       return;
@@ -409,15 +411,12 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                   src={currentVideoUrl ?? getPlayableUrl(generation.video_url)}
                   controls
                   autoPlay
+                  muted
                   playsInline
                   className="w-full h-full object-cover"
-                  preload="metadata"
+                  preload="auto"
                   onPlaying={() => setHasStartedPlaying(true)}
-                  onLoadedData={() => {
-                    videoRef.current?.play().catch(() => {
-                      // Autoplay può essere bloccato dal browser: l'utente può usare i controls
-                    });
-                  }}
+                  onLoadedData={() => setVideoLoadError(false)}
                   onError={handleVideoPlaybackError}
                 />
 
