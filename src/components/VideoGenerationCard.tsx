@@ -112,6 +112,34 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const [hasTriedProxyFallback, setHasTriedProxyFallback] = useState(false);
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
+  const [resolvedSignedUrl, setResolvedSignedUrl] = useState<string | null>(null);
+
+  // Resolve storage:// references to signed URLs
+  const isStorageRef = (url: string) => url.startsWith("storage://");
+
+  useEffect(() => {
+    if (!generation.video_url || !isStorageRef(generation.video_url)) {
+      setResolvedSignedUrl(null);
+      return;
+    }
+
+    // Parse storage://generated-videos/user_id/gen_id.mp4
+    const path = generation.video_url.replace("storage://generated-videos/", "");
+    
+    const resolveUrl = async () => {
+      const { data, error } = await supabase.storage
+        .from("generated-videos")
+        .createSignedUrl(path, 60 * 60 * 2); // 2 hours
+      
+      if (!error && data?.signedUrl) {
+        setResolvedSignedUrl(data.signedUrl);
+      } else {
+        console.error("Failed to create signed URL:", error);
+      }
+    };
+
+    resolveUrl();
+  }, [generation.video_url]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -167,6 +195,10 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   };
 
   const getPlayableUrl = (url: string) => {
+    // If it's a storage ref, use the resolved signed URL
+    if (isStorageRef(url)) {
+      return resolvedSignedUrl || "";
+    }
     if (isProxyVideoUrl(url)) return url;
 
     const sourceUrl = getSourceVideoUrl(url);
@@ -175,6 +207,13 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
 
   const initializeVideoPlayback = () => {
     if (!generation.video_url) return;
+    
+    // For storage refs, wait until signed URL is resolved
+    if (isStorageRef(generation.video_url) && !resolvedSignedUrl) {
+      toast.info("Caricamento video in corso...");
+      return;
+    }
+    
     setVideoLoadError(false);
     setHasStartedPlaying(false);
     setHasTriedProxyFallback(false);
@@ -210,10 +249,22 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     if (!generation.video_url) return;
 
     setIsDownloading(true);
+    
+    // For storage refs, use the resolved signed URL
+    const downloadUrl = isStorageRef(generation.video_url) 
+      ? resolvedSignedUrl 
+      : generation.video_url;
+    
+    if (!downloadUrl) {
+      toast.error("URL video non disponibile");
+      setIsDownloading(false);
+      return;
+    }
+
     try {
       // First attempt: direct download
       try {
-        const response = await fetch(generation.video_url);
+        const response = await fetch(downloadUrl);
         if (!response.ok) throw new Error("Direct fetch failed");
 
         const blob = await response.blob();
@@ -229,28 +280,33 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
         toast.success("Download avviato!");
         return;
       } catch {
-        // If direct fetch fails and this URL should be proxied, try proxy
-        const playableUrl = getPlayableUrl(generation.video_url);
-        if (playableUrl !== generation.video_url) {
-          const proxyResponse = await fetch(playableUrl);
-          if (proxyResponse.ok) {
-            const blob = await proxyResponse.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `video-${generation.id.slice(0, 8)}.mp4`;
-            document.body.appendChild(a);
-            a.click();
-            window.URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-            toast.success("Download avviato!");
-            return;
+        // If it's a storage ref, we already tried the signed URL - no fallback needed
+        if (isStorageRef(generation.video_url)) {
+          toast.error("Errore nel download del video dallo storage");
+        } else {
+          // If direct fetch fails and this URL should be proxied, try proxy
+          const playableUrl = getPlayableUrl(generation.video_url);
+          if (playableUrl && playableUrl !== downloadUrl) {
+            const proxyResponse = await fetch(playableUrl);
+            if (proxyResponse.ok) {
+              const blob = await proxyResponse.blob();
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `video-${generation.id.slice(0, 8)}.mp4`;
+              document.body.appendChild(a);
+              a.click();
+              window.URL.revokeObjectURL(url);
+              document.body.removeChild(a);
+              toast.success("Download avviato!");
+              return;
+            }
           }
-        }
 
-        // Final fallback for CORS-restricted CDNs: open direct URL in new tab
-        window.open(generation.video_url, "_blank", "noopener,noreferrer");
-        toast.info("Apro il video in una nuova scheda: puoi scaricarlo da lì.");
+          // Final fallback: open direct URL in new tab
+          window.open(downloadUrl, "_blank", "noopener,noreferrer");
+          toast.info("Apro il video in una nuova scheda: puoi scaricarlo da lì.");
+        }
       }
     } catch (error) {
       console.error("Error downloading video:", error);
@@ -289,6 +345,25 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
       return;
     }
     
+    // Per storage refs, usiamo il signed URL per la thumbnail
+    if (isStorageRef(generation.video_url)) {
+      if (resolvedSignedUrl) {
+        setIsLoadingThumbnail(true);
+        generateThumbnail(resolvedSignedUrl)
+          .then((thumb) => {
+            setThumbnail(thumb);
+            saveThumbnailToCache(generation.id, thumb);
+          })
+          .catch(() => {
+            if (generation.image_url) setThumbnail(generation.image_url);
+          })
+          .finally(() => setIsLoadingThumbnail(false));
+      } else if (generation.image_url) {
+        setThumbnail(generation.image_url);
+      }
+      return;
+    }
+
     // Per CDN esterni evitiamo estrazione frame via canvas (spesso bloccata da CORS)
     if (isExternalCdnVideo(generation.video_url)) {
       if (generation.image_url) {
@@ -313,7 +388,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
         }
       })
       .finally(() => setIsLoadingThumbnail(false));
-  }, [isVisible, generation.video_url, generation.status, generation.id, generation.image_url]);
+  }, [isVisible, generation.video_url, generation.status, generation.id, generation.image_url, resolvedSignedUrl]);
 
   // Kling: 3-5 minuti, Veo: 60-120 secondi
   const getEstimatedTotalSeconds = () => {
