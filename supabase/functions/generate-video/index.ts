@@ -1234,10 +1234,17 @@ serve(async (req) => {
       const isI2V = type === "image_to_video";
       const modelConfig = AIML_MODEL_IDS[modelKey];
       
-      // Use provided modelId from request body, or look up from mapping, or use default
-      let modelId = body.modelId;
-      if (!modelId && modelConfig) {
-        modelId = isI2V ? modelConfig.i2v : modelConfig.t2v;
+      // IMPORTANT: prefer provider+mode mapping over raw modelId from request body.
+      // Some UI configs store a T2V modelId placeholder; using it during I2V makes the API ignore the image.
+      const requestedModelId = typeof body.modelId === 'string' ? body.modelId : undefined;
+      let modelId = modelConfig
+        ? (isI2V ? modelConfig.i2v : modelConfig.t2v)
+        : requestedModelId;
+
+      if (requestedModelId && modelId && requestedModelId !== modelId) {
+        console.warn(
+          `[AI/ML API] Ignoring request modelId "${requestedModelId}" and using "${modelId}" for ${isI2V ? 'image-to-video' : 'text-to-video'} mode`
+        );
       }
 
       // Normalize a few known IDs (docs use hyphens, some UI values may still use dots)
@@ -1300,9 +1307,14 @@ serve(async (req) => {
       const sanitizedDuration = sanitizeDuration(modelId, duration || 5);
 
       // Build AI/ML API request
+      const isKlingI2V = isI2V && typeof modelId === 'string' && modelId.toLowerCase().includes('kling');
+      const normalizedPrompt = isKlingI2V
+        ? `Use the provided reference image as the exact visual anchor and first frame. Keep subject identity, style, and composition consistent with that image. ${prompt || "Smooth cinematic video"}`
+        : (prompt || "Smooth cinematic video");
+
       const aimlPayload: Record<string, unknown> = {
         model: modelId,
-        prompt: prompt || "Smooth cinematic video",
+        prompt: normalizedPrompt,
         duration: sanitizedDuration,
       };
 

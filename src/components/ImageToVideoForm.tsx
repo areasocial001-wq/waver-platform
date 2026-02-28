@@ -362,7 +362,7 @@ export const ImageToVideoForm = () => {
           : "Il video verrà generato. Attendi qualche istante..."
       });
 
-      // Generate video synchronously - include modelId for AI/ML API providers
+      // Generate video synchronously; backend resolves the exact model by provider + mode (I2V/T2V)
       const requestBody: any = {
         type: "image_to_video",
         prompt: cinematicPrompt,
@@ -372,7 +372,6 @@ export const ImageToVideoForm = () => {
         aspect_ratio: aspectRatio,
         generationId: generationData.id,
         preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
-        modelId: currentProvider.modelId, // Pass model ID for AI/ML API
       };
 
       // Add end image if provided
