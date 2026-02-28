@@ -6,6 +6,64 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchVideoWithRetry = async (
+  videoUrl: string,
+  headers: Record<string, string>,
+  maxAttempts = 3,
+) => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let timeoutId: number | undefined;
+
+    try {
+      const controller = new AbortController();
+      timeoutId = setTimeout(() => controller.abort("timeout"), 12000);
+
+      const response = await fetch(videoUrl, { headers, signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        return response;
+      }
+
+      const errorBody = (await response.text()).slice(0, 200);
+      lastError = new Error(
+        `Failed to download video: ${response.status} ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`,
+      );
+
+      if (!RETRYABLE_STATUSES.has(response.status) || attempt === maxAttempts) {
+        break;
+      }
+
+      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      console.warn(
+        `Download attempt ${attempt}/${maxAttempts} failed with ${response.status}. Retrying in ${waitMs}ms`,
+      );
+      await sleep(waitMs);
+    } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt === maxAttempts) {
+        break;
+      }
+
+      const waitMs = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      console.warn(
+        `Download attempt ${attempt}/${maxAttempts} failed with network/timeout error. Retrying in ${waitMs}ms`,
+      );
+      await sleep(waitMs);
+    }
+  }
+
+  throw lastError ?? new Error("Failed to download video");
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,7 +92,9 @@ serve(async (req) => {
     console.log(`Storing video ${generationId} from: ${videoUrl.slice(0, 100)}...`);
 
     // Build fetch headers for the source video
-    const fetchHeaders: Record<string, string> = {};
+    const fetchHeaders: Record<string, string> = {
+      accept: "video/*,*/*",
+    };
     
     // Add Google API key for Google-hosted URIs
     if (videoUrl.includes("generativelanguage.googleapis.com") || videoUrl.includes("googleapis.com")) {
@@ -44,12 +104,8 @@ serve(async (req) => {
       }
     }
 
-    // Download the video
-    const videoResponse = await fetch(videoUrl, { headers: fetchHeaders });
-    
-    if (!videoResponse.ok) {
-      throw new Error(`Failed to download video: ${videoResponse.status} ${videoResponse.statusText}`);
-    }
+    // Download the video with retries for transient provider failures (e.g. 502)
+    const videoResponse = await fetchVideoWithRetry(videoUrl, fetchHeaders);
 
     const videoBlob = await videoResponse.blob();
     const videoSize = videoBlob.size;
@@ -130,9 +186,25 @@ serve(async (req) => {
     );
 
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+
+    // Upstream CDN glitches are transient: return 200 so client can retry without surfacing hard failures.
+    const statusMatch = message.match(/Failed to download video:\s*(\d{3})/);
+    const upstreamStatus = statusMatch ? Number(statusMatch[1]) : null;
+    const isTransientUpstream =
+      upstreamStatus !== null && (upstreamStatus >= 500 || upstreamStatus === 429 || upstreamStatus === 408);
+
+    if (isTransientUpstream) {
+      console.warn("Transient source error in store-video:", message);
+      return new Response(
+        JSON.stringify({ status: "source_temporarily_unavailable", retryable: true, error: message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     console.error("Error in store-video:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
