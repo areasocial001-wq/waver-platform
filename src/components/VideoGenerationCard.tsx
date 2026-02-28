@@ -128,47 +128,71 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     }
   };
 
-  // Build proxy URL for CORS-restricted videos
+  // Build proxy URL
   const getProxyUrl = (url: string) => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     return `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(url)}`;
   };
 
-  // Get the playable URL (use proxy for external CDN URLs)
+  const isExternalCdnVideo = (url: string) => {
+    return url.includes('cdn.aimlapi.com') || url.includes('theapi.app');
+  };
+
+  // Use proxy only for Google-hosted protected assets, not for external CDNs
+  const shouldUseProxy = (url: string) => {
+    return url.includes('googleapis.com') || url.includes('generativelanguage.googleapis.com');
+  };
+
   const getPlayableUrl = (url: string) => {
-    if (url.includes('cdn.aimlapi.com') || url.includes('theapi.app')) {
-      return getProxyUrl(url);
-    }
-    return url;
+    return shouldUseProxy(url) ? getProxyUrl(url) : url;
   };
 
   const handleDownload = async () => {
     if (!generation.video_url) return;
-    
+
     setIsDownloading(true);
     try {
-      // Try direct fetch first, fallback to proxy
-      let response: Response;
+      // First attempt: direct download
       try {
-        response = await fetch(generation.video_url);
+        const response = await fetch(generation.video_url);
         if (!response.ok) throw new Error("Direct fetch failed");
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `video-${generation.id.slice(0, 8)}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast.success("Download avviato!");
+        return;
       } catch {
-        // Fallback to proxy
-        response = await fetch(getProxyUrl(generation.video_url));
-        if (!response.ok) throw new Error("Impossibile scaricare il video");
+        // If direct fetch fails and this URL should be proxied, try proxy
+        const playableUrl = getPlayableUrl(generation.video_url);
+        if (playableUrl !== generation.video_url) {
+          const proxyResponse = await fetch(playableUrl);
+          if (proxyResponse.ok) {
+            const blob = await proxyResponse.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `video-${generation.id.slice(0, 8)}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            toast.success("Download avviato!");
+            return;
+          }
+        }
+
+        // Final fallback for CORS-restricted CDNs: open direct URL in new tab
+        window.open(generation.video_url, "_blank", "noopener,noreferrer");
+        toast.info("Apro il video in una nuova scheda: puoi scaricarlo da lì.");
       }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `video-${generation.id.slice(0, 8)}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast.success("Download avviato!");
     } catch (error) {
       console.error("Error downloading video:", error);
       toast.error("Errore nel download del video");
@@ -206,6 +230,15 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
       return;
     }
     
+    // Per CDN esterni evitiamo estrazione frame via canvas (spesso bloccata da CORS)
+    if (isExternalCdnVideo(generation.video_url)) {
+      if (generation.image_url) {
+        setThumbnail(generation.image_url);
+      }
+      setIsLoadingThumbnail(false);
+      return;
+    }
+
     // Genera la miniatura
     setIsLoadingThumbnail(true);
     generateThumbnail(getPlayableUrl(generation.video_url))
