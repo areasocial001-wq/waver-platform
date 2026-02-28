@@ -17,6 +17,28 @@ interface VideoGeneration {
   priority?: number;
 }
 
+// Helper: check if video is already stored in our bucket
+const isStoredVideo = (url: string) => url.startsWith("storage://");
+
+// Helper: trigger store-video edge function in background
+const storeVideoInBucket = async (generationId: string, videoUrl: string) => {
+  try {
+    console.log(`Auto-storing video ${generationId}...`);
+    const { data, error } = await supabase.functions.invoke("store-video", {
+      body: { generationId, videoUrl },
+    });
+    if (error) {
+      console.error("Failed to store video:", error);
+      return;
+    }
+    if (data?.status === "stored") {
+      console.log(`Video ${generationId} stored successfully`);
+    }
+  } catch (err) {
+    console.error("Error calling store-video:", err);
+  }
+};
+
 export const useVideoPolling = (
   generations: VideoGeneration[],
   onUpdate: () => void
@@ -108,12 +130,16 @@ export const useVideoPolling = (
   }, [repairVideoLink, isGoogleVeoUrl]);
 
   useEffect(() => {
-    // Check completed videos for broken links
+    // Check completed videos for broken links + auto-store unstored ones
     const completedVideos = generations.filter(
       (g) => g.status === "completed" && g.video_url
     );
 
     completedVideos.forEach((video) => {
+      // Auto-store videos not yet in our bucket
+      if (video.video_url && !isStoredVideo(video.video_url) && !video.video_url.includes("/storage/")) {
+        storeVideoInBucket(video.id, video.video_url);
+      }
       checkVideoUrl(video.id, video.video_url);
     });
   }, [generations, checkVideoUrl]);
@@ -203,6 +229,11 @@ export const useVideoPolling = (
                 next_retry_at: null
               })
               .eq("id", gen.id);
+            
+            // Auto-store video in internal bucket (fire-and-forget)
+            if (videoUrl && !isStoredVideo(videoUrl)) {
+              storeVideoInBucket(gen.id, videoUrl);
+            }
             
             // Log success
             await apiLogger.success("Replicate", "Video Generation", `Video completato: ${gen.prompt?.slice(0, 50)}...`, {
