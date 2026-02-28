@@ -11,11 +11,6 @@ serve(async (req) => {
   }
 
   try {
-    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
-    if (!GOOGLE_AI_API_KEY) {
-      throw new Error("GOOGLE_AI_API_KEY is not set");
-    }
-
     // Get video URI from query params
     const url = new URL(req.url);
     const videoUri = url.searchParams.get("uri");
@@ -29,24 +24,54 @@ serve(async (req) => {
 
     console.log("Proxying video from:", videoUri);
 
-    // Fetch video from Google with API key
+    // Build fetch headers based on the target URL
+    const fetchHeaders: Record<string, string> = {};
+    
+    // Only add Google API key for Google-hosted URIs
+    if (videoUri.includes("generativelanguage.googleapis.com") || videoUri.includes("google")) {
+      const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+      if (GOOGLE_AI_API_KEY) {
+        fetchHeaders["x-goog-api-key"] = GOOGLE_AI_API_KEY;
+      }
+    }
+
+    // Forward range header for partial content requests (needed for video seeking)
+    const rangeHeader = req.headers.get("Range");
+    if (rangeHeader) {
+      fetchHeaders["Range"] = rangeHeader;
+    }
+
     const videoResponse = await fetch(videoUri, {
-      headers: {
-        "x-goog-api-key": GOOGLE_AI_API_KEY,
-      },
+      headers: fetchHeaders,
     });
 
-    if (!videoResponse.ok) {
+    if (!videoResponse.ok && videoResponse.status !== 206) {
       throw new Error(`Failed to fetch video: ${videoResponse.status}`);
     }
 
-    // Stream the video response back to client
+    // Build response headers
+    const responseHeaders: Record<string, string> = {
+      ...corsHeaders,
+      "Content-Type": videoResponse.headers.get("Content-Type") || "video/mp4",
+      "Cache-Control": "public, max-age=31536000",
+      "Accept-Ranges": "bytes",
+    };
+
+    // Forward content-length if available
+    const contentLength = videoResponse.headers.get("Content-Length");
+    if (contentLength) {
+      responseHeaders["Content-Length"] = contentLength;
+    }
+
+    // Forward content-range for partial responses
+    const contentRange = videoResponse.headers.get("Content-Range");
+    if (contentRange) {
+      responseHeaders["Content-Range"] = contentRange;
+    }
+
     return new Response(videoResponse.body, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "video/mp4",
-        "Cache-Control": "public, max-age=31536000",
-      },
+      status: videoResponse.status,
+      headers: responseHeaders,
     });
   } catch (error) {
     console.error("Error in video-proxy function:", error);

@@ -208,7 +208,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     
     // Genera la miniatura
     setIsLoadingThumbnail(true);
-    generateThumbnail(generation.video_url)
+    generateThumbnail(getPlayableUrl(generation.video_url))
       .then((thumb) => {
         setThumbnail(thumb);
         saveThumbnailToCache(generation.id, thumb);
