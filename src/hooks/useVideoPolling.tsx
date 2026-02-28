@@ -20,8 +20,14 @@ interface VideoGeneration {
 // Helper: check if video is already stored in our bucket
 const isStoredVideo = (url: string) => url.startsWith("storage://");
 
-// Helper: trigger store-video edge function in background
+// Track videos already being stored or permanently failed to prevent duplicate calls
+const storingVideos = new Set<string>();
+
+// Helper: trigger store-video edge function in background (deduplicated)
 const storeVideoInBucket = async (generationId: string, videoUrl: string) => {
+  if (storingVideos.has(generationId)) return;
+  storingVideos.add(generationId);
+
   try {
     console.log(`Auto-storing video ${generationId}...`);
     const { data, error } = await supabase.functions.invoke("store-video", {
@@ -29,13 +35,21 @@ const storeVideoInBucket = async (generationId: string, videoUrl: string) => {
     });
     if (error) {
       console.error("Failed to store video:", error);
+      storingVideos.delete(generationId);
       return;
     }
     if (data?.status === "stored") {
       console.log(`Video ${generationId} stored successfully`);
+    } else if (data?.status === "source_not_found") {
+      console.warn(`Video ${generationId} source gone (404/410), won't retry`);
+    } else if (data?.status === "source_temporarily_unavailable") {
+      setTimeout(() => storingVideos.delete(generationId), 60000);
+    } else {
+      storingVideos.delete(generationId);
     }
   } catch (err) {
     console.error("Error calling store-video:", err);
+    storingVideos.delete(generationId);
   }
 };
 
