@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, XCircle, Loader2, Play, Trash2, Download, Volume2, Layers } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { it } from "date-fns/locale";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { AddVoiceoverDialog } from "./AddVoiceoverDialog";
@@ -107,6 +107,11 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string | null>(null);
+  const [hasTriedProxyFallback, setHasTriedProxyFallback] = useState(false);
+  const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
+  const [videoLoadError, setVideoLoadError] = useState(false);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -146,6 +151,36 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const getPlayableUrl = (url: string) => {
     return shouldUseProxy(url) ? getProxyUrl(url) : url;
   };
+
+  const initializeVideoPlayback = () => {
+    if (!generation.video_url) return;
+    setVideoLoadError(false);
+    setHasStartedPlaying(false);
+    setHasTriedProxyFallback(false);
+    setCurrentVideoUrl(getPlayableUrl(generation.video_url));
+    setShouldLoadVideo(true);
+  };
+
+  const handleVideoPlaybackError = () => {
+    if (!generation.video_url) return;
+
+    const proxyUrl = getProxyUrl(generation.video_url);
+    if (!hasTriedProxyFallback && currentVideoUrl !== proxyUrl) {
+      setHasTriedProxyFallback(true);
+      setCurrentVideoUrl(proxyUrl);
+      return;
+    }
+
+    setVideoLoadError(true);
+  };
+
+  useEffect(() => {
+    setShouldLoadVideo(false);
+    setCurrentVideoUrl(null);
+    setHasTriedProxyFallback(false);
+    setHasStartedPlaying(false);
+    setVideoLoadError(false);
+  }, [generation.id, generation.video_url]);
 
   const handleDownload = async () => {
     if (!generation.video_url) return;
@@ -368,22 +403,77 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
         <div className="aspect-video bg-muted relative overflow-hidden">
           {generation.status === "completed" && generation.video_url ? (
             shouldLoadVideo ? (
-              <video
-                src={getPlayableUrl(generation.video_url)}
-                controls
-                autoPlay
-                className="w-full h-full object-cover"
-                preload="metadata"
-              />
+              <div className="relative w-full h-full bg-black">
+                <video
+                  ref={videoRef}
+                  src={currentVideoUrl ?? getPlayableUrl(generation.video_url)}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-cover"
+                  preload="metadata"
+                  onPlaying={() => setHasStartedPlaying(true)}
+                  onLoadedData={() => {
+                    videoRef.current?.play().catch(() => {
+                      // Autoplay può essere bloccato dal browser: l'utente può usare i controls
+                    });
+                  }}
+                  onError={handleVideoPlaybackError}
+                />
+
+                {!hasStartedPlaying && !videoLoadError && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {thumbnail ? (
+                      <img
+                        src={thumbnail}
+                        alt="Anteprima video"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : isLoadingThumbnail ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : generation.image_url ? (
+                      <img
+                        src={generation.image_url}
+                        alt="Anteprima video"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : null}
+
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                      <div className="flex items-center gap-2 text-white text-xs font-medium drop-shadow-md">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Caricamento video...
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {videoLoadError && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="text-center space-y-3 px-4">
+                      <p className="text-xs text-white font-medium">Riproduzione non disponibile in-app</p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => window.open(generation.video_url, "_blank", "noopener,noreferrer")}
+                      >
+                        Apri in nuova scheda
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              <div 
+              <div
                 className="w-full h-full flex items-center justify-center cursor-pointer bg-muted hover:bg-muted/80 transition-colors relative group"
-                onClick={() => setShouldLoadVideo(true)}
+                onClick={initializeVideoPlayback}
               >
                 {/* Miniatura del video */}
                 {thumbnail ? (
-                  <img 
-                    src={thumbnail} 
+                  <img
+                    src={thumbnail}
                     alt="Anteprima video"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
@@ -392,7 +482,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
                     <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : null}
-                
+
                 {/* Overlay con pulsante play */}
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
                   <div className="text-center space-y-2">
