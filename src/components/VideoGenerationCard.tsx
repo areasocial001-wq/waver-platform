@@ -128,13 +128,35 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     }
   };
 
+  // Build proxy URL for CORS-restricted videos
+  const getProxyUrl = (url: string) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(url)}`;
+  };
+
+  // Get the playable URL (use proxy for external CDN URLs)
+  const getPlayableUrl = (url: string) => {
+    if (url.includes('cdn.aimlapi.com') || url.includes('theapi.app')) {
+      return getProxyUrl(url);
+    }
+    return url;
+  };
+
   const handleDownload = async () => {
     if (!generation.video_url) return;
     
     setIsDownloading(true);
     try {
-      const response = await fetch(generation.video_url);
-      if (!response.ok) throw new Error("Impossibile scaricare il video");
+      // Try direct fetch first, fallback to proxy
+      let response: Response;
+      try {
+        response = await fetch(generation.video_url);
+        if (!response.ok) throw new Error("Direct fetch failed");
+      } catch {
+        // Fallback to proxy
+        response = await fetch(getProxyUrl(generation.video_url));
+        if (!response.ok) throw new Error("Impossibile scaricare il video");
+      }
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
@@ -314,7 +336,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
           {generation.status === "completed" && generation.video_url ? (
             shouldLoadVideo ? (
               <video
-                src={generation.video_url}
+                src={getPlayableUrl(generation.video_url)}
                 controls
                 autoPlay
                 className="w-full h-full object-cover"
