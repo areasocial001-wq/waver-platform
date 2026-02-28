@@ -139,17 +139,38 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
     return `${supabaseUrl}/functions/v1/video-proxy?uri=${encodeURIComponent(url)}`;
   };
 
+  const isProxyVideoUrl = (url: string) => {
+    return url.includes('/functions/v1/video-proxy?uri=');
+  };
+
+  const getSourceVideoUrl = (url: string) => {
+    if (!isProxyVideoUrl(url)) return url;
+
+    try {
+      const parsed = new URL(url);
+      const sourceUrl = parsed.searchParams.get('uri');
+      return sourceUrl ? decodeURIComponent(sourceUrl) : url;
+    } catch {
+      return url;
+    }
+  };
+
   const isExternalCdnVideo = (url: string) => {
-    return url.includes('cdn.aimlapi.com') || url.includes('theapi.app');
+    const sourceUrl = getSourceVideoUrl(url);
+    return sourceUrl.includes('cdn.aimlapi.com') || sourceUrl.includes('theapi.app');
   };
 
   // Use proxy only for Google-hosted protected assets, not for external CDNs
   const shouldUseProxy = (url: string) => {
-    return url.includes('googleapis.com') || url.includes('generativelanguage.googleapis.com');
+    const sourceUrl = getSourceVideoUrl(url);
+    return sourceUrl.includes('googleapis.com') || sourceUrl.includes('generativelanguage.googleapis.com');
   };
 
   const getPlayableUrl = (url: string) => {
-    return shouldUseProxy(url) ? getProxyUrl(url) : url;
+    if (isProxyVideoUrl(url)) return url;
+
+    const sourceUrl = getSourceVideoUrl(url);
+    return shouldUseProxy(sourceUrl) ? getProxyUrl(sourceUrl) : sourceUrl;
   };
 
   const initializeVideoPlayback = () => {
@@ -164,8 +185,9 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const handleVideoPlaybackError = () => {
     if (!generation.video_url) return;
 
-    const proxyUrl = getProxyUrl(generation.video_url);
-    const canFallbackToProxy = !isExternalCdnVideo(generation.video_url);
+    const sourceUrl = getSourceVideoUrl(generation.video_url);
+    const proxyUrl = shouldUseProxy(sourceUrl) ? getProxyUrl(sourceUrl) : null;
+    const canFallbackToProxy = !!proxyUrl && !isExternalCdnVideo(sourceUrl);
 
     if (canFallbackToProxy && !hasTriedProxyFallback && currentVideoUrl !== proxyUrl) {
       setHasTriedProxyFallback(true);
