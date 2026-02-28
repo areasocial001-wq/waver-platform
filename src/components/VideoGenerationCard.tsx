@@ -113,6 +113,7 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
   const [hasStartedPlaying, setHasStartedPlaying] = useState(false);
   const [videoLoadError, setVideoLoadError] = useState(false);
   const [resolvedSignedUrl, setResolvedSignedUrl] = useState<string | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // Resolve storage:// references to signed URLs
   const isStorageRef = (url: string) => url.startsWith("storage://");
@@ -158,6 +159,28 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
       toast.error("Errore nell'eliminazione del video");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleMigrateToStorage = async () => {
+    if (!generation.video_url || isStorageRef(generation.video_url)) return;
+    setIsMigrating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("store-video", {
+        body: { generationId: generation.id, videoUrl: generation.video_url },
+      });
+      if (error) throw error;
+      if (data?.status === "source_temporarily_unavailable") {
+        toast.warning("Sorgente temporaneamente non disponibile, riprova tra poco");
+      } else {
+        toast.success("Video archiviato nello storage interno!");
+        onDelete?.(); // refresh list
+      }
+    } catch (err) {
+      console.error("Migration error:", err);
+      toast.error("Errore nell'archiviazione del video");
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -658,115 +681,131 @@ export const VideoGenerationCard = ({ generation, onDelete }: VideoGenerationCar
             </p>
           )}
 
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {formatDistanceToNow(new Date(generation.created_at), {
-                  addSuffix: true,
-                  locale: it,
-                })}
-              </span>
-              {generation.provider && (
-                <ProviderBadge providerId={generation.provider} size="sm" />
-              )}
-              {generation.status === "completed" && generation.video_url && (
-                isStorageRef(generation.video_url) ? (
-                  <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">
-                    <HardDrive className="w-2.5 h-2.5" />
-                    Archiviato
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatDistanceToNow(new Date(generation.created_at), {
+                addSuffix: true,
+                locale: it,
+              })}
+            </span>
+            <span className="capitalize">{generation.type.replace("_", " ")}</span>
+            {generation.provider && (
+              <ProviderBadge providerId={generation.provider} size="sm" />
+            )}
+            {generation.status === "completed" && generation.video_url && (
+              isStorageRef(generation.video_url) ? (
+                <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-600 border-green-500/30 text-[10px] px-1.5 py-0">
+                  <HardDrive className="w-2.5 h-2.5" />
+                  Archiviato
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">
+                  <Cloud className="w-2.5 h-2.5" />
+                  CDN
+                </Badge>
+              )
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 flex-wrap pt-1">
+            {generation.status === "completed" && generation.video_url && (
+              <>
+                <AddVoiceoverDialog 
+                  videoId={generation.id}
+                  dialogueText={generation.dialogue_text}
+                  onVoiceoverAdded={() => {
+                    toast.success("Voiceover aggiunto al video!");
+                  }}
+                />
+                
+                {generation.audio_url && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Volume2 className="h-3 w-3" />
+                    Audio
                   </Badge>
-                ) : (
-                  <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-600 border-yellow-500/30 text-[10px] px-1.5 py-0">
-                    <Cloud className="w-2.5 h-2.5" />
-                    CDN
-                  </Badge>
-                )
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="capitalize">{generation.type.replace("_", " ")}</span>
-              
-              {generation.status === "completed" && generation.video_url && (
-                <>
-                  {/* Voiceover button */}
-                  <AddVoiceoverDialog 
-                    videoId={generation.id}
-                    dialogueText={generation.dialogue_text}
-                    onVoiceoverAdded={() => {
-                      toast.success("Voiceover aggiunto al video!");
-                    }}
-                  />
-                  
-                  {/* Show audio indicator if voiceover exists */}
-                  {generation.audio_url && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Volume2 className="h-3 w-3" />
-                      Audio
-                    </Badge>
-                  )}
-                  
-                  {/* Video + Audio Combiner */}
-                  <VideoAudioCombiner
-                    videoUrl={generation.video_url}
-                    videoName={`video-${generation.id.slice(0, 8)}`}
-                    existingAudioUrl={generation.audio_url || undefined}
-                    dialogueText={generation.dialogue_text || undefined}
-                  />
-                  
+                )}
+                
+                <VideoAudioCombiner
+                  videoUrl={generation.video_url}
+                  videoName={`video-${generation.id.slice(0, 8)}`}
+                  existingAudioUrl={generation.audio_url || undefined}
+                  dialogueText={generation.dialogue_text || undefined}
+                />
+                
+                {/* Migrate to internal storage */}
+                {!isStorageRef(generation.video_url) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 px-3 text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
-                    onClick={handleDownload}
-                    disabled={isDownloading}
+                    className="h-7 px-2 text-xs"
+                    disabled={isMigrating}
+                    onClick={handleMigrateToStorage}
                   >
-                    {isDownloading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                    {isMigrating ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
                     ) : (
                       <>
-                        <Download className="w-4 h-4 mr-1" />
-                        Scarica
+                        <HardDrive className="w-3 h-3 mr-1" />
+                        Archivia
                       </>
                     )}
                   </Button>
-                </>
-              )}
-              
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="h-8 px-3 text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground"
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Elimina
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Eliminare questo video?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Questa azione non può essere annullata. Il video verrà eliminato permanentemente.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annulla</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-primary border-primary/30 hover:bg-primary hover:text-primary-foreground"
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Download className="w-3 h-3 mr-1" />
+                      Scarica
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+            
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive hover:text-destructive-foreground"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="w-3 h-3 mr-1" />
                       Elimina
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Eliminare questo video?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Questa azione non può essere annullata. Il video verrà eliminato permanentemente.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annulla</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    Elimina
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
       </CardContent>
