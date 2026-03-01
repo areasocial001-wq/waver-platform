@@ -200,9 +200,11 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
   'aiml-runway-act-two': {
     durations: STANDARD_DURATIONS,
     resolutions: STANDARD_RESOLUTIONS,
+    aspectRatios: STANDARD_ASPECT_RATIOS,
     supportsTextToVideo: true,
     supportsImageToVideo: true,
     defaultDuration: 5,
+    defaultAspectRatio: '16:9',
     defaultResolution: '720p',
   },
 
