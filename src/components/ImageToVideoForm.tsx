@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Sparkles, X, Info, ArrowRight, Wand2, Plus, ImageIcon } from "lucide-react";
+import { Upload, Sparkles, X, Info, ArrowRight, Wand2, Plus, ImageIcon, Video } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ScenePresets, SCENE_PRESETS, ScenePreset } from "@/components/ScenePresets";
@@ -28,6 +28,9 @@ export const ImageToVideoForm = () => {
   const [endImagePreview, setEndImagePreview] = useState<string>("");
   // Multiple reference images for Veo 3.1 reference-to-video
   const [referenceImages, setReferenceImages] = useState<{ file: File; preview: string }[]>([]);
+  // Reference video for Runway Act Two
+  const [referenceVideo, setReferenceVideo] = useState<File | null>(null);
+  const [referenceVideoPreview, setReferenceVideoPreview] = useState<string>("");
   const [prompt, setPrompt] = useState("");
   const [duration, setDuration] = useState<number>(6);
   const [resolution, setResolution] = useState("720p");
@@ -235,6 +238,32 @@ export const ImageToVideoForm = () => {
   // Check if current provider supports reference images (Veo 3.1 reference-to-video)
   const supportsReferenceImages = currentProvider.modelId === 'google/veo-3.1-reference-to-video';
 
+  // Check if current provider is Runway Act Two (needs reference video)
+  const isRunwayActTwo = preferredProvider === 'aiml-runway-act-two';
+
+  const handleReferenceVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      toast.error("Seleziona un file video valido (MP4, MOV, WEBM)");
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("Il video di riferimento non può superare i 50 MB");
+      return;
+    }
+    setReferenceVideo(file);
+    const url = URL.createObjectURL(file);
+    setReferenceVideoPreview(url);
+    toast.success("Video di riferimento caricato");
+  };
+
+  const removeReferenceVideo = () => {
+    if (referenceVideoPreview) URL.revokeObjectURL(referenceVideoPreview);
+    setReferenceVideo(null);
+    setReferenceVideoPreview("");
+  };
+
   const handlePresetChange = (preset: ScenePreset) => {
     setSelectedPreset(preset.id);
     setCameraMovement(preset.cameraMovement);
@@ -257,6 +286,14 @@ export const ImageToVideoForm = () => {
   const handleGenerate = async () => {
     if (!startImage) {
       toast.error("Carica almeno lo start frame per procedere");
+      return;
+    }
+
+    // Validate reference video for Runway Act Two
+    if (isRunwayActTwo && !referenceVideo) {
+      toast.error("Video di riferimento obbligatorio", {
+        description: "Runway Act Two richiede un video di riferimento per il performance transfer."
+      });
       return;
     }
 
@@ -386,6 +423,17 @@ export const ImageToVideoForm = () => {
         requestBody.reference_images = referenceImages.map(img => img.preview);
       }
 
+      // Add reference video for Runway Act Two (as base64 data URL)
+      if (isRunwayActTwo && referenceVideo) {
+        const videoBase64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(referenceVideo);
+        });
+        requestBody.reference_video = videoBase64;
+      }
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: requestBody
@@ -429,6 +477,7 @@ export const ImageToVideoForm = () => {
       setEndImage(null);
       setEndImagePreview("");
       setReferenceImages([]);
+      removeReferenceVideo();
       setPrompt("");
     } catch (error) {
       console.error("Error saving generation:", error);
@@ -609,6 +658,63 @@ export const ImageToVideoForm = () => {
           </div>
         )}
       </div>
+
+      {/* Reference Video for Runway Act Two */}
+      {isRunwayActTwo && (
+        <div className="space-y-3">
+          <Label className="flex items-center gap-2">
+            <Video className="w-4 h-4" />
+            Video di Riferimento (Obbligatorio)
+            <span className="text-xs text-destructive font-medium">*</span>
+          </Label>
+          
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-accent/5 border border-accent/20">
+            <Info className="w-4 h-4 mt-0.5 text-accent shrink-0" />
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Runway Act Two – Performance Transfer:</span>{" "}
+              Carica un video con i movimenti/espressioni che vuoi trasferire sul personaggio dell'immagine.
+            </div>
+          </div>
+
+          {!referenceVideoPreview ? (
+            <div className="border-2 border-dashed border-primary/50 rounded-lg p-6 text-center hover:border-primary transition-colors">
+              <input
+                type="file"
+                id="reference-video-upload"
+                className="hidden"
+                accept="video/*"
+                onChange={handleReferenceVideoUpload}
+              />
+              <label
+                htmlFor="reference-video-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <Video className="w-10 h-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Carica video di riferimento
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  MP4, MOV o WEBM (max 50 MB)
+                </p>
+              </label>
+            </div>
+          ) : (
+            <div className="relative rounded-lg overflow-hidden border border-border">
+              <video
+                src={referenceVideoPreview}
+                controls
+                className="w-full max-h-64 bg-muted"
+              />
+              <button
+                onClick={removeReferenceVideo}
+                className="absolute top-2 right-2 p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Keyframe-capable provider info */}
       {supportsEndFrame && (
