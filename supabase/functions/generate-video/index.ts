@@ -1805,6 +1805,15 @@ serve(async (req) => {
         // SkyReels specific parameters
         piApiPayload.input.guidance_scale = 3.5; // Default optimal value
         
+        // Duration - SkyReels supports 5 and 10 seconds
+        const sanitizedDuration = sanitizePiAPIDuration("skyreels", duration || 5);
+        piApiPayload.input.duration = sanitizedDuration;
+        
+        // Resolution - pass through user selection (1080p, 720p, 480p)
+        if (resolution) {
+          piApiPayload.input.resolution = resolution;
+        }
+        
         // Aspect ratio (16:9, 9:16, 1:1 supported)
         if (aspect_ratio && ["16:9", "9:16", "1:1"].includes(aspect_ratio)) {
           piApiPayload.input.aspect_ratio = aspect_ratio;
@@ -1820,7 +1829,7 @@ serve(async (req) => {
         // Negative prompt for better results
         piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality";
         
-        console.log("[PiAPI SkyReels] Using Qubico/skyreels model for human-centric video generation");
+        console.log(`[PiAPI SkyReels] duration=${sanitizedDuration}s, resolution=${resolution || 'default'}, aspect_ratio=${piApiPayload.input.aspect_ratio}`);
       } else if (modelConfig.model === "framepack") {
         // Framepack specific handling - uses Qubico/framepack model
         // Framepack is IMAGE-TO-VIDEO ONLY - optimized for smooth frame interpolation
