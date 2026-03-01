@@ -30,10 +30,10 @@ const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   "hailuo": { model: "hailuo", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "luma": { model: "luma", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "wan": { model: "wan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
-  "hunyuan": { model: "hunyuan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "hunyuan": { model: "Qubico/hunyuan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   // New models from PIAPI Creator subscription
-  "skyreels": { model: "skyreels", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
-  "framepack": { model: "framepack", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "skyreels": { model: "Qubico/skyreels", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "framepack": { model: "Qubico/framepack", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   // Veo3 uses specific task_types: veo3-video or veo3-video-fast
   "veo3": { model: "veo3", task_type_txt2video: "veo3-video", task_type_img2video: "veo3-video" },
   "sora2": { model: "sora2", task_type_txt2video: "sora2-video", task_type_img2video: "sora2-video" },
