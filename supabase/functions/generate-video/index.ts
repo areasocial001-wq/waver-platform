@@ -1120,7 +1120,7 @@ serve(async (req) => {
         
         viduPayload = {
           model: viduModel,
-          image: { url: imageUrl, type: 'url' },
+          images: [{ url: imageUrl, type: 'url' }],
           duration: sanitizeDuration(viduModel, duration || 5),
           resolution: resolution || '720p',
         };
