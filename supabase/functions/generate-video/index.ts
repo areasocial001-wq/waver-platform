@@ -1721,6 +1721,32 @@ serve(async (req) => {
       console.log(`Starting PiAPI generation with model: ${modelKey}`, modelConfig);
       
       const startImageData = start_image || image || image_url;
+
+      // Normalize structured prompts (e.g. JSON from prompt assistant)
+      const normalizePrompt = (rawPrompt: unknown): string => {
+        if (typeof rawPrompt !== "string") return "Smooth cinematic video";
+        const trimmedPrompt = rawPrompt.trim();
+
+        if (!trimmedPrompt.startsWith("{")) {
+          return trimmedPrompt || "Smooth cinematic video";
+        }
+
+        try {
+          const parsed = JSON.parse(trimmedPrompt);
+          if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
+            return parsed.generated_prompt.trim();
+          }
+          if (typeof parsed?.prompt === "string" && parsed.prompt.trim()) {
+            return parsed.prompt.trim();
+          }
+        } catch {
+          // Not valid JSON, keep the original prompt
+        }
+
+        return trimmedPrompt || "Smooth cinematic video";
+      };
+
+      const normalizedPrompt = normalizePrompt(prompt);
       
       // Build PiAPI request payload
       // Determine task_type - some models like veo3 have custom task types
@@ -1735,7 +1761,7 @@ serve(async (req) => {
         model: modelConfig.model,
         task_type: taskType,
         input: {
-          prompt: prompt || "Smooth cinematic video",
+          prompt: normalizedPrompt,
         }
       };
       
@@ -1746,7 +1772,7 @@ serve(async (req) => {
         'luma': [5],
         'wan': [4, 8],
         'hunyuan': [5, 10],
-        'skyreels': [5, 10],
+        'skyreels': [4],
         'framepack': [5, 10],
         'veo3': [4, 6, 8],
         'sora2': [5, 10, 15, 20],
@@ -1805,31 +1831,32 @@ serve(async (req) => {
         // SkyReels specific parameters
         piApiPayload.input.guidance_scale = 3.5; // Default optimal value
         
-        // Duration - SkyReels supports 5 and 10 seconds
-        const sanitizedDuration = sanitizePiAPIDuration("skyreels", duration || 5);
+        // SkyReels currently returns fixed-length output (~4s)
+        const sanitizedDuration = sanitizePiAPIDuration("skyreels", duration || 4);
         piApiPayload.input.duration = sanitizedDuration;
-        
-        // Resolution - pass through user selection (1080p, 720p, 480p)
-        if (resolution) {
-          piApiPayload.input.resolution = resolution;
+
+        // SkyReels currently uses a fixed native resolution from provider side.
+        // We intentionally do not send `resolution` because the API ignores it.
+        if (resolution && resolution !== "540p") {
+          console.log(`[PiAPI SkyReels] Requested resolution '${resolution}' ignored by provider; using native output`);
         }
-        
+
         // Aspect ratio (16:9, 9:16, 1:1 supported)
         if (aspect_ratio && ["16:9", "9:16", "1:1"].includes(aspect_ratio)) {
           piApiPayload.input.aspect_ratio = aspect_ratio;
         } else {
           piApiPayload.input.aspect_ratio = "16:9"; // Default
         }
-        
+
         // SkyReels recommends including "FPS-24" in prompt
-        if (prompt && !prompt.includes("FPS-24")) {
-          piApiPayload.input.prompt = `FPS-24, ${prompt}`;
+        if (normalizedPrompt && !normalizedPrompt.includes("FPS-24")) {
+          piApiPayload.input.prompt = `FPS-24, ${normalizedPrompt}`;
         }
         
         // Negative prompt for better results
         piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality";
         
-        console.log(`[PiAPI SkyReels] duration=${sanitizedDuration}s, resolution=${resolution || 'default'}, aspect_ratio=${piApiPayload.input.aspect_ratio}`);
+        console.log(`[PiAPI SkyReels] duration=${sanitizedDuration}s (provider fixed), aspect_ratio=${piApiPayload.input.aspect_ratio}`);
       } else if (modelConfig.model === "framepack") {
         // Framepack specific handling - uses Qubico/framepack model
         // Framepack is IMAGE-TO-VIDEO ONLY - optimized for smooth frame interpolation

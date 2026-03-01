@@ -945,15 +945,19 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
   'piapi-skyreels': {
-    durations: STANDARD_DURATIONS,
-    resolutions: STANDARD_RESOLUTIONS,
+    durations: [
+      { value: 4, label: '4 secondi (fisso SkyReels)' },
+    ],
+    resolutions: [
+      { value: '540p', label: '540p (~960 lato lungo, fisso SkyReels)' },
+    ],
     aspectRatios: EXTENDED_ASPECT_RATIOS,
     supportsTextToVideo: false, // SkyReels V2 is image-to-video only (human-centric)
     supportsImageToVideo: true,
     requiresStartFrame: true,
-    defaultDuration: 5,
+    defaultDuration: 4,
     defaultAspectRatio: '16:9',
-    defaultResolution: '720p',
+    defaultResolution: '540p',
   },
   'piapi-framepack': {
     durations: [

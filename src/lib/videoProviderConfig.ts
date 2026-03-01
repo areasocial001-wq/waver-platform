@@ -2192,10 +2192,10 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     estimatedTime: '2-3 min',
     fallbackOrder: ['piapi-hunyuan', 'piapi-kling-2.5'],
     durations: [
-      { value: '5', label: '5 secondi' },
+      { value: '4', label: '4 secondi (fisso)' },
     ],
     resolutions: [
-      { value: '720p', label: '720p (HD)' },
+      { value: '540p', label: '540p (~960 lato lungo, fisso)' },
     ],
     aspectRatios: [
       { value: '16:9', label: '16:9 (Orizzontale)' },
