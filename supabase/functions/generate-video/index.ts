@@ -1055,12 +1055,22 @@ serve(async (req) => {
       const viduModelKey = preferredProvider.replace('vidu-', '');
       // Extract model name: q3-turbo-t2v -> viduq3-turbo, q2-i2v -> viduq2
       const modelMatch = viduModelKey.match(/^(q\d+)(?:-(turbo|pro))?/);
-      const viduModel = modelMatch 
+      let viduModel = modelMatch 
         ? `vidu${modelMatch[1]}${modelMatch[2] ? '-' + modelMatch[2] : ''}`
         : 'viduq3-pro';
       
       const isI2V = type === "image_to_video";
       const startImageData = start_image || image || image_url;
+      
+      // Vidu img2video only supports viduq3-pro and viduq3-turbo (not viduq2 or viduq1)
+      const VIDU_I2V_SUPPORTED_MODELS = ['viduq3-pro', 'viduq3-turbo'];
+      if (isI2V && !VIDU_I2V_SUPPORTED_MODELS.includes(viduModel)) {
+        console.log(`[Vidu] Model ${viduModel} doesn't support img2video, falling back to viduq3-pro`);
+        viduModel = 'viduq3-pro';
+      }
+      
+      // Normalize prompt to extract plain text from JSON blobs
+      const normalizedViduPrompt = normalizePrompt(prompt);
       
       console.log(`[Vidu] Starting generation: model=${viduModel}, type=${type}, duration=${duration}`);
       
@@ -1087,13 +1097,13 @@ serve(async (req) => {
           duration: sanitizeDuration(viduModel, duration || 5),
           resolution: resolution || '720p',
         };
-        if (prompt) viduPayload.prompt = prompt;
+        if (normalizedViduPrompt) viduPayload.prompt = normalizedViduPrompt;
         if (viduModel.startsWith('viduq3')) viduPayload.audio = true;
       } else {
         viduEndpoint = 'https://api.vidu.com/ent/v2/text2video';
         viduPayload = {
           model: viduModel,
-          prompt: prompt,
+          prompt: normalizedViduPrompt,
           duration: sanitizeDuration(viduModel, duration || 5),
           aspect_ratio: aspect_ratio || '16:9',
           resolution: resolution || '720p',
