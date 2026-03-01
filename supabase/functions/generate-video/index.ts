@@ -1726,24 +1726,41 @@ serve(async (req) => {
       const normalizePrompt = (rawPrompt: unknown): string => {
         if (typeof rawPrompt !== "string") return "Smooth cinematic video";
         const trimmedPrompt = rawPrompt.trim();
+        if (!trimmedPrompt) return "Smooth cinematic video";
 
-        if (!trimmedPrompt.startsWith("{")) {
-          return trimmedPrompt || "Smooth cinematic video";
+        // Case 1: Entire string is JSON starting with {
+        if (trimmedPrompt.startsWith("{")) {
+          try {
+            const parsed = JSON.parse(trimmedPrompt);
+            if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
+              return parsed.generated_prompt.trim();
+            }
+            if (typeof parsed?.prompt === "string" && parsed.prompt.trim()) {
+              return parsed.prompt.trim();
+            }
+          } catch {
+            // Not valid JSON
+          }
         }
 
-        try {
-          const parsed = JSON.parse(trimmedPrompt);
-          if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
-            return parsed.generated_prompt.trim();
+        // Case 2: JSON is embedded within a larger string (e.g. "camera instructions, {json...}")
+        const jsonStartIdx = trimmedPrompt.indexOf('{');
+        if (jsonStartIdx > 0) {
+          const jsonCandidate = trimmedPrompt.substring(jsonStartIdx);
+          try {
+            const parsed = JSON.parse(jsonCandidate);
+            if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
+              // Combine any prefix text with the extracted prompt
+              const prefix = trimmedPrompt.substring(0, jsonStartIdx).replace(/,\s*$/, '').trim();
+              const extracted = parsed.generated_prompt.trim();
+              return prefix ? `${prefix}, ${extracted}` : extracted;
+            }
+          } catch {
+            // Not valid embedded JSON, use as-is
           }
-          if (typeof parsed?.prompt === "string" && parsed.prompt.trim()) {
-            return parsed.prompt.trim();
-          }
-        } catch {
-          // Not valid JSON, keep the original prompt
         }
 
-        return trimmedPrompt || "Smooth cinematic video";
+        return trimmedPrompt;
       };
 
       const normalizedPrompt = normalizePrompt(prompt);
