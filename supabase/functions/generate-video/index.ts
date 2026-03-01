@@ -79,6 +79,8 @@ const MODEL_DURATION_CONSTRAINTS: Record<string, number[]> = {
   // OmniHuman
   'omnihuman': [5, 10],
   // Default fallback
+  'hunyuan': [5],
+  'qubico/hunyuan': [5],
   'default': [5, 10],
 };
 
@@ -1788,9 +1790,12 @@ serve(async (req) => {
         'hailuo': [6],
         'luma': [5],
         'wan': [4, 8],
-        'hunyuan': [5, 10],
+        'hunyuan': [5],
+        'Qubico/hunyuan': [5],
         'skyreels': [4],
+        'Qubico/skyreels': [4],
         'framepack': [5, 10],
+        'Qubico/framepack': [5, 10],
         'veo3': [4, 6, 8],
         'sora2': [5, 10, 15, 20],
       };
