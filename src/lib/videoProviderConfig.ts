@@ -2550,7 +2550,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
       { value: '720p', label: '720p (HD)' },
       { value: '1080p', label: '1080p (Full HD)' },
     ],
-    supportsImageToVideo: true,
+    supportsImageToVideo: false,
     supportsTextToVideo: false,
     requiresApiKey: 'VIDU_API_KEY',
     modelId: 'viduq2',
@@ -2609,7 +2609,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     resolutions: [
       { value: '1080p', label: '1080p (Full HD)' },
     ],
-    supportsImageToVideo: true,
+    supportsImageToVideo: false,
     supportsTextToVideo: false,
     requiresApiKey: 'VIDU_API_KEY',
     modelId: 'viduq1',
@@ -2908,7 +2908,5 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'vidu-q3-turbo-t2v',
   'vidu-q3-turbo-i2v',
   'vidu-q2-t2v',
-  'vidu-q2-i2v',
   'vidu-q1-t2v',
-  'vidu-q1-i2v',
 ];
