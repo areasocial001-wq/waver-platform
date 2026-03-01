@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -45,7 +45,8 @@ export const Navbar = () => {
   const isSettingsPage = location.pathname === "/settings";
   const isExportTestPage = location.pathname === "/export-test";
   const isViduToolsPage = location.pathname === "/vidu-tools";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage;
+  const isNLtoJSONPage = location.pathname === "/nl-to-json";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isNLtoJSONPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -222,6 +223,10 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Freepik
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/nl-to-json")}>
+                    <FileJson className="w-4 h-4 mr-2" />
+                    Testo → JSON
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/api-monitoring")}>
                     <Activity className="w-4 h-4 mr-2" />
