@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useAutoSplitGeneration, calculateSplitPlan } from "@/hooks/useAutoSplitGeneration";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ export const ImageToVideoForm = () => {
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
+  const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   
@@ -85,13 +87,21 @@ export const ImageToVideoForm = () => {
 
   // Aggiorna durata, resolution e aspect ratio quando cambia il provider
   useEffect(() => {
-    const validDuration = getValidDuration(duration);
-    if (validDuration !== duration) {
-      setOriginalDuration(duration);
-      setDuration(validDuration);
-      toast.info("Durata adattata", {
-        description: `Il provider supporta ${validDuration}s`
-      });
+    // Skip auto-correction if user selected an auto-split extended duration
+    const maxNative = Math.max(...durationOptions.map(d => d.value));
+    const isAutoSplitDuration = duration > maxNative;
+
+    if (!isAutoSplitDuration) {
+      const validDuration = getValidDuration(duration);
+      if (validDuration !== duration) {
+        setOriginalDuration(duration);
+        setDuration(validDuration);
+        toast.info("Durata adattata", {
+          description: `Il provider supporta ${validDuration}s`
+        });
+      } else {
+        setOriginalDuration(null);
+      }
     } else {
       setOriginalDuration(null);
     }
@@ -116,7 +126,7 @@ export const ImageToVideoForm = () => {
     } else {
       setOriginalAspectRatio(null);
     }
-  }, [preferredProvider, getValidDuration, getValidResolution, duration, resolution, aspectRatio, aspectRatioOptions, defaultAspectRatio]);
+  }, [preferredProvider, getValidDuration, getValidResolution, duration, resolution, aspectRatio, aspectRatioOptions, defaultAspectRatio, durationOptions]);
 
   // Compress and resize image to prevent Out of Memory errors and PiAPI size limits
   const compressImage = (file: File, maxWidth: number = 1024, quality: number = 0.6): Promise<string> => {
@@ -394,6 +404,35 @@ export const ImageToVideoForm = () => {
         .single();
 
       if (dbError) throw dbError;
+
+      // Check if auto-split is needed (duration exceeds provider max)
+      const splitPlan = calculateSplitPlan(preferredProvider as VideoProviderType, duration);
+
+      if (splitPlan.needed && !isSequential) {
+        // Auto-split: generate N clips sequentially and concatenate
+        await supabase.from("video_generations").delete().eq("id", generationData.id);
+
+        const result = await runSplitGeneration({
+          plan: splitPlan,
+          userId: user.id,
+          type: "image_to_video",
+          prompt: cinematicPrompt,
+          resolution,
+          aspectRatio,
+          preferredProvider,
+          startImage: startImagePreview,
+        });
+
+        if (result.success) {
+          toast.success("Video generato con successo!", {
+            description: `${splitPlan.clipCount} clip concatenate. Vai allo storico.`
+          });
+          setStartImage(null);
+          setStartImagePreview("");
+          setPrompt("");
+        }
+        return;
+      }
 
       toast.success("Generazione video avviata!", {
         description: isSequential 
@@ -953,6 +992,16 @@ export const ImageToVideoForm = () => {
               {durationOptions.map((d) => (
                 <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
               ))}
+              {/* Auto-split extended durations */}
+              {(() => {
+                const maxNative = Math.max(...durationOptions.map(d => d.value));
+                const extendedDurations = [10, 15, 20].filter(d => d > maxNative);
+                return extendedDurations.map(d => (
+                  <SelectItem key={`split-${d}`} value={String(d)}>
+                    {d}s ⚡ auto-split ({Math.ceil(d / maxNative)}x{maxNative}s)
+                  </SelectItem>
+                ));
+              })()}
             </SelectContent>
           </Select>
         </div>
@@ -1012,20 +1061,45 @@ export const ImageToVideoForm = () => {
         </div>
       )}
 
+      {/* Auto-split progress indicator */}
+      {splitState.isSplitting && (
+        <div className="p-3 rounded-lg border border-accent/30 bg-accent/5">
+          <div className="flex items-center gap-2 mb-2">
+            <Sparkles className="w-4 h-4 animate-spin text-accent" />
+            <span className="text-sm font-medium">
+              Auto-split: clip {splitState.currentClip}/{splitState.totalClips}
+            </span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="bg-accent h-2 rounded-full transition-all duration-500"
+              style={{ width: `${(splitState.currentClip / splitState.totalClips) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {splitState.phase === "generating" && "Generazione in corso..."}
+            {splitState.phase === "waiting" && "Attesa completamento..."}
+            {splitState.phase === "concatenating" && "Concatenazione clip..."}
+          </p>
+        </div>
+      )}
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || !startImage || (requiresEndFrame && !endImage)}
+        disabled={isLoading || splitState.isSplitting || !startImage || (requiresEndFrame && !endImage)}
         className="w-full bg-gradient-accent text-accent-foreground hover:opacity-90 shadow-glow-accent transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {isLoading 
-          ? "Preparazione..." 
-          : requiresEndFrame && !endImage
-            ? "Carica entrambi i frame"
-            : endImage 
-              ? "Genera Video Keyframe" 
-              : "Genera Video da Immagine"
+        {splitState.isSplitting 
+          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+          : isLoading 
+            ? "Preparazione..." 
+            : requiresEndFrame && !endImage
+              ? "Carica entrambi i frame"
+              : endImage 
+                ? "Genera Video Keyframe" 
+                : "Genera Video da Immagine"
         }
       </Button>
 
