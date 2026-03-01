@@ -7,6 +7,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Normalize structured prompts (e.g. JSON from prompt assistant)
+function normalizePrompt(rawPrompt: unknown): string {
+  if (typeof rawPrompt !== "string") return "Smooth cinematic video";
+  const trimmedPrompt = rawPrompt.trim();
+  if (!trimmedPrompt) return "Smooth cinematic video";
+  if (trimmedPrompt.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmedPrompt);
+      if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) return parsed.generated_prompt.trim();
+      if (typeof parsed?.prompt === "string" && parsed.prompt.trim()) return parsed.prompt.trim();
+    } catch { /* not JSON */ }
+  }
+  const jsonStartIdx = trimmedPrompt.indexOf('{');
+  if (jsonStartIdx > 0) {
+    const jsonCandidate = trimmedPrompt.substring(jsonStartIdx);
+    try {
+      const parsed = JSON.parse(jsonCandidate);
+      if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
+        const prefix = trimmedPrompt.substring(0, jsonStartIdx).replace(/,\s*$/, '').trim();
+        const extracted = parsed.generated_prompt.trim();
+        return prefix ? `${prefix}, ${extracted}` : extracted;
+      }
+    } catch { /* not embedded JSON */ }
+  }
+  return trimmedPrompt;
+}
+
 // PiAPI is now the only Kling provider (direct API removed)
 
 // PiAPI model configuration
@@ -1734,46 +1761,7 @@ serve(async (req) => {
       
       const startImageData = start_image || image || image_url;
 
-      // Normalize structured prompts (e.g. JSON from prompt assistant)
-      const normalizePrompt = (rawPrompt: unknown): string => {
-        if (typeof rawPrompt !== "string") return "Smooth cinematic video";
-        const trimmedPrompt = rawPrompt.trim();
-        if (!trimmedPrompt) return "Smooth cinematic video";
-
-        // Case 1: Entire string is JSON starting with {
-        if (trimmedPrompt.startsWith("{")) {
-          try {
-            const parsed = JSON.parse(trimmedPrompt);
-            if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
-              return parsed.generated_prompt.trim();
-            }
-            if (typeof parsed?.prompt === "string" && parsed.prompt.trim()) {
-              return parsed.prompt.trim();
-            }
-          } catch {
-            // Not valid JSON
-          }
-        }
-
-        // Case 2: JSON is embedded within a larger string (e.g. "camera instructions, {json...}")
-        const jsonStartIdx = trimmedPrompt.indexOf('{');
-        if (jsonStartIdx > 0) {
-          const jsonCandidate = trimmedPrompt.substring(jsonStartIdx);
-          try {
-            const parsed = JSON.parse(jsonCandidate);
-            if (typeof parsed?.generated_prompt === "string" && parsed.generated_prompt.trim()) {
-              // Combine any prefix text with the extracted prompt
-              const prefix = trimmedPrompt.substring(0, jsonStartIdx).replace(/,\s*$/, '').trim();
-              const extracted = parsed.generated_prompt.trim();
-              return prefix ? `${prefix}, ${extracted}` : extracted;
-            }
-          } catch {
-            // Not valid embedded JSON, use as-is
-          }
-        }
-
-        return trimmedPrompt;
-      };
+      // normalizePrompt is now a top-level function
 
       const normalizedPrompt = normalizePrompt(prompt);
       
