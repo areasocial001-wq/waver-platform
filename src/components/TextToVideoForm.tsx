@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useAutoSplitGeneration, calculateSplitPlan } from "@/hooks/useAutoSplitGeneration";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ export const TextToVideoForm = () => {
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [generateAudio, setGenerateAudio] = useState(true);
   const [videoTitle, setVideoTitle] = useState("");
+  const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
   
   // Track original values before auto-correction for warning display
@@ -93,12 +95,19 @@ export const TextToVideoForm = () => {
 
   // Auto-adjust form values when provider changes using capability constraints
   useEffect(() => {
-    // Validate and adjust duration
-    const validDuration = capabilities.getValidDuration(duration);
-    if (validDuration !== duration) {
-      setOriginalDuration(duration);
-      setDuration(validDuration);
-      toast.info(`Durata adattata a ${validDuration}s per ${currentProvider.shortName}`);
+    // Validate and adjust duration (skip if auto-split extended duration)
+    const maxNative = Math.max(...capabilities.durationOptions.map(d => d.value));
+    const isAutoSplitDuration = duration > maxNative;
+    
+    if (!isAutoSplitDuration) {
+      const validDuration = capabilities.getValidDuration(duration);
+      if (validDuration !== duration) {
+        setOriginalDuration(duration);
+        setDuration(validDuration);
+        toast.info(`Durata adattata a ${validDuration}s per ${currentProvider.shortName}`);
+      } else {
+        setOriginalDuration(null);
+      }
     } else {
       setOriginalDuration(null);
     }
@@ -254,6 +263,36 @@ export const TextToVideoForm = () => {
         .single();
 
       if (dbError) throw dbError;
+
+      // Check if auto-split is needed (duration exceeds provider max)
+      const splitPlan = calculateSplitPlan(preferredProvider as VideoProviderType, duration);
+
+      if (splitPlan.needed) {
+        // Auto-split: generate N clips sequentially and concatenate
+        // Cancel the single-generation DB entry since split will create its own
+        await supabase.from("video_generations").delete().eq("id", generationData.id);
+
+        const result = await runSplitGeneration({
+          plan: splitPlan,
+          userId: user.id,
+          type: "text_to_video",
+          prompt: translatedPrompt,
+          originalPrompt,
+          resolution,
+          aspectRatio,
+          preferredProvider,
+          modelId: currentProvider.modelId,
+          generateAudio,
+        });
+
+        if (result.success) {
+          toast.success("Video generato con successo!", {
+            description: `${splitPlan.clipCount} clip concatenate. Vai allo storico.`
+          });
+          setPrompt("");
+        }
+        return;
+      }
 
       toast.success("Generazione video avviata!", {
         description: "Il video verrà generato. Attendi qualche istante..."
@@ -576,6 +615,16 @@ export const TextToVideoForm = () => {
               {capabilities.durationOptions.map((d) => (
                 <SelectItem key={d.value} value={String(d.value)}>{d.label}</SelectItem>
               ))}
+              {/* Auto-split extended durations */}
+              {(() => {
+                const maxNative = Math.max(...capabilities.durationOptions.map(d => d.value));
+                const extendedDurations = [10, 15, 20].filter(d => d > maxNative);
+                return extendedDurations.map(d => (
+                  <SelectItem key={`split-${d}`} value={String(d)}>
+                    {d}s ⚡ auto-split ({Math.ceil(d / maxNative)}x{maxNative}s)
+                  </SelectItem>
+                ));
+              })()}
             </SelectContent>
           </Select>
         </div>
@@ -636,14 +685,40 @@ export const TextToVideoForm = () => {
         )}
       </div>
 
+      {/* Auto-split progress indicator */}
+      {splitState.isSplitting && (
+        <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-2 mb-2">
+            <RefreshCw className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-sm font-medium">
+              Auto-split: clip {splitState.currentClip}/{splitState.totalClips}
+            </span>
+          </div>
+          <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="bg-primary h-2 rounded-full transition-all duration-500"
+              style={{ width: `${(splitState.currentClip / splitState.totalClips) * 100}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            {splitState.phase === "generating" && "Generazione in corso..."}
+            {splitState.phase === "waiting" && "Attesa completamento..."}
+            {splitState.phase === "concatenating" && "Concatenazione clip..."}
+          </p>
+        </div>
+      )}
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || !prompt.trim()}
+        disabled={isLoading || splitState.isSplitting || !prompt.trim()}
         className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow-primary transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {isLoading ? "Preparazione..." : "Genera Video"}
+        {splitState.isSplitting 
+          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+          : isLoading ? "Preparazione..." : "Genera Video"
+        }
       </Button>
 
       <div className="p-4 rounded-lg bg-muted/30 border border-border">
