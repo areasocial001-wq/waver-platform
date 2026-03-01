@@ -71,3 +71,6 @@ verify_jwt = true
 
 [functions.json2video]
 verify_jwt = true
+
+[functions.nl-to-json]
+verify_jwt = true
