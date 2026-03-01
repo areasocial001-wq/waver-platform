@@ -30,7 +30,7 @@ const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
   "hailuo": { model: "hailuo", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "luma": { model: "luma", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "wan": { model: "wan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
-  "hunyuan": { model: "Qubico/hunyuan", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
+  "hunyuan": { model: "Qubico/hunyuan", task_type_txt2video: "txt2video", task_type_img2video: "img2video-concat" },
   // New models from PIAPI Creator subscription
   "skyreels": { model: "Qubico/skyreels", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "framepack": { model: "Qubico/framepack", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
