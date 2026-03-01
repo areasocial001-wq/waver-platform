@@ -934,7 +934,9 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
   'piapi-hunyuan': {
-    durations: STANDARD_DURATIONS,
+    durations: [
+      { value: 5, label: '5 secondi' },
+    ],
     resolutions: STANDARD_RESOLUTIONS,
     aspectRatios: EXTENDED_ASPECT_RATIOS,
     supportsTextToVideo: true,
