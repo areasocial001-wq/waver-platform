@@ -1292,6 +1292,7 @@ serve(async (req) => {
 
       const isLumaRay = typeof modelId === 'string' && modelId.startsWith('luma/');
       const isPixVerseTransition = modelId === 'pixverse/v5/transition';
+      const isRunwayActTwo = modelId === 'runway/act_two';
       // Veo first-last model uses image_url and last_image_url (per API docs)
       const isVeoFirstLast = modelId === 'google/veo-3.1-first-last-image-to-video';
       // Veo 3.1 reference-to-video uses image_urls as an ARRAY (per API docs)
@@ -1301,6 +1302,90 @@ serve(async (req) => {
       if (modelId === 'google/veo-3.1-first-last-image-to-video-fast') {
         console.log('[AI/ML API] Correcting model ID: removing -fast suffix');
         modelId = 'google/veo-3.1-first-last-image-to-video';
+      }
+
+      // ==================== RUNWAY ACT TWO (special payload) ====================
+      // Act Two is a performance-transfer model: it requires a character (image/video)
+      // and a reference performance video. It does NOT use prompt/duration/image_url.
+      if (isRunwayActTwo) {
+        const characterImageData = start_image || image || image_url;
+        const referenceVideoData = body.reference_video || body.motion_video;
+        
+        if (!characterImageData) {
+          throw new Error("Runway Act Two requires a character image. Please upload an image of the character.");
+        }
+        if (!referenceVideoData) {
+          throw new Error("Runway Act Two requires a reference performance video. Please provide a video reference for motion/expression transfer.");
+        }
+        
+        const characterUrl = await getAimlImageUrl(characterImageData, 'act-two-character');
+        
+        // Reference video: upload if base64, ensure accessible if URL
+        let referenceUrl = referenceVideoData;
+        if (!referenceVideoData.startsWith('http')) {
+          referenceUrl = await uploadToStorageAndGetUrl(referenceVideoData, "act-two-ref", { signed: true, signedExpiresInSec: 3600 });
+        } else {
+          referenceUrl = await ensureAccessibleUrl(referenceVideoData, 'reference-video');
+        }
+
+        const actTwoPayload: Record<string, unknown> = {
+          model: 'runway/act_two',
+          character: { type: 'image', url: characterUrl },
+          reference: { type: 'video', url: referenceUrl },
+        };
+        
+        if (body.body_control !== undefined) actTwoPayload.body_control = body.body_control;
+        if (body.expression_intensity) actTwoPayload.expression_intensity = body.expression_intensity;
+        if (body.frame_size) actTwoPayload.frame_size = body.frame_size;
+
+        console.log(`[AI/ML API] Runway Act Two payload:`, JSON.stringify(actTwoPayload, null, 2));
+
+        const aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${AIML_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(actTwoPayload),
+        });
+
+        const responseText = await aimlResponse.text();
+        console.log(`[AI/ML API] Act Two response status: ${aimlResponse.status}`);
+        console.log(`[AI/ML API] Act Two response body: ${responseText}`);
+
+        if (!aimlResponse.ok) {
+          throw new Error(`AI/ML API error: ${aimlResponse.status} - ${responseText}`);
+        }
+
+        let aimlData;
+        try { aimlData = JSON.parse(responseText); } catch { throw new Error(`AI/ML API returned invalid JSON: ${responseText}`); }
+
+        const taskId = aimlData.id || aimlData.task_id;
+        if (!taskId) {
+          if (aimlData.video?.url) {
+            if (generationId) {
+              const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+              const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+              const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+              const supabaseClient = createClient(supabaseUrl, supabaseKey);
+              await supabaseClient.from('video_generations').update({ status: 'completed', video_url: aimlData.video.url, provider: 'aiml-runway-act-two' }).eq('id', generationId);
+            }
+            return new Response(JSON.stringify({ status: "succeeded", output: aimlData.video.url, provider: 'aiml-runway-act-two' }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          }
+          throw new Error("AI/ML API did not return a task ID or video URL for Act Two");
+        }
+
+        if (generationId) {
+          const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+          const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+          const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+          const supabaseClient = createClient(supabaseUrl, supabaseKey);
+          await supabaseClient.from('video_generations').update({ status: 'processing', prediction_id: `aiml:runway-act-two:${taskId}`, provider: 'aiml-runway-act-two' }).eq('id', generationId);
+        }
+
+        return new Response(JSON.stringify({ status: "starting", operationId: `aiml:runway-act-two:${taskId}`, provider: 'aiml-runway-act-two', message: "Runway Act Two generation started" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       // Sanitize duration for this model (server-side validation)
