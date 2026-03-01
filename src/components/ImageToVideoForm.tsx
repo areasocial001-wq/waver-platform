@@ -17,6 +17,8 @@ import { useModelCapabilities } from "@/hooks/useModelCapabilities";
 import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
+import { resolveAimlModelId } from "@/lib/aimlModelIds";
+import { Badge } from "@/components/ui/badge";
 import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
 
 export const ImageToVideoForm = () => {
@@ -471,6 +473,17 @@ export const ImageToVideoForm = () => {
           filterType="image_to_video"
           showDetails={true}
         />
+        {/* Debug badge: resolved AIML model ID */}
+        {(() => {
+          const resolved = resolveAimlModelId(preferredProvider, 'image_to_video');
+          if (!resolved) return null;
+          return (
+            <Badge variant="outline" className="mt-1.5 text-[10px] font-mono text-muted-foreground border-muted gap-1">
+              🔧 Backend model: <span className="text-foreground">{resolved}</span>
+              <span className="ml-1 text-primary">(I2V)</span>
+            </Badge>
+          );
+        })()}
       </div>
 
       {/* API Key Missing Banner */}
