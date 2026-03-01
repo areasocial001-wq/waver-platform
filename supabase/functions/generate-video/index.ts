@@ -745,14 +745,14 @@ serve(async (req) => {
       let rawBase64 = base64Data;
 
       if (base64Data.startsWith('data:')) {
-        const mimeMatch = base64Data.match(/^data:(image\/[^;]+);base64,/);
+        const mimeMatch = base64Data.match(/^data:([^;]+);base64,/);
         if (mimeMatch) {
           mimeType = mimeMatch[1];
           rawBase64 = base64Data.split(',')[1];
         }
       }
 
-      // Convert base64 to Uint8Array
+      // Convert base64 to Uint8Array using chunked approach to avoid stack overflow
       const binaryString = atob(rawBase64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -760,9 +760,11 @@ serve(async (req) => {
       }
 
       // Generate unique filename
-      const ext = mimeType.split('/')[1] || 'jpg';
+      const extMap: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'image/jpeg': 'jpeg', 'image/png': 'png', 'image/webp': 'webp' };
+      const ext = extMap[mimeType] || mimeType.split('/')[1] || 'bin';
+      const isVideo = mimeType.startsWith('video/');
       const fileName = `${prefix}_${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-      const filePath = `temp-images/${fileName}`;
+      const filePath = isVideo ? `temp-videos/${fileName}` : `temp-images/${fileName}`;
 
       // Upload to storage
       const { error: uploadError } = await supabaseClient.storage
