@@ -1865,7 +1865,15 @@ serve(async (req) => {
         // Negative prompt for quality
         piApiPayload.input.negative_prompt = "chaotic, distortion, morphing, blurry, low quality, artifacts";
         
-        console.log("[PiAPI Framepack] Using Qubico/framepack model for frame interpolation");
+        // Resolution and aspect ratio for Framepack
+        if (resolution) {
+          piApiPayload.input.resolution = resolution;
+        }
+        if (aspect_ratio) {
+          piApiPayload.input.aspect_ratio = aspect_ratio;
+        }
+        
+        console.log(`[PiAPI Framepack] duration=${sanitizedDuration}s, resolution=${resolution || 'default'}, aspect_ratio=${aspect_ratio || 'default'}`);
         
         // Skip the generic image processing below since we handled it above
         // Set a flag to prevent duplicate image handling
@@ -1873,6 +1881,14 @@ serve(async (req) => {
       } else {
         const sanitizedDuration = sanitizePiAPIDuration(modelConfig.model, duration || 5);
         piApiPayload.input.duration = sanitizedDuration;
+        
+        // Pass resolution and aspect_ratio for all generic PiAPI models (wan, hunyuan, hailuo, luma, etc.)
+        if (resolution) {
+          piApiPayload.input.resolution = resolution;
+        }
+        if (aspect_ratio) {
+          piApiPayload.input.aspect_ratio = aspect_ratio;
+        }
       }
       
       // Add model-specific parameters
