@@ -2543,7 +2543,10 @@ serve(async (req) => {
                         rawErrorMessage.includes("quota") ||
                         rawErrorMessage.includes("temporarily") ||
                         rawErrorMessage.includes("RESOURCE_EXHAUSTED") ||
-                        rawErrorMessage.includes("429"));
+                        rawErrorMessage.includes("429") ||
+                        rawErrorMessage.toLowerCase().includes("internal server error") ||
+                        rawErrorMessage.toLowerCase().includes("failed to do request") ||
+                        rawErrorMessage.includes("status code: 500"));
     
     if (body?.generationId) {
       try {
@@ -2576,6 +2579,7 @@ serve(async (req) => {
             .eq('id', body.generationId);
 
           return new Response(JSON.stringify({
+            status: "retry_scheduled",
             error: errorMessage,
             retryable: true,
             nextRetryAt: nextRetryAt,
@@ -2598,6 +2602,21 @@ serve(async (req) => {
       }
     }
     
+    // For polling requests, always return 200 with structured status so frontend can stop polling cleanly
+    if (body?.operationId) {
+      return new Response(
+        JSON.stringify({
+          status: isRetryable ? "retry_scheduled" : "failed",
+          error: errorMessage,
+          retryable: isRetryable,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify({ 
         error: errorMessage,
