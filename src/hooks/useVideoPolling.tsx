@@ -198,10 +198,10 @@ export const useVideoPolling = (
     }
   }, [onUpdate]);
 
-  // Check pending generations for retry
+  // Check generations with scheduled retry
   useEffect(() => {
     const pendingWithRetry = generations.filter(
-      (g) => g.status === "pending" && g.next_retry_at
+      (g) => (g.status === "pending" || g.status === "retry_scheduled") && g.next_retry_at
     );
     
     pendingWithRetry.forEach(retryPendingGeneration);
