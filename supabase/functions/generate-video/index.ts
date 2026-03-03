@@ -1438,12 +1438,23 @@ serve(async (req) => {
         ? `Use the provided reference image as the exact visual anchor and first frame. Keep subject identity, style, and composition consistent with that image. ${prompt || "Smooth cinematic video"}`
         : (prompt || "Smooth cinematic video");
 
-      // Truncate prompt to 2500 chars (AI/ML API limit)
-      const truncatedPrompt = normalizedPrompt.length > 2500
-        ? normalizedPrompt.slice(0, 2497) + '...'
+      // Truncate prompt to model-specific max length (AI/ML API limit differs by model)
+      const getAimlPromptMaxLength = (id: string): number => {
+        const lower = id.toLowerCase();
+        // Runway Gen4 variants have a stricter prompt limit
+        if (lower.includes('runway/gen4') || lower.includes('gen4_')) {
+          return 1000;
+        }
+        // Default limit for most AI/ML video models
+        return 2500;
+      };
+
+      const promptMaxLength = getAimlPromptMaxLength(modelId);
+      const truncatedPrompt = normalizedPrompt.length > promptMaxLength
+        ? normalizedPrompt.slice(0, Math.max(promptMaxLength - 3, 1)) + '...'
         : normalizedPrompt;
-      if (normalizedPrompt.length > 2500) {
-        console.warn(`[AI/ML API] Prompt truncated from ${normalizedPrompt.length} to 2500 chars`);
+      if (normalizedPrompt.length > promptMaxLength) {
+        console.warn(`[AI/ML API] Prompt truncated from ${normalizedPrompt.length} to ${promptMaxLength} chars for model ${modelId}`);
       }
 
       const aimlPayload: Record<string, unknown> = {
