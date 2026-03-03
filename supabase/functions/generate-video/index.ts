@@ -1438,9 +1438,17 @@ serve(async (req) => {
         ? `Use the provided reference image as the exact visual anchor and first frame. Keep subject identity, style, and composition consistent with that image. ${prompt || "Smooth cinematic video"}`
         : (prompt || "Smooth cinematic video");
 
+      // Truncate prompt to 2500 chars (AI/ML API limit)
+      const truncatedPrompt = normalizedPrompt.length > 2500
+        ? normalizedPrompt.slice(0, 2497) + '...'
+        : normalizedPrompt;
+      if (normalizedPrompt.length > 2500) {
+        console.warn(`[AI/ML API] Prompt truncated from ${normalizedPrompt.length} to 2500 chars`);
+      }
+
       const aimlPayload: Record<string, unknown> = {
         model: modelId,
-        prompt: normalizedPrompt,
+        prompt: truncatedPrompt,
         duration: sanitizedDuration,
       };
 
