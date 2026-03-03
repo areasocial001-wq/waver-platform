@@ -1302,6 +1302,8 @@ serve(async (req) => {
       // Some AIML models are image/video conditioned and will 400 on pure text payloads.
       // Guard against invalid text-to-video requests (e.g. runway/gen4_turbo requires image_url).
       const modelsRequiringImageInput = new Set<string>([
+        'gen3a_turbo',
+        'runway/gen-3-alpha-turbo',
         'runway/gen4_turbo',
         'runway/gen4_aleph',
         'runway/act_two',
@@ -1309,9 +1311,9 @@ serve(async (req) => {
       const hasAnyInputImage = Boolean(start_image || image || image_url);
       if (type === 'text_to_video' && modelsRequiringImageInput.has(modelId) && !hasAnyInputImage) {
         console.warn(
-          `[AI/ML API] Model ${modelId} requires image input for generation. Falling back to gen3a_turbo for text-to-video.`
+          `[AI/ML API] Model ${modelId} requires image input for generation. Falling back to kling-video/v1.6/pro/text-to-video.`
         );
-        modelId = 'gen3a_turbo';
+        modelId = 'kling-video/v1.6/pro/text-to-video';
       }
       
       console.log(`[AI/ML API] ========================================`);
@@ -1569,7 +1571,7 @@ serve(async (req) => {
       
       console.log(`[AI/ML API] Request payload:`, JSON.stringify(aimlPayload, null, 2));
       
-      const aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
+      let aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${AIML_API_KEY}`,
@@ -1578,9 +1580,41 @@ serve(async (req) => {
         body: JSON.stringify(aimlPayload),
       });
 
-      const responseText = await aimlResponse.text();
+      let responseText = await aimlResponse.text();
       console.log(`[AI/ML API] Response status: ${aimlResponse.status}`);
       console.log(`[AI/ML API] Response body: ${responseText}`);
+
+      // Some providers may return 400(image_url required) for a text model alias.
+      // Retry once with a known text-only compatible model.
+      const missingImageForText =
+        !aimlResponse.ok &&
+        type === "text_to_video" &&
+        !startImageData &&
+        (
+          (aimlResponse.status === 400 && responseText.includes('"path":["image_url"]')) ||
+          (aimlResponse.status === 404 && responseText.toLowerCase().includes("model not found"))
+        );
+
+      if (missingImageForText) {
+        const textFallbackModel = "kling-video/v1.6/pro/text-to-video";
+        console.warn(
+          `[AI/ML API] ${String(aimlPayload.model)} rejected text-only payload (or model unavailable). Retrying with ${textFallbackModel}.`
+        );
+
+        aimlPayload.model = textFallbackModel;
+        aimlResponse = await fetch("https://api.aimlapi.com/v2/video/generations", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${AIML_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(aimlPayload),
+        });
+
+        responseText = await aimlResponse.text();
+        console.log(`[AI/ML API] Retry response status: ${aimlResponse.status}`);
+        console.log(`[AI/ML API] Retry response body: ${responseText}`);
+      }
 
       if (!aimlResponse.ok) {
         console.error(`[AI/ML API] Error: ${aimlResponse.status} - ${responseText}`);
