@@ -1298,6 +1298,21 @@ serve(async (req) => {
         modelId = isI2V ? 'kling-video/v1.6/pro/image-to-video' : 'kling-video/v1.6/pro/text-to-video';
         console.warn(`[AI/ML API] Unknown model key "${modelKey}", using fallback: ${modelId}`);
       }
+
+      // Some AIML models are image/video conditioned and will 400 on pure text payloads.
+      // Guard against invalid text-to-video requests (e.g. runway/gen4_turbo requires image_url).
+      const modelsRequiringImageInput = new Set<string>([
+        'runway/gen4_turbo',
+        'runway/gen4_aleph',
+        'runway/act_two',
+      ]);
+      const hasAnyInputImage = Boolean(start_image || image || image_url);
+      if (type === 'text_to_video' && modelsRequiringImageInput.has(modelId) && !hasAnyInputImage) {
+        console.warn(
+          `[AI/ML API] Model ${modelId} requires image input for generation. Falling back to gen3a_turbo for text-to-video.`
+        );
+        modelId = 'gen3a_turbo';
+      }
       
       console.log(`[AI/ML API] ========================================`);
       console.log(`[AI/ML API] Starting video generation`);
