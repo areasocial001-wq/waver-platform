@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SUPPORTED_LANGUAGES } from "@/hooks/useVoiceOptions";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -87,6 +88,7 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
   const [stability, setStability] = useState([0.5]);
   const [similarityBoost, setSimilarityBoost] = useState([0.75]);
   const [style, setStyle] = useState([0.5]);
+  const [selectedLanguage, setSelectedLanguage] = useState("it");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewGenerating, setIsPreviewGenerating] = useState(false);
@@ -415,6 +417,7 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
           stability: stability[0],
           similarityBoost: similarityBoost[0],
           style: style[0],
+          languageCode: selectedLanguage,
         }),
       });
 

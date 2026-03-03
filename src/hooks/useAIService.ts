@@ -17,6 +17,7 @@ interface SoundEffectParams {
 interface TTSParams {
   text: string;
   voice?: string;
+  languageCode?: string;
 }
 
 interface ImageGenerationParams {
@@ -195,7 +196,8 @@ export function useAIService() {
         const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
           body: {
             text: params.text,
-            voice: params.voice,
+            voiceId: params.voice,
+            languageCode: params.languageCode || 'it',
           },
         });
         
