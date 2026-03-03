@@ -26,7 +26,7 @@ import { GenerationStatusIndicator, GenerationStep } from './GenerationStatusInd
 import { LivePreviewPanel } from './LivePreviewPanel';
 import { ExternalAudioUploader } from './ExternalAudioUploader';
 import { useTalkingAvatarProjects, EMOTION_MUSIC_PROMPTS, detectDominantEmotion } from '@/hooks/useTalkingAvatarProjects';
-import { useVoiceOptions, DEFAULT_VOICE_OPTIONS } from '@/hooks/useVoiceOptions';
+import { useVoiceOptions, DEFAULT_VOICE_OPTIONS, SUPPORTED_LANGUAGES } from '@/hooks/useVoiceOptions';
 import { 
   User, 
   Upload, 
@@ -122,6 +122,7 @@ export function TalkingAvatarGenerator() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [useTTS, setUseTTS] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState(DEFAULT_VOICE_OPTIONS[0].id);
+  const [selectedLanguage, setSelectedLanguage] = useState("it");
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   
   // External audio for lip sync
@@ -238,6 +239,7 @@ export function TalkingAvatarGenerator() {
           body: JSON.stringify({
             text: dialogueText,
             voiceId: selectedVoice,
+            languageCode: selectedLanguage,
           }),
         }
       );

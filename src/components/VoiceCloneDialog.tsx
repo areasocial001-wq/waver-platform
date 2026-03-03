@@ -227,6 +227,7 @@ export const VoiceCloneDialog = ({
           stability: 0.5,
           similarityBoost: 0.75,
           style: 0.5,
+          languageCode: 'it',
         }),
       });
 

@@ -239,6 +239,7 @@ export function TalkingAvatarBatch({
             body: JSON.stringify({
               text: scene.dialogueText,
               voiceId: selectedVoice,
+              languageCode: 'it',
             }),
           }
         );
