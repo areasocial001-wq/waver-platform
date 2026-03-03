@@ -192,7 +192,25 @@ export default function History() {
   const handleRetry = async (generation: VideoGeneration) => {
     try {
       toast.info("Avvio nuova generazione...");
-      
+
+      const isRunwayGen4I2V =
+        generation.type === "image_to_video" &&
+        (generation.provider === "aiml-runway-gen4-turbo" || generation.provider === "aiml-runway-gen4-aleph");
+
+      const effectiveProvider = isRunwayGen4I2V
+        ? "aiml-kling-v2.6-pro"
+        : generation.provider || undefined;
+
+      if (isRunwayGen4I2V) {
+        toast.info("Provider adattato automaticamente", {
+          description: "Runway Gen4 I2V ha avuto errori ripetuti: uso Kling 2.6 Pro per maggiore stabilità.",
+        });
+      }
+
+      const { data: authData } = await supabase.auth.getUser();
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Utente non autenticato");
+
       // Create new generation with same parameters
       const { data: newGen, error: insertError } = await supabase
         .from("video_generations")
@@ -205,33 +223,40 @@ export default function History() {
           image_url: generation.image_url,
           image_name: generation.image_name,
           status: "processing",
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: userId,
+          provider: effectiveProvider ?? null,
         })
         .select()
         .single();
 
       if (insertError) throw insertError;
 
+      const requestBody: Record<string, unknown> = {
+        type: generation.type,
+        prompt: generation.prompt,
+        duration: generation.duration,
+        resolution: generation.resolution,
+        motion_intensity: generation.motion_intensity,
+        generationId: newGen.id,
+        preferredProvider: effectiveProvider,
+      };
+
+      if (generation.type === "image_to_video" && generation.image_url) {
+        requestBody.image_url = generation.image_url;
+        requestBody.start_image = generation.image_url;
+      }
+
       // Call the generate-video function
       const { data, error } = await supabase.functions.invoke("generate-video", {
-        body: {
-          prompt: generation.prompt,
-          duration: generation.duration,
-          resolution: generation.resolution,
-          motionIntensity: generation.motion_intensity,
-          type: generation.type,
-          imageUrl: generation.image_url,
-          generationId: newGen.id,
-        },
+        body: requestBody,
       });
 
       if (error) throw error;
 
-      // Update with prediction ID
-      if (data?.id) {
+      if (data?.operationId) {
         await supabase
           .from("video_generations")
-          .update({ prediction_id: data.id })
+          .update({ prediction_id: data.operationId, provider: effectiveProvider ?? null })
           .eq("id", newGen.id);
       }
 

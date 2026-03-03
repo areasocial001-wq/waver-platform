@@ -390,6 +390,17 @@ export const ImageToVideoForm = () => {
         ? `Sequential video: ${cinematicPrompt}` 
         : cinematicPrompt;
 
+      const isRunwayGen4WithDialogue =
+        audioType === "dialogue" &&
+        (preferredProvider === "aiml-runway-gen4-turbo" || preferredProvider === "aiml-runway-gen4-aleph");
+      const effectiveProvider = isRunwayGen4WithDialogue ? "aiml-kling-v2.6-pro" : preferredProvider;
+
+      if (isRunwayGen4WithDialogue) {
+        toast.info("Provider adattato automaticamente", {
+          description: "Runway Gen4 I2V con dialogo può fallire spesso: uso Kling 2.6 Pro per maggiore stabilità.",
+        });
+      }
+
       // Save to database first
       const { data: generationData, error: dbError } = await supabase
         .from("video_generations")
@@ -403,6 +414,7 @@ export const ImageToVideoForm = () => {
           image_name: isSequential ? `${startImage.name} → ${endImage.name}` : startImage.name,
           image_url: startImagePreview,
           status: "processing",
+          provider: effectiveProvider !== "auto" ? effectiveProvider : null,
           dialogue_text: audioType === "dialogue" ? audioPrompt : null,
           voice_settings: audioType === "dialogue" ? { voiceId: selectedVoiceId, language: selectedLanguage } : null,
         })
@@ -412,7 +424,7 @@ export const ImageToVideoForm = () => {
       if (dbError) throw dbError;
 
       // Check if auto-split is needed (duration exceeds provider max)
-      const splitPlan = calculateSplitPlan(preferredProvider as VideoProviderType, duration);
+      const splitPlan = calculateSplitPlan(effectiveProvider as VideoProviderType, duration);
 
       if (splitPlan.needed && !isSequential) {
         // Auto-split: generate N clips sequentially and concatenate
@@ -425,7 +437,7 @@ export const ImageToVideoForm = () => {
           prompt: cinematicPrompt,
           resolution,
           aspectRatio,
-          preferredProvider,
+          preferredProvider: effectiveProvider,
           startImage: startImagePreview,
         });
 
@@ -455,7 +467,7 @@ export const ImageToVideoForm = () => {
         resolution: resolution,
         aspect_ratio: aspectRatio,
         generationId: generationData.id,
-        preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
+        preferredProvider: effectiveProvider !== "auto" ? effectiveProvider : undefined,
       };
 
       // Add end image if provided
