@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useVoiceOptions, SUPPORTED_LANGUAGES } from "@/hooks/useVoiceOptions";
 import { useAutoSplitGeneration, calculateSplitPlan } from "@/hooks/useAutoSplitGeneration";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +42,9 @@ export const ImageToVideoForm = () => {
   const [composition, setComposition] = useState<string>("medium");
   const [audioType, setAudioType] = useState<string>("none");
   const [audioPrompt, setAudioPrompt] = useState("");
+  const [selectedVoiceId, setSelectedVoiceId] = useState("EXAVITQu4vr4xnSDxMaL");
+  const [selectedLanguage, setSelectedLanguage] = useState("it");
+  const { voiceOptions, hasClonedVoices } = useVoiceOptions();
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
@@ -398,7 +402,9 @@ export const ImageToVideoForm = () => {
           resolution: resolution,
           image_name: isSequential ? `${startImage.name} → ${endImage.name}` : startImage.name,
           image_url: startImagePreview,
-          status: "processing"
+          status: "processing",
+          dialogue_text: audioType === "dialogue" ? audioPrompt : null,
+          voice_settings: audioType === "dialogue" ? { voiceId: selectedVoiceId, language: selectedLanguage } : null,
         })
         .select()
         .single();
@@ -902,29 +908,81 @@ export const ImageToVideoForm = () => {
         </div>
 
         {audioType !== "none" && (
-          <div className="space-y-2">
-            <Label htmlFor="audio-prompt">
-              {audioType === "dialogue" ? "Testo del Dialogo" : 
-               audioType === "sfx" ? "Descrizione Effetti" : 
-               "Descrizione Ambiente Sonoro"}
-            </Label>
-            <Textarea
-              id="audio-prompt"
-              placeholder={
-                audioType === "dialogue" ? "Es: Hello, welcome to my channel" :
-                audioType === "sfx" ? "Es: thunder cracks in the distance, footsteps on wet pavement" :
-                "Es: the quiet hum of a starship bridge, distant traffic noise"
-              }
-              value={audioPrompt}
-              onChange={(e) => setAudioPrompt(e.target.value)}
-              className="min-h-[80px] resize-none"
-            />
-            <p className="text-xs text-muted-foreground">
-              {audioType === "dialogue" && "Veo 3.1 genererà il dialogo parlato sincronizzato con il video"}
-              {audioType === "sfx" && "Descrivi gli effetti sonori che vuoi sentire"}
-              {audioType === "ambient" && "Descrivi l'atmosfera sonora di fondo"}
-            </p>
-          </div>
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="audio-prompt">
+                {audioType === "dialogue" ? "Testo del Dialogo" : 
+                 audioType === "sfx" ? "Descrizione Effetti" : 
+                 "Descrizione Ambiente Sonoro"}
+              </Label>
+              <Textarea
+                id="audio-prompt"
+                placeholder={
+                  audioType === "dialogue" ? "Es: Hello, welcome to my channel" :
+                  audioType === "sfx" ? "Es: thunder cracks in the distance, footsteps on wet pavement" :
+                  "Es: the quiet hum of a starship bridge, distant traffic noise"
+                }
+                value={audioPrompt}
+                onChange={(e) => setAudioPrompt(e.target.value)}
+                className="min-h-[80px] resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                {audioType === "dialogue" && "Il dialogo verrà generato con la voce ElevenLabs selezionata"}
+                {audioType === "sfx" && "Descrivi gli effetti sonori che vuoi sentire"}
+                {audioType === "ambient" && "Descrivi l'atmosfera sonora di fondo"}
+              </p>
+            </div>
+
+            {audioType === "dialogue" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="i2v-voice">Voce</Label>
+                  <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId}>
+                    <SelectTrigger id="i2v-voice">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hasClonedVoices && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-primary">
+                            Voci Clonate
+                          </div>
+                          {voiceOptions.filter(v => v.isCloned).map((voice) => (
+                            <SelectItem key={voice.id} value={voice.id}>
+                              <span className="text-primary">{voice.name}</span>
+                            </SelectItem>
+                          ))}
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                            Voci Standard
+                          </div>
+                        </>
+                      )}
+                      {voiceOptions.filter(v => !v.isCloned).map((voice) => (
+                        <SelectItem key={voice.id} value={voice.id}>
+                          {voice.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="i2v-lang">Lingua</Label>
+                  <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                    <SelectTrigger id="i2v-lang">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPORTED_LANGUAGES.map((lang) => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.flag} {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
