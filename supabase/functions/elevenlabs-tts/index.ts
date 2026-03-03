@@ -82,7 +82,8 @@ serve(async (req) => {
     const voiceStability = stability ?? 0.5;
     const voiceSimilarity = similarityBoost ?? 0.75;
     const voiceStyle = style ?? 0.5;
-    const voiceSpeed = Math.max(0.7, Math.min(1.2, speed ?? 1.0));
+    // Cloned voices tend to speak faster; use 0.85 as a safer default
+    const voiceSpeed = Math.max(0.7, Math.min(1.2, speed ?? 0.85));
     
     // Default to Italian if no language specified
     const selectedLanguage = languageCode || 'it';
