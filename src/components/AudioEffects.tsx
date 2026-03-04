@@ -6,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sparkles, Radio, Timer, Volume1 } from "lucide-react";
 
 export interface AudioEffectsSettings {
+  // Global Dry/Wet mix: 0 = 100% dry (no effects), 100 = 100% wet (only effects)
+  dryWetMix: number;
+
   // Reverb
   reverbEnabled: boolean;
   reverbMix: number; // 0-100 (wet/dry)
@@ -26,6 +29,7 @@ export interface AudioEffectsSettings {
 }
 
 export const DEFAULT_EFFECTS_SETTINGS: AudioEffectsSettings = {
+  dryWetMix: 50,
   reverbEnabled: false,
   reverbMix: 30,
   reverbDecay: 2,
@@ -131,6 +135,8 @@ export function AudioEffects({ settings, onSettingsChange }: AudioEffectsProps) 
     }
   };
 
+  const hasAnyEffect = settings.reverbEnabled || settings.echoEnabled || settings.compressorEnabled;
+
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
       <div className="flex items-center justify-between">
@@ -139,6 +145,30 @@ export function AudioEffects({ settings, onSettingsChange }: AudioEffectsProps) 
           Effetti Audio
         </Label>
       </div>
+
+      {/* Global Dry/Wet Mix */}
+      {hasAnyEffect && (
+        <div className="space-y-2 p-3 bg-accent/10 rounded-md border border-accent/20">
+          <div className="flex justify-between text-xs">
+            <span className="font-medium flex items-center gap-1">
+              <Volume1 className="w-3 h-3" />
+              Dry / Wet Mix
+            </span>
+            <span className="tabular-nums">{settings.dryWetMix}%</span>
+          </div>
+          <Slider
+            value={[settings.dryWetMix]}
+            min={0}
+            max={100}
+            step={1}
+            onValueChange={(v) => handleChange('dryWetMix', v[0])}
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground">
+            <span>100% Pulito</span>
+            <span>100% Effetti</span>
+          </div>
+        </div>
+      )}
 
       {/* Preset Selector */}
       <div className="space-y-2">
