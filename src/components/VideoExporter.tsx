@@ -174,23 +174,34 @@ export function VideoExporter({
       audio.crossOrigin = 'anonymous';
       audio.preload = 'auto';
 
-      // Wait for both to load
+      // Wait for both to load AND fully buffer
       await Promise.all([
         new Promise<void>((resolve, reject) => {
-          video.onloadedmetadata = () => resolve();
+          video.oncanplaythrough = () => resolve();
           video.onerror = () => reject(new Error('Errore caricamento video'));
+          video.load();
         }),
         new Promise<void>((resolve, reject) => {
-          audio.onloadedmetadata = () => resolve();
+          audio.oncanplaythrough = () => resolve();
           audio.onerror = () => reject(new Error('Errore caricamento audio'));
+          audio.load();
         }),
       ]);
 
-      // Create canvas for video capture
+      // Cap canvas to 1080p to reduce encoder pressure
+      let cw = video.videoWidth;
+      let ch = video.videoHeight;
+      const MAX_DIM = 1080;
+      if (cw > MAX_DIM || ch > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(cw, ch);
+        cw = Math.round(cw * scale);
+        ch = Math.round(ch * scale);
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d', { alpha: false });
 
       if (!ctx) {
         throw new Error('Impossibile creare contesto canvas');
@@ -207,7 +218,7 @@ export function VideoExporter({
       // Create effects chain for generated audio using dry/wet architecture
       let lastNode: AudioNode = audioSource;
       
-      // Apply compressor if enabled (inline, affects both dry and wet)
+      // Apply compressor if enabled
       if (effectsSettings?.compressorEnabled) {
         const compressor = audioContext.createDynamicsCompressor();
         compressor.threshold.value = effectsSettings.compressorThreshold;
@@ -219,20 +230,17 @@ export function VideoExporter({
       }
 
       const hasEffects = effectsSettings?.echoEnabled || effectsSettings?.reverbEnabled;
-      const dryWet = (effectsSettings?.dryWetMix ?? 50) / 100; // 0 = full dry, 1 = full wet
+      const dryWet = (effectsSettings?.dryWetMix ?? 50) / 100;
 
       if (hasEffects) {
-        // Dry path: clean signal → generatedGain
         const dryGain = audioContext.createGain();
         dryGain.gain.value = 1 - dryWet;
         lastNode.connect(dryGain);
         dryGain.connect(generatedGain);
 
-        // Wet path: effects → wetGain → generatedGain
         const wetGain = audioContext.createGain();
         wetGain.gain.value = dryWet;
 
-        // Apply delay/echo if enabled
         if (effectsSettings?.echoEnabled) {
           const delay = audioContext.createDelay(1);
           delay.delayTime.value = effectsSettings.echoDelay;
@@ -248,7 +256,6 @@ export function VideoExporter({
           echoMixGain.connect(wetGain);
         }
         
-        // Apply reverb if enabled
         if (effectsSettings?.reverbEnabled) {
           const reverbGain = audioContext.createGain();
           reverbGain.gain.value = effectsSettings.reverbMix / 100;
@@ -258,17 +265,13 @@ export function VideoExporter({
 
         wetGain.connect(generatedGain);
       } else {
-        // No effects: direct connection
         lastNode.connect(generatedGain);
       }
       
-      // Create destination for combined audio (no speaker output during export to reduce load)
       const audioDestination = audioContext.createMediaStreamDestination();
       generatedGain.connect(audioDestination);
 
-      // Keep an always-alive silent signal so the audio track doesn't end early.
-      // This prevents some containers/players from truncating the whole recording when the
-      // generated audio is shorter than the selected video segment.
+      // Silent signal to prevent audio track ending early
       const silent = audioContext.createConstantSource();
       const silentGain = audioContext.createGain();
       silentGain.gain.value = 0;
@@ -276,7 +279,7 @@ export function VideoExporter({
       silentGain.connect(audioDestination);
       silent.start();
       
-      // Mix original video audio directly from the same video element (avoid loading a second <video>)
+      // Mix original video audio
       if (mixerSettings?.originalEnabled && mixerSettings.originalVolume > 0) {
         const originalSource = audioContext.createMediaElementSource(video);
         const originalGain = audioContext.createGain();
@@ -285,22 +288,19 @@ export function VideoExporter({
         originalGain.connect(audioDestination);
       }
 
-      // Create video stream from canvas with selected FPS
+      // Create video stream from canvas
       const targetFps = parseInt(fps);
       videoStream = canvas.captureStream(targetFps);
       
-      // Combine video and audio streams
       combinedStream = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...audioDestination.stream.getAudioTracks(),
       ]);
 
-      // Get actual mime type to use
       const mimeType = getMimeType(format);
       const actualFormat = mimeType.includes('mp4') ? 'mp4' : 'webm';
       const extension = FORMAT_CONFIG[actualFormat].extension;
 
-      // Set up MediaRecorder
       const mediaRecorder = new MediaRecorder(combinedStream, {
         mimeType,
         videoBitsPerSecond: QUALITY_CONFIG[quality].bitrate,
@@ -308,40 +308,33 @@ export function VideoExporter({
 
       const chunks: Blob[] = [];
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
+        if (e.data.size > 0) chunks.push(e.data);
       };
 
       const segmentDuration = segmentEnd - segmentStart;
       let recordingComplete = false;
-
-      // Throttle UI updates during export to avoid dropping capture frames.
       let lastUiUpdateMs = 0;
-      const UI_UPDATE_INTERVAL_MS = 200;
+      const UI_UPDATE_INTERVAL_MS = 250;
 
       const stopOnce = () => {
         if (recordingComplete) return;
-        try {
-          video.pause();
-          audio.pause();
-        } catch {
-          // ignore
-        }
-        try {
-          if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-        } catch {
-          // ignore
-        }
+        recordingComplete = true;
+        try { loop?.stop(); } catch { /* ignore */ }
+        try { video.pause(); } catch { /* ignore */ }
+        try { audio.pause(); } catch { /* ignore */ }
+        // Small delay to let the encoder flush remaining data
+        setTimeout(() => {
+          try {
+            if (mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+          } catch { /* ignore */ }
+        }, 100);
       };
 
       mediaRecorder.onstop = () => {
-        recordingComplete = true;
         const blobType = actualFormat === 'mp4' ? 'video/mp4' : 'video/webm';
         const blob = new Blob(chunks, { type: blobType });
         const url = URL.createObjectURL(blob);
         
-        // Download the file
         const link = document.createElement('a');
         link.href = url;
         link.download = `video_con_nuovo_audio_${Date.now()}.${extension}`;
@@ -353,77 +346,64 @@ export function VideoExporter({
         setIsExporting(false);
         setExportProgress(100);
         toast.success(`Video esportato con successo in formato ${extension.toUpperCase()}!`);
-
-        // Cleanup resources/tracks (important: avoids export getting slower after each run)
         void cleanup();
       };
 
-      // Start recording
+      // Seek video to start and wait for full buffer readiness
       video.currentTime = segmentStart;
       audio.currentTime = 0;
       
-      // Wait for video to seek AND have enough data buffered
       await new Promise<void>((resolve) => {
-        video.onseeked = () => {
-          if (video.readyState >= 3) {
+        const checkReady = () => {
+          if (video.readyState >= 4) {
             resolve();
           } else {
-            video.oncanplay = () => resolve();
+            video.oncanplaythrough = () => resolve();
           }
         };
+        video.onseeked = checkReady;
       });
 
-      // Small timeslice keeps chunks flowing without starving the encoder
-      mediaRecorder.start(250);
+      // Use a larger timeslice to reduce encoder interruptions
+      mediaRecorder.start(500);
 
-      // Play sources
+      // Play sources — unmute video only if we need its original audio
+      if (mixerSettings?.originalEnabled && mixerSettings.originalVolume > 0) {
+        video.muted = false;
+      }
       await Promise.all([video.play(), audio.play()]);
 
-      // Render frames on a fixed wall-clock schedule to avoid duration drift
+      // Simple draw loop using setTimeout (no catch-up, no frame skipping pressure)
       loop = createFixedFpsLoop({
         fps: targetFps,
         durationMs: segmentDuration * 1000,
         onFrame: ({ progress01 }) => {
           if (recordingComplete) return;
-
-          // Draw whatever frame is currently available (if decoding lags, frames may repeat,
-          // but duration + container timestamps stay stable)
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.drawImage(video, 0, 0, cw, ch);
 
           const now = performance.now();
-          if (now - lastUiUpdateMs >= UI_UPDATE_INTERVAL_MS || progress01 >= 0.999) {
+          if (now - lastUiUpdateMs >= UI_UPDATE_INTERVAL_MS || progress01 >= 0.99) {
             lastUiUpdateMs = now;
-            setExportProgress(progress01 * 100);
-          }
-
-          // IMPORTANT: do NOT stop when audio ends.
-          // The generated audio might be shorter than the selected segment; stopping here
-          // causes early termination + perceived FPS drop/out-of-sync.
-          if (video.currentTime >= segmentEnd || video.ended) {
-            stopOnce();
+            setExportProgress(Math.min(progress01 * 100, 99));
           }
         },
         onDone: () => {
-          stopOnce();
+          // Draw final frame, then wait a grace period for audio tail (reverb/echo)
+          ctx.drawImage(video, 0, 0, cw, ch);
+          // Grace: let audio effects (echo tail, reverb) ring out for up to 1s
+          const gracePeriodMs = hasEffects ? 1000 : 200;
+          setTimeout(() => stopOnce(), gracePeriodMs);
         },
       });
 
-      // Stop if video ends; audio ending is allowed (we keep a silent track alive)
-      video.onended = () => stopOnce();
-
-      // Ensure timer is stopped when recorder stops
-      const originalOnStop = mediaRecorder.onstop;
-      mediaRecorder.onstop = (e) => {
-        try {
-          loop?.stop();
-        } catch {
-          // ignore
-        }
-        if (originalOnStop) originalOnStop.call(mediaRecorder, e);
+      // If video ends early (shorter than segment), handle gracefully
+      video.onended = () => {
+        // Draw last available frame to avoid black
+        ctx.drawImage(video, 0, 0, cw, ch);
       };
 
-      // Initial frame + start loop
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // Initial frame + start
+      ctx.drawImage(video, 0, 0, cw, ch);
       loop.start();
 
     } catch (error) {
