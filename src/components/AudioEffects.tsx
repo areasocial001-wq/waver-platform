@@ -121,6 +121,23 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
       compressorRatio: 6,
     },
   },
+  cinematic: {
+    name: 'Cinematico',
+    description: 'Scene drammatiche con riverbero lungo ed eco sottile',
+    settings: {
+      dryWetMix: 45,
+      reverbEnabled: true,
+      reverbMix: 55,
+      reverbDecay: 7,
+      echoEnabled: true,
+      echoDelay: 0.4,
+      echoFeedback: 20,
+      echoMix: 15,
+      compressorEnabled: true,
+      compressorThreshold: -22,
+      compressorRatio: 3,
+    },
+  },
 };
 
 interface AudioEffectsProps {
