@@ -1,9 +1,13 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Radio, Timer, Volume1 } from "lucide-react";
+import { Sparkles, Radio, Timer, Volume1, Save, Trash2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export interface AudioEffectsSettings {
   // Global Dry/Wet mix: 0 = 100% dry (no effects), 100 = 100% wet (only effects)
@@ -156,20 +160,101 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
   },
 };
 
+interface UserPreset {
+  id: string;
+  name: string;
+  settings: AudioEffectsSettings;
+}
+
 interface AudioEffectsProps {
   settings: AudioEffectsSettings;
   onSettingsChange: (settings: AudioEffectsSettings) => void;
 }
 
 export function AudioEffects({ settings, onSettingsChange }: AudioEffectsProps) {
+  const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadUserPresets = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await (supabase
+        .from('audio_effect_presets') as any)
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      setUserPresets((data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        settings: p.settings as unknown as AudioEffectsSettings,
+      })));
+    } catch {
+      // silent
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadUserPresets(); }, [loadUserPresets]);
+
   const handleChange = <K extends keyof AudioEffectsSettings>(key: K, value: AudioEffectsSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
   const handlePresetChange = (presetKey: string) => {
+    // Check built-in presets first
     const preset = EFFECT_PRESETS[presetKey];
     if (preset) {
       onSettingsChange({ ...DEFAULT_EFFECTS_SETTINGS, ...preset.settings });
+      return;
+    }
+    // Check user presets
+    const userPreset = userPresets.find(p => p.id === presetKey);
+    if (userPreset) {
+      onSettingsChange({ ...DEFAULT_EFFECTS_SETTINGS, ...userPreset.settings });
+    }
+  };
+
+  const handleSavePreset = async () => {
+    if (!newPresetName.trim()) {
+      toast.error("Inserisci un nome per il preset");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Devi essere autenticato"); return; }
+      const { error } = await (supabase.from('audio_effect_presets') as any).insert({
+        user_id: user.id,
+        name: newPresetName.trim(),
+        settings: settings as unknown as Record<string, unknown>,
+      });
+      if (error) throw error;
+      toast.success(`Preset "${newPresetName.trim()}" salvato!`);
+      setNewPresetName("");
+      setShowSaveInput(false);
+      await loadUserPresets();
+    } catch (e) {
+      toast.error("Errore nel salvataggio: " + (e as Error).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeletePreset = async (presetId: string, presetName: string) => {
+    try {
+      const { error } = await (supabase.from('audio_effect_presets') as any).delete().eq('id', presetId);
+      if (error) throw error;
+      toast.success(`Preset "${presetName}" eliminato`);
+      await loadUserPresets();
+    } catch (e) {
+      toast.error("Errore: " + (e as Error).message);
     }
   };
 
@@ -224,8 +309,76 @@ export function AudioEffects({ settings, onSettingsChange }: AudioEffectsProps) 
                 </div>
               </SelectItem>
             ))}
+            {userPresets.length > 0 && (
+              <>
+                {userPresets.map((preset) => (
+                  <SelectItem key={preset.id} value={preset.id}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">⭐ {preset.name}</span>
+                      <span className="text-xs text-muted-foreground">Preset personalizzato</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Save / Manage Custom Presets */}
+      <div className="space-y-2">
+        {!showSaveInput ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setShowSaveInput(true)}
+          >
+            <Save className="w-3 h-3 mr-1" />
+            Salva impostazioni come preset
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nome preset..."
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
+              className="h-8 text-xs"
+            />
+            <Button size="sm" onClick={handleSavePreset} disabled={isSaving} className="h-8 shrink-0">
+              {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowSaveInput(false)} className="h-8 shrink-0">
+              ✕
+            </Button>
+          </div>
+        )}
+
+        {/* User presets list with delete */}
+        {userPresets.length > 0 && (
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">I tuoi preset</Label>
+            {userPresets.map((preset) => (
+              <div key={preset.id} className="flex items-center justify-between p-1.5 rounded bg-background/50 text-xs">
+                <span className="truncate">⭐ {preset.name}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                  onClick={() => handleDeletePreset(preset.id, preset.name)}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        {isLoading && (
+          <div className="flex items-center justify-center py-1">
+            <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
 
       {/* Reverb Section */}
