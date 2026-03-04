@@ -24,9 +24,9 @@ type ExportFormat = 'webm' | 'mp4';
 type ExportFps = '24' | '30' | '60';
 
 const QUALITY_CONFIG: Record<ExportQuality, { bitrate: number; label: string }> = {
-  low: { bitrate: 800_000, label: 'Bassa (800 Kbps)' },
-  medium: { bitrate: 1_500_000, label: 'Media (1.5 Mbps)' },
-  high: { bitrate: 3_000_000, label: 'Alta (3 Mbps)' },
+  low: { bitrate: 2_500_000, label: 'Bassa (2.5 Mbps)' },
+  medium: { bitrate: 5_000_000, label: 'Media (5 Mbps)' },
+  high: { bitrate: 10_000_000, label: 'Alta (10 Mbps)' },
 };
 
 const FORMAT_CONFIG: Record<ExportFormat, { 
@@ -218,6 +218,9 @@ export function VideoExporter({
         lastNode = compressor;
       }
       
+      // Track whether any effect already routes to generatedGain
+      let effectConnected = false;
+
       // Apply delay/echo if enabled
       if (effectsSettings?.echoEnabled) {
         const delay = audioContext.createDelay(1);
@@ -232,6 +235,7 @@ export function VideoExporter({
         feedbackGain.connect(delay);
         delay.connect(echoMixGain);
         echoMixGain.connect(generatedGain);
+        effectConnected = true;
       }
       
       // Apply reverb if enabled (simple convolver approximation)
@@ -240,9 +244,13 @@ export function VideoExporter({
         reverbGain.gain.value = effectsSettings.reverbMix / 100;
         lastNode.connect(reverbGain);
         reverbGain.connect(generatedGain);
+        effectConnected = true;
       }
       
-      lastNode.connect(generatedGain);
+      // Only connect dry signal if no effect already routes to generatedGain
+      if (!effectConnected) {
+        lastNode.connect(generatedGain);
+      }
       
       // Create destination for combined audio (no speaker output during export to reduce load)
       const audioDestination = audioContext.createMediaStreamDestination();
@@ -344,13 +352,19 @@ export function VideoExporter({
       video.currentTime = segmentStart;
       audio.currentTime = 0;
       
+      // Wait for video to seek AND have enough data buffered
       await new Promise<void>((resolve) => {
-        video.onseeked = () => resolve();
+        video.onseeked = () => {
+          if (video.readyState >= 3) {
+            resolve();
+          } else {
+            video.oncanplay = () => resolve();
+          }
+        };
       });
 
-      // Using a very small timeslice causes frequent main-thread events.
-      // A larger slice reduces overhead and helps keep capture FPS stable.
-      mediaRecorder.start(1000);
+      // Small timeslice keeps chunks flowing without starving the encoder
+      mediaRecorder.start(250);
 
       // Play sources
       await Promise.all([video.play(), audio.play()]);
