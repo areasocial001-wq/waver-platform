@@ -138,6 +138,22 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
       compressorRatio: 3,
     },
   },
+  documentary: {
+    name: 'Documentario',
+    description: 'Voce naturale con compressione moderata',
+    settings: {
+      dryWetMix: 25,
+      reverbEnabled: true,
+      reverbMix: 12,
+      reverbDecay: 1.8,
+      echoEnabled: false,
+      compressorEnabled: true,
+      compressorThreshold: -20,
+      compressorRatio: 3.5,
+      compressorAttack: 0.008,
+      compressorRelease: 0.3,
+    },
+  },
 };
 
 interface AudioEffectsProps {
