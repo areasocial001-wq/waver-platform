@@ -44,46 +44,46 @@ const PRESETS: Record<string, PresetConfig> = {
   voice: {
     name: 'Voce',
     description: 'Ottimizzato per dialoghi e narrazioni',
-    settings: { bass: -2, lowMid: 0, mid: 4, highMid: 3, treble: 1 },
+    settings: { bass: -4, lowMid: -1, mid: 8, highMid: 6, treble: 2 },
   },
   podcast: {
     name: 'Podcast',
     description: 'Chiarezza vocale con bassi caldi',
-    settings: { bass: 2, lowMid: -1, mid: 3, highMid: 4, treble: 2 },
+    settings: { bass: 4, lowMid: -2, mid: 6, highMid: 7, treble: 3 },
   },
   music: {
     name: 'Musica',
     description: 'Bilanciato per sottofondo musicale',
-    settings: { bass: 4, lowMid: 2, mid: 0, highMid: 2, treble: 3 },
+    settings: { bass: 7, lowMid: 3, mid: 0, highMid: 3, treble: 6 },
   },
   cinema: {
     name: 'Cinema',
     description: 'Drammatico con bassi profondi',
-    settings: { bass: 6, lowMid: 3, mid: -1, highMid: 2, treble: 4 },
+    settings: { bass: 10, lowMid: 5, mid: -2, highMid: 3, treble: 7 },
   },
   bright: {
     name: 'Brillante',
     description: 'Alti enfatizzati per chiarezza',
-    settings: { bass: -1, lowMid: 0, mid: 2, highMid: 4, treble: 6 },
+    settings: { bass: -3, lowMid: 0, mid: 3, highMid: 7, treble: 10 },
   },
   warm: {
     name: 'Caldo',
     description: 'Bassi ricchi e morbidi',
-    settings: { bass: 5, lowMid: 3, mid: 0, highMid: -1, treble: -2 },
+    settings: { bass: 9, lowMid: 5, mid: 0, highMid: -2, treble: -4 },
   },
   presence: {
     name: 'Presenza',
     description: 'Voce in primo piano',
-    settings: { bass: -3, lowMid: 1, mid: 5, highMid: 6, treble: 2 },
+    settings: { bass: -6, lowMid: 2, mid: 9, highMid: 10, treble: 3 },
   },
 };
 
 const BAND_CONFIG = [
-  { key: 'bass' as const, label: 'Bassi', frequency: 60, color: 'bg-red-500' },
-  { key: 'lowMid' as const, label: 'Bassi-Medi', frequency: 250, color: 'bg-orange-500' },
-  { key: 'mid' as const, label: 'Medi', frequency: 1000, color: 'bg-yellow-500' },
-  { key: 'highMid' as const, label: 'Medi-Alti', frequency: 4000, color: 'bg-green-500' },
-  { key: 'treble' as const, label: 'Alti', frequency: 12000, color: 'bg-blue-500' },
+  { key: 'bass' as const, label: 'Bassi', frequency: 80, q: 0.7, color: 'bg-red-500' },
+  { key: 'lowMid' as const, label: 'Bassi-Medi', frequency: 300, q: 0.8, color: 'bg-orange-500' },
+  { key: 'mid' as const, label: 'Medi', frequency: 1000, q: 0.7, color: 'bg-yellow-500' },
+  { key: 'highMid' as const, label: 'Medi-Alti', frequency: 3500, q: 0.8, color: 'bg-green-500' },
+  { key: 'treble' as const, label: 'Alti', frequency: 10000, q: 0.7, color: 'bg-blue-500' },
 ];
 
 export function AudioEqualizer({ 
@@ -123,7 +123,7 @@ export function AudioEqualizer({
         
         filter.frequency.value = band.frequency;
         filter.gain.value = settings[band.key];
-        filter.Q.value = 1;
+        filter.Q.value = band.q;
         
         return filter;
       });
