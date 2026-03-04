@@ -204,10 +204,10 @@ export function VideoExporter({
       const generatedGain = audioContext.createGain();
       generatedGain.gain.value = (mixerSettings?.generatedVolume ?? 100) / 100;
       
-      // Create effects chain for generated audio
+      // Create effects chain for generated audio using dry/wet architecture
       let lastNode: AudioNode = audioSource;
       
-      // Apply compressor if enabled
+      // Apply compressor if enabled (inline, affects both dry and wet)
       if (effectsSettings?.compressorEnabled) {
         const compressor = audioContext.createDynamicsCompressor();
         compressor.threshold.value = effectsSettings.compressorThreshold;
@@ -217,38 +217,48 @@ export function VideoExporter({
         lastNode.connect(compressor);
         lastNode = compressor;
       }
-      
-      // Track whether any effect already routes to generatedGain
-      let effectConnected = false;
 
-      // Apply delay/echo if enabled
-      if (effectsSettings?.echoEnabled) {
-        const delay = audioContext.createDelay(1);
-        delay.delayTime.value = effectsSettings.echoDelay;
-        const feedbackGain = audioContext.createGain();
-        feedbackGain.gain.value = effectsSettings.echoFeedback / 100;
-        const echoMixGain = audioContext.createGain();
-        echoMixGain.gain.value = effectsSettings.echoMix / 100;
+      const hasEffects = effectsSettings?.echoEnabled || effectsSettings?.reverbEnabled;
+      const dryWet = (effectsSettings?.dryWetMix ?? 50) / 100; // 0 = full dry, 1 = full wet
+
+      if (hasEffects) {
+        // Dry path: clean signal → generatedGain
+        const dryGain = audioContext.createGain();
+        dryGain.gain.value = 1 - dryWet;
+        lastNode.connect(dryGain);
+        dryGain.connect(generatedGain);
+
+        // Wet path: effects → wetGain → generatedGain
+        const wetGain = audioContext.createGain();
+        wetGain.gain.value = dryWet;
+
+        // Apply delay/echo if enabled
+        if (effectsSettings?.echoEnabled) {
+          const delay = audioContext.createDelay(1);
+          delay.delayTime.value = effectsSettings.echoDelay;
+          const feedbackGain = audioContext.createGain();
+          feedbackGain.gain.value = effectsSettings.echoFeedback / 100;
+          const echoMixGain = audioContext.createGain();
+          echoMixGain.gain.value = effectsSettings.echoMix / 100;
+          
+          lastNode.connect(delay);
+          delay.connect(feedbackGain);
+          feedbackGain.connect(delay);
+          delay.connect(echoMixGain);
+          echoMixGain.connect(wetGain);
+        }
         
-        lastNode.connect(delay);
-        delay.connect(feedbackGain);
-        feedbackGain.connect(delay);
-        delay.connect(echoMixGain);
-        echoMixGain.connect(generatedGain);
-        effectConnected = true;
-      }
-      
-      // Apply reverb if enabled (simple convolver approximation)
-      if (effectsSettings?.reverbEnabled) {
-        const reverbGain = audioContext.createGain();
-        reverbGain.gain.value = effectsSettings.reverbMix / 100;
-        lastNode.connect(reverbGain);
-        reverbGain.connect(generatedGain);
-        effectConnected = true;
-      }
-      
-      // Only connect dry signal if no effect already routes to generatedGain
-      if (!effectConnected) {
+        // Apply reverb if enabled
+        if (effectsSettings?.reverbEnabled) {
+          const reverbGain = audioContext.createGain();
+          reverbGain.gain.value = effectsSettings.reverbMix / 100;
+          lastNode.connect(reverbGain);
+          reverbGain.connect(wetGain);
+        }
+
+        wetGain.connect(generatedGain);
+      } else {
+        // No effects: direct connection
         lastNode.connect(generatedGain);
       }
       
