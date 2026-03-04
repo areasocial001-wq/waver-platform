@@ -78,23 +78,38 @@ serve(async (req) => {
     // Default to a natural Italian voice if not specified
     const selectedVoiceId = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah - natural multilingual voice
 
-    // Use provided values or sensible defaults
-    const voiceStability = stability ?? 0.5;
+    // Detect if voice is cloned (not in default list)
+    const defaultVoiceIds = [
+      'EXAVITQu4vr4xnSDxMaL', 'JBFqnCBsd6RMkjVDRZzb', 'onwK4e9ZLuTAKqWW03F9',
+      'pFZP5JQG7iQjIQuC4Bku', 'TX3LPaxmHKxFdv7VOQHJ', 'XrExE9yKIg1WjnnlVkGX',
+      '9BWtsMINqrJLrRacOk9x', 'CwhRBWXzGAHq8TQ4Fs17',
+    ];
+    const isClonedVoice = !defaultVoiceIds.includes(selectedVoiceId);
+
+    // Higher stability for cloned voices to reduce artifacts/noise
+    const voiceStability = stability ?? (isClonedVoice ? 0.7 : 0.5);
     const voiceSimilarity = similarityBoost ?? 0.75;
-    const voiceStyle = style ?? 0.5;
-    // Cloned voices tend to speak faster; use 0.85 as a safer default
-    const voiceSpeed = Math.max(0.7, Math.min(1.2, speed ?? 0.85));
+    // Lower style for cloned voices to reduce distortion
+    const voiceStyle = style ?? (isClonedVoice ? 0.2 : 0.5);
+    // Cloned voices tend to speak faster; use 0.85 as default
+    const voiceSpeed = speed ?? (isClonedVoice ? 0.85 : 1.0);
+    // Clamp to API limits
+    const clampedSpeed = Math.max(0.7, Math.min(1.2, voiceSpeed));
+    
+    // Disable speaker boost for cloned voices to prevent mic noise amplification
+    const useSpeakerBoost = !isClonedVoice;
     
     // Default to Italian if no language specified
     const selectedLanguage = languageCode || 'it';
 
     console.log('Generating TTS for text:', text.substring(0, 100) + '...');
-    console.log('Using voice ID:', selectedVoiceId);
+    console.log('Using voice ID:', selectedVoiceId, isClonedVoice ? '(cloned)' : '(default)');
     console.log('Language code:', selectedLanguage);
-    console.log('Settings - Speed:', voiceSpeed, 'Stability:', voiceStability, 'Similarity:', voiceSimilarity, 'Style:', voiceStyle);
+    console.log('Settings - Speed:', clampedSpeed, 'Stability:', voiceStability, 'Similarity:', voiceSimilarity, 'Style:', voiceStyle, 'SpeakerBoost:', useSpeakerBoost);
 
+    // CRITICAL: output_format must be a query parameter, NOT in the body
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}?output_format=mp3_44100_128`,
       {
         method: 'POST',
         headers: {
@@ -104,14 +119,13 @@ serve(async (req) => {
         body: JSON.stringify({
           text,
           model_id: 'eleven_multilingual_v2',
-          output_format: 'mp3_44100_128',
-          language_code: selectedLanguage, // Force specific language pronunciation
+          language_code: selectedLanguage,
           voice_settings: {
             stability: voiceStability,
             similarity_boost: voiceSimilarity,
             style: voiceStyle,
-            use_speaker_boost: true,
-            speed: voiceSpeed,
+            use_speaker_boost: useSpeakerBoost,
+            speed: clampedSpeed,
           },
         }),
       }
