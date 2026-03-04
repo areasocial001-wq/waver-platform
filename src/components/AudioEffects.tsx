@@ -61,6 +61,7 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
     name: 'Studio',
     description: 'Riverbero leggero da studio',
     settings: {
+      dryWetMix: 30,
       reverbEnabled: true,
       reverbMix: 15,
       reverbDecay: 1.5,
@@ -73,6 +74,7 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
     name: 'Podcast',
     description: 'Voce chiara con compressione',
     settings: {
+      dryWetMix: 15,
       reverbEnabled: false,
       compressorEnabled: true,
       compressorThreshold: -18,
@@ -85,6 +87,7 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
     name: 'Concerto',
     description: 'Riverbero ampio da sala',
     settings: {
+      dryWetMix: 60,
       reverbEnabled: true,
       reverbMix: 50,
       reverbDecay: 4,
@@ -95,6 +98,7 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
     name: 'Ambient',
     description: 'Atmosfera con eco e riverbero',
     settings: {
+      dryWetMix: 70,
       reverbEnabled: true,
       reverbMix: 40,
       reverbDecay: 6,
@@ -108,6 +112,7 @@ const EFFECT_PRESETS: Record<string, EffectPreset> = {
     name: 'Voiceover',
     description: 'Ottimizzato per narrazioni',
     settings: {
+      dryWetMix: 20,
       reverbEnabled: true,
       reverbMix: 10,
       reverbDecay: 1,
