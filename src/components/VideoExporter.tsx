@@ -535,84 +535,124 @@ export function VideoExporter({
   return (
     <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border">
       <div className="flex items-center gap-2">
-        <Film className="w-4 h-4" />
-        <Label>Esporta Video con Nuovo Audio</Label>
+        {exportMode === 'audio-only' ? <Music className="w-4 h-4" /> : <Film className="w-4 h-4" />}
+        <Label>Esporta {exportMode === 'audio-only' ? 'Audio Processato' : 'Video con Nuovo Audio'}</Label>
       </div>
 
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Formato</Label>
-            <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(FORMAT_CONFIG).map(([key, config]) => {
-                  const isSupported = supportedFormats.includes(key as ExportFormat);
-                  const isRecommended = key === 'webm';
-                  return (
-                    <SelectItem 
-                      key={key} 
-                      value={key}
-                      disabled={!isSupported}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{config.label}</span>
-                        {isRecommended && (
-                          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
-                            Consigliato
-                          </span>
-                        )}
-                        {isSupported ? (
-                          <CheckCircle className="w-3 h-3 text-green-500" />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">(non supportato)</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Qualità</Label>
-            <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(QUALITY_CONFIG).map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    {config.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
+        {/* Export mode toggle */}
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Framerate</Label>
-          <Select value={fps} onValueChange={(v) => setFps(v as ExportFps)}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="24">24 fps (Cinema)</SelectItem>
-              <SelectItem value="30">30 fps (Standard)</SelectItem>
-              <SelectItem value="60">60 fps (Fluido)</SelectItem>
-            </SelectContent>
-          </Select>
+          <Label className="text-xs text-muted-foreground">Modalità esportazione</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant={exportMode === 'video' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setExportMode('video')}
+              className="w-full"
+            >
+              <Film className="w-3.5 h-3.5 mr-1.5" />
+              Video + Audio
+            </Button>
+            <Button
+              variant={exportMode === 'audio-only' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setExportMode('audio-only')}
+              className="w-full"
+            >
+              <Music className="w-3.5 h-3.5 mr-1.5" />
+              Solo Audio
+            </Button>
+          </div>
         </div>
+
+        {/* Video-specific settings */}
+        {exportMode === 'video' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Formato</Label>
+                <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(FORMAT_CONFIG).map(([key, config]) => {
+                      const isSupported = supportedFormats.includes(key as ExportFormat);
+                      const isRecommended = key === 'webm';
+                      return (
+                        <SelectItem 
+                          key={key} 
+                          value={key}
+                          disabled={!isSupported}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span>{config.label}</span>
+                            {isRecommended && (
+                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                                Consigliato
+                              </span>
+                            )}
+                            {isSupported ? (
+                              <CheckCircle className="w-3 h-3 text-primary" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">(non supportato)</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Qualità</Label>
+                <Select value={quality} onValueChange={(v) => setQuality(v as ExportQuality)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(QUALITY_CONFIG).map(([key, config]) => (
+                      <SelectItem key={key} value={key}>
+                        {config.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Framerate</Label>
+              <Select value={fps} onValueChange={(v) => setFps(v as ExportFps)}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24">24 fps (Cinema)</SelectItem>
+                  <SelectItem value="30">30 fps (Standard)</SelectItem>
+                  <SelectItem value="60">60 fps (Fluido)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+
+        {/* Audio-only info */}
+        {exportMode === 'audio-only' && (
+          <div className="flex items-start gap-2 p-2 bg-muted/50 rounded text-xs">
+            <Music className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-muted-foreground">
+              Esporta solo l'audio processato con tutti gli effetti applicati (EQ, riverbero, eco, compressore) in formato WebM/Opus.
+            </p>
+          </div>
+        )}
 
         {isExporting ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Esportazione in corso...</span>
+              <span className="text-sm">Esportazione {exportMode === 'audio-only' ? 'audio' : 'video'} in corso...</span>
             </div>
             <Progress value={exportProgress} className="w-full" />
             <p className="text-xs text-muted-foreground text-center">
@@ -626,29 +666,33 @@ export function VideoExporter({
             variant="default"
           >
             <Download className="w-4 h-4 mr-2" />
-            Esporta Video (.{FORMAT_CONFIG[format].extension})
+            {exportMode === 'audio-only' 
+              ? 'Esporta Audio (.webm)' 
+              : `Esporta Video (.${FORMAT_CONFIG[format].extension})`}
           </Button>
         )}
 
         {/* Warning for MP4 on Chromium browsers */}
-        {format === 'mp4' && isChromium && (
-          <div className="flex items-start gap-2 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded text-xs">
-            <AlertTriangle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
-            <p className="text-yellow-400">
+        {exportMode === 'video' && format === 'mp4' && isChromium && (
+          <div className="flex items-start gap-2 p-2 bg-destructive/10 border border-destructive/30 rounded text-xs">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <p className="text-destructive">
               <strong>Attenzione:</strong> L'encoding MP4 (H.264) su browser Chromium (Chrome, Brave, Edge) può causare cali di FPS. 
               Per un framerate stabile a 24fps, consigliamo <strong>WebM (VP8)</strong>.
             </p>
           </div>
         )}
         
-        <div className="flex items-start gap-2 p-2 bg-muted/50 rounded text-xs">
-          <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-muted-foreground">
-            {format === 'mp4' 
-              ? "MP4 offre la massima compatibilità con dispositivi e player. Richiede browser recenti (Chrome 107+, Edge 107+)."
-              : "WebM (VP8) garantisce FPS stabili durante l'export. Per massima compatibilità con tutti i dispositivi, considera MP4."}
-          </p>
-        </div>
+        {exportMode === 'video' && (
+          <div className="flex items-start gap-2 p-2 bg-muted/50 rounded text-xs">
+            <AlertCircle className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-muted-foreground">
+              {format === 'mp4' 
+                ? "MP4 offre la massima compatibilità con dispositivi e player. Richiede browser recenti (Chrome 107+, Edge 107+)."
+                : "WebM (VP8) garantisce FPS stabili durante l'export. Per massima compatibilità con tutti i dispositivi, considera MP4."}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Hidden elements for reference */}
