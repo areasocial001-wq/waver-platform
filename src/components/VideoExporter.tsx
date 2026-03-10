@@ -21,6 +21,7 @@ interface VideoExporterProps {
 
 type ExportQuality = 'low' | 'medium' | 'high';
 type ExportFormat = 'webm' | 'mp4';
+type ExportMode = 'video' | 'audio-only';
 type ExportFps = '24' | '30' | '60';
 
 const QUALITY_CONFIG: Record<ExportQuality, { bitrate: number; label: string }> = {
