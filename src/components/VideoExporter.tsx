@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Film, Download, AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2, Film, Download, AlertCircle, CheckCircle, AlertTriangle, Music } from "lucide-react";
 import { toast } from "sonner";
 import { AudioMixerSettings } from "./AudioMixer";
 import { AudioEffectsSettings } from "./AudioEffects";
