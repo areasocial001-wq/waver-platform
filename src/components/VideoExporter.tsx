@@ -79,6 +79,7 @@ export function VideoExporter({
   const [quality, setQuality] = useState<ExportQuality>('medium');
   const [format, setFormat] = useState<ExportFormat>('webm');
   const [fps, setFps] = useState<ExportFps>('24');
+  const [exportMode, setExportMode] = useState<ExportMode>('video');
   const [supportedFormats, setSupportedFormats] = useState<ExportFormat[]>([]);
   const [isChromium, setIsChromium] = useState(false);
   
