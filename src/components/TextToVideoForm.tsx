@@ -662,6 +662,13 @@ export const TextToVideoForm = () => {
               <SelectItem value="crane_down">Crane Down - Gru verso il basso</SelectItem>
               <SelectItem value="pan_left">Pan Left - Panoramica sinistra</SelectItem>
               <SelectItem value="pan_right">Pan Right - Panoramica destra</SelectItem>
+              <SelectItem value="pan_up">Pan Up - Panoramica verso l'alto</SelectItem>
+              <SelectItem value="pan_down">Pan Down - Panoramica verso il basso</SelectItem>
+              <SelectItem value="zoom_in">Zoom In - Ingrandimento</SelectItem>
+              <SelectItem value="zoom_out">Zoom Out - Riduzione</SelectItem>
+              <SelectItem value="tilt_up">Tilt Up - Inclinazione verso l'alto</SelectItem>
+              <SelectItem value="tilt_down">Tilt Down - Inclinazione verso il basso</SelectItem>
+              <SelectItem value="handheld">Handheld - Camera a mano</SelectItem>
               <SelectItem value="aerial">Aerial - Vista aerea</SelectItem>
               <SelectItem value="pov">POV - Prima persona</SelectItem>
               <SelectItem value="orbit">Orbit - Rotazione circolare</SelectItem>
