@@ -221,6 +221,10 @@ export const Navbar = () => {
                     <Film className="w-4 h-4 mr-2" />
                     Vidu Advanced
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/ltx-tools")}>
+                    <Film className="w-4 h-4 mr-2" />
+                    LTX Advanced
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Freepik

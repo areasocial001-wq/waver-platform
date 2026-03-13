@@ -43,6 +43,7 @@ const App = () => (
             <Route path="/video-editor" element={<JSON2VideoPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/vidu-tools" element={<ViduToolsPage />} />
+            <Route path="/ltx-tools" element={<LTXToolsPage />} />
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
