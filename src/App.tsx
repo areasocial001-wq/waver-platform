@@ -16,6 +16,7 @@ import TalkingAvatarPage from "./pages/TalkingAvatar";
 import JSON2VideoPage from "./pages/JSON2VideoPage";
 import SettingsPage from "./pages/Settings";
 import ViduToolsPage from "./pages/ViduTools";
+import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
 
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ const App = () => (
             <Route path="/video-editor" element={<JSON2VideoPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/vidu-tools" element={<ViduToolsPage />} />
+            <Route path="/ltx-tools" element={<LTXToolsPage />} />
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
