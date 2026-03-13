@@ -335,11 +335,40 @@ export const ImageToVideoForm = () => {
       // Build cinematic prompt with camera controls
       let cinematicPrompt = "";
       
+      // Map camera movements for LTX native API support
+      const isLtxProvider = preferredProvider.startsWith("ltx-");
+      const ltxCameraMotionMap: Record<string, string> = {
+        "dolly_in": "dolly-in",
+        "dolly_out": "dolly-out",
+        "pan_up": "pan-up",
+        "pan_down": "pan-down",
+        "tilt_up": "tilt-up",
+        "tilt_down": "tilt-down",
+        "zoom_in": "zoom-in",
+        "zoom_out": "zoom-out",
+        "handheld": "handheld",
+        "tracking": "tracking",
+        "crane_up": "crane-up",
+        "crane_down": "crane-down",
+        "pan_left": "pan-left",
+        "pan_right": "pan-right",
+        "aerial": "aerial",
+        "pov": "pov",
+        "orbit": "orbit"
+      };
+      
       // Add camera movement
       if (cameraMovement !== "none") {
-        const cameraMovements = {
+        const cameraMovements: Record<string, string> = {
           "dolly_in": "Slow dolly in shot, camera smoothly pushes toward the subject",
           "dolly_out": "Slow dolly out shot, camera smoothly pulls away from the subject",
+          "pan_up": "Smooth camera pan upward",
+          "pan_down": "Smooth camera pan downward",
+          "tilt_up": "Camera tilts upward revealing more of the scene",
+          "tilt_down": "Camera tilts downward focusing on the ground",
+          "zoom_in": "Smooth zoom in toward the subject",
+          "zoom_out": "Smooth zoom out revealing more context",
+          "handheld": "Handheld camera with natural subtle shake",
           "tracking": "Smooth tracking shot following the subject's movement",
           "crane_up": "Crane shot ascending upward revealing the scene from above",
           "crane_down": "Crane shot descending from above down to the subject",
