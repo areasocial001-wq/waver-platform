@@ -61,7 +61,7 @@ export const useApiMonitoring = () => {
   const [history, setHistory] = useState<ApiHistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   
-  const retryTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const retryTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const previousStatus = useRef<Map<string, string>>(new Map());
   const offlineSince = useRef<Map<string, Date>>(new Map());
   const offlineAlertSent = useRef<Map<string, boolean>>(new Map());

@@ -54,7 +54,7 @@ export function VideoToAudioForm() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const playbackInterval = useRef<NodeJS.Timeout | null>(null);
+  const playbackInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

@@ -85,7 +85,7 @@ const FreepikWorkflowInner = () => {
   const [loadDialogOpen, setLoadDialogOpen] = useState(false);
   const [currentWorkflowId, setCurrentWorkflowId] = useState<string | undefined>();
   const [currentWorkflowName, setCurrentWorkflowName] = useState<string | undefined>();
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   const onConnect = useCallback(
