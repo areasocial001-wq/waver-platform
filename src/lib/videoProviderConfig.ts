@@ -3068,4 +3068,9 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'vidu-q3-turbo-i2v',
   'vidu-q2-t2v',
   'vidu-q1-t2v',
+  // LTX Video
+  'ltx-2-3-pro',
+  'ltx-2-3-fast',
+  'ltx-2-pro',
+  'ltx-2-fast',
 ];
