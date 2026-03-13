@@ -521,7 +521,6 @@ export const ImageToVideoForm = () => {
       }
 
       // Add native LTX camera motion parameter
-      const isLtxProvider = preferredProvider.startsWith("ltx-");
       const ltxCameraMotion = isLtxProvider && cameraMovement !== "none" 
         ? (ltxCameraMotionMap[cameraMovement] || cameraMovement) 
         : undefined;
