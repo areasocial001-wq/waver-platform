@@ -177,7 +177,7 @@ export const TextToVideoForm = () => {
       
       // Add camera movement
       if (cameraMovement !== "none") {
-        const cameraMovements = {
+        const cameraMovements: Record<string, string> = {
           "dolly_in": "Slow dolly in shot, camera smoothly pushes toward the subject",
           "dolly_out": "Slow dolly out shot, camera smoothly pulls away from the subject",
           "tracking": "Smooth tracking shot following the subject's movement",
@@ -185,11 +185,18 @@ export const TextToVideoForm = () => {
           "crane_down": "Crane shot descending from above down to the subject",
           "pan_left": "Slow pan left across the scene",
           "pan_right": "Slow pan right across the scene",
+          "pan_up": "Slow pan upward across the scene",
+          "pan_down": "Slow pan downward across the scene",
           "aerial": "Aerial view, high angle perspective looking down",
           "pov": "POV shot, first person perspective",
-          "orbit": "Orbital camera movement circling around the subject"
+          "orbit": "Orbital camera movement circling around the subject",
+          "handheld": "Handheld camera with natural subtle movement and shake",
+          "zoom_in": "Smooth zoom in toward the subject",
+          "zoom_out": "Smooth zoom out from the subject",
+          "tilt_up": "Camera tilts upward from low to high angle",
+          "tilt_down": "Camera tilts downward from high to low angle",
         };
-        cinematicPrompt += cameraMovements[cameraMovement] + ", ";
+        cinematicPrompt += (cameraMovements[cameraMovement] || cameraMovement) + ", ";
       }
       
       // Add composition style
@@ -305,6 +312,31 @@ export const TextToVideoForm = () => {
       });
 
       // Generate video synchronously - include modelId for AI/ML API providers
+      // Map camera movement IDs to LTX API camera_motion values
+      const ltxCameraMotionMap: Record<string, string> = {
+        "dolly_in": "dolly-in",
+        "dolly_out": "dolly-out",
+        "pan_left": "pan-left",
+        "pan_right": "pan-right",
+        "pan_up": "pan-up",
+        "pan_down": "pan-down",
+        "crane_up": "crane-up",
+        "crane_down": "crane-down",
+        "tracking": "tracking",
+        "orbit": "orbit",
+        "handheld": "handheld",
+        "zoom_in": "zoom-in",
+        "zoom_out": "zoom-out",
+        "tilt_up": "tilt-up",
+        "tilt_down": "tilt-down",
+        "static": "static",
+      };
+
+      const isLtxProvider = preferredProvider.startsWith("ltx-");
+      const ltxCameraMotion = isLtxProvider && cameraMovement !== "none" 
+        ? (ltxCameraMotionMap[cameraMovement] || cameraMovement) 
+        : undefined;
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: {
@@ -312,11 +344,12 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: duration,
             resolution: resolution,
-            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? aspectRatio : undefined,
-            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? generateAudio : undefined,
+            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || isLtxProvider) ? aspectRatio : undefined,
+            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || isLtxProvider) ? generateAudio : undefined,
+            camera_motion: ltxCameraMotion,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
-            modelId: currentProvider.modelId, // Pass model ID for AI/ML API
+            modelId: currentProvider.modelId,
           }
         });
 
@@ -629,6 +662,13 @@ export const TextToVideoForm = () => {
               <SelectItem value="crane_down">Crane Down - Gru verso il basso</SelectItem>
               <SelectItem value="pan_left">Pan Left - Panoramica sinistra</SelectItem>
               <SelectItem value="pan_right">Pan Right - Panoramica destra</SelectItem>
+              <SelectItem value="pan_up">Pan Up - Panoramica verso l'alto</SelectItem>
+              <SelectItem value="pan_down">Pan Down - Panoramica verso il basso</SelectItem>
+              <SelectItem value="zoom_in">Zoom In - Ingrandimento</SelectItem>
+              <SelectItem value="zoom_out">Zoom Out - Riduzione</SelectItem>
+              <SelectItem value="tilt_up">Tilt Up - Inclinazione verso l'alto</SelectItem>
+              <SelectItem value="tilt_down">Tilt Down - Inclinazione verso il basso</SelectItem>
+              <SelectItem value="handheld">Handheld - Camera a mano</SelectItem>
               <SelectItem value="aerial">Aerial - Vista aerea</SelectItem>
               <SelectItem value="pov">POV - Prima persona</SelectItem>
               <SelectItem value="orbit">Orbit - Rotazione circolare</SelectItem>
