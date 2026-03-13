@@ -249,6 +249,7 @@ export const ProviderCreditsWidget = () => {
         results.push({ name: "LTX Video", hasKey: false, status: "error", supportedModels: ["2.3 Pro", "2.3 Fast", "2 Pro", "2 Fast"] });
       }
 
+    } catch (error) {
       console.error("Error fetching provider balances:", error);
     }
 
