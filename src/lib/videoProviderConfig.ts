@@ -2819,6 +2819,7 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   if (providerId === 'google-veo' || providerId === 'veo') return 'google';
   if (providerId === 'freepik') return 'freepik';
   if (providerId.startsWith('vidu-')) return 'vidu';
+  if (providerId.startsWith('ltx-')) return 'ltx';
   return 'auto';
 }
 
