@@ -148,6 +148,7 @@ export const DiagnosticsPanel = () => {
       { name: "piapi-image", label: "PIAPI Image", body: { healthCheck: true } },
       { name: "piapi-audio", label: "PIAPI Audio", body: { healthCheck: true } },
       { name: "aiml-balance", label: "AIML API", body: {} },
+      { name: "ltx-video", label: "LTX Video", body: { healthCheck: true } },
     ];
 
     for (const check of checks) {
