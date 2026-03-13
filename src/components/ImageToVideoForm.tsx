@@ -520,6 +520,16 @@ export const ImageToVideoForm = () => {
         requestBody.reference_video = videoBase64;
       }
 
+      // Add native LTX camera motion parameter
+      const isLtxProvider = preferredProvider.startsWith("ltx-");
+      const ltxCameraMotion = isLtxProvider && cameraMovement !== "none" 
+        ? (ltxCameraMotionMap[cameraMovement] || cameraMovement) 
+        : undefined;
+      
+      if (ltxCameraMotion) {
+        requestBody.camera_motion = ltxCameraMotion;
+      }
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: requestBody
