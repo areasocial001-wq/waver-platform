@@ -35,6 +35,7 @@ const REQUIRED_API_KEYS: Record<string, string> = {
   'PIAPI_API_KEY': 'PiAPI',
   'AIML_API_KEY': 'AI/ML API',
   'FREEPIK_API_KEY': 'Freepik',
+  'LTX_API_KEY': 'LTX Video',
 };
 
 export const TextToVideoForm = () => {
@@ -311,8 +312,8 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: duration,
             resolution: resolution,
-            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3") ? aspectRatio : undefined,
-            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3") ? generateAudio : undefined,
+            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? aspectRatio : undefined,
+            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? generateAudio : undefined,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
             modelId: currentProvider.modelId, // Pass model ID for AI/ML API

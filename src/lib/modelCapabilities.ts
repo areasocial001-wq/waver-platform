@@ -1203,6 +1203,83 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
   },
+
+  // ============ LTX VIDEO ============
+  'ltx-2-3-fast': {
+    durations: [
+      { value: 6, label: '6 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+      { value: 12, label: '12 secondi' },
+      { value: 14, label: '14 secondi' },
+      { value: 16, label: '16 secondi' },
+      { value: 18, label: '18 secondi' },
+      { value: 20, label: '20 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+      { value: '1440p', label: '1440p (QHD)' },
+      { value: '4k', label: '4K (Ultra HD)' },
+    ],
+    aspectRatios: STANDARD_ASPECT_RATIOS,
+    supportsTextToVideo: true,
+    supportsImageToVideo: true,
+    supportsEndFrame: true,
+    supportsAudio: true,
+    defaultDuration: 8,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '1080p',
+  },
+  'ltx-2-3-pro': {
+    durations: [
+      { value: 6, label: '6 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+      { value: '1440p', label: '1440p (QHD)' },
+      { value: '4k', label: '4K (Ultra HD)' },
+    ],
+    aspectRatios: STANDARD_ASPECT_RATIOS,
+    supportsTextToVideo: true,
+    supportsImageToVideo: true,
+    supportsEndFrame: true,
+    supportsAudio: true,
+    defaultDuration: 8,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '1080p',
+  },
+  'ltx-2-fast': {
+    durations: [
+      { value: 6, label: '6 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
+    resolutions: STANDARD_RESOLUTIONS,
+    aspectRatios: STANDARD_ASPECT_RATIOS,
+    supportsTextToVideo: true,
+    supportsImageToVideo: true,
+    supportsAudio: true,
+    defaultDuration: 8,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '1080p',
+  },
+  'ltx-2-pro': {
+    durations: [
+      { value: 6, label: '6 secondi' },
+      { value: 8, label: '8 secondi' },
+      { value: 10, label: '10 secondi' },
+    ],
+    resolutions: STANDARD_RESOLUTIONS,
+    aspectRatios: STANDARD_ASPECT_RATIOS,
+    supportsTextToVideo: true,
+    supportsImageToVideo: true,
+    supportsAudio: true,
+    defaultDuration: 8,
+    defaultAspectRatio: '16:9',
+    defaultResolution: '1080p',
+  },
 };
 
 /**

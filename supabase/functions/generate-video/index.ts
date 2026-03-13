@@ -108,6 +108,12 @@ const MODEL_DURATION_CONSTRAINTS: Record<string, number[]> = {
   // Default fallback
   'hunyuan': [5],
   'qubico/hunyuan': [5],
+  // LTX Video
+  'ltx-2-3-fast': [6, 8, 10, 12, 14, 16, 18, 20],
+  'ltx-2-3-pro': [6, 8, 10],
+  'ltx-2-fast': [6, 8, 10],
+  'ltx-2-pro': [6, 8, 10],
+  'ltx': [6, 8, 10],
   'default': [5, 10],
 };
 
@@ -224,10 +230,11 @@ serve(async (req) => {
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
     const hasValidViduKey = VIDU_API_KEY && VIDU_API_KEY.trim().length > 0;
+    const hasValidLtxKey = !!Deno.env.get('LTX_API_KEY')?.trim();
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, or VIDU_API_KEY");
+    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey) {
+      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, or LTX_API_KEY");
     }
     
     console.log("API credentials check:", {
@@ -1072,6 +1079,144 @@ serve(async (req) => {
         status: "starting",
         operationId: `piapi:kling-2.6-motion:${taskId}`,
         message: "Kling 2.6 Motion Control video generation started"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ==================== LTX VIDEO PROVIDERS ====================
+    if (preferredProvider?.startsWith('ltx-')) {
+      const LTX_API_KEY = Deno.env.get('LTX_API_KEY');
+      if (!LTX_API_KEY) {
+        throw new Error("LTX_API_KEY is not configured");
+      }
+
+      const ltxModel = preferredProvider; // ltx-2-3-fast, ltx-2-3-pro, ltx-2-fast, ltx-2-pro
+      const isI2V = type === "image_to_video";
+      const startImageData = start_image || image || image_url;
+      const normalizedLtxPrompt = normalizePrompt(prompt);
+
+      // Map resolution to LTX format
+      const ltxResolutionMap: Record<string, Record<string, string>> = {
+        '16:9': { '1080p': '1920x1080', '1440p': '2560x1440', '4k': '3840x2160' },
+        '9:16': { '1080p': '1080x1920', '1440p': '1440x2560', '4k': '2160x3840' },
+      };
+      const ar = aspect_ratio || '16:9';
+      const ltxResolution = ltxResolutionMap[ar]?.[resolution || '1080p'] || '1920x1080';
+
+      // Map camera movements to LTX format
+      const ltxCameraMotion = body.camera_motion && body.camera_motion !== 'none' ? body.camera_motion : undefined;
+
+      console.log(`[LTX] Starting generation: model=${ltxModel}, type=${type}, duration=${duration}, resolution=${ltxResolution}`);
+
+      const ltxHeaders = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${LTX_API_KEY}`,
+      };
+
+      let ltxEndpoint: string;
+      let ltxPayload: any;
+
+      if (isI2V && startImageData) {
+        ltxEndpoint = 'https://api.ltx.video/v1/image-to-video';
+
+        // Need URL for LTX - upload base64 if needed
+        let imageUri = startImageData;
+        if (startImageData.startsWith('data:') || !startImageData.startsWith('http')) {
+          imageUri = await uploadToStorageAndGetUrl(startImageData, "ltx-img", { signed: true, signedExpiresInSec: 3600 });
+        }
+
+        ltxPayload = {
+          image_uri: imageUri,
+          prompt: normalizedLtxPrompt || '',
+          model: ltxModel,
+          duration: sanitizeDuration(ltxModel, duration || 8),
+          resolution: ltxResolution,
+          generate_audio: generate_audio !== false,
+        };
+
+        // End frame support (LTX 2.3 models only)
+        if (end_image && ltxModel.includes('2-3')) {
+          let lastFrameUri = end_image;
+          if (end_image.startsWith('data:') || !end_image.startsWith('http')) {
+            lastFrameUri = await uploadToStorageAndGetUrl(end_image, "ltx-end", { signed: true, signedExpiresInSec: 3600 });
+          }
+          ltxPayload.last_frame_uri = lastFrameUri;
+        }
+
+        if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
+      } else {
+        ltxEndpoint = 'https://api.ltx.video/v1/text-to-video';
+        ltxPayload = {
+          prompt: normalizedLtxPrompt,
+          model: ltxModel,
+          duration: sanitizeDuration(ltxModel, duration || 8),
+          resolution: ltxResolution,
+          generate_audio: generate_audio !== false,
+        };
+        if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
+      }
+
+      console.log(`[LTX] Payload:`, JSON.stringify(ltxPayload));
+
+      const ltxResponse = await fetch(ltxEndpoint, {
+        method: "POST",
+        headers: ltxHeaders,
+        body: JSON.stringify(ltxPayload),
+      });
+
+      if (!ltxResponse.ok) {
+        const error = await ltxResponse.text();
+        console.error(`[LTX] Error: ${ltxResponse.status} - ${error}`);
+        throw new Error(`LTX error: ${ltxResponse.status} - ${error}`);
+      }
+
+      // LTX returns video directly as MP4 binary - no polling needed!
+      const videoBuffer = await ltxResponse.arrayBuffer();
+      const requestId = ltxResponse.headers.get('x-request-id') || Date.now().toString();
+      console.log(`[LTX] Video received: ${videoBuffer.byteLength} bytes, request-id: ${requestId}`);
+
+      // Upload to Supabase storage
+      const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+      const fileName = `ltx-video/${isI2V ? 'i2v' : 't2v'}_${Date.now()}_${requestId}.mp4`;
+      const { error: uploadError } = await supabaseClient.storage
+        .from('generated-videos')
+        .upload(fileName, new Uint8Array(videoBuffer), {
+          contentType: 'video/mp4',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('[LTX] Storage upload error:', uploadError);
+        throw new Error(`Failed to store LTX video: ${uploadError.message}`);
+      }
+
+      // Get signed URL
+      const { data: signedData } = await supabaseClient.storage
+        .from('generated-videos')
+        .createSignedUrl(fileName, 7200);
+
+      const videoUrl = signedData?.signedUrl || supabaseClient.storage.from('generated-videos').getPublicUrl(fileName).data.publicUrl;
+
+      // Update generation record as completed immediately
+      if (generationId) {
+        await supabaseClient
+          .from('video_generations')
+          .update({
+            status: 'completed',
+            video_url: `storage://${fileName}`,
+          })
+          .eq('id', generationId);
+      }
+
+      return new Response(JSON.stringify({
+        status: "succeeded",
+        output: videoUrl,
+        provider: "ltx",
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

@@ -100,9 +100,14 @@ export type VideoProviderType =
   | 'piapi-veo3'
   | 'piapi-sora2'
   // Freepik
-  | 'freepik';
+  | 'freepik'
+  // LTX Video
+  | 'ltx-2-3-fast'
+  | 'ltx-2-3-pro'
+  | 'ltx-2-fast'
+  | 'ltx-2-pro';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'auto';
+export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
@@ -2615,6 +2620,152 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     modelId: 'viduq1',
     category: 'Vidu',
   },
+
+  // ============ LTX VIDEO ============
+  'ltx-2-3-fast': {
+    id: 'ltx-2-3-fast',
+    name: 'LTX: 2.3 Fast',
+    shortName: 'LTX 2.3 Fast',
+    group: 'ltx',
+    description: 'Veloce, fino a 4K, audio sincronizzato, fino a 20s',
+    color: 'bg-emerald-500',
+    badgeColor: 'bg-emerald-500/20',
+    textColor: 'text-emerald-500',
+    speed: 3,
+    quality: 2,
+    cost: 1,
+    features: ['Audio sincronizzato', 'Fino a 4K', 'Fino a 20s', 'Veloce'],
+    estimatedTime: '30s-2 min',
+    fallbackOrder: ['ltx-2-3-pro', 'ltx-2-fast'],
+    durations: [
+      { value: '6', label: '6 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+      { value: '14', label: '14 secondi' },
+      { value: '20', label: '20 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+      { value: '1440p', label: '1440p (QHD)' },
+      { value: '4k', label: '4K (Ultra HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    supportsEndFrame: true,
+    requiresApiKey: 'LTX_API_KEY',
+    modelId: 'ltx-2-3-fast',
+    category: 'LTX Video',
+  },
+  'ltx-2-3-pro': {
+    id: 'ltx-2-3-pro',
+    name: 'LTX: 2.3 Pro',
+    shortName: 'LTX 2.3 Pro',
+    group: 'ltx',
+    description: 'Qualità massima, 4K, audio, retake & extend',
+    color: 'bg-emerald-600',
+    badgeColor: 'bg-emerald-600/20',
+    textColor: 'text-emerald-600',
+    speed: 2,
+    quality: 3,
+    cost: 2,
+    features: ['Audio sincronizzato', 'Fino a 4K', 'Retake', 'Extend', 'Audio-to-Video'],
+    estimatedTime: '1-3 min',
+    fallbackOrder: ['ltx-2-3-fast', 'ltx-2-pro'],
+    durations: [
+      { value: '6', label: '6 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+      { value: '1440p', label: '1440p (QHD)' },
+      { value: '4k', label: '4K (Ultra HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    supportsEndFrame: true,
+    requiresApiKey: 'LTX_API_KEY',
+    modelId: 'ltx-2-3-pro',
+    category: 'LTX Video',
+  },
+  'ltx-2-fast': {
+    id: 'ltx-2-fast',
+    name: 'LTX: 2 Fast',
+    shortName: 'LTX 2 Fast',
+    group: 'ltx',
+    description: 'Generazione rapida, audio integrato',
+    color: 'bg-emerald-400',
+    badgeColor: 'bg-emerald-400/20',
+    textColor: 'text-emerald-400',
+    speed: 3,
+    quality: 2,
+    cost: 1,
+    features: ['Audio sincronizzato', 'Veloce', 'Economico'],
+    estimatedTime: '30s-1 min',
+    fallbackOrder: ['ltx-2-pro', 'ltx-2-3-fast'],
+    durations: [
+      { value: '6', label: '6 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    requiresApiKey: 'LTX_API_KEY',
+    modelId: 'ltx-2-fast',
+    category: 'LTX Video',
+  },
+  'ltx-2-pro': {
+    id: 'ltx-2-pro',
+    name: 'LTX: 2 Pro',
+    shortName: 'LTX 2 Pro',
+    group: 'ltx',
+    description: 'Alta fedeltà, audio, retake & extend',
+    color: 'bg-emerald-500',
+    badgeColor: 'bg-emerald-500/20',
+    textColor: 'text-emerald-500',
+    speed: 2,
+    quality: 3,
+    cost: 2,
+    features: ['Audio sincronizzato', 'Alta fedeltà', 'Retake', 'Extend', 'Audio-to-Video'],
+    estimatedTime: '1-3 min',
+    fallbackOrder: ['ltx-2-fast', 'ltx-2-3-pro'],
+    durations: [
+      { value: '6', label: '6 secondi' },
+      { value: '8', label: '8 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+    ],
+    supportsAudio: true,
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    requiresApiKey: 'LTX_API_KEY',
+    modelId: 'ltx-2-pro',
+    category: 'LTX Video',
+  },
 };
 
 // Helper per ottenere provider per gruppo
@@ -2638,6 +2789,7 @@ export function getGroupLabel(group: ProviderGroup): string {
     piapi: 'PiAPI',
     freepik: 'Freepik',
     vidu: 'Vidu',
+    ltx: 'LTX Video',
   };
   return labels[group];
 }
@@ -2651,6 +2803,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
     piapi: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
     vidu: { bg: 'bg-teal-500/20', text: 'text-teal-500' },
+    ltx: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
   };
   return styles[group];
 }
@@ -2666,6 +2819,7 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   if (providerId === 'google-veo' || providerId === 'veo') return 'google';
   if (providerId === 'freepik') return 'freepik';
   if (providerId.startsWith('vidu-')) return 'vidu';
+  if (providerId.startsWith('ltx-')) return 'ltx';
   return 'auto';
 }
 
@@ -2808,6 +2962,11 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'vidu-q2-i2v': { perSecond: 0.04, perGeneration: 0.20 },
   'vidu-q1-t2v': { perSecond: 0.02, perGeneration: 0.10 },
   'vidu-q1-i2v': { perSecond: 0.02, perGeneration: 0.10 },
+  // LTX Video
+  'ltx-2-3-fast': { perSecond: 0.03, perGeneration: 0.24 },
+  'ltx-2-3-pro': { perSecond: 0.06, perGeneration: 0.48 },
+  'ltx-2-fast': { perSecond: 0.02, perGeneration: 0.16 },
+  'ltx-2-pro': { perSecond: 0.05, perGeneration: 0.40 },
 };
 
 // Ordine di visualizzazione per provider (raggruppati)
@@ -2909,4 +3068,9 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'vidu-q3-turbo-i2v',
   'vidu-q2-t2v',
   'vidu-q1-t2v',
+  // LTX Video
+  'ltx-2-3-pro',
+  'ltx-2-3-fast',
+  'ltx-2-pro',
+  'ltx-2-fast',
 ];
