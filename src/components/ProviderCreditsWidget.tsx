@@ -232,7 +232,23 @@ export const ProviderCreditsWidget = () => {
         results.push({ name: "Vidu", hasKey: false, status: "error", supportedModels: ["Q3 Pro", "Q3 Turbo", "Q2", "Q1"] });
       }
 
-    } catch (error) {
+      // LTX Video Health Check
+      try {
+        const { data: ltxData } = await supabase.functions.invoke('ltx-video', {
+          body: { healthCheck: true }
+        });
+        const hasLtxKey = !!ltxData && ltxData.hasKey;
+        results.push({
+          name: "LTX Video",
+          hasKey: hasLtxKey,
+          status: hasLtxKey ? "active" : "unknown",
+          details: hasLtxKey ? "Chiave configurata" : "Non configurato",
+          supportedModels: ["2.3 Pro", "2.3 Fast", "2 Pro", "2 Fast"]
+        });
+      } catch {
+        results.push({ name: "LTX Video", hasKey: false, status: "error", supportedModels: ["2.3 Pro", "2.3 Fast", "2 Pro", "2 Fast"] });
+      }
+
       console.error("Error fetching provider balances:", error);
     }
 
