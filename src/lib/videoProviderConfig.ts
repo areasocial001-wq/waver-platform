@@ -2789,6 +2789,7 @@ export function getGroupLabel(group: ProviderGroup): string {
     piapi: 'PiAPI',
     freepik: 'Freepik',
     vidu: 'Vidu',
+    ltx: 'LTX Video',
   };
   return labels[group];
 }
