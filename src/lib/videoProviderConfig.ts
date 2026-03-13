@@ -2803,6 +2803,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
     piapi: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
     vidu: { bg: 'bg-teal-500/20', text: 'text-teal-500' },
+    ltx: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
   };
   return styles[group];
 }
