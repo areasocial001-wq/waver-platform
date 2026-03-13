@@ -45,6 +45,7 @@ export const ProviderCreditsWidget = () => {
     { name: "Freepik", hasKey: false, status: "loading" },
     { name: "Google AI", hasKey: false, status: "loading" },
     { name: "Vidu", hasKey: false, status: "loading" },
+    { name: "LTX Video", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
