@@ -2962,6 +2962,11 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'vidu-q2-i2v': { perSecond: 0.04, perGeneration: 0.20 },
   'vidu-q1-t2v': { perSecond: 0.02, perGeneration: 0.10 },
   'vidu-q1-i2v': { perSecond: 0.02, perGeneration: 0.10 },
+  // LTX Video
+  'ltx-2-3-fast': { perSecond: 0.03, perGeneration: 0.24 },
+  'ltx-2-3-pro': { perSecond: 0.06, perGeneration: 0.48 },
+  'ltx-2-fast': { perSecond: 0.02, perGeneration: 0.16 },
+  'ltx-2-pro': { perSecond: 0.05, perGeneration: 0.40 },
 };
 
 // Ordine di visualizzazione per provider (raggruppati)
