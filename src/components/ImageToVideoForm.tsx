@@ -1051,6 +1051,13 @@ export const ImageToVideoForm = () => {
               <SelectItem value="none">Nessuno (Statico)</SelectItem>
               <SelectItem value="dolly_in">Dolly In - Avvicinamento</SelectItem>
               <SelectItem value="dolly_out">Dolly Out - Allontanamento</SelectItem>
+              <SelectItem value="zoom_in">Zoom In - Zoom avanti</SelectItem>
+              <SelectItem value="zoom_out">Zoom Out - Zoom indietro</SelectItem>
+              <SelectItem value="pan_up">Pan Up - Panoramica su</SelectItem>
+              <SelectItem value="pan_down">Pan Down - Panoramica giù</SelectItem>
+              <SelectItem value="tilt_up">Tilt Up - Inclinazione su</SelectItem>
+              <SelectItem value="tilt_down">Tilt Down - Inclinazione giù</SelectItem>
+              <SelectItem value="handheld">Handheld - Camera a mano</SelectItem>
               <SelectItem value="tracking">Tracking - Segui soggetto</SelectItem>
               <SelectItem value="crane_up">Crane Up - Gru verso l'alto</SelectItem>
               <SelectItem value="crane_down">Crane Down - Gru verso il basso</SelectItem>
