@@ -177,7 +177,7 @@ export const TextToVideoForm = () => {
       
       // Add camera movement
       if (cameraMovement !== "none") {
-        const cameraMovements = {
+        const cameraMovements: Record<string, string> = {
           "dolly_in": "Slow dolly in shot, camera smoothly pushes toward the subject",
           "dolly_out": "Slow dolly out shot, camera smoothly pulls away from the subject",
           "tracking": "Smooth tracking shot following the subject's movement",
@@ -185,11 +185,18 @@ export const TextToVideoForm = () => {
           "crane_down": "Crane shot descending from above down to the subject",
           "pan_left": "Slow pan left across the scene",
           "pan_right": "Slow pan right across the scene",
+          "pan_up": "Slow pan upward across the scene",
+          "pan_down": "Slow pan downward across the scene",
           "aerial": "Aerial view, high angle perspective looking down",
           "pov": "POV shot, first person perspective",
-          "orbit": "Orbital camera movement circling around the subject"
+          "orbit": "Orbital camera movement circling around the subject",
+          "handheld": "Handheld camera with natural subtle movement and shake",
+          "zoom_in": "Smooth zoom in toward the subject",
+          "zoom_out": "Smooth zoom out from the subject",
+          "tilt_up": "Camera tilts upward from low to high angle",
+          "tilt_down": "Camera tilts downward from high to low angle",
         };
-        cinematicPrompt += cameraMovements[cameraMovement] + ", ";
+        cinematicPrompt += (cameraMovements[cameraMovement] || cameraMovement) + ", ";
       }
       
       // Add composition style
