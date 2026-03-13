@@ -35,15 +35,42 @@ serve(async (req) => {
   }
 
   try {
+    const body = await req.json();
+
+    // Handle health check (no auth needed)
+    if (body.healthCheck) {
+      return new Response(
+        JSON.stringify({ status: 'ok', service: 'piapi-image' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // JWT validation
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Invalid JWT" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     if (!PIAPI_API_KEY) {
       throw new Error("PIAPI_API_KEY is not configured");
     }
-
-    const body = await req.json();
-
-    // Handle health check
-    if (body.healthCheck) {
       return new Response(
         JSON.stringify({ status: 'ok', service: 'piapi-image' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
