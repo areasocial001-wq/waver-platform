@@ -45,8 +45,9 @@ export const Navbar = () => {
   const isSettingsPage = location.pathname === "/settings";
   const isExportTestPage = location.pathname === "/export-test";
   const isViduToolsPage = location.pathname === "/vidu-tools";
+  const isLTXToolsPage = location.pathname === "/ltx-tools";
   const isNLtoJSONPage = location.pathname === "/nl-to-json";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isNLtoJSONPage;
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
