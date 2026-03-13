@@ -16,6 +16,7 @@ import TalkingAvatarPage from "./pages/TalkingAvatar";
 import JSON2VideoPage from "./pages/JSON2VideoPage";
 import SettingsPage from "./pages/Settings";
 import ViduToolsPage from "./pages/ViduTools";
+import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
 
 import NotFound from "./pages/NotFound";
