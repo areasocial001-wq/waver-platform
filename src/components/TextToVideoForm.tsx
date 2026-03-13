@@ -35,6 +35,7 @@ const REQUIRED_API_KEYS: Record<string, string> = {
   'PIAPI_API_KEY': 'PiAPI',
   'AIML_API_KEY': 'AI/ML API',
   'FREEPIK_API_KEY': 'Freepik',
+  'LTX_API_KEY': 'LTX Video',
 };
 
 export const TextToVideoForm = () => {
