@@ -100,7 +100,12 @@ export type VideoProviderType =
   | 'piapi-veo3'
   | 'piapi-sora2'
   // Freepik
-  | 'freepik';
+  | 'freepik'
+  // LTX Video
+  | 'ltx-2-3-fast'
+  | 'ltx-2-3-pro'
+  | 'ltx-2-fast'
+  | 'ltx-2-pro';
 
 export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'auto';
 
