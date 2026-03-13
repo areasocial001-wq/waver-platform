@@ -63,7 +63,7 @@ export const useVideoPolling = (
   // Track videos with broken links
   const brokenLinkVideos = useRef<Set<string>>(new Set());
   // Track retry timers
-  const retryTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const retryTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Check if URL is a Google VEO API URL that needs proxying
   const isGoogleVeoUrl = useCallback((url: string) => {
