@@ -312,6 +312,31 @@ export const TextToVideoForm = () => {
       });
 
       // Generate video synchronously - include modelId for AI/ML API providers
+      // Map camera movement IDs to LTX API camera_motion values
+      const ltxCameraMotionMap: Record<string, string> = {
+        "dolly_in": "dolly-in",
+        "dolly_out": "dolly-out",
+        "pan_left": "pan-left",
+        "pan_right": "pan-right",
+        "pan_up": "pan-up",
+        "pan_down": "pan-down",
+        "crane_up": "crane-up",
+        "crane_down": "crane-down",
+        "tracking": "tracking",
+        "orbit": "orbit",
+        "handheld": "handheld",
+        "zoom_in": "zoom-in",
+        "zoom_out": "zoom-out",
+        "tilt_up": "tilt-up",
+        "tilt_down": "tilt-down",
+        "static": "static",
+      };
+
+      const isLtxProvider = preferredProvider.startsWith("ltx-");
+      const ltxCameraMotion = isLtxProvider && cameraMovement !== "none" 
+        ? (ltxCameraMotionMap[cameraMovement] || cameraMovement) 
+        : undefined;
+
       const { data, error } = await supabase.functions
         .invoke("generate-video", {
           body: {
@@ -319,11 +344,12 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: duration,
             resolution: resolution,
-            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? aspectRatio : undefined,
-            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || preferredProvider.startsWith("ltx-")) ? generateAudio : undefined,
+            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || isLtxProvider) ? aspectRatio : undefined,
+            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || isLtxProvider) ? generateAudio : undefined,
+            camera_motion: ltxCameraMotion,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
-            modelId: currentProvider.modelId, // Pass model ID for AI/ML API
+            modelId: currentProvider.modelId,
           }
         });
 
