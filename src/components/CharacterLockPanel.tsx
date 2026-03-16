@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, DragEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, X, Upload, Trash2, Edit2, Check, Image as ImageIcon } from "lucide-react";
+import { Users, Plus, X, Upload, Trash2, Edit2, Check, Image as ImageIcon, GripVertical } from "lucide-react";
 import { StoryboardCharacter } from "@/hooks/useStoryboardCharacters";
+import { toast } from "sonner";
 
 const CHARACTER_COLORS = [
   "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6",
