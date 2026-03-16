@@ -15,11 +15,19 @@ interface StoryboardPanel {
   imageUrl: string | null;
   caption: string;
   note?: string;
+  characterIds?: string[];
+}
+
+interface CharacterRef {
+  id: string;
+  name: string;
+  reference_images: string[];
 }
 
 interface StoryboardToVideoDialogProps {
   storyboardId: string;
   panels: StoryboardPanel[];
+  characters?: CharacterRef[];
   onSuccess?: () => void;
 }
 
