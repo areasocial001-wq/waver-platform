@@ -984,6 +984,19 @@ export const StoryboardEditor = () => {
                 </div>
               </ScrollArea>
             </div>
+            {currentStoryboardId && (
+              <CharacterLockPanel
+                characters={characters}
+                onAddCharacter={addCharacter}
+                onUpdateCharacter={updateCharacterData}
+                onDeleteCharacter={deleteCharacter}
+                onAddReferenceImage={addReferenceImage}
+                onRemoveReferenceImage={removeReferenceImage}
+                onAssignCharacter={handleAssignCharacter}
+                onUnassignCharacter={handleUnassignCharacter}
+                disabled={!currentStoryboardId}
+              />
+            )}
           </Card>
         )}
 
