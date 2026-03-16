@@ -20,12 +20,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   ImageIcon, Video, Wand2, Play, Sparkles, Camera, Users, Film,
-  ChevronRight, Loader2, Settings2
+  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight
 } from 'lucide-react';
 import { ImageTransform } from './SortablePanel';
 import { StoryboardCharacter } from '@/hooks/useStoryboardCharacters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+interface PromptVersion {
+  prompt: string;
+  camera: string;
+  timestamp: number;
+}
 
 interface StoryboardPanel {
   id: string;
@@ -222,8 +228,20 @@ export const ScriptToVideoWorkflow = ({
   const [aiGenerating, setAiGenerating] = useState<Record<string, boolean>>({});
   const [aiGeneratingAll, setAiGeneratingAll] = useState(false);
 
+  const [promptHistory, setPromptHistory] = useState<Record<string, PromptVersion[]>>({});
+  const [showComparison, setShowComparison] = useState<string | null>(null);
+
   const generatePromptForScene = useCallback(async (panel: StoryboardPanel) => {
     if (!panel.imageUrl) return;
+    // Save current prompt as history before overwriting
+    const currentPrompt = scenePrompts[panel.id] || panel.caption || '';
+    const currentCamera = sceneCameras[panel.id] || 'none';
+    if (currentPrompt.trim()) {
+      setPromptHistory(prev => ({
+        ...prev,
+        [panel.id]: [...(prev[panel.id] || []), { prompt: currentPrompt, camera: currentCamera, timestamp: Date.now() }],
+      }));
+    }
     setAiGenerating(prev => ({ ...prev, [panel.id]: true }));
     try {
       // Compress image for API
@@ -269,6 +287,12 @@ export const ScriptToVideoWorkflow = ({
     } finally {
       setAiGenerating(prev => ({ ...prev, [panel.id]: false }));
     }
+  }, [scenePrompts, sceneCameras]);
+
+  const restorePromptVersion = useCallback((panelId: string, version: PromptVersion) => {
+    setScenePrompts(prev => ({ ...prev, [panelId]: version.prompt }));
+    setSceneCameras(prev => ({ ...prev, [panelId]: version.camera }));
+    toast.success('Prompt precedente ripristinato');
   }, []);
 
   const generateAllPrompts = useCallback(async () => {
@@ -600,6 +624,55 @@ export const ScriptToVideoWorkflow = ({
                     <><Sparkles className="h-3 w-3" /> Genera prompt con AI</>
                   )}
                 </Button>
+                {/* Prompt history / before-after */}
+                {(promptHistory[selectedPanel.id]?.length || 0) > 0 && (
+                  <div className="space-y-1.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowComparison(showComparison === selectedPanel.id ? null : selectedPanel.id)}
+                      className="w-full gap-1.5 text-xs h-6 text-muted-foreground hover:text-foreground"
+                    >
+                      <History className="h-3 w-3" />
+                      {promptHistory[selectedPanel.id].length} versioni precedenti
+                    </Button>
+                    {showComparison === selectedPanel.id && (
+                      <div className="space-y-2 border rounded-md p-2 bg-muted/30">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Before / After</p>
+                        {promptHistory[selectedPanel.id].map((ver, i) => (
+                          <div key={i} className="space-y-1 border-b border-border/50 pb-2 last:border-0">
+                            <div className="flex items-center justify-between">
+                              <Badge variant="outline" className="text-[9px]">
+                                v{i + 1} • {new Date(ver.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}
+                              </Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => restorePromptVersion(selectedPanel.id, ver)}
+                                className="h-5 px-1.5 text-[9px] gap-1 text-muted-foreground hover:text-foreground"
+                              >
+                                <RotateCcw className="h-2.5 w-2.5" /> Ripristina
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-3 bg-destructive/5 rounded px-1.5 py-1 border-l-2 border-destructive/30">
+                              {ver.prompt}
+                            </p>
+                            <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                              <ArrowRight className="h-2.5 w-2.5" />
+                              <span>Camera: {ver.camera}</span>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="pt-1">
+                          <p className="text-[10px] font-medium text-primary mb-1">Attuale:</p>
+                          <p className="text-[10px] bg-primary/5 rounded px-1.5 py-1 border-l-2 border-primary/30 line-clamp-3">
+                            {scenePrompts[selectedPanel.id] || selectedPanel.caption || 'Nessun prompt'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
