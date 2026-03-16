@@ -27,6 +27,7 @@ import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
 import { useStoryboardHistory } from "@/hooks/useStoryboardHistory";
 import { usePromptTemplates } from "@/hooks/usePromptTemplates";
 import { WorkflowView } from "./WorkflowView";
+import { ScriptToVideoWorkflow, PipelineConfig } from "./ScriptToVideoWorkflow";
 import { AIPromptAssistant, PromptTemplate } from "./AIPromptAssistant";
 import { MultiModelGenerator } from "./MultiModelGenerator";
 import { VideoComparisonReport } from "./VideoComparisonReport";
