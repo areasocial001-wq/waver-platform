@@ -287,6 +287,12 @@ export const ScriptToVideoWorkflow = ({
     } finally {
       setAiGenerating(prev => ({ ...prev, [panel.id]: false }));
     }
+  }, [scenePrompts, sceneCameras]);
+
+  const restorePromptVersion = useCallback((panelId: string, version: PromptVersion) => {
+    setScenePrompts(prev => ({ ...prev, [panelId]: version.prompt }));
+    setSceneCameras(prev => ({ ...prev, [panelId]: version.camera }));
+    toast.success('Prompt precedente ripristinato');
   }, []);
 
   const generateAllPrompts = useCallback(async () => {
