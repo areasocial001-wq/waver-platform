@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { ImageTransform } from './SortablePanel';
 import { StoryboardCharacter } from '@/hooks/useStoryboardCharacters';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface StoryboardPanel {
