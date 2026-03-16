@@ -1059,6 +1059,33 @@ export const StoryboardEditor = () => {
                         imageTransform={panel.transform}
                         onTransformChange={(transform) => handleTransformChange(panel.id, transform)}
                       />
+                      {/* Character assignment chips */}
+                      {characters.length > 0 && panel.imageUrl && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {characters.map((char) => {
+                            const isAssigned = (panel.characterIds || []).includes(char.id);
+                            return (
+                              <button
+                                key={char.id}
+                                onClick={() => isAssigned 
+                                  ? handleUnassignCharacter(panel.id, char.id) 
+                                  : handleAssignCharacter(panel.id, char.id)
+                                }
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                                  isAssigned 
+                                    ? "opacity-100 border-current" 
+                                    : "opacity-40 border-dashed hover:opacity-70"
+                                }`}
+                                style={{ color: char.color, borderColor: char.color, backgroundColor: isAssigned ? `${char.color}20` : 'transparent' }}
+                                title={isAssigned ? `Rimuovi ${char.name}` : `Assegna ${char.name}`}
+                              >
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: char.color }} />
+                                {char.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                       {!panel.imageUrl && (
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
                           <StockLibraryDialog
