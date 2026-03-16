@@ -180,6 +180,15 @@ export const StoryboardEditor = () => {
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
   const { templates: savedTemplates, saveTemplate, deleteTemplate, updateTemplate } = usePromptTemplates();
+  const {
+    characters,
+    addCharacter,
+    updateCharacter: updateCharacterData,
+    deleteCharacter,
+    addReferenceImage,
+    removeReferenceImage,
+    getCharacterRefsForPanel,
+  } = useStoryboardCharacters(currentStoryboardId);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
