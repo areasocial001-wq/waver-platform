@@ -144,16 +144,24 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
           }
         }
 
+        // Collect character reference images for this panel
+        const panelCharacterIds = startPanel.characterIds || [];
+        const characterRefImages = characters
+          .filter(c => panelCharacterIds.includes(c.id))
+          .flatMap(c => c.reference_images)
+          .slice(0, 5); // Max 5 reference images (Veo 3.1 limit)
+
         // Call edge function to generate video
         const { error: videoError } = await supabase.functions.invoke("generate-video", {
           body: {
             type: "image_to_video",
             duration,
             start_image: startPanel.imageUrl,
-            end_image: endPanel.imageUrl, // Use end frame for transition
+            end_image: endPanel.imageUrl,
             prompt: fullPrompt,
             generationId: generation.id,
             preferredProvider: videoProvider !== "auto" ? videoProvider : undefined,
+            ...(characterRefImages.length > 0 && { image_urls: characterRefImages }),
           },
         });
 
