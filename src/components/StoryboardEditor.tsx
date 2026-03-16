@@ -40,6 +40,7 @@ interface StoryboardPanel {
   caption: string;
   note?: string;
   transform?: ImageTransform;
+  characterIds?: string[];
 }
 
 type LayoutType = "2x2" | "3x2" | "4x2" | "2x3" | "3x3";
