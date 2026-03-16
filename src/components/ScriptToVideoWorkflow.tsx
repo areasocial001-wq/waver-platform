@@ -587,6 +587,19 @@ export const ScriptToVideoWorkflow = ({
                   rows={3}
                   className="text-xs"
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => generatePromptForScene(selectedPanel)}
+                  disabled={aiGenerating[selectedPanel.id]}
+                  className="w-full gap-1.5 text-xs h-7"
+                >
+                  {aiGenerating[selectedPanel.id] ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Analisi AI...</>
+                  ) : (
+                    <><Sparkles className="h-3 w-3" /> Genera prompt con AI</>
+                  )}
+                </Button>
               </div>
 
               <div className="space-y-1.5">
