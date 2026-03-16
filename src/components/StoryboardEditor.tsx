@@ -167,7 +167,7 @@ export const StoryboardEditor = () => {
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [mysticDialogOpen, setMysticDialogOpen] = useState(false);
   const [mysticTargetPanelId, setMysticTargetPanelId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'workflow'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'workflow' | 'pipeline'>('grid');
   const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const [aiAssistantPanelId, setAiAssistantPanelId] = useState<string | null>(null);
   const [aiAssistantImageUrl, setAiAssistantImageUrl] = useState<string | null>(null);
