@@ -1061,7 +1061,7 @@ export const StoryboardEditor = () => {
                       key={image.id}
                       className="cursor-grab active:cursor-grabbing hover:border-accent/50 transition-colors overflow-hidden"
                       draggable
-                      onDragStart={() => handleDragStart(image.url)}
+                      onDragStart={(e) => handleGalleryDragStart(e, image.url)}
                     >
                       <img
                         src={image.url}
