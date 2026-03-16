@@ -31,7 +31,7 @@ interface StoryboardToVideoDialogProps {
   onSuccess?: () => void;
 }
 
-export const StoryboardToVideoDialog = ({ storyboardId, panels, onSuccess }: StoryboardToVideoDialogProps) => {
+export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [], onSuccess }: StoryboardToVideoDialogProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [startPanelIndex, setStartPanelIndex] = useState(0);
