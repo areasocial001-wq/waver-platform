@@ -987,7 +987,24 @@ export const StoryboardEditor = () => {
           </Card>
         )}
 
-        <div className={showGallery && images.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
+        {/* Character Lock Panel */}
+        {currentStoryboardId && (
+          <div className={showGallery && images.length > 0 ? "lg:col-span-4" : "lg:col-span-1"}>
+            <CharacterLockPanel
+              characters={characters}
+              onAddCharacter={addCharacter}
+              onUpdateCharacter={updateCharacterData}
+              onDeleteCharacter={deleteCharacter}
+              onAddReferenceImage={addReferenceImage}
+              onRemoveReferenceImage={removeReferenceImage}
+              onAssignCharacter={handleAssignCharacter}
+              onUnassignCharacter={handleUnassignCharacter}
+              disabled={!currentStoryboardId}
+            />
+          </div>
+        )}
+
+        <div className={showGallery && images.length > 0 ? "lg:col-span-3" : currentStoryboardId ? "lg:col-span-3" : "lg:col-span-4"}>
           <Card className="p-8 bg-card/50" ref={storyboardRef}>
             <div className="mb-6 text-center">
               <h2 className="text-3xl font-bold text-foreground">{title}</h2>
