@@ -390,6 +390,12 @@ export const StoryboardEditor = () => {
     setDraggedImageUrl(imageUrl);
   };
 
+  const handleGalleryDragStart = (e: React.DragEvent, imageUrl: string) => {
+    setDraggedImageUrl(imageUrl);
+    e.dataTransfer.setData("text/plain", imageUrl);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
   };
