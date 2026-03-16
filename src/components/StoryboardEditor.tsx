@@ -27,6 +27,7 @@ import { MysticGeneratorDialog } from "./MysticGeneratorDialog";
 import { useStoryboardHistory } from "@/hooks/useStoryboardHistory";
 import { usePromptTemplates } from "@/hooks/usePromptTemplates";
 import { WorkflowView } from "./WorkflowView";
+import { ScriptToVideoWorkflow, PipelineConfig } from "./ScriptToVideoWorkflow";
 import { AIPromptAssistant, PromptTemplate } from "./AIPromptAssistant";
 import { MultiModelGenerator } from "./MultiModelGenerator";
 import { VideoComparisonReport } from "./VideoComparisonReport";
@@ -166,7 +167,7 @@ export const StoryboardEditor = () => {
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
   const [mysticDialogOpen, setMysticDialogOpen] = useState(false);
   const [mysticTargetPanelId, setMysticTargetPanelId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'workflow'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'workflow' | 'pipeline'>('grid');
   const [aiAssistantOpen, setAiAssistantOpen] = useState(false);
   const [aiAssistantPanelId, setAiAssistantPanelId] = useState<string | null>(null);
   const [aiAssistantImageUrl, setAiAssistantImageUrl] = useState<string | null>(null);
@@ -387,6 +388,12 @@ export const StoryboardEditor = () => {
 
   const handleDragStart = (imageUrl: string) => {
     setDraggedImageUrl(imageUrl);
+  };
+
+  const handleGalleryDragStart = (e: React.DragEvent, imageUrl: string) => {
+    setDraggedImageUrl(imageUrl);
+    e.dataTransfer.setData("text/plain", imageUrl);
+    e.dataTransfer.effectAllowed = "copy";
   };
 
   const handleDragOver = (e: DragEvent) => {
@@ -923,15 +930,19 @@ export const StoryboardEditor = () => {
       </div>
 
       {/* View Mode Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'workflow')} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <Grid3x3 className="h-4 w-4" />
-            Vista Griglia
+            Griglia
           </TabsTrigger>
           <TabsTrigger value="workflow" className="flex items-center gap-2">
             <Workflow className="h-4 w-4" />
-            Vista Workflow
+            Workflow
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Pipeline Video
           </TabsTrigger>
         </TabsList>
 
@@ -944,6 +955,88 @@ export const StoryboardEditor = () => {
             }}
             onGenerateMultiModel={handleGenerateMultiModel}
             isOptimizing={isOptimizingPrompt}
+          />
+        </TabsContent>
+
+        <TabsContent value="pipeline" className="mt-4">
+          <ScriptToVideoWorkflow
+            panels={panels}
+            characters={characters}
+            storyboardId={currentStoryboardId}
+            onGenerateVideo={async (config: PipelineConfig) => {
+              if (!currentStoryboardId) {
+                toast.error("Salva prima lo storyboard");
+                return;
+              }
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error("Non autenticato");
+
+                const { data: batch, error: batchError } = await supabase
+                  .from("storyboard_video_batches")
+                  .insert({
+                    user_id: user.id,
+                    storyboard_id: currentStoryboardId,
+                    status: "processing",
+                    total_videos: Math.max(1, config.scenes.length - 1),
+                    completed_videos: 0,
+                    duration: config.globalSettings.duration,
+                    camera_movement: null,
+                    transition_style: config.globalSettings.transitionStyle,
+                    transition_speed: config.globalSettings.transitionSpeed,
+                  })
+                  .select()
+                  .single();
+
+                if (batchError) throw batchError;
+
+                for (let i = 0; i < config.scenes.length - 1; i++) {
+                  const scene = config.scenes[i];
+                  const nextScene = config.scenes[i + 1];
+
+                  let fullPrompt = scene.prompt || `Transition scene ${i + 1} to ${i + 2}`;
+                  if (scene.cameraMovement !== 'none') {
+                    fullPrompt += `. Camera: ${scene.cameraMovement}`;
+                  }
+
+                  const { data: gen, error: genError } = await supabase
+                    .from("video_generations")
+                    .insert({
+                      user_id: user.id,
+                      type: "image_to_video" as const,
+                      duration: config.globalSettings.duration,
+                      status: "pending",
+                      image_url: scene.imageUrl,
+                      image_name: `Pipeline Scena ${i + 1}`,
+                      batch_id: batch.id,
+                      sequence_order: i,
+                      prompt: fullPrompt,
+                    })
+                    .select()
+                    .single();
+
+                  if (genError) throw genError;
+
+                  await supabase.functions.invoke("generate-video", {
+                    body: {
+                      type: "image_to_video",
+                      duration: config.globalSettings.duration,
+                      start_image: scene.imageUrl,
+                      end_image: nextScene.imageUrl,
+                      prompt: fullPrompt,
+                      generationId: gen.id,
+                      preferredProvider: config.globalSettings.provider !== "auto" ? config.globalSettings.provider : undefined,
+                      ...(scene.characterRefs.length > 0 && { image_urls: scene.characterRefs }),
+                    },
+                  });
+                }
+
+                toast.success(`Pipeline avviata! ${config.scenes.length - 1} video in generazione`);
+              } catch (err: any) {
+                console.error("Pipeline error:", err);
+                toast.error("Errore nell'avvio della pipeline");
+              }
+            }}
           />
         </TabsContent>
 
@@ -968,7 +1061,7 @@ export const StoryboardEditor = () => {
                       key={image.id}
                       className="cursor-grab active:cursor-grabbing hover:border-accent/50 transition-colors overflow-hidden"
                       draggable
-                      onDragStart={() => handleDragStart(image.url)}
+                      onDragStart={(e) => handleGalleryDragStart(e, image.url)}
                     >
                       <img
                         src={image.url}

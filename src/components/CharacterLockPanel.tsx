@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, DragEvent } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,8 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, Plus, X, Upload, Trash2, Edit2, Check, Image as ImageIcon } from "lucide-react";
+import { Users, Plus, X, Upload, Trash2, Edit2, Check, Image as ImageIcon, GripVertical } from "lucide-react";
 import { StoryboardCharacter } from "@/hooks/useStoryboardCharacters";
+import { toast } from "sonner";
 
 const CHARACTER_COLORS = [
   "#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6",
@@ -43,6 +44,7 @@ export const CharacterLockPanel = ({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [dragOverCharId, setDragOverCharId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleAdd = async () => {
@@ -64,6 +66,48 @@ export const CharacterLockPanel = ({
       onAddReferenceImage(characterId, url);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDropImage = (e: DragEvent, characterId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCharId(null);
+
+    // Check for image URL from gallery drag
+    const imageUrl = e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("text/uri-list");
+    if (imageUrl && (imageUrl.startsWith("data:") || imageUrl.startsWith("http") || imageUrl.startsWith("blob:"))) {
+      const char = characters.find(c => c.id === characterId);
+      if (char && char.reference_images.length >= 5) {
+        toast.error("Massimo 5 immagini di riferimento per personaggio");
+        return;
+      }
+      onAddReferenceImage(characterId, imageUrl);
+      toast.success("Immagine di riferimento aggiunta tramite drag & drop!");
+      return;
+    }
+
+    // Check for file drop
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      const char = characters.find(c => c.id === characterId);
+      if (char && char.reference_images.length >= 5) {
+        toast.error("Massimo 5 immagini di riferimento per personaggio");
+        return;
+      }
+      handleFileUpload(characterId, file);
+      toast.success("Immagine di riferimento aggiunta!");
+    }
+  };
+
+  const handleDragOver = (e: DragEvent, characterId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCharId(characterId);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOverCharId(null);
   };
 
   const handleStartEdit = (char: StoryboardCharacter) => {
@@ -147,7 +191,16 @@ export const CharacterLockPanel = ({
           <ScrollArea className="max-h-[500px]">
             <div className="space-y-3 pr-2">
               {characters.map((char) => (
-                <Card key={char.id} className="p-3 bg-background/50 border" style={{ borderLeftColor: char.color, borderLeftWidth: 3 }}>
+                <Card
+                  key={char.id}
+                  className={`p-3 bg-background/50 border transition-all ${
+                    dragOverCharId === char.id ? "ring-2 ring-primary bg-primary/5 scale-[1.02]" : ""
+                  }`}
+                  style={{ borderLeftColor: char.color, borderLeftWidth: 3 }}
+                  onDrop={(e) => handleDropImage(e, char.id)}
+                  onDragOver={(e) => handleDragOver(e, char.id)}
+                  onDragLeave={handleDragLeave}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       {editingId === char.id ? (
@@ -227,9 +280,9 @@ export const CharacterLockPanel = ({
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center h-16 border border-dashed rounded text-muted-foreground">
-                          <ImageIcon className="h-4 w-4 mr-1" />
-                          <span className="text-xs">Nessun riferimento</span>
+                        <div className="flex flex-col items-center justify-center h-16 border border-dashed rounded text-muted-foreground hover:border-primary/50 transition-colors">
+                          <GripVertical className="h-3.5 w-3.5 mb-0.5" />
+                          <span className="text-[10px]">Trascina immagini qui</span>
                         </div>
                       )}
                     </div>
