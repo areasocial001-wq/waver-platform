@@ -884,6 +884,7 @@ export const StoryboardEditor = () => {
             <StoryboardToVideoDialog
               storyboardId={currentStoryboardId}
               panels={panels}
+              characters={characters}
               onSuccess={() => toast.success("Controlla la pagina Storia per vedere i video generati")}
             />
           )}
