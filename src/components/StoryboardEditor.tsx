@@ -987,9 +987,9 @@ export const StoryboardEditor = () => {
           </Card>
         )}
 
-        {/* Character Lock Panel */}
-        {currentStoryboardId && (
-          <div className={showGallery && images.length > 0 ? "lg:col-span-4" : "lg:col-span-1"}>
+        {/* Character Lock Panel - show in sidebar when no gallery, or below content */}
+        {currentStoryboardId && !(showGallery && images.length > 0) && (
+          <div className="lg:col-span-1">
             <CharacterLockPanel
               characters={characters}
               onAddCharacter={addCharacter}
@@ -1004,7 +1004,7 @@ export const StoryboardEditor = () => {
           </div>
         )}
 
-        <div className={showGallery && images.length > 0 ? "lg:col-span-3" : currentStoryboardId ? "lg:col-span-3" : "lg:col-span-4"}>
+        <div className={(showGallery && images.length > 0) || currentStoryboardId ? "lg:col-span-3" : "lg:col-span-4"}>
           <Card className="p-8 bg-card/50" ref={storyboardRef}>
             <div className="mb-6 text-center">
               <h2 className="text-3xl font-bold text-foreground">{title}</h2>
