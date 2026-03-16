@@ -350,6 +350,22 @@ export const StoryboardEditor = () => {
     }
   };
 
+  const handleAssignCharacter = (panelId: string, characterId: string) => {
+    setPanels(prev => prev.map(panel => {
+      if (panel.id !== panelId) return panel;
+      const ids = panel.characterIds || [];
+      if (ids.includes(characterId)) return panel;
+      return { ...panel, characterIds: [...ids, characterId] };
+    }));
+  };
+
+  const handleUnassignCharacter = (panelId: string, characterId: string) => {
+    setPanels(prev => prev.map(panel => {
+      if (panel.id !== panelId) return panel;
+      return { ...panel, characterIds: (panel.characterIds || []).filter(id => id !== characterId) };
+    }));
+  };
+
   const handleOptimizePrompt = (panelId: string, imageUrl: string) => {
     const panel = panels.find(p => p.id === panelId);
     setAiAssistantPanelId(panelId);
