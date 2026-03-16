@@ -44,6 +44,7 @@ export const CharacterLockPanel = ({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
+  const [dragOverCharId, setDragOverCharId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const handleAdd = async () => {
