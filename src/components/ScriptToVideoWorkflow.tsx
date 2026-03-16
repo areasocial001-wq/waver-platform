@@ -513,6 +513,18 @@ export const ScriptToVideoWorkflow = ({
             </Select>
           </div>
           <Button
+            variant="outline"
+            onClick={generateAllPrompts}
+            disabled={aiGeneratingAll || isGenerating}
+            className="gap-2"
+          >
+            {aiGeneratingAll ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Generazione AI...</>
+            ) : (
+              <><Sparkles className="h-4 w-4" /> Auto-genera prompt AI</>
+            )}
+          </Button>
+          <Button
             onClick={handleLaunchPipeline}
             disabled={isGenerating || panelsWithImages.length < 2}
             className="ml-auto bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 gap-2"
