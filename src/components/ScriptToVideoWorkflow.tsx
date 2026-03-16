@@ -228,8 +228,20 @@ export const ScriptToVideoWorkflow = ({
   const [aiGenerating, setAiGenerating] = useState<Record<string, boolean>>({});
   const [aiGeneratingAll, setAiGeneratingAll] = useState(false);
 
+  const [promptHistory, setPromptHistory] = useState<Record<string, PromptVersion[]>>({});
+  const [showComparison, setShowComparison] = useState<string | null>(null);
+
   const generatePromptForScene = useCallback(async (panel: StoryboardPanel) => {
     if (!panel.imageUrl) return;
+    // Save current prompt as history before overwriting
+    const currentPrompt = scenePrompts[panel.id] || panel.caption || '';
+    const currentCamera = sceneCameras[panel.id] || 'none';
+    if (currentPrompt.trim()) {
+      setPromptHistory(prev => ({
+        ...prev,
+        [panel.id]: [...(prev[panel.id] || []), { prompt: currentPrompt, camera: currentCamera, timestamp: Date.now() }],
+      }));
+    }
     setAiGenerating(prev => ({ ...prev, [panel.id]: true }));
     try {
       // Compress image for API
