@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -31,6 +31,8 @@ import { AIPromptAssistant, PromptTemplate } from "./AIPromptAssistant";
 import { MultiModelGenerator } from "./MultiModelGenerator";
 import { VideoComparisonReport } from "./VideoComparisonReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CharacterLockPanel } from "./CharacterLockPanel";
+import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
 
 interface StoryboardPanel {
   id: string;
@@ -38,6 +40,7 @@ interface StoryboardPanel {
   caption: string;
   note?: string;
   transform?: ImageTransform;
+  characterIds?: string[];
 }
 
 type LayoutType = "2x2" | "3x2" | "4x2" | "2x3" | "3x3";
@@ -177,6 +180,15 @@ export const StoryboardEditor = () => {
   const storyboardRef = useRef<HTMLDivElement>(null);
   const { images } = useImageGallery();
   const { templates: savedTemplates, saveTemplate, deleteTemplate, updateTemplate } = usePromptTemplates();
+  const {
+    characters,
+    addCharacter,
+    updateCharacter: updateCharacterData,
+    deleteCharacter,
+    addReferenceImage,
+    removeReferenceImage,
+    getCharacterRefsForPanel,
+  } = useStoryboardCharacters(currentStoryboardId);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -336,6 +348,22 @@ export const StoryboardEditor = () => {
         panel.id === mysticTargetPanelId ? { ...panel, imageUrl } : panel
       ));
     }
+  };
+
+  const handleAssignCharacter = (panelId: string, characterId: string) => {
+    setPanels(prev => prev.map(panel => {
+      if (panel.id !== panelId) return panel;
+      const ids = panel.characterIds || [];
+      if (ids.includes(characterId)) return panel;
+      return { ...panel, characterIds: [...ids, characterId] };
+    }));
+  };
+
+  const handleUnassignCharacter = (panelId: string, characterId: string) => {
+    setPanels(prev => prev.map(panel => {
+      if (panel.id !== panelId) return panel;
+      return { ...panel, characterIds: (panel.characterIds || []).filter(id => id !== characterId) };
+    }));
   };
 
   const handleOptimizePrompt = (panelId: string, imageUrl: string) => {
@@ -856,6 +884,7 @@ export const StoryboardEditor = () => {
             <StoryboardToVideoDialog
               storyboardId={currentStoryboardId}
               panels={panels}
+              characters={characters}
               onSuccess={() => toast.success("Controlla la pagina Storia per vedere i video generati")}
             />
           )}
@@ -956,10 +985,40 @@ export const StoryboardEditor = () => {
                 </div>
               </ScrollArea>
             </div>
+            {currentStoryboardId && (
+              <CharacterLockPanel
+                characters={characters}
+                onAddCharacter={addCharacter}
+                onUpdateCharacter={updateCharacterData}
+                onDeleteCharacter={deleteCharacter}
+                onAddReferenceImage={addReferenceImage}
+                onRemoveReferenceImage={removeReferenceImage}
+                onAssignCharacter={handleAssignCharacter}
+                onUnassignCharacter={handleUnassignCharacter}
+                disabled={!currentStoryboardId}
+              />
+            )}
           </Card>
         )}
 
-        <div className={showGallery && images.length > 0 ? "lg:col-span-3" : "lg:col-span-4"}>
+        {/* Character Lock Panel - show in sidebar when no gallery, or below content */}
+        {currentStoryboardId && !(showGallery && images.length > 0) && (
+          <div className="lg:col-span-1">
+            <CharacterLockPanel
+              characters={characters}
+              onAddCharacter={addCharacter}
+              onUpdateCharacter={updateCharacterData}
+              onDeleteCharacter={deleteCharacter}
+              onAddReferenceImage={addReferenceImage}
+              onRemoveReferenceImage={removeReferenceImage}
+              onAssignCharacter={handleAssignCharacter}
+              onUnassignCharacter={handleUnassignCharacter}
+              disabled={!currentStoryboardId}
+            />
+          </div>
+        )}
+
+        <div className={(showGallery && images.length > 0) || currentStoryboardId ? "lg:col-span-3" : "lg:col-span-4"}>
           <Card className="p-8 bg-card/50" ref={storyboardRef}>
             <div className="mb-6 text-center">
               <h2 className="text-3xl font-bold text-foreground">{title}</h2>
@@ -1001,6 +1060,33 @@ export const StoryboardEditor = () => {
                         imageTransform={panel.transform}
                         onTransformChange={(transform) => handleTransformChange(panel.id, transform)}
                       />
+                      {/* Character assignment chips */}
+                      {characters.length > 0 && panel.imageUrl && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {characters.map((char) => {
+                            const isAssigned = (panel.characterIds || []).includes(char.id);
+                            return (
+                              <button
+                                key={char.id}
+                                onClick={() => isAssigned 
+                                  ? handleUnassignCharacter(panel.id, char.id) 
+                                  : handleAssignCharacter(panel.id, char.id)
+                                }
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                                  isAssigned 
+                                    ? "opacity-100 border-current" 
+                                    : "opacity-40 border-dashed hover:opacity-70"
+                                }`}
+                                style={{ color: char.color, borderColor: char.color, backgroundColor: isAssigned ? `${char.color}20` : 'transparent' }}
+                                title={isAssigned ? `Rimuovi ${char.name}` : `Assegna ${char.name}`}
+                              >
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: char.color }} />
+                                {char.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
                       {!panel.imageUrl && (
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
                           <StockLibraryDialog
