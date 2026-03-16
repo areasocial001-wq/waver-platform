@@ -68,6 +68,48 @@ export const CharacterLockPanel = ({
     reader.readAsDataURL(file);
   };
 
+  const handleDropImage = (e: DragEvent, characterId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCharId(null);
+
+    // Check for image URL from gallery drag
+    const imageUrl = e.dataTransfer.getData("text/plain") || e.dataTransfer.getData("text/uri-list");
+    if (imageUrl && (imageUrl.startsWith("data:") || imageUrl.startsWith("http") || imageUrl.startsWith("blob:"))) {
+      const char = characters.find(c => c.id === characterId);
+      if (char && char.reference_images.length >= 5) {
+        toast.error("Massimo 5 immagini di riferimento per personaggio");
+        return;
+      }
+      onAddReferenceImage(characterId, imageUrl);
+      toast.success("Immagine di riferimento aggiunta tramite drag & drop!");
+      return;
+    }
+
+    // Check for file drop
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      const char = characters.find(c => c.id === characterId);
+      if (char && char.reference_images.length >= 5) {
+        toast.error("Massimo 5 immagini di riferimento per personaggio");
+        return;
+      }
+      handleFileUpload(characterId, file);
+      toast.success("Immagine di riferimento aggiunta!");
+    }
+  };
+
+  const handleDragOver = (e: DragEvent, characterId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverCharId(characterId);
+  };
+
+  const handleDragLeave = (e: DragEvent) => {
+    e.preventDefault();
+    setDragOverCharId(null);
+  };
+
   const handleStartEdit = (char: StoryboardCharacter) => {
     setEditingId(char.id);
     setEditName(char.name);
