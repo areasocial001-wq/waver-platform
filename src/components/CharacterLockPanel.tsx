@@ -191,7 +191,16 @@ export const CharacterLockPanel = ({
           <ScrollArea className="max-h-[500px]">
             <div className="space-y-3 pr-2">
               {characters.map((char) => (
-                <Card key={char.id} className="p-3 bg-background/50 border" style={{ borderLeftColor: char.color, borderLeftWidth: 3 }}>
+                <Card
+                  key={char.id}
+                  className={`p-3 bg-background/50 border transition-all ${
+                    dragOverCharId === char.id ? "ring-2 ring-primary bg-primary/5 scale-[1.02]" : ""
+                  }`}
+                  style={{ borderLeftColor: char.color, borderLeftWidth: 3 }}
+                  onDrop={(e) => handleDropImage(e, char.id)}
+                  onDragOver={(e) => handleDragOver(e, char.id)}
+                  onDragLeave={handleDragLeave}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       {editingId === char.id ? (
