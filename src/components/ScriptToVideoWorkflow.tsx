@@ -219,6 +219,67 @@ export const ScriptToVideoWorkflow = ({
   const [transitionStyle, setTransitionStyle] = useState('smooth');
   const [transitionSpeed, setTransitionSpeed] = useState('normal');
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState<Record<string, boolean>>({});
+  const [aiGeneratingAll, setAiGeneratingAll] = useState(false);
+
+  const generatePromptForScene = useCallback(async (panel: StoryboardPanel) => {
+    if (!panel.imageUrl) return;
+    setAiGenerating(prev => ({ ...prev, [panel.id]: true }));
+    try {
+      // Compress image for API
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = reject;
+        img.src = panel.imageUrl!;
+      });
+      const canvas = document.createElement('canvas');
+      const maxW = 800;
+      const scale = Math.min(1, maxW / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const compressedUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+      const { data, error } = await supabase.functions.invoke('optimize-video-prompt', {
+        body: {
+          imageUrl: compressedUrl,
+          caption: panel.caption || undefined,
+        },
+      });
+      if (error) throw error;
+      if (data?.mainPrompt) {
+        setScenePrompts(prev => ({ ...prev, [panel.id]: data.mainPrompt }));
+        if (data.cameraMovement) {
+          const camMap: Record<string, string> = {
+            'slow dolly in': 'dolly_in', 'dolly in': 'dolly_in',
+            'dolly out': 'dolly_out', 'tracking shot': 'tracking', 'tracking': 'tracking',
+            'pan left': 'pan_left', 'pan right': 'pan_right',
+            'crane up': 'crane_up', 'orbit': 'orbit', 'aerial': 'aerial',
+          };
+          const mapped = camMap[data.cameraMovement.toLowerCase()] || 'none';
+          setSceneCameras(prev => ({ ...prev, [panel.id]: mapped }));
+        }
+      }
+    } catch (err) {
+      console.error('AI prompt generation error:', err);
+      toast.error(`Errore generazione prompt per scena`);
+    } finally {
+      setAiGenerating(prev => ({ ...prev, [panel.id]: false }));
+    }
+  }, []);
+
+  const generateAllPrompts = useCallback(async () => {
+    setAiGeneratingAll(true);
+    toast.info(`Generazione AI prompt per ${panelsWithImages.length} scene...`);
+    for (const panel of panelsWithImages) {
+      await generatePromptForScene(panel);
+    }
+    setAiGeneratingAll(false);
+    toast.success('Prompt AI generati per tutte le scene!');
+  }, [panelsWithImages, generatePromptForScene]);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     const nodes: Node[] = [];
