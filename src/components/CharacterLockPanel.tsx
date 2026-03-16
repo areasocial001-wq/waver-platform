@@ -280,9 +280,9 @@ export const CharacterLockPanel = ({
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center h-16 border border-dashed rounded text-muted-foreground">
-                          <ImageIcon className="h-4 w-4 mr-1" />
-                          <span className="text-xs">Nessun riferimento</span>
+                        <div className="flex flex-col items-center justify-center h-16 border border-dashed rounded text-muted-foreground hover:border-primary/50 transition-colors">
+                          <GripVertical className="h-3.5 w-3.5 mb-0.5" />
+                          <span className="text-[10px]">Trascina immagini qui</span>
                         </div>
                       )}
                     </div>
