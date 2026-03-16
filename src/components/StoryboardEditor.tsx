@@ -930,15 +930,19 @@ export const StoryboardEditor = () => {
       </div>
 
       {/* View Mode Tabs */}
-      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'grid' | 'workflow')} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <Grid3x3 className="h-4 w-4" />
-            Vista Griglia
+            Griglia
           </TabsTrigger>
           <TabsTrigger value="workflow" className="flex items-center gap-2">
             <Workflow className="h-4 w-4" />
-            Vista Workflow
+            Workflow
+          </TabsTrigger>
+          <TabsTrigger value="pipeline" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Pipeline Video
           </TabsTrigger>
         </TabsList>
 
