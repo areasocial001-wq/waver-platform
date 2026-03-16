@@ -20,12 +20,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   ImageIcon, Video, Wand2, Play, Sparkles, Camera, Users, Film,
-  ChevronRight, Loader2, Settings2
+  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight
 } from 'lucide-react';
 import { ImageTransform } from './SortablePanel';
 import { StoryboardCharacter } from '@/hooks/useStoryboardCharacters';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+interface PromptVersion {
+  prompt: string;
+  camera: string;
+  timestamp: number;
+}
 
 interface StoryboardPanel {
   id: string;
