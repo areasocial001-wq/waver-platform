@@ -31,6 +31,8 @@ import { AIPromptAssistant, PromptTemplate } from "./AIPromptAssistant";
 import { MultiModelGenerator } from "./MultiModelGenerator";
 import { VideoComparisonReport } from "./VideoComparisonReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CharacterLockPanel } from "./CharacterLockPanel";
+import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
 
 interface StoryboardPanel {
   id: string;
