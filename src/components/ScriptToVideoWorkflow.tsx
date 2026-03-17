@@ -606,6 +606,15 @@ export const ScriptToVideoWorkflow = ({
               <><Sparkles className="h-4 w-4" /> Auto-genera prompt AI</>
             )}
           </Button>
+          {Object.keys(promptHistory).some(k => promptHistory[k]?.length > 0) && (
+            <Button
+              variant="outline"
+              onClick={exportAllPromptHistory}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" /> Export cronologia
+            </Button>
+          )}
           <Button
             onClick={handleLaunchPipeline}
             disabled={isGenerating || panelsWithImages.length < 2}
