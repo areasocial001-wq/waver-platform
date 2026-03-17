@@ -2750,7 +2750,6 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     durations: [
       { value: '6', label: '6 secondi' },
       { value: '8', label: '8 secondi' },
-      { value: '10', label: '10 secondi' },
     ],
     resolutions: [
       { value: '1080p', label: '1080p (Full HD)' },
