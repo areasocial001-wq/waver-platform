@@ -112,7 +112,7 @@ const MODEL_DURATION_CONSTRAINTS: Record<string, number[]> = {
   'ltx-2-3-fast': [6, 8, 10, 12, 14, 16, 18, 20],
   'ltx-2-3-pro': [6, 8, 10],
   'ltx-2-fast': [6, 8, 10],
-  'ltx-2-pro': [6, 8, 10],
+  'ltx-2-pro': [6, 8],
   'ltx': [6, 8, 10],
   'default': [5, 10],
 };

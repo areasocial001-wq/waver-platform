@@ -1269,7 +1269,6 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     durations: [
       { value: 6, label: '6 secondi' },
       { value: 8, label: '8 secondi' },
-      { value: 10, label: '10 secondi' },
     ],
     resolutions: STANDARD_RESOLUTIONS,
     aspectRatios: STANDARD_ASPECT_RATIOS,
