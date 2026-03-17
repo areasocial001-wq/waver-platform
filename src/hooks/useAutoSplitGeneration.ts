@@ -61,6 +61,73 @@ export function useAutoSplitGeneration() {
   }, []);
 
   /**
+   * Extract the last frame from a video URL as a base64 data URL.
+   * Uses a hidden <video> + <canvas> to seek to the end and capture.
+   */
+  const extractLastFrame = useCallback(async (videoUrl: string): Promise<string | null> => {
+    try {
+      // Resolve storage:// URLs to signed URLs
+      let resolvedUrl = videoUrl;
+      if (videoUrl.startsWith("storage://")) {
+        const path = videoUrl.replace("storage://", "");
+        const bucketName = path.split("/")[0];
+        const filePath = path.substring(bucketName.length + 1);
+        const { data } = await supabase.storage.from(bucketName).createSignedUrl(filePath, 600);
+        if (data?.signedUrl) resolvedUrl = data.signedUrl;
+        else return null;
+      }
+
+      return await new Promise<string | null>((resolve) => {
+        const video = document.createElement("video");
+        video.crossOrigin = "anonymous";
+        video.preload = "auto";
+        video.muted = true;
+
+        const timeout = setTimeout(() => {
+          console.warn("Last frame extraction timed out");
+          video.src = "";
+          resolve(null);
+        }, 30_000);
+
+        video.onloadedmetadata = () => {
+          // Seek to near the end (last 0.1s)
+          video.currentTime = Math.max(0, video.duration - 0.1);
+        };
+
+        video.onseeked = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) { clearTimeout(timeout); resolve(null); return; }
+            ctx.drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            clearTimeout(timeout);
+            video.src = "";
+            resolve(dataUrl);
+          } catch (e) {
+            console.error("Canvas draw error (CORS?):", e);
+            clearTimeout(timeout);
+            resolve(null);
+          }
+        };
+
+        video.onerror = () => {
+          console.error("Video load error for frame extraction");
+          clearTimeout(timeout);
+          resolve(null);
+        };
+
+        video.src = resolvedUrl;
+      });
+    } catch (e) {
+      console.error("extractLastFrame error:", e);
+      return null;
+    }
+  }, []);
+
+  /**
    * Wait for a generation to complete by polling the database
    */
   const waitForCompletion = useCallback(async (generationId: string, maxWaitMs = 300_000): Promise<string | null> => {
