@@ -46,7 +46,10 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
   const [videoProvider, setVideoProvider] = useState<string>("auto");
 
   const panelsWithImages = panels.filter(p => p.imageUrl);
+  const allSelectedPanels = panels.slice(startPanelIndex, endPanelIndex + 1);
   const selectedPanels = panelsWithImages.slice(startPanelIndex, endPanelIndex + 1);
+  const panelsWithoutImages = allSelectedPanels.filter(p => !p.imageUrl);
+  const hasInvalidPanels = panelsWithoutImages.length > 0;
   const transitionCount = Math.max(0, selectedPanels.length - 1);
 
   const handleGenerate = async () => {
