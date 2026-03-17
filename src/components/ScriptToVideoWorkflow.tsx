@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   ImageIcon, Video, Wand2, Play, Sparkles, Camera, Users, Film,
-  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight
+  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight, Download
 } from 'lucide-react';
 import { ImageTransform } from './SortablePanel';
 import { StoryboardCharacter } from '@/hooks/useStoryboardCharacters';
