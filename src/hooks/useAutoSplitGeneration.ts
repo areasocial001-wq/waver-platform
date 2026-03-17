@@ -185,6 +185,7 @@ export function useAutoSplitGeneration() {
         totalClips: plan.clipCount,
         phase: "generating",
         clipVideoUrls: [],
+        continuityFrames: [],
       });
 
       toast.info(`Auto-split attivato: ${plan.clipCount} clip da ${plan.clipDuration}s ciascuna`, {
