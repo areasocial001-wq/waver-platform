@@ -15,8 +15,9 @@ interface AutoSplitState {
   isSplitting: boolean;
   currentClip: number;
   totalClips: number;
-  phase: "generating" | "waiting" | "concatenating" | "done" | "idle";
+  phase: "generating" | "waiting" | "extracting_frame" | "concatenating" | "done" | "idle";
   clipVideoUrls: string[];
+  continuityFrames: string[]; // base64 frames extracted between clips
 }
 
 /**
