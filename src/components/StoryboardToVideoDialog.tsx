@@ -50,12 +50,13 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
   const transitionCount = Math.max(0, selectedPanels.length - 1);
 
   const handleGenerate = async () => {
-    if (selectedPanels.length < 2) {
-      toast.error("Seleziona almeno 2 pannelli con immagini");
+    const panelsReady = selectedPanels.filter(p => p.imageUrl);
+    if (panelsReady.length < 2) {
+      toast.error("Seleziona almeno 2 pannelli con immagini valide");
       return;
     }
 
-    if (selectedPanels.length > 8) {
+    if (panelsReady.length > 8) {
       toast.error("Puoi selezionare massimo 8 pannelli");
       return;
     }
