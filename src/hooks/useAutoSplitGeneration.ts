@@ -79,20 +79,40 @@ export function useAutoSplitGeneration() {
         else return null;
       }
 
+      // Fetch video as blob to avoid CORS canvas tainting
+      // Object URLs created from blobs bypass cross-origin restrictions
+      let blobUrl: string | null = null;
+      try {
+        const response = await fetch(resolvedUrl);
+        if (response.ok) {
+          const blob = await response.blob();
+          blobUrl = URL.createObjectURL(blob);
+        }
+      } catch (fetchErr) {
+        console.warn("Could not fetch video as blob, trying direct URL:", fetchErr);
+      }
+
+      const videoSrc = blobUrl || resolvedUrl;
+
       return await new Promise<string | null>((resolve) => {
         const video = document.createElement("video");
-        video.crossOrigin = "anonymous";
+        // Only set crossOrigin if using direct URL (not blob)
+        if (!blobUrl) video.crossOrigin = "anonymous";
         video.preload = "auto";
         video.muted = true;
 
+        const cleanup = () => {
+          video.src = "";
+          if (blobUrl) URL.revokeObjectURL(blobUrl);
+        };
+
         const timeout = setTimeout(() => {
           console.warn("Last frame extraction timed out");
-          video.src = "";
+          cleanup();
           resolve(null);
         }, 30_000);
 
         video.onloadedmetadata = () => {
-          // Seek to near the end (last 0.1s)
           video.currentTime = Math.max(0, video.duration - 0.1);
         };
 
@@ -102,15 +122,16 @@ export function useAutoSplitGeneration() {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext("2d");
-            if (!ctx) { clearTimeout(timeout); resolve(null); return; }
+            if (!ctx) { clearTimeout(timeout); cleanup(); resolve(null); return; }
             ctx.drawImage(video, 0, 0);
             const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
             clearTimeout(timeout);
-            video.src = "";
+            cleanup();
             resolve(dataUrl);
           } catch (e) {
-            console.error("Canvas draw error (CORS?):", e);
+            console.error("Canvas draw error:", e);
             clearTimeout(timeout);
+            cleanup();
             resolve(null);
           }
         };
@@ -118,10 +139,11 @@ export function useAutoSplitGeneration() {
         video.onerror = () => {
           console.error("Video load error for frame extraction");
           clearTimeout(timeout);
+          cleanup();
           resolve(null);
         };
 
-        video.src = resolvedUrl;
+        video.src = videoSrc;
       });
     } catch (e) {
       console.error("extractLastFrame error:", e);
