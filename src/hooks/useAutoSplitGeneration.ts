@@ -157,8 +157,12 @@ export function useAutoSplitGeneration() {
         generationIds.push(genData.id);
 
         // Build request body
+        // For first clip, use original start image and image_to_video type
+        // For subsequent clips, fall back to text_to_video since we don't have a start image
+        const clipType = (type === "image_to_video" && startImage && i === 0) ? "image_to_video" : "text_to_video";
+
         const requestBody: any = {
-          type,
+          type: clipType,
           prompt: clipPrompt,
           duration: plan.clipDuration,
           resolution,
@@ -168,9 +172,7 @@ export function useAutoSplitGeneration() {
           modelId,
         };
 
-        // For first clip, use original start image; for subsequent clips, skip image
-        // (PiAPI doesn't support extracting last frame, so we rely on prompt continuity)
-        if (type === "image_to_video" && startImage && i === 0) {
+        if (clipType === "image_to_video" && startImage) {
           requestBody.start_image = startImage;
         }
 
