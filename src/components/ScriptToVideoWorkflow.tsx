@@ -231,6 +231,64 @@ export const ScriptToVideoWorkflow = ({
   const [promptHistory, setPromptHistory] = useState<Record<string, PromptVersion[]>>({});
   const [showComparison, setShowComparison] = useState<string | null>(null);
 
+  const exportPromptHistory = useCallback((panelId: string, panelCaption: string) => {
+    const history = promptHistory[panelId] || [];
+    const currentPrompt = scenePrompts[panelId] || panelCaption || '';
+    const currentCamera = sceneCameras[panelId] || 'none';
+
+    const exportData = {
+      sceneId: panelId,
+      exportedAt: new Date().toISOString(),
+      currentVersion: { prompt: currentPrompt, camera: currentCamera },
+      history: history.map((v, i) => ({
+        version: i + 1,
+        prompt: v.prompt,
+        camera: v.camera,
+        timestamp: new Date(v.timestamp).toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt-history-scene-${panelId.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Cronologia prompt esportata');
+  }, [promptHistory, scenePrompts, sceneCameras]);
+
+  const exportAllPromptHistory = useCallback(() => {
+    const panelsWithHistory = panels.filter(p => p.imageUrl);
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      storyboardId,
+      scenes: panelsWithHistory.map(panel => ({
+        sceneId: panel.id,
+        caption: panel.caption,
+        currentVersion: {
+          prompt: scenePrompts[panel.id] || panel.caption || '',
+          camera: sceneCameras[panel.id] || 'none',
+        },
+        history: (promptHistory[panel.id] || []).map((v, i) => ({
+          version: i + 1,
+          prompt: v.prompt,
+          camera: v.camera,
+          timestamp: new Date(v.timestamp).toISOString(),
+        })),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt-history-all-scenes.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Cronologia completa esportata');
+  }, [panels, promptHistory, scenePrompts, sceneCameras, storyboardId]);
+
   const generatePromptForScene = useCallback(async (panel: StoryboardPanel) => {
     if (!panel.imageUrl) return;
     // Save current prompt as history before overwriting
