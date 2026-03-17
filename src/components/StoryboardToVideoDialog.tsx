@@ -50,12 +50,13 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
   const transitionCount = Math.max(0, selectedPanels.length - 1);
 
   const handleGenerate = async () => {
-    if (selectedPanels.length < 2) {
-      toast.error("Seleziona almeno 2 pannelli con immagini");
+    const panelsReady = selectedPanels.filter(p => p.imageUrl);
+    if (panelsReady.length < 2) {
+      toast.error("Seleziona almeno 2 pannelli con immagini valide");
       return;
     }
 
-    if (selectedPanels.length > 8) {
+    if (panelsReady.length > 8) {
       toast.error("Puoi selezionare massimo 8 pannelli");
       return;
     }
@@ -152,18 +153,21 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
           .slice(0, 5); // Max 5 reference images (Veo 3.1 limit)
 
         // Call edge function to generate video
-        const { error: videoError } = await supabase.functions.invoke("generate-video", {
-          body: {
-            type: "image_to_video",
+        const videoBody: Record<string, unknown> = {
+            type: startPanel.imageUrl ? "image_to_video" : "text_to_video",
             duration,
-            start_image: startPanel.imageUrl,
-            end_image: endPanel.imageUrl,
             prompt: fullPrompt,
             generationId: generation.id,
             preferredProvider: videoProvider !== "auto" ? videoProvider : undefined,
-            ...(characterRefImages.length > 0 && { image_urls: characterRefImages }),
-          },
-        });
+          };
+
+          if (startPanel.imageUrl) videoBody.start_image = startPanel.imageUrl;
+          if (endPanel.imageUrl) videoBody.end_image = endPanel.imageUrl;
+          if (characterRefImages.length > 0) videoBody.image_urls = characterRefImages;
+
+          const { error: videoError } = await supabase.functions.invoke("generate-video", {
+            body: videoBody,
+          });
 
         if (videoError) {
           console.error(`Error generating video ${i}:`, videoError);

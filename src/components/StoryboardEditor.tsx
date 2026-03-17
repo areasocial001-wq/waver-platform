@@ -994,6 +994,14 @@ export const StoryboardEditor = () => {
                   const scene = config.scenes[i];
                   const nextScene = config.scenes[i + 1];
 
+                  // Skip scenes without images for image-to-video
+                  if (!scene.imageUrl) {
+                    console.warn(`Skipping scene ${i + 1}: no image available`);
+                    continue;
+                  }
+
+                  const generationType = scene.imageUrl ? "image_to_video" as const : "text_to_video" as const;
+
                   let fullPrompt = scene.prompt || `Transition scene ${i + 1} to ${i + 2}`;
                   if (scene.cameraMovement !== 'none') {
                     fullPrompt += `. Camera: ${scene.cameraMovement}`;
@@ -1003,7 +1011,7 @@ export const StoryboardEditor = () => {
                     .from("video_generations")
                     .insert({
                       user_id: user.id,
-                      type: "image_to_video" as const,
+                      type: generationType,
                       duration: config.globalSettings.duration,
                       status: "pending",
                       image_url: scene.imageUrl,
@@ -1017,18 +1025,19 @@ export const StoryboardEditor = () => {
 
                   if (genError) throw genError;
 
-                  await supabase.functions.invoke("generate-video", {
-                    body: {
-                      type: "image_to_video",
-                      duration: config.globalSettings.duration,
-                      start_image: scene.imageUrl,
-                      end_image: nextScene.imageUrl,
-                      prompt: fullPrompt,
-                      generationId: gen.id,
-                      preferredProvider: config.globalSettings.provider !== "auto" ? config.globalSettings.provider : undefined,
-                      ...(scene.characterRefs.length > 0 && { image_urls: scene.characterRefs }),
-                    },
-                  });
+                  const body: Record<string, unknown> = {
+                    type: generationType,
+                    duration: config.globalSettings.duration,
+                    prompt: fullPrompt,
+                    generationId: gen.id,
+                    preferredProvider: config.globalSettings.provider !== "auto" ? config.globalSettings.provider : undefined,
+                  };
+
+                  if (scene.imageUrl) body.start_image = scene.imageUrl;
+                  if (nextScene.imageUrl) body.end_image = nextScene.imageUrl;
+                  if (scene.characterRefs.length > 0) body.image_urls = scene.characterRefs;
+
+                  await supabase.functions.invoke("generate-video", { body });
                 }
 
                 toast.success(`Pipeline avviata! ${config.scenes.length - 1} video in generazione`);
