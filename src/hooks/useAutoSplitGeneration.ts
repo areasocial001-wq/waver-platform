@@ -59,7 +59,7 @@ export function useAutoSplitGeneration() {
 
   const reset = useCallback(() => {
     abortRef.current = false;
-    setState({ isSplitting: false, currentClip: 0, totalClips: 0, phase: "idle", clipVideoUrls: [] });
+    setState({ isSplitting: false, currentClip: 0, totalClips: 0, phase: "idle", clipVideoUrls: [], continuityFrames: [] });
   }, []);
 
   /**
