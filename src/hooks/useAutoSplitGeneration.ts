@@ -61,6 +61,73 @@ export function useAutoSplitGeneration() {
   }, []);
 
   /**
+   * Extract the last frame from a video URL as a base64 data URL.
+   * Uses a hidden <video> + <canvas> to seek to the end and capture.
+   */
+  const extractLastFrame = useCallback(async (videoUrl: string): Promise<string | null> => {
+    try {
+      // Resolve storage:// URLs to signed URLs
+      let resolvedUrl = videoUrl;
+      if (videoUrl.startsWith("storage://")) {
+        const path = videoUrl.replace("storage://", "");
+        const bucketName = path.split("/")[0];
+        const filePath = path.substring(bucketName.length + 1);
+        const { data } = await supabase.storage.from(bucketName).createSignedUrl(filePath, 600);
+        if (data?.signedUrl) resolvedUrl = data.signedUrl;
+        else return null;
+      }
+
+      return await new Promise<string | null>((resolve) => {
+        const video = document.createElement("video");
+        video.crossOrigin = "anonymous";
+        video.preload = "auto";
+        video.muted = true;
+
+        const timeout = setTimeout(() => {
+          console.warn("Last frame extraction timed out");
+          video.src = "";
+          resolve(null);
+        }, 30_000);
+
+        video.onloadedmetadata = () => {
+          // Seek to near the end (last 0.1s)
+          video.currentTime = Math.max(0, video.duration - 0.1);
+        };
+
+        video.onseeked = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) { clearTimeout(timeout); resolve(null); return; }
+            ctx.drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+            clearTimeout(timeout);
+            video.src = "";
+            resolve(dataUrl);
+          } catch (e) {
+            console.error("Canvas draw error (CORS?):", e);
+            clearTimeout(timeout);
+            resolve(null);
+          }
+        };
+
+        video.onerror = () => {
+          console.error("Video load error for frame extraction");
+          clearTimeout(timeout);
+          resolve(null);
+        };
+
+        video.src = resolvedUrl;
+      });
+    } catch (e) {
+      console.error("extractLastFrame error:", e);
+      return null;
+    }
+  }, []);
+
+  /**
    * Wait for a generation to complete by polling the database
    */
   const waitForCompletion = useCallback(async (generationId: string, maxWaitMs = 300_000): Promise<string | null> => {
@@ -123,6 +190,9 @@ export function useAutoSplitGeneration() {
         duration: 5000,
       });
 
+      // Track the current frame to use as start_image for continuity
+      let nextStartImage: string | null | undefined = startImage || null;
+
       for (let i = 0; i < plan.clipCount; i++) {
         if (abortRef.current) break;
 
@@ -156,10 +226,9 @@ export function useAutoSplitGeneration() {
 
         generationIds.push(genData.id);
 
-        // Build request body
-        // For first clip, use original start image and image_to_video type
-        // For subsequent clips, fall back to text_to_video since we don't have a start image
-        const clipType = (type === "image_to_video" && startImage && i === 0) ? "image_to_video" : "text_to_video";
+        // Determine clip type: use image_to_video whenever we have a start image
+        const hasStartImage = !!nextStartImage;
+        const clipType = hasStartImage ? "image_to_video" : "text_to_video";
 
         const requestBody: any = {
           type: clipType,
@@ -172,8 +241,8 @@ export function useAutoSplitGeneration() {
           modelId,
         };
 
-        if (clipType === "image_to_video" && startImage) {
-          requestBody.start_image = startImage;
+        if (hasStartImage) {
+          requestBody.start_image = nextStartImage;
         }
 
         // Only generate audio on last clip to avoid duplication
@@ -189,7 +258,9 @@ export function useAutoSplitGeneration() {
         if (error) {
           console.error(`Clip ${i + 1} generation error:`, error);
           toast.error(`Errore generazione clip ${i + 1}`, { description: error.message });
-          // Continue with remaining clips
+          // Clear start image for next clip since this one failed
+          nextStartImage = null;
+          continue;
         }
 
         // Wait for this clip to complete before starting next
@@ -200,12 +271,26 @@ export function useAutoSplitGeneration() {
 
         if (!videoUrl) {
           toast.error(`Clip ${i + 1} non completata, skip...`);
+          nextStartImage = null;
           continue;
         }
 
         clipUrls.push(videoUrl);
         setState((s) => ({ ...s, clipVideoUrls: [...clipUrls] }));
         toast.success(`Clip ${i + 1}/${plan.clipCount} completata!`);
+
+        // Extract last frame for visual continuity in next clip
+        if (i < plan.clipCount - 1) {
+          toast.info(`Estrazione ultimo frame per continuità visiva...`);
+          const lastFrame = await extractLastFrame(videoUrl);
+          if (lastFrame) {
+            nextStartImage = lastFrame;
+            console.log(`Last frame extracted from clip ${i + 1} for continuity`);
+          } else {
+            console.warn(`Could not extract last frame from clip ${i + 1}, next clip will use text_to_video`);
+            nextStartImage = null;
+          }
+        }
       }
 
       // If we have less than 2 clips, no concat needed
