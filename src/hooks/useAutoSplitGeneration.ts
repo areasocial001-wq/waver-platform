@@ -190,6 +190,9 @@ export function useAutoSplitGeneration() {
         duration: 5000,
       });
 
+      // Track the current frame to use as start_image for continuity
+      let nextStartImage: string | null | undefined = startImage || null;
+
       for (let i = 0; i < plan.clipCount; i++) {
         if (abortRef.current) break;
 
@@ -223,10 +226,9 @@ export function useAutoSplitGeneration() {
 
         generationIds.push(genData.id);
 
-        // Build request body
-        // For first clip, use original start image and image_to_video type
-        // For subsequent clips, fall back to text_to_video since we don't have a start image
-        const clipType = (type === "image_to_video" && startImage && i === 0) ? "image_to_video" : "text_to_video";
+        // Determine clip type: use image_to_video whenever we have a start image
+        const hasStartImage = !!nextStartImage;
+        const clipType = hasStartImage ? "image_to_video" : "text_to_video";
 
         const requestBody: any = {
           type: clipType,
@@ -239,8 +241,8 @@ export function useAutoSplitGeneration() {
           modelId,
         };
 
-        if (clipType === "image_to_video" && startImage) {
-          requestBody.start_image = startImage;
+        if (hasStartImage) {
+          requestBody.start_image = nextStartImage;
         }
 
         // Only generate audio on last clip to avoid duplication
@@ -256,7 +258,9 @@ export function useAutoSplitGeneration() {
         if (error) {
           console.error(`Clip ${i + 1} generation error:`, error);
           toast.error(`Errore generazione clip ${i + 1}`, { description: error.message });
-          // Continue with remaining clips
+          // Clear start image for next clip since this one failed
+          nextStartImage = null;
+          continue;
         }
 
         // Wait for this clip to complete before starting next
@@ -267,12 +271,26 @@ export function useAutoSplitGeneration() {
 
         if (!videoUrl) {
           toast.error(`Clip ${i + 1} non completata, skip...`);
+          nextStartImage = null;
           continue;
         }
 
         clipUrls.push(videoUrl);
         setState((s) => ({ ...s, clipVideoUrls: [...clipUrls] }));
         toast.success(`Clip ${i + 1}/${plan.clipCount} completata!`);
+
+        // Extract last frame for visual continuity in next clip
+        if (i < plan.clipCount - 1) {
+          toast.info(`Estrazione ultimo frame per continuità visiva...`);
+          const lastFrame = await extractLastFrame(videoUrl);
+          if (lastFrame) {
+            nextStartImage = lastFrame;
+            console.log(`Last frame extracted from clip ${i + 1} for continuity`);
+          } else {
+            console.warn(`Could not extract last frame from clip ${i + 1}, next clip will use text_to_video`);
+            nextStartImage = null;
+          }
+        }
       }
 
       // If we have less than 2 clips, no concat needed
