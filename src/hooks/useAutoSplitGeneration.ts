@@ -53,6 +53,7 @@ export function useAutoSplitGeneration() {
     totalClips: 0,
     phase: "idle",
     clipVideoUrls: [],
+    continuityFrames: [],
   });
   const abortRef = useRef(false);
 
