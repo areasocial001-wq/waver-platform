@@ -1180,7 +1180,7 @@ export const ImageToVideoForm = () => {
       {/* Split plan preview (before generation) */}
       {!splitState.isSplitting && !isLoading && startImage && (
         <SplitPlanPreview 
-          provider={effectiveProvider as VideoProviderType} 
+          provider={preferredProvider as VideoProviderType} 
           requestedDuration={duration} 
         />
       )}
