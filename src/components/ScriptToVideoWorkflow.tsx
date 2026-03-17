@@ -721,11 +721,21 @@ export const ScriptToVideoWorkflow = ({
                             </div>
                           </div>
                         ))}
-                        <div className="pt-1">
-                          <p className="text-[10px] font-medium text-primary mb-1">Attuale:</p>
-                          <p className="text-[10px] bg-primary/5 rounded px-1.5 py-1 border-l-2 border-primary/30 line-clamp-3">
-                            {scenePrompts[selectedPanel.id] || selectedPanel.caption || 'Nessun prompt'}
-                          </p>
+                        <div className="pt-1 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-medium text-primary mb-1">Attuale:</p>
+                            <p className="text-[10px] bg-primary/5 rounded px-1.5 py-1 border-l-2 border-primary/30 line-clamp-3">
+                              {scenePrompts[selectedPanel.id] || selectedPanel.caption || 'Nessun prompt'}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => exportPromptHistory(selectedPanel.id, selectedPanel.caption)}
+                            className="h-6 px-1.5 text-[9px] gap-1 text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            <Download className="h-2.5 w-2.5" /> Export JSON
+                          </Button>
                         </div>
                       </div>
                     )}
