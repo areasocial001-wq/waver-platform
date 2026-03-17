@@ -284,10 +284,12 @@ export function useAutoSplitGeneration() {
 
         // Extract last frame for visual continuity in next clip
         if (i < plan.clipCount - 1) {
+          setState((s) => ({ ...s, phase: "extracting_frame" }));
           toast.info(`Estrazione ultimo frame per continuità visiva...`);
           const lastFrame = await extractLastFrame(videoUrl);
           if (lastFrame) {
             nextStartImage = lastFrame;
+            setState((s) => ({ ...s, continuityFrames: [...s.continuityFrames, lastFrame] }));
             console.log(`Last frame extracted from clip ${i + 1} for continuity`);
           } else {
             console.warn(`Could not extract last frame from clip ${i + 1}, next clip will use text_to_video`);
