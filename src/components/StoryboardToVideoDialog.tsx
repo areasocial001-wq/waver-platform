@@ -316,36 +316,54 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
                 </Select>
               </div>
             </div>
+            {hasInvalidPanels && (
+              <Alert className="border-destructive/50 bg-destructive/10">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-destructive">
+                  {panelsWithoutImages.length} pannell{panelsWithoutImages.length === 1 ? 'o' : 'i'} senza immagine verr{panelsWithoutImages.length === 1 ? 'à' : 'anno'} saltat{panelsWithoutImages.length === 1 ? 'o' : 'i'} durante la generazione.
+                </AlertDescription>
+              </Alert>
+            )}
             <Alert>
               <AlertDescription>
-                Verranno generati {transitionCount} video di transizione tra {selectedPanels.length} pannelli selezionati.
+                Verranno generati {transitionCount} video di transizione tra {selectedPanels.length} pannelli validi.
               </AlertDescription>
             </Alert>
 
             {/* Image Preview Grid */}
-            {selectedPanels.length > 0 && (
+            {allSelectedPanels.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-sm text-muted-foreground">Anteprima sequenza:</Label>
                 <div className="flex gap-2 overflow-x-auto pb-2">
-                  {selectedPanels.map((panel, idx) => (
-                    <div key={panel.id} className="relative flex-shrink-0">
-                      <div className="w-24 h-16 rounded-md overflow-hidden border border-border">
-                        <img
-                          src={panel.imageUrl || ""}
-                          alt={`Frame ${idx + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
-                        {startPanelIndex + idx + 1}
-                      </div>
-                      {idx < selectedPanels.length - 1 && (
-                        <div className="absolute top-1/2 -right-2 -translate-y-1/2 text-muted-foreground text-xs">
-                          →
+                  {allSelectedPanels.map((panel, idx) => {
+                    const isMissing = !panel.imageUrl;
+                    return (
+                      <div key={panel.id} className="relative flex-shrink-0">
+                        <div className={`w-24 h-16 rounded-md overflow-hidden border-2 ${isMissing ? 'border-destructive bg-destructive/10' : 'border-border'}`}>
+                          {isMissing ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center gap-0.5">
+                              <ImageOff className="h-4 w-4 text-destructive" />
+                              <span className="text-[9px] text-destructive font-medium">Mancante</span>
+                            </div>
+                          ) : (
+                            <img
+                              src={panel.imageUrl || ""}
+                              alt={`Frame ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        <div className={`absolute -bottom-1 left-1/2 -translate-x-1/2 text-xs px-1.5 py-0.5 rounded-full ${isMissing ? 'bg-destructive text-destructive-foreground' : 'bg-primary text-primary-foreground'}`}>
+                          {startPanelIndex + idx + 1}
+                        </div>
+                        {idx < allSelectedPanels.length - 1 && (
+                          <div className="absolute top-1/2 -right-2 -translate-y-1/2 text-muted-foreground text-xs">
+                            →
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
