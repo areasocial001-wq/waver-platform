@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Wallet, RefreshCw, Sparkles, Wand2 } from "lucide-react";
+import { SplitPlanPreview, AutoSplitProgress } from "@/components/AutoSplitIndicator";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
@@ -783,27 +784,24 @@ export const TextToVideoForm = () => {
         )}
       </div>
 
+      {/* Split plan preview (before generation) */}
+      {!splitState.isSplitting && !isLoading && prompt.trim() && (
+        <SplitPlanPreview 
+          provider={preferredProvider as VideoProviderType} 
+          requestedDuration={duration} 
+        />
+      )}
+
       {/* Auto-split progress indicator */}
       {splitState.isSplitting && (
-        <div className="p-3 rounded-lg border border-primary/30 bg-primary/5">
-          <div className="flex items-center gap-2 mb-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-primary" />
-            <span className="text-sm font-medium">
-              Auto-split: clip {splitState.currentClip}/{splitState.totalClips}
-            </span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div 
-              className="bg-primary h-2 rounded-full transition-all duration-500"
-              style={{ width: `${(splitState.currentClip / splitState.totalClips) * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {splitState.phase === "generating" && "Generazione in corso..."}
-            {splitState.phase === "waiting" && "Attesa completamento..."}
-            {splitState.phase === "concatenating" && "Concatenazione clip..."}
-          </p>
-        </div>
+        <AutoSplitProgress
+          currentClip={splitState.currentClip}
+          totalClips={splitState.totalClips}
+          phase={splitState.phase}
+          clipVideoUrls={splitState.clipVideoUrls}
+          continuityFrames={splitState.continuityFrames}
+          accentColor="primary"
+        />
       )}
 
       <Button 
