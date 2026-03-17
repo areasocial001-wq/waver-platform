@@ -314,8 +314,13 @@ export function useAutoSplitGeneration() {
             setState((s) => ({ ...s, continuityFrames: [...s.continuityFrames, lastFrame] }));
             console.log(`Last frame extracted from clip ${i + 1} for continuity`);
           } else {
-            console.warn(`Could not extract last frame from clip ${i + 1}, next clip will use text_to_video`);
-            nextStartImage = null;
+            // CRITICAL: Keep the original start image to maintain character consistency
+            // instead of falling back to text_to_video which loses the character entirely
+            console.warn(`Could not extract last frame from clip ${i + 1}, keeping original start image for character consistency`);
+            if (!nextStartImage && startImage) {
+              nextStartImage = startImage;
+            }
+            // If nextStartImage is already set (from a previous successful extraction), keep it
           }
         }
       }
