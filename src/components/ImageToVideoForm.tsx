@@ -1176,27 +1176,24 @@ export const ImageToVideoForm = () => {
         </div>
       )}
 
+      {/* Split plan preview (before generation) */}
+      {!splitState.isSplitting && !isLoading && startImage && (
+        <SplitPlanPreview 
+          provider={effectiveProvider as VideoProviderType} 
+          requestedDuration={duration} 
+        />
+      )}
+
       {/* Auto-split progress indicator */}
       {splitState.isSplitting && (
-        <div className="p-3 rounded-lg border border-accent/30 bg-accent/5">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 animate-spin text-accent" />
-            <span className="text-sm font-medium">
-              Auto-split: clip {splitState.currentClip}/{splitState.totalClips}
-            </span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2">
-            <div 
-              className="bg-accent h-2 rounded-full transition-all duration-500"
-              style={{ width: `${(splitState.currentClip / splitState.totalClips) * 100}%` }}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {splitState.phase === "generating" && "Generazione in corso..."}
-            {splitState.phase === "waiting" && "Attesa completamento..."}
-            {splitState.phase === "concatenating" && "Concatenazione clip..."}
-          </p>
-        </div>
+        <AutoSplitProgress
+          currentClip={splitState.currentClip}
+          totalClips={splitState.totalClips}
+          phase={splitState.phase}
+          clipVideoUrls={splitState.clipVideoUrls}
+          continuityFrames={splitState.continuityFrames}
+          accentColor="accent"
+        />
       )}
 
       <Button 
