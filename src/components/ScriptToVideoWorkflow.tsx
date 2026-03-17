@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import {
   ImageIcon, Video, Wand2, Play, Sparkles, Camera, Users, Film,
-  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight
+  ChevronRight, Loader2, Settings2, RotateCcw, History, ArrowRight, Download
 } from 'lucide-react';
 import { ImageTransform } from './SortablePanel';
 import { StoryboardCharacter } from '@/hooks/useStoryboardCharacters';
@@ -230,6 +230,64 @@ export const ScriptToVideoWorkflow = ({
 
   const [promptHistory, setPromptHistory] = useState<Record<string, PromptVersion[]>>({});
   const [showComparison, setShowComparison] = useState<string | null>(null);
+
+  const exportPromptHistory = useCallback((panelId: string, panelCaption: string) => {
+    const history = promptHistory[panelId] || [];
+    const currentPrompt = scenePrompts[panelId] || panelCaption || '';
+    const currentCamera = sceneCameras[panelId] || 'none';
+
+    const exportData = {
+      sceneId: panelId,
+      exportedAt: new Date().toISOString(),
+      currentVersion: { prompt: currentPrompt, camera: currentCamera },
+      history: history.map((v, i) => ({
+        version: i + 1,
+        prompt: v.prompt,
+        camera: v.camera,
+        timestamp: new Date(v.timestamp).toISOString(),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt-history-scene-${panelId.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Cronologia prompt esportata');
+  }, [promptHistory, scenePrompts, sceneCameras]);
+
+  const exportAllPromptHistory = useCallback(() => {
+    const panelsWithHistory = panels.filter(p => p.imageUrl);
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      storyboardId,
+      scenes: panelsWithHistory.map(panel => ({
+        sceneId: panel.id,
+        caption: panel.caption,
+        currentVersion: {
+          prompt: scenePrompts[panel.id] || panel.caption || '',
+          camera: sceneCameras[panel.id] || 'none',
+        },
+        history: (promptHistory[panel.id] || []).map((v, i) => ({
+          version: i + 1,
+          prompt: v.prompt,
+          camera: v.camera,
+          timestamp: new Date(v.timestamp).toISOString(),
+        })),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `prompt-history-all-scenes.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Cronologia completa esportata');
+  }, [panels, promptHistory, scenePrompts, sceneCameras, storyboardId]);
 
   const generatePromptForScene = useCallback(async (panel: StoryboardPanel) => {
     if (!panel.imageUrl) return;
@@ -548,6 +606,15 @@ export const ScriptToVideoWorkflow = ({
               <><Sparkles className="h-4 w-4" /> Auto-genera prompt AI</>
             )}
           </Button>
+          {Object.keys(promptHistory).some(k => promptHistory[k]?.length > 0) && (
+            <Button
+              variant="outline"
+              onClick={exportAllPromptHistory}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" /> Export cronologia
+            </Button>
+          )}
           <Button
             onClick={handleLaunchPipeline}
             disabled={isGenerating || panelsWithImages.length < 2}
@@ -663,11 +730,21 @@ export const ScriptToVideoWorkflow = ({
                             </div>
                           </div>
                         ))}
-                        <div className="pt-1">
-                          <p className="text-[10px] font-medium text-primary mb-1">Attuale:</p>
-                          <p className="text-[10px] bg-primary/5 rounded px-1.5 py-1 border-l-2 border-primary/30 line-clamp-3">
-                            {scenePrompts[selectedPanel.id] || selectedPanel.caption || 'Nessun prompt'}
-                          </p>
+                        <div className="pt-1 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-medium text-primary mb-1">Attuale:</p>
+                            <p className="text-[10px] bg-primary/5 rounded px-1.5 py-1 border-l-2 border-primary/30 line-clamp-3">
+                              {scenePrompts[selectedPanel.id] || selectedPanel.caption || 'Nessun prompt'}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => exportPromptHistory(selectedPanel.id, selectedPanel.caption)}
+                            className="h-6 px-1.5 text-[9px] gap-1 text-muted-foreground hover:text-foreground shrink-0"
+                          >
+                            <Download className="h-2.5 w-2.5" /> Export JSON
+                          </Button>
                         </div>
                       </div>
                     )}
