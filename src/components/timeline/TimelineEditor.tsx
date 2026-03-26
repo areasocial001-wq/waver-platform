@@ -372,6 +372,10 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
           ref={audioInputRef}
           type="file"
           accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/aac,audio/mp4"
+          multiple
+          onChange={handleAudioFileSelected}
+          className="hidden"
+        />
           onChange={handleAudioFileSelected}
           className="hidden"
         />
