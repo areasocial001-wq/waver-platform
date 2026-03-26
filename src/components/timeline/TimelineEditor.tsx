@@ -6,7 +6,7 @@ import {
   Play, Pause, SkipBack, SkipForward, Plus, Trash2, Volume2, VolumeX,
   Film, Music, Mic, Sparkles, ZoomIn, ZoomOut, Scissors, Copy,
   Lock, Unlock, Eye, EyeOff, GripVertical, MoreHorizontal, Download,
-  Magnet, Import
+  Magnet, Import, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -55,6 +55,8 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
   const [totalDuration] = useState(30);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playIntervalRef = useRef<number | null>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const [importTargetTrackId, setImportTargetTrackId] = useState<string | null>(null);
 
   const pixelsPerSecond = zoom;
   const snapInterval = snapEnabled ? (zoom >= 80 ? 0.5 : 1) : 0.1;
@@ -214,6 +216,61 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
     setTracks(prev => prev.filter(t => t.id !== trackId));
   };
 
+  const handleImportAudio = useCallback((trackId: string) => {
+    setImportTargetTrackId(trackId);
+    audioInputRef.current?.click();
+  }, []);
+
+  const handleAudioFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !importTargetTrackId) return;
+
+    const maxSizeMB = 50;
+    if (file.size / (1024 * 1024) > maxSizeMB) {
+      toast.error(`File troppo grande. Max: ${maxSizeMB}MB`);
+      e.target.value = '';
+      return;
+    }
+
+    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4'];
+    if (!validTypes.some(t => file.type.includes(t.split('/')[1]))) {
+      toast.error('Formato non supportato. Usa MP3, WAV, OGG, WebM o AAC.');
+      e.target.value = '';
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    
+    audio.addEventListener('loadedmetadata', () => {
+      const duration = audio.duration;
+      setTracks(prev => prev.map(track => {
+        if (track.id !== importTargetTrackId) return track;
+        const lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
+        const newItem: TimelineItem = {
+          id: `item-${Date.now()}`,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          startTime: lastEnd,
+          duration,
+          url,
+          color: track.color,
+          volume: 100,
+          sourceType: 'upload',
+        };
+        return { ...track, items: [...track.items, newItem] };
+      }));
+      toast.success(`"${file.name}" importato nella traccia`);
+    });
+
+    audio.addEventListener('error', () => {
+      toast.error('Impossibile leggere il file audio');
+      URL.revokeObjectURL(url);
+    });
+
+    e.target.value = '';
+    setImportTargetTrackId(null);
+  }, [importTargetTrackId]);
+
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
     const rect = timelineRef.current.getBoundingClientRect();
@@ -261,6 +318,14 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
+        {/* Hidden audio file input */}
+        <input
+          ref={audioInputRef}
+          type="file"
+          accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/aac,audio/mp4"
+          onChange={handleAudioFileSelected}
+          className="hidden"
+        />
         {/* Transport Controls */}
         <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
           <div className="flex items-center gap-2">
@@ -404,6 +469,11 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
                       <DropdownMenuItem onClick={() => addItem(track.id)}>
                         <Plus className="w-3.5 h-3.5 mr-2" /> Aggiungi clip
                       </DropdownMenuItem>
+                      {track.type !== 'video' && (
+                        <DropdownMenuItem onClick={() => handleImportAudio(track.id)}>
+                          <Upload className="w-3.5 h-3.5 mr-2" /> Importa audio
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => removeTrack(track.id)} className="text-destructive">
                         <Trash2 className="w-3.5 h-3.5 mr-2" /> Rimuovi traccia
                       </DropdownMenuItem>
@@ -460,12 +530,22 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
                   {/* Drop zone */}
                   {!track.locked && track.items.length === 0 && (
                     <div
-                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-                      onClick={(e) => { e.stopPropagation(); addItem(track.id); }}
+                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity gap-2"
                     >
-                      <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full">
-                        <Plus className="w-3 h-3" /> Clicca per aggiungere
+                      <span
+                        className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full cursor-pointer hover:bg-muted transition-colors"
+                        onClick={(e) => { e.stopPropagation(); addItem(track.id); }}
+                      >
+                        <Plus className="w-3 h-3" /> Aggiungi clip
                       </span>
+                      {track.type !== 'video' && (
+                        <span
+                          className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full cursor-pointer hover:bg-muted transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleImportAudio(track.id); }}
+                        >
+                          <Upload className="w-3 h-3" /> Importa audio
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
