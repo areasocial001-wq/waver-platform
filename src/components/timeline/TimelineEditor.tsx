@@ -317,8 +317,8 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
       toast.error('Nessun file audio trovato. Trascina file MP3, WAV, OGG, etc.');
       return;
     }
-    files.forEach(file => processDroppedAudioFile(file, trackId));
-  }, [processDroppedAudioFile]);
+    processMultipleAudioFiles(files, trackId);
+  }, [processMultipleAudioFiles]);
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
