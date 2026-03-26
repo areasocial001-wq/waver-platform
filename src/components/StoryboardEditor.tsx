@@ -933,7 +933,7 @@ export const StoryboardEditor = () => {
 
       {/* View Mode Tabs */}
       <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <Grid3x3 className="h-4 w-4" />
             Griglia
@@ -945,6 +945,10 @@ export const StoryboardEditor = () => {
           <TabsTrigger value="pipeline" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             Pipeline Video
+          </TabsTrigger>
+          <TabsTrigger value="animatic" className="flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Animatic
           </TabsTrigger>
         </TabsList>
 
