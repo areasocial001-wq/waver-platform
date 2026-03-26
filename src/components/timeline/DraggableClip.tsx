@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { TimelineItem } from './types';
+import { TrackWaveform } from '@/components/TrackWaveform';
 
 interface DraggableClipProps {
   item: TimelineItem;
