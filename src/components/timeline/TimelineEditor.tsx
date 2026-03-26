@@ -376,9 +376,6 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
           onChange={handleAudioFileSelected}
           className="hidden"
         />
-          onChange={handleAudioFileSelected}
-          className="hidden"
-        />
         {/* Transport Controls */}
         <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
           <div className="flex items-center gap-2">
