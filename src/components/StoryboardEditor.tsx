@@ -147,6 +147,7 @@ const TEMPLATES: StoryboardTemplate[] = [
 
 export const StoryboardEditor = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [layout, setLayout] = useState<LayoutType>("3x2");
   const [title, setTitle] = useState("Il Mio Storyboard");
   const {
