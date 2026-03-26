@@ -36,6 +36,7 @@ import { CharacterLockPanel } from "./CharacterLockPanel";
 import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
 import { ShotDescriptionGenerator, ShotDescription } from "./ShotDescriptionGenerator";
 import { AnimaticMaker } from "./AnimaticMaker";
+import { ScriptToStoryboardDialog } from "./ScriptToStoryboardDialog";
 
 interface StoryboardPanel {
   id: string;
@@ -268,6 +269,44 @@ export const StoryboardEditor = () => {
       transform: { rotation: 0, flipH: false, flipV: false },
     }));
     resetPanels(newPanels);
+  };
+
+  const handleImportFromScript = (
+    importedPanels: { imageUrl: string | null; caption: string; note?: string }[],
+    importedTitle?: string
+  ) => {
+    const newPanels: StoryboardPanel[] = importedPanels.map((p, i) => ({
+      id: `panel-${i}`,
+      imageUrl: p.imageUrl,
+      caption: p.caption,
+      note: p.note || "",
+      transform: { rotation: 0, flipH: false, flipV: false },
+    }));
+    
+    // Auto-select best layout for the number of panels
+    const count = newPanels.length;
+    let bestLayout: LayoutType = "3x3";
+    if (count <= 4) bestLayout = "2x2";
+    else if (count <= 6) bestLayout = "3x2";
+    else if (count <= 8) bestLayout = "4x2";
+    else bestLayout = "3x3";
+    
+    // Pad with empty panels if needed
+    const config = LAYOUT_CONFIG[bestLayout];
+    const totalSlots = config.cols * config.rows;
+    while (newPanels.length < totalSlots) {
+      newPanels.push({
+        id: `panel-${newPanels.length}`,
+        imageUrl: null,
+        caption: "",
+        note: "",
+        transform: { rotation: 0, flipH: false, flipV: false },
+      });
+    }
+    
+    setLayout(bestLayout);
+    if (importedTitle) setTitle(importedTitle);
+    resetPanels(newPanels.slice(0, totalSlots));
   };
 
   const handleTemplateSelect = (templateId: TemplateType) => {
@@ -857,6 +896,8 @@ export const StoryboardEditor = () => {
             <Images className="mr-2 h-4 w-4" />
             {showGallery ? "Nascondi" : "Mostra"} Galleria ({images.length})
           </Button>
+
+          <ScriptToStoryboardDialog onImportPanels={handleImportFromScript} />
 
           <Select value={layout} onValueChange={(value) => handleLayoutChange(value as LayoutType)}>
             <SelectTrigger className="w-[180px] bg-background/50 border-border">
