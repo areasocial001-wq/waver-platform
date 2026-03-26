@@ -129,9 +129,19 @@ export function DraggableClip({
       onMouseDown={handleMouseDown}
     >
       <div className="flex items-center h-full px-1.5 overflow-hidden pointer-events-none">
-        <span className="text-[10px] font-medium truncate text-foreground">
-          {item.name}
-        </span>
+        {item.url && item.sourceType === 'upload' ? (
+          <TrackWaveform
+            audioUrl={item.url}
+            color={item.color}
+            trimStart={0}
+            trimEnd={0}
+            height={40}
+          />
+        ) : (
+          <span className="text-[10px] font-medium truncate text-foreground">
+            {item.name}
+          </span>
+        )}
       </div>
 
       {/* Left resize handle */}
