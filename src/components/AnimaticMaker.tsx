@@ -259,9 +259,6 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
     );
   }
 
-  // MP4 Export
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
 
   const exportAsMP4 = useCallback(async () => {
     if (panels.length === 0) return;
