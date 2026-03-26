@@ -1,5 +1,5 @@
 import { useState, useRef, DragEvent, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users, Film } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users, Film, PlayCircle } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -937,6 +937,17 @@ export const StoryboardEditor = () => {
               characters={characters}
               onSuccess={() => toast.success("Controlla la pagina Storia per vedere i video generati")}
             />
+          )}
+
+          {currentStoryboardId && (
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => navigate(`/timeline-editor?storyboard=${currentStoryboardId}`)}
+            >
+              <PlayCircle className="h-4 w-4" />
+              Apri in Timeline
+            </Button>
           )}
 
           <DropdownMenu>
