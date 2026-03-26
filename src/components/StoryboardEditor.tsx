@@ -309,7 +309,7 @@ export const StoryboardEditor = () => {
     resetPanels(newPanels.slice(0, totalSlots));
   };
 
-
+  const handleTemplateSelect = (templateId: TemplateType) => {
     const template = TEMPLATES.find(t => t.id === templateId);
     if (!template) return;
     
