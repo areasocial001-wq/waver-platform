@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import {
   FileText, Loader2, Camera, Move, Lightbulb, Eye, Clock, StickyNote,
   CheckCircle2, Image as ImageIcon, Sparkles, ChevronDown, ChevronUp,
-  Upload, Pencil, RotateCcw, X
+  Upload, Pencil, RotateCcw, X, Copy, Trash2
 } from "lucide-react";
 
 export interface StoryboardShot {
@@ -266,6 +266,33 @@ export function ScriptToStoryboardDialog({ onImportPanels }: Props) {
     }
   };
 
+  const handleDuplicateShot = (index: number) => {
+    if (!parsed) return;
+    const shot = parsed.shots[index];
+    const newShot: StoryboardShot = {
+      ...shot,
+      shotNumber: parsed.shots.length + 1,
+      sketchUrl: undefined,
+      isGenerating: false,
+    };
+    const updatedShots = [...parsed.shots];
+    updatedShots.splice(index + 1, 0, newShot);
+    // Renumber
+    updatedShots.forEach((s, idx) => s.shotNumber = idx + 1);
+    setParsed({ ...parsed, shots: updatedShots });
+    toast.success(`Inquadratura #${index + 1} duplicata`);
+  };
+
+  const handleDeleteShot = (index: number) => {
+    if (!parsed || parsed.shots.length <= 1) return;
+    const updatedShots = parsed.shots.filter((_, idx) => idx !== index);
+    updatedShots.forEach((s, idx) => s.shotNumber = idx + 1);
+    setParsed({ ...parsed, shots: updatedShots });
+    if (expandedShot === index) setExpandedShot(null);
+    if (editingShot === index) setEditingShot(null);
+    toast.success(`Inquadratura eliminata`);
+  };
+
   const handleRegenerateSketch = async (index: number) => {
     if (!parsed) return;
     const updatedShots = [...parsed.shots];
@@ -484,6 +511,29 @@ export function ScriptToStoryboardDialog({ onImportPanels }: Props) {
                             <Clock className="h-2.5 w-2.5" />{shot.duration}s
                           </Badge>
                         </div>
+                      </div>
+
+                      {/* Duplicate & Delete */}
+                      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleDuplicateShot(i)}
+                          title="Duplica"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteShot(i)}
+                          disabled={parsed.shots.length <= 1}
+                          title="Elimina"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
 
                       {expandedShot === i ? (
