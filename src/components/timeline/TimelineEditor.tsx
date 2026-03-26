@@ -1,43 +1,18 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Play, Pause, SkipBack, SkipForward, Plus, Trash2, Volume2, VolumeX,
   Film, Music, Mic, Sparkles, ZoomIn, ZoomOut, Scissors, Copy,
-  Lock, Unlock, Eye, EyeOff, GripVertical, MoreHorizontal, Download
+  Lock, Unlock, Eye, EyeOff, GripVertical, MoreHorizontal, Download,
+  Magnet, Import
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
-// Types
-export interface TimelineItem {
-  id: string;
-  name: string;
-  startTime: number; // seconds
-  duration: number;
-  url?: string;
-  color: string;
-  volume?: number;
-  thumbnail?: string;
-}
-
-export interface TimelineTrack {
-  id: string;
-  type: 'video' | 'voiceover' | 'music' | 'sfx';
-  label: string;
-  icon: React.ReactNode;
-  items: TimelineItem[];
-  muted: boolean;
-  locked: boolean;
-  visible: boolean;
-  volume: number;
-  color: string;
-}
+import { TimelineItem, TimelineTrack, formatTime } from './types';
+import { DraggableClip } from './DraggableClip';
 
 const TRACK_CONFIGS = {
   video: { label: 'Video', icon: <Film className="w-4 h-4" />, color: 'hsl(var(--primary))' },
@@ -46,30 +21,43 @@ const TRACK_CONFIGS = {
   sfx: { label: 'SFX', icon: <Sparkles className="w-4 h-4" />, color: 'hsl(var(--destructive))' },
 };
 
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  const frames = Math.floor((seconds % 1) * 30);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-};
+export interface TimelineEditorProps {
+  initialItems?: {
+    trackType: TimelineTrack['type'];
+    items: TimelineItem[];
+  }[];
+}
 
-export function TimelineEditor() {
-  const [tracks, setTracks] = useState<TimelineTrack[]>([
-    { id: 'video-1', type: 'video', label: 'Video 1', icon: TRACK_CONFIGS.video.icon, items: [], muted: false, locked: false, visible: true, volume: 100, color: TRACK_CONFIGS.video.color },
-    { id: 'vo-1', type: 'voiceover', label: 'Voiceover', icon: TRACK_CONFIGS.voiceover.icon, items: [], muted: false, locked: false, visible: true, volume: 100, color: TRACK_CONFIGS.voiceover.color },
-    { id: 'music-1', type: 'music', label: 'Music', icon: TRACK_CONFIGS.music.icon, items: [], muted: false, locked: false, visible: true, volume: 80, color: TRACK_CONFIGS.music.color },
-    { id: 'sfx-1', type: 'sfx', label: 'SFX', icon: TRACK_CONFIGS.sfx.icon, items: [], muted: false, locked: false, visible: true, volume: 90, color: TRACK_CONFIGS.sfx.color },
-  ]);
+export function TimelineEditor({ initialItems }: TimelineEditorProps) {
+  const [tracks, setTracks] = useState<TimelineTrack[]>(() => {
+    const defaults: TimelineTrack[] = [
+      { id: 'video-1', type: 'video', label: 'Video 1', icon: TRACK_CONFIGS.video.icon, items: [], muted: false, locked: false, visible: true, volume: 100, color: TRACK_CONFIGS.video.color },
+      { id: 'vo-1', type: 'voiceover', label: 'Voiceover', icon: TRACK_CONFIGS.voiceover.icon, items: [], muted: false, locked: false, visible: true, volume: 100, color: TRACK_CONFIGS.voiceover.color },
+      { id: 'music-1', type: 'music', label: 'Music', icon: TRACK_CONFIGS.music.icon, items: [], muted: false, locked: false, visible: true, volume: 80, color: TRACK_CONFIGS.music.color },
+      { id: 'sfx-1', type: 'sfx', label: 'SFX', icon: TRACK_CONFIGS.sfx.icon, items: [], muted: false, locked: false, visible: true, volume: 90, color: TRACK_CONFIGS.sfx.color },
+    ];
+
+    if (initialItems?.length) {
+      initialItems.forEach(({ trackType, items }) => {
+        const track = defaults.find(t => t.type === trackType);
+        if (track) track.items = items;
+      });
+    }
+
+    return defaults;
+  });
 
   const [playhead, setPlayhead] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [zoom, setZoom] = useState(50); // pixels per second
+  const [zoom, setZoom] = useState(50);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
-  const [totalDuration, setTotalDuration] = useState(30);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [totalDuration] = useState(30);
   const timelineRef = useRef<HTMLDivElement>(null);
   const playIntervalRef = useRef<number | null>(null);
 
   const pixelsPerSecond = zoom;
+  const snapInterval = snapEnabled ? (zoom >= 80 ? 0.5 : 1) : 0.1;
 
   const maxDuration = useMemo(() => {
     let max = 30;
@@ -101,6 +89,12 @@ export function TimelineEditor() {
     }
   }, [isPlaying, maxDuration]);
 
+  useEffect(() => {
+    return () => {
+      if (playIntervalRef.current) clearInterval(playIntervalRef.current);
+    };
+  }, []);
+
   const addItem = (trackId: string) => {
     setTracks(prev => prev.map(track => {
       if (track.id !== trackId || track.locked) return track;
@@ -125,6 +119,66 @@ export function TimelineEditor() {
     if (selectedItem === itemId) setSelectedItem(null);
   };
 
+  const moveItem = useCallback((itemId: string, newStartTime: number) => {
+    setTracks(prev => prev.map(track => ({
+      ...track,
+      items: track.items.map(item =>
+        item.id === itemId ? { ...item, startTime: Math.max(0, newStartTime) } : item
+      ),
+    })));
+  }, []);
+
+  const resizeItem = useCallback((itemId: string, newStartTime: number, newDuration: number) => {
+    setTracks(prev => prev.map(track => ({
+      ...track,
+      items: track.items.map(item =>
+        item.id === itemId ? { ...item, startTime: Math.max(0, newStartTime), duration: newDuration } : item
+      ),
+    })));
+  }, []);
+
+  const duplicateItem = useCallback(() => {
+    if (!selectedItem) return;
+    setTracks(prev => prev.map(track => {
+      const item = track.items.find(i => i.id === selectedItem);
+      if (!item) return track;
+      const clone: TimelineItem = {
+        ...item,
+        id: `item-${Date.now()}`,
+        name: `${item.name} (copia)`,
+        startTime: item.startTime + item.duration,
+      };
+      return { ...track, items: [...track.items, clone] };
+    }));
+    toast.success('Clip duplicata');
+  }, [selectedItem]);
+
+  const splitItem = useCallback(() => {
+    if (!selectedItem) return;
+    setTracks(prev => prev.map(track => {
+      const idx = track.items.findIndex(i => i.id === selectedItem);
+      if (idx === -1) return track;
+      const item = track.items[idx];
+      const splitPoint = playhead - item.startTime;
+      if (splitPoint <= 0.5 || splitPoint >= item.duration - 0.5) {
+        toast.error('Posiziona il playhead al centro della clip per tagliare');
+        return track;
+      }
+      const left: TimelineItem = { ...item, duration: splitPoint };
+      const right: TimelineItem = {
+        ...item,
+        id: `item-${Date.now()}`,
+        name: `${item.name} (B)`,
+        startTime: item.startTime + splitPoint,
+        duration: item.duration - splitPoint,
+      };
+      const newItems = [...track.items];
+      newItems.splice(idx, 1, left, right);
+      return { ...track, items: newItems };
+    }));
+    toast.success('Clip tagliata');
+  }, [selectedItem, playhead]);
+
   const toggleTrackMute = (trackId: string) => {
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, muted: !t.muted } : t));
   };
@@ -135,10 +189,6 @@ export function TimelineEditor() {
 
   const toggleTrackVisible = (trackId: string) => {
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, visible: !t.visible } : t));
-  };
-
-  const setTrackVolume = (trackId: string, volume: number) => {
-    setTracks(prev => prev.map(t => t.id === trackId ? { ...t, volume } : t));
   };
 
   const addTrack = (type: TimelineTrack['type']) => {
@@ -172,7 +222,6 @@ export function TimelineEditor() {
     setPlayhead(Math.max(0, Math.min(time, maxDuration)));
   };
 
-  // Render time ruler markers
   const renderTimeRuler = () => {
     const markers = [];
     const step = zoom >= 80 ? 1 : zoom >= 40 ? 2 : 5;
@@ -191,6 +240,22 @@ export function TimelineEditor() {
       );
     }
     return markers;
+  };
+
+  // Snap grid lines
+  const renderSnapGrid = () => {
+    if (!snapEnabled) return null;
+    const lines = [];
+    for (let t = 0; t <= maxDuration; t += snapInterval) {
+      lines.push(
+        <div
+          key={`snap-${t}`}
+          className="absolute top-0 bottom-0 w-px bg-primary/10"
+          style={{ left: `${t * pixelsPerSecond}px` }}
+        />
+      );
+    }
+    return lines;
   };
 
   return (
@@ -228,6 +293,21 @@ export function TimelineEditor() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Snap toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={snapEnabled ? 'default' : 'ghost'}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setSnapEnabled(!snapEnabled)}
+                >
+                  <Magnet className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Snap alla griglia ({snapEnabled ? 'ON' : 'OFF'})</TooltipContent>
+            </Tooltip>
+
             <div className="flex items-center gap-1.5">
               <ZoomOut className="w-3.5 h-3.5 text-muted-foreground" />
               <Slider
@@ -275,7 +355,6 @@ export function TimelineEditor() {
         <div className="flex flex-1 overflow-hidden">
           {/* Track Headers */}
           <div className="w-56 flex-shrink-0 border-r border-border bg-card/50">
-            {/* Ruler spacer */}
             <div className="h-8 border-b border-border" />
 
             {tracks.map(track => (
@@ -284,9 +363,7 @@ export function TimelineEditor() {
                 className="h-16 flex items-center gap-1.5 px-2 border-b border-border hover:bg-muted/30 transition-colors group"
               >
                 <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 cursor-grab" />
-
                 <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: track.color }} />
-
                 <span className="text-xs font-medium truncate flex-1 text-foreground">{track.label}</span>
 
                 <div className="flex items-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -362,47 +439,33 @@ export function TimelineEditor() {
                     />
                   ))}
 
-                  {/* Items */}
-                  {track.items.map(item => (
-                    <div
-                      key={item.id}
-                      className={`absolute top-1.5 bottom-1.5 rounded-md border cursor-pointer transition-all
-                        ${selectedItem === item.id ? 'ring-2 ring-primary shadow-lg z-10' : 'hover:brightness-110'}
-                        ${track.muted ? 'opacity-40' : ''}`}
-                      style={{
-                        left: `${item.startTime * pixelsPerSecond}px`,
-                        width: `${Math.max(item.duration * pixelsPerSecond, 24)}px`,
-                        backgroundColor: `${item.color}33`,
-                        borderColor: item.color,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedItem(item.id);
-                      }}
-                    >
-                      <div className="flex items-center h-full px-1.5 overflow-hidden">
-                        <span className="text-[10px] font-medium truncate text-foreground">
-                          {item.name}
-                        </span>
-                      </div>
+                  {/* Snap grid */}
+                  {renderSnapGrid()}
 
-                      {/* Resize handles */}
-                      <div className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 rounded-l" />
-                      <div className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 rounded-r" />
-                    </div>
+                  {/* Items with drag/resize */}
+                  {track.items.map(item => (
+                    <DraggableClip
+                      key={item.id}
+                      item={item}
+                      pixelsPerSecond={pixelsPerSecond}
+                      isSelected={selectedItem === item.id}
+                      isMuted={track.muted}
+                      snapInterval={snapInterval}
+                      onSelect={setSelectedItem}
+                      onMove={track.locked ? () => {} : moveItem}
+                      onResize={track.locked ? () => {} : resizeItem}
+                    />
                   ))}
 
-                  {/* Drop zone indicator */}
-                  {!track.locked && (
+                  {/* Drop zone */}
+                  {!track.locked && track.items.length === 0 && (
                     <div
                       className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
                       onClick={(e) => { e.stopPropagation(); addItem(track.id); }}
                     >
-                      {track.items.length === 0 && (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full">
-                          <Plus className="w-3 h-3" /> Clicca per aggiungere
-                        </span>
-                      )}
+                      <span className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full">
+                        <Plus className="w-3 h-3" /> Clicca per aggiungere
+                      </span>
                     </div>
                   )}
                 </div>
@@ -433,10 +496,10 @@ export function TimelineEditor() {
                 }}>
                   <Trash2 className="w-3.5 h-3.5" /> Elimina
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => toast.info('Clip duplicata')}>
+                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={duplicateItem}>
                   <Copy className="w-3.5 h-3.5" /> Duplica
                 </Button>
-                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={() => toast.info('Clip tagliata')}>
+                <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={splitItem}>
                   <Scissors className="w-3.5 h-3.5" /> Taglia
                 </Button>
               </div>
