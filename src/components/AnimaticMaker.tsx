@@ -62,6 +62,8 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   const totalDuration = panels.reduce((sum, p) => sum + p.duration, 0);
 
