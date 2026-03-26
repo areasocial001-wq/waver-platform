@@ -897,7 +897,9 @@ export const StoryboardEditor = () => {
             {showGallery ? "Nascondi" : "Mostra"} Galleria ({images.length})
           </Button>
 
-          <Select value={layout} onValueChange={(value) => handleLayoutChange(value as LayoutType)}>
+          <ScriptToStoryboardDialog onImportPanels={handleImportFromScript} />
+
+
             <SelectTrigger className="w-[180px] bg-background/50 border-border">
               <SelectValue />
             </SelectTrigger>
