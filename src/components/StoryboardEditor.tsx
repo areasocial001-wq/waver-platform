@@ -36,6 +36,7 @@ import { CharacterLockPanel } from "./CharacterLockPanel";
 import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
 import { ShotDescriptionGenerator, ShotDescription } from "./ShotDescriptionGenerator";
 import { AnimaticMaker } from "./AnimaticMaker";
+import { ScriptToStoryboardDialog } from "./ScriptToStoryboardDialog";
 
 interface StoryboardPanel {
   id: string;
