@@ -223,91 +223,72 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
   }, []);
 
   const handleAudioFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !importTargetTrackId) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !importTargetTrackId) return;
 
-    const maxSizeMB = 50;
-    if (file.size / (1024 * 1024) > maxSizeMB) {
-      toast.error(`File troppo grande. Max: ${maxSizeMB}MB`);
-      e.target.value = '';
-      return;
-    }
-
-    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4'];
-    if (!validTypes.some(t => file.type.includes(t.split('/')[1]))) {
-      toast.error('Formato non supportato. Usa MP3, WAV, OGG, WebM o AAC.');
-      e.target.value = '';
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    const audio = new Audio(url);
-    
-    audio.addEventListener('loadedmetadata', () => {
-      const duration = audio.duration;
-      setTracks(prev => prev.map(track => {
-        if (track.id !== importTargetTrackId) return track;
-        const lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
-        const newItem: TimelineItem = {
-          id: `item-${Date.now()}`,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          startTime: lastEnd,
-          duration,
-          url,
-          color: track.color,
-          volume: 100,
-          sourceType: 'upload',
-        };
-        return { ...track, items: [...track.items, newItem] };
-      }));
-      toast.success(`"${file.name}" importato nella traccia`);
-    });
-
-    audio.addEventListener('error', () => {
-      toast.error('Impossibile leggere il file audio');
-      URL.revokeObjectURL(url);
-    });
-
+    processMultipleAudioFiles(files, importTargetTrackId);
     e.target.value = '';
     setImportTargetTrackId(null);
   }, [importTargetTrackId]);
 
-  const processDroppedAudioFile = useCallback((file: File, trackId: string) => {
+  const validateAudioFile = useCallback((file: File): boolean => {
     const maxSizeMB = 50;
     if (file.size / (1024 * 1024) > maxSizeMB) {
-      toast.error(`File troppo grande. Max: ${maxSizeMB}MB`);
-      return;
+      toast.error(`"${file.name}" troppo grande. Max: ${maxSizeMB}MB`);
+      return false;
     }
     const validExts = ['mp3', 'mpeg', 'wav', 'ogg', 'webm', 'aac', 'mp4'];
     if (!validExts.some(ext => file.type.includes(ext))) {
-      toast.error('Formato non supportato. Usa MP3, WAV, OGG, WebM o AAC.');
-      return;
+      toast.error(`"${file.name}" formato non supportato.`);
+      return false;
     }
-    const url = URL.createObjectURL(file);
-    const audio = new Audio(url);
-    audio.addEventListener('loadedmetadata', () => {
-      setTracks(prev => prev.map(track => {
-        if (track.id !== trackId) return track;
-        const lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
-        const newItem: TimelineItem = {
-          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          startTime: lastEnd,
-          duration: audio.duration,
-          url,
-          color: track.color,
-          volume: 100,
-          sourceType: 'upload',
-        };
-        return { ...track, items: [...track.items, newItem] };
-      }));
-      toast.success(`"${file.name}" importato nella traccia`);
-    });
-    audio.addEventListener('error', () => {
-      toast.error('Impossibile leggere il file audio');
-      URL.revokeObjectURL(url);
-    });
+    return true;
   }, []);
+
+  const processMultipleAudioFiles = useCallback((files: File[], trackId: string) => {
+    const validFiles = files.filter(f => validateAudioFile(f));
+    if (validFiles.length === 0) return;
+
+    let loadedCount = 0;
+    const fileData: { file: File; url: string; duration: number }[] = [];
+
+    validFiles.forEach(file => {
+      const url = URL.createObjectURL(file);
+      const audio = new Audio(url);
+      audio.addEventListener('loadedmetadata', () => {
+        fileData.push({ file, url, duration: audio.duration });
+        loadedCount++;
+        if (loadedCount === validFiles.length) {
+          // All loaded — add sequentially
+          setTracks(prev => prev.map(track => {
+            if (track.id !== trackId) return track;
+            let lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
+            const newItems = fileData.map(({ file: f, url: u, duration: d }) => {
+              const item: TimelineItem = {
+                id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                name: f.name.replace(/\.[^/.]+$/, ''),
+                startTime: lastEnd,
+                duration: d,
+                url: u,
+                color: track.color,
+                volume: 100,
+                sourceType: 'upload',
+              };
+              lastEnd += d;
+              return item;
+            });
+            return { ...track, items: [...track.items, ...newItems] };
+          }));
+          toast.success(`${fileData.length} file audio importati`);
+        }
+      });
+      audio.addEventListener('error', () => {
+        toast.error(`Impossibile leggere "${file.name}"`);
+        URL.revokeObjectURL(url);
+        loadedCount++;
+      });
+    });
+  }, [validateAudioFile]);
 
   const handleTrackDragOver = useCallback((e: React.DragEvent, trackId: string, trackType: string) => {
     e.preventDefault();
@@ -336,8 +317,8 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
       toast.error('Nessun file audio trovato. Trascina file MP3, WAV, OGG, etc.');
       return;
     }
-    files.forEach(file => processDroppedAudioFile(file, trackId));
-  }, [processDroppedAudioFile]);
+    processMultipleAudioFiles(files, trackId);
+  }, [processMultipleAudioFiles]);
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
@@ -391,6 +372,7 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
           ref={audioInputRef}
           type="file"
           accept="audio/mp3,audio/mpeg,audio/wav,audio/ogg,audio/webm,audio/aac,audio/mp4"
+          multiple
           onChange={handleAudioFileSelected}
           className="hidden"
         />
