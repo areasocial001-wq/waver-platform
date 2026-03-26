@@ -1256,6 +1256,17 @@ export const StoryboardEditor = () => {
                   disabled={!panel.imageUrl}
                 />
               </div>
+              {/* Shot Description Generator */}
+              {panel.imageUrl && (
+                <ShotDescriptionGenerator
+                  caption={panel.caption}
+                  imageUrl={panel.imageUrl}
+                  onDescriptionGenerated={(desc) => {
+                    handleNoteChange(panel.id, `📷 ${desc.cameraAngle} | 🔭 ${desc.lensType} | 💡 ${desc.lighting} | 🎬 ${desc.cameraMovement} | ${desc.composition} — ${desc.mood}`);
+                  }}
+                  compact
+                />
+              )}
               <div className="space-y-2">
                 <Label htmlFor={`note-${panel.id}`} className="text-sm text-muted-foreground">
                   Note tecniche/creative (solo per te)
