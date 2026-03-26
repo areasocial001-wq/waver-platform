@@ -34,6 +34,8 @@ import { VideoComparisonReport } from "./VideoComparisonReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CharacterLockPanel } from "./CharacterLockPanel";
 import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
+import { ShotDescriptionGenerator, ShotDescription } from "./ShotDescriptionGenerator";
+import { AnimaticMaker } from "./AnimaticMaker";
 
 interface StoryboardPanel {
   id: string;
