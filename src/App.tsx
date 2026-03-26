@@ -18,6 +18,7 @@ import SettingsPage from "./pages/Settings";
 import ViduToolsPage from "./pages/ViduTools";
 import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
+import TimelineEditorPage from "./pages/TimelineEditorPage";
 
 import NotFound from "./pages/NotFound";
 
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/vidu-tools" element={<ViduToolsPage />} />
             <Route path="/ltx-tools" element={<LTXToolsPage />} />
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
+            <Route path="/timeline-editor" element={<TimelineEditorPage />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
