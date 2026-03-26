@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users, Film } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -34,6 +34,8 @@ import { VideoComparisonReport } from "./VideoComparisonReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CharacterLockPanel } from "./CharacterLockPanel";
 import { useStoryboardCharacters } from "@/hooks/useStoryboardCharacters";
+import { ShotDescriptionGenerator, ShotDescription } from "./ShotDescriptionGenerator";
+import { AnimaticMaker } from "./AnimaticMaker";
 
 interface StoryboardPanel {
   id: string;
@@ -931,7 +933,7 @@ export const StoryboardEditor = () => {
 
       {/* View Mode Tabs */}
       <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="w-full">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="grid" className="flex items-center gap-2">
             <Grid3x3 className="h-4 w-4" />
             Griglia
@@ -943,6 +945,10 @@ export const StoryboardEditor = () => {
           <TabsTrigger value="pipeline" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             Pipeline Video
+          </TabsTrigger>
+          <TabsTrigger value="animatic" className="flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Animatic
           </TabsTrigger>
         </TabsList>
 
@@ -1047,6 +1053,10 @@ export const StoryboardEditor = () => {
               }
             }}
           />
+        </TabsContent>
+
+        <TabsContent value="animatic" className="mt-4">
+          <AnimaticMaker panels={panels} />
         </TabsContent>
 
         <TabsContent value="grid" className="mt-4">
@@ -1246,6 +1256,17 @@ export const StoryboardEditor = () => {
                   disabled={!panel.imageUrl}
                 />
               </div>
+              {/* Shot Description Generator */}
+              {panel.imageUrl && (
+                <ShotDescriptionGenerator
+                  caption={panel.caption}
+                  imageUrl={panel.imageUrl}
+                  onDescriptionGenerated={(desc) => {
+                    handleNoteChange(panel.id, `📷 ${desc.cameraAngle} | 🔭 ${desc.lensType} | 💡 ${desc.lighting} | 🎬 ${desc.cameraMovement} | ${desc.composition} — ${desc.mood}`);
+                  }}
+                  compact
+                />
+              )}
               <div className="space-y-2">
                 <Label htmlFor={`note-${panel.id}`} className="text-sm text-muted-foreground">
                   Note tecniche/creative (solo per te)
