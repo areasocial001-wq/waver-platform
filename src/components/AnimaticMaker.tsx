@@ -245,21 +245,6 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  if (panels.length === 0) {
-    return (
-      <Card className="border-primary/20 bg-card/50">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Film className="w-12 h-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">Animatic Maker</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-md">
-            Aggiungi immagini ai pannelli dello storyboard per creare un'anteprima animatic con timing e transizioni.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-
   const exportAsMP4 = useCallback(async () => {
     if (panels.length === 0) return;
     pause();
@@ -286,7 +271,6 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
 
       mediaRecorder.start();
 
-      // Pre-load all images
       const loadedImages: HTMLImageElement[] = [];
       for (const panel of panels) {
         const img = new Image();
@@ -333,11 +317,9 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
             ctx.translate(0, 540 * (1 - transP));
           }
 
-          // Ken Burns
           const kbs = 1 + p * 0.05;
           ctx.translate(480, 270); ctx.scale(kbs, kbs); ctx.translate(-480, -270);
 
-          // Draw cover-fit
           if (img.width > 0) {
             const ir = img.width / img.height;
             const cr = 960 / 540;
@@ -348,7 +330,6 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
           }
           ctx.restore();
 
-          // Caption
           if (panel.caption) {
             const grad = ctx.createLinearGradient(0, 440, 0, 540);
             grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.7)');
@@ -359,7 +340,6 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
 
           frame++;
           setExportProgress(Math.round((frame / totalFrames) * 100));
-          // Yield to UI
           if (frame % 10 === 0) await new Promise(r => setTimeout(r, 0));
         }
       }
@@ -382,6 +362,20 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
     setIsExporting(false);
     setExportProgress(0);
   }, [panels, totalDuration, transitionDuration]);
+
+  if (panels.length === 0) {
+    return (
+      <Card className="border-primary/20 bg-card/50">
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <Film className="w-12 h-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">Animatic Maker</h3>
+          <p className="text-sm text-muted-foreground text-center max-w-md">
+            Aggiungi immagini ai pannelli dello storyboard per creare un'anteprima animatic con timing e transizioni.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-primary/20 bg-card/50">
