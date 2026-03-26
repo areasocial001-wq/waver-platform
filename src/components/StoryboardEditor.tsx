@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users } from "lucide-react";
+import { Loader2, Download, Plus, X, Image as ImageIcon, Type, Clock, ArrowLeftRight, ListOrdered, Grid3x3, Images, GripVertical, Save, Tag as TagIcon, FileText, Lock, Unlock, Library, Undo2, Redo2, Workflow, Wand2, Sparkles, Users, Film } from "lucide-react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Alert, AlertDescription } from "@/components/ui/alert";
