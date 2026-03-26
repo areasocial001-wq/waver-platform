@@ -271,7 +271,45 @@ export const StoryboardEditor = () => {
     resetPanels(newPanels);
   };
 
-  const handleTemplateSelect = (templateId: TemplateType) => {
+  const handleImportFromScript = (
+    importedPanels: { imageUrl: string | null; caption: string; note?: string }[],
+    importedTitle?: string
+  ) => {
+    const newPanels: StoryboardPanel[] = importedPanels.map((p, i) => ({
+      id: `panel-${i}`,
+      imageUrl: p.imageUrl,
+      caption: p.caption,
+      note: p.note || "",
+      transform: { rotation: 0, flipH: false, flipV: false },
+    }));
+    
+    // Auto-select best layout for the number of panels
+    const count = newPanels.length;
+    let bestLayout: LayoutType = "3x3";
+    if (count <= 4) bestLayout = "2x2";
+    else if (count <= 6) bestLayout = "3x2";
+    else if (count <= 8) bestLayout = "4x2";
+    else bestLayout = "3x3";
+    
+    // Pad with empty panels if needed
+    const config = LAYOUT_CONFIG[bestLayout];
+    const totalSlots = config.cols * config.rows;
+    while (newPanels.length < totalSlots) {
+      newPanels.push({
+        id: `panel-${newPanels.length}`,
+        imageUrl: null,
+        caption: "",
+        note: "",
+        transform: { rotation: 0, flipH: false, flipV: false },
+      });
+    }
+    
+    setLayout(bestLayout);
+    if (importedTitle) setTitle(importedTitle);
+    resetPanels(newPanels.slice(0, totalSlots));
+  };
+
+
     const template = TEMPLATES.find(t => t.id === templateId);
     if (!template) return;
     
