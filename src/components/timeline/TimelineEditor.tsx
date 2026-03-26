@@ -606,7 +606,9 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
                   {/* Drop zone */}
                   {!track.locked && track.items.length === 0 && (
                     <div
-                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity gap-2"
+                      className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity ${
+                        dragOverTrackId === track.id ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+                      }`}
                     >
                       <span
                         className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full cursor-pointer hover:bg-muted transition-colors"
