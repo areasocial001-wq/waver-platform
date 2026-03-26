@@ -57,6 +57,7 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
   const playIntervalRef = useRef<number | null>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [importTargetTrackId, setImportTargetTrackId] = useState<string | null>(null);
+  const [dragOverTrackId, setDragOverTrackId] = useState<string | null>(null);
 
   const pixelsPerSecond = zoom;
   const snapInterval = snapEnabled ? (zoom >= 80 ? 0.5 : 1) : 0.1;
@@ -270,6 +271,73 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
     e.target.value = '';
     setImportTargetTrackId(null);
   }, [importTargetTrackId]);
+
+  const processDroppedAudioFile = useCallback((file: File, trackId: string) => {
+    const maxSizeMB = 50;
+    if (file.size / (1024 * 1024) > maxSizeMB) {
+      toast.error(`File troppo grande. Max: ${maxSizeMB}MB`);
+      return;
+    }
+    const validExts = ['mp3', 'mpeg', 'wav', 'ogg', 'webm', 'aac', 'mp4'];
+    if (!validExts.some(ext => file.type.includes(ext))) {
+      toast.error('Formato non supportato. Usa MP3, WAV, OGG, WebM o AAC.');
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    audio.addEventListener('loadedmetadata', () => {
+      setTracks(prev => prev.map(track => {
+        if (track.id !== trackId) return track;
+        const lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
+        const newItem: TimelineItem = {
+          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          name: file.name.replace(/\.[^/.]+$/, ''),
+          startTime: lastEnd,
+          duration: audio.duration,
+          url,
+          color: track.color,
+          volume: 100,
+          sourceType: 'upload',
+        };
+        return { ...track, items: [...track.items, newItem] };
+      }));
+      toast.success(`"${file.name}" importato nella traccia`);
+    });
+    audio.addEventListener('error', () => {
+      toast.error('Impossibile leggere il file audio');
+      URL.revokeObjectURL(url);
+    });
+  }, []);
+
+  const handleTrackDragOver = useCallback((e: React.DragEvent, trackId: string, trackType: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (trackType === 'video') return;
+    e.dataTransfer.dropEffect = 'copy';
+    setDragOverTrackId(trackId);
+  }, []);
+
+  const handleTrackDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverTrackId(null);
+  }, []);
+
+  const handleTrackDrop = useCallback((e: React.DragEvent, trackId: string, trackType: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverTrackId(null);
+    if (trackType === 'video') {
+      toast.error('Trascina i file audio su una traccia Voiceover, Music o SFX');
+      return;
+    }
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+    if (files.length === 0) {
+      toast.error('Nessun file audio trovato. Trascina file MP3, WAV, OGG, etc.');
+      return;
+    }
+    files.forEach(file => processDroppedAudioFile(file, trackId));
+  }, [processDroppedAudioFile]);
 
   const handleTimelineClick = (e: React.MouseEvent) => {
     if (!timelineRef.current) return;
@@ -499,7 +567,15 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
 
               {/* Tracks */}
               {tracks.map(track => (
-                <div key={track.id} className="h-16 relative border-b border-border">
+                <div
+                  key={track.id}
+                  className={`h-16 relative border-b border-border transition-colors ${
+                    dragOverTrackId === track.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/40' : ''
+                  }`}
+                  onDragOver={(e) => handleTrackDragOver(e, track.id, track.type)}
+                  onDragLeave={handleTrackDragLeave}
+                  onDrop={(e) => handleTrackDrop(e, track.id, track.type)}
+                >
                   {/* Grid lines */}
                   {Array.from({ length: Math.ceil(maxDuration) }).map((_, i) => (
                     <div
@@ -530,7 +606,9 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
                   {/* Drop zone */}
                   {!track.locked && track.items.length === 0 && (
                     <div
-                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity gap-2"
+                      className={`absolute inset-0 flex items-center justify-center gap-2 transition-opacity ${
+                        dragOverTrackId === track.id ? 'opacity-100' : 'opacity-0 hover:opacity-100'
+                      }`}
                     >
                       <span
                         className="text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/80 px-3 py-1.5 rounded-full cursor-pointer hover:bg-muted transition-colors"
