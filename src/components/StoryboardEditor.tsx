@@ -1055,6 +1055,10 @@ export const StoryboardEditor = () => {
           />
         </TabsContent>
 
+        <TabsContent value="animatic" className="mt-4">
+          <AnimaticMaker panels={panels} />
+        </TabsContent>
+
         <TabsContent value="grid" className="mt-4">
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {showGallery && images.length > 0 && (
