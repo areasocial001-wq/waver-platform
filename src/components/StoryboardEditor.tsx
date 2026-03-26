@@ -899,7 +899,7 @@ export const StoryboardEditor = () => {
 
           <ScriptToStoryboardDialog onImportPanels={handleImportFromScript} />
 
-
+          <Select value={layout} onValueChange={(value) => handleLayoutChange(value as LayoutType)}>
             <SelectTrigger className="w-[180px] bg-background/50 border-border">
               <SelectValue />
             </SelectTrigger>
