@@ -223,51 +223,10 @@ export function TimelineEditor({ initialItems }: TimelineEditorProps) {
   }, []);
 
   const handleAudioFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !importTargetTrackId) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0 || !importTargetTrackId) return;
 
-    const maxSizeMB = 50;
-    if (file.size / (1024 * 1024) > maxSizeMB) {
-      toast.error(`File troppo grande. Max: ${maxSizeMB}MB`);
-      e.target.value = '';
-      return;
-    }
-
-    const validTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/webm', 'audio/aac', 'audio/mp4'];
-    if (!validTypes.some(t => file.type.includes(t.split('/')[1]))) {
-      toast.error('Formato non supportato. Usa MP3, WAV, OGG, WebM o AAC.');
-      e.target.value = '';
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-    const audio = new Audio(url);
-    
-    audio.addEventListener('loadedmetadata', () => {
-      const duration = audio.duration;
-      setTracks(prev => prev.map(track => {
-        if (track.id !== importTargetTrackId) return track;
-        const lastEnd = track.items.reduce((max, item) => Math.max(max, item.startTime + item.duration), 0);
-        const newItem: TimelineItem = {
-          id: `item-${Date.now()}`,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          startTime: lastEnd,
-          duration,
-          url,
-          color: track.color,
-          volume: 100,
-          sourceType: 'upload',
-        };
-        return { ...track, items: [...track.items, newItem] };
-      }));
-      toast.success(`"${file.name}" importato nella traccia`);
-    });
-
-    audio.addEventListener('error', () => {
-      toast.error('Impossibile leggere il file audio');
-      URL.revokeObjectURL(url);
-    });
-
+    processMultipleAudioFiles(files, importTargetTrackId);
     e.target.value = '';
     setImportTargetTrackId(null);
   }, [importTargetTrackId]);
