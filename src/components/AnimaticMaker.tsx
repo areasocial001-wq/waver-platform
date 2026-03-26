@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 import {
   Play, Pause, SkipBack, SkipForward, Image as ImageIcon,
-  Clock, ArrowRight, Film, Settings2, Maximize2, Download
+  Clock, ArrowRight, Film, Settings2, Maximize2, Download, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -61,6 +62,8 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   const totalDuration = panels.reduce((sum, p) => sum + p.duration, 0);
 
@@ -242,6 +245,124 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const exportAsMP4 = useCallback(async () => {
+    if (panels.length === 0) return;
+    pause();
+    setIsExporting(true);
+    setExportProgress(0);
+
+    try {
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = 960;
+      exportCanvas.height = 540;
+      const ctx = exportCanvas.getContext('2d')!;
+
+      const stream = exportCanvas.captureStream(30);
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=vp9',
+        videoBitsPerSecond: 5000000,
+      });
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      const exportPromise = new Promise<Blob>((resolve) => {
+        mediaRecorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' }));
+      });
+
+      mediaRecorder.start();
+
+      const loadedImages: HTMLImageElement[] = [];
+      for (const panel of panels) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = panel.imageUrl;
+        });
+        loadedImages.push(img);
+      }
+
+      const fps = 30;
+      const totalFrames = Math.ceil(totalDuration * fps);
+      let frame = 0;
+
+      for (let pIdx = 0; pIdx < panels.length; pIdx++) {
+        const panel = panels[pIdx];
+        const panelFrames = Math.ceil(panel.duration * fps);
+        const img = loadedImages[pIdx];
+
+        for (let f = 0; f < panelFrames && frame < totalFrames; f++) {
+          const p = f / panelFrames;
+          ctx.clearRect(0, 0, 960, 540);
+          ctx.fillStyle = '#000';
+          ctx.fillRect(0, 0, 960, 540);
+
+          ctx.save();
+          const t = panel.transition;
+          const transP = Math.min(p / (transitionDuration / panel.duration), 1);
+
+          if (t === 'fade' && transP < 1) ctx.globalAlpha = transP;
+          else if (t === 'zoom-in') {
+            const s = 1 + (1 - transP) * 0.3;
+            ctx.translate(480, 270); ctx.scale(s, s); ctx.translate(-480, -270);
+          } else if (t === 'zoom-out') {
+            const s = 0.7 + transP * 0.3;
+            ctx.translate(480, 270); ctx.scale(s, s); ctx.translate(-480, -270);
+          } else if (t === 'wipe-left') {
+            ctx.beginPath(); ctx.rect(0, 0, 960 * transP, 540); ctx.clip();
+          } else if (t === 'wipe-right') {
+            ctx.beginPath(); ctx.rect(960 * (1 - transP), 0, 960 * transP, 540); ctx.clip();
+          } else if (t === 'slide-up') {
+            ctx.translate(0, 540 * (1 - transP));
+          }
+
+          const kbs = 1 + p * 0.05;
+          ctx.translate(480, 270); ctx.scale(kbs, kbs); ctx.translate(-480, -270);
+
+          if (img.width > 0) {
+            const ir = img.width / img.height;
+            const cr = 960 / 540;
+            let dw, dh, dx, dy;
+            if (ir > cr) { dh = 540; dw = dh * ir; dx = (960 - dw) / 2; dy = 0; }
+            else { dw = 960; dh = dw / ir; dx = 0; dy = (540 - dh) / 2; }
+            ctx.drawImage(img, dx, dy, dw, dh);
+          }
+          ctx.restore();
+
+          if (panel.caption) {
+            const grad = ctx.createLinearGradient(0, 440, 0, 540);
+            grad.addColorStop(0, 'rgba(0,0,0,0)'); grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+            ctx.fillStyle = grad; ctx.fillRect(0, 440, 960, 100);
+            ctx.fillStyle = '#fff'; ctx.font = '16px system-ui, sans-serif';
+            ctx.textAlign = 'center'; ctx.fillText(panel.caption, 480, 520, 920);
+          }
+
+          frame++;
+          setExportProgress(Math.round((frame / totalFrames) * 100));
+          if (frame % 10 === 0) await new Promise(r => setTimeout(r, 0));
+        }
+      }
+
+      mediaRecorder.stop();
+      const blob = await exportPromise;
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `animatic-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast.success('Animatic esportato con successo!');
+    } catch (err) {
+      console.error('Export error:', err);
+      toast.error('Errore durante l\'esportazione');
+    }
+    setIsExporting(false);
+    setExportProgress(0);
+  }, [panels, totalDuration, transitionDuration]);
+
   if (panels.length === 0) {
     return (
       <Card className="border-primary/20 bg-card/50">
@@ -263,11 +384,26 @@ export function AnimaticMaker({ panels: inputPanels }: AnimaticMakerProps) {
           <Film className="w-5 h-5 text-primary" />
           Animatic Maker
         </CardTitle>
-        <CardDescription>
-          Anteprima dello storyboard con timing e transizioni — {panels.length} pannelli, {formatTime(totalDuration)} totali
+        <CardDescription className="flex items-center justify-between">
+          <span>Anteprima dello storyboard con timing e transizioni — {panels.length} pannelli, {formatTime(totalDuration)} totali</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1.5"
+            onClick={exportAsMP4}
+            disabled={isExporting || panels.length === 0}
+          >
+            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {isExporting ? `Esportazione ${exportProgress}%` : 'Esporta Video'}
+          </Button>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Export progress */}
+        {isExporting && (
+          <Progress value={exportProgress} className="h-2" />
+        )}
+
         {/* Preview Canvas */}
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
           <canvas
