@@ -71,11 +71,6 @@ serve(async (req) => {
     if (!PIAPI_API_KEY) {
       throw new Error("PIAPI_API_KEY is not configured");
     }
-      return new Response(
-        JSON.stringify({ status: 'ok', service: 'piapi-image' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     const { action, taskId, prompt, model, aspectRatio, width, height } = body;
 
