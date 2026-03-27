@@ -188,7 +188,7 @@ export default function AdminDashboard() {
                             {u.profile?.is_blocked ? (
                               <Badge variant="destructive">Bloccato</Badge>
                             ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-600">Attivo</Badge>
+                              <Badge variant="secondary">Attivo</Badge>
                             )}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
