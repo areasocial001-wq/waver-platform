@@ -20,6 +20,7 @@ import ViduToolsPage from "./pages/ViduTools";
 import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
 import TimelineEditorPage from "./pages/TimelineEditorPage";
+import AdminDashboard from "./pages/AdminDashboard";
 
 import NotFound from "./pages/NotFound";
 
