@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, CreditCard } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, CreditCard, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
 import { AudioExtractorDialog } from "./AudioExtractorDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useSubscription } from "@/hooks/useSubscription";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,7 @@ export const Navbar = () => {
   const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
   const [audioExtractorOpen, setAudioExtractorOpen] = useState(false);
   const { isAdmin } = useUserRole();
+  const { tier, subscribed } = useSubscription();
   
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
@@ -95,6 +98,14 @@ export const Navbar = () => {
           <div className="hidden md:block">
             <ApiStatusNavWidget />
           </div>
+          
+          {/* Premium Badge */}
+          {subscribed && tier === "premium" && (
+            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30 hidden sm:inline-flex gap-1">
+              <Crown className="w-3 h-3" />
+              Premium
+            </Badge>
+          )}
           
           {/* Email - hidden on small screens */}
           <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
