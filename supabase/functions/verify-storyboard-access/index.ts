@@ -85,7 +85,7 @@ serve(async (req) => {
     // Fetch storyboard with service role (bypasses RLS)
     const { data: storyboard, error } = await supabase
       .from('storyboards')
-      .select('id, title, layout, panels, tags, template_type, is_public, share_password')
+      .select('id, title, layout, panels, tags, template_type, is_public')
       .eq('id', storyboardId)
       .single();
 
@@ -97,6 +97,15 @@ serve(async (req) => {
       );
     }
 
+    // Fetch share password from separate table
+    const { data: pwData } = await supabase
+      .from('storyboard_share_passwords')
+      .select('share_password')
+      .eq('storyboard_id', storyboardId)
+      .maybeSingle();
+    
+    const sharePassword = pwData?.share_password || null;
+
     // Check if storyboard is public
     if (!storyboard.is_public) {
       return new Response(
@@ -106,7 +115,7 @@ serve(async (req) => {
     }
 
     // Check if password is required
-    if (storyboard.share_password) {
+    if (sharePassword) {
       if (!password) {
         return new Response(
           JSON.stringify({ 
@@ -120,13 +129,10 @@ serve(async (req) => {
       // Validate password using bcrypt if hashed, otherwise plain comparison for legacy passwords
       let isValidPassword = false;
       
-      if (isHashedPassword(storyboard.share_password)) {
-        // Password is hashed - use bcrypt comparison
-        isValidPassword = await bcrypt.compare(password, storyboard.share_password);
+      if (isHashedPassword(sharePassword)) {
+        isValidPassword = await bcrypt.compare(password, sharePassword);
       } else {
-        // Legacy plaintext password - compare directly
-        // Note: This supports backwards compatibility with existing plaintext passwords
-        isValidPassword = password === storyboard.share_password;
+        isValidPassword = password === sharePassword;
       }
 
       if (!isValidPassword) {
@@ -142,9 +148,7 @@ serve(async (req) => {
       resetAttempts(storyboardId);
     }
 
-    // Password valid or not required - return storyboard data WITHOUT the password
-    const { share_password, ...safeStoryboard } = storyboard;
-
+    // Password valid or not required - return storyboard data
     console.log('Storyboard access granted:', storyboardId);
 
     return new Response(

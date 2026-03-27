@@ -257,8 +257,9 @@ export const StoryboardEditor = () => {
         .select('share_password')
         .eq('storyboard_id', data.id)
         .maybeSingle();
-      setIsPasswordProtected(!!pwData?.share_password);
-      setSharePassword(pwData?.share_password || "");
+      const pwRecord = pwData as any;
+      setIsPasswordProtected(!!pwRecord?.share_password);
+      setSharePassword(pwRecord?.share_password || "");
       toast.success("Storyboard caricato!");
     } catch (error: any) {
       console.error("Error loading storyboard:", error);
@@ -519,6 +520,8 @@ export const StoryboardEditor = () => {
         user_id: user.id,
       };
 
+      let storyboardId = currentStoryboardId;
+      
       if (currentStoryboardId) {
         const { error } = await supabase
           .from('storyboards')
@@ -535,8 +538,24 @@ export const StoryboardEditor = () => {
           .single();
 
         if (error) throw error;
+        storyboardId = data.id;
         setCurrentStoryboardId(data.id);
         toast.success("Storyboard salvato!");
+      }
+
+      // Save/update share password in separate table
+      if (storyboardId) {
+        if (hashedPassword) {
+          await supabase
+            .from('storyboard_share_passwords' as any)
+            .upsert({ storyboard_id: storyboardId, share_password: hashedPassword } as any, { onConflict: 'storyboard_id' });
+        } else {
+          // Remove password if protection was disabled
+          await supabase
+            .from('storyboard_share_passwords' as any)
+            .delete()
+            .eq('storyboard_id', storyboardId);
+        }
       }
     } catch (error: any) {
       console.error("Error saving storyboard:", error);
