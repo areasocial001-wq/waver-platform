@@ -392,6 +392,78 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_quotas: {
+        Row: {
+          can_clone_voice: boolean
+          can_use_api_access: boolean
+          can_use_multi_provider: boolean
+          can_use_timeline: boolean
+          created_at: string
+          id: string
+          max_resolution: string
+          max_storyboards: number
+          max_video_generations_monthly: number
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          can_clone_voice?: boolean
+          can_use_api_access?: boolean
+          can_use_multi_provider?: boolean
+          can_use_timeline?: boolean
+          created_at?: string
+          id?: string
+          max_resolution?: string
+          max_storyboards?: number
+          max_video_generations_monthly?: number
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          can_clone_voice?: boolean
+          can_use_api_access?: boolean
+          can_use_multi_provider?: boolean
+          can_use_timeline?: boolean
+          created_at?: string
+          id?: string
+          max_resolution?: string
+          max_storyboards?: number
+          max_video_generations_monthly?: number
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_blocked: boolean
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          is_blocked?: boolean
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_blocked?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       prompt_templates: {
         Row: {
           audio_suggestion: string | null
