@@ -74,10 +74,11 @@ export default function PricingPage() {
   const [searchParams] = useSearchParams();
   const [checkoutLoading, setCheckoutLoading] = React.useState(false);
 
+  const [welcomeShown, setWelcomeShown] = React.useState(false);
+
   useEffect(() => {
     if (searchParams.get("success") === "true") {
       toast.success("Pagamento completato! Aggiornamento del piano in corso...");
-      // Poll subscription status for up to 30s to catch webhook processing
       let attempts = 0;
       const interval = setInterval(async () => {
         await checkSubscription();
@@ -91,6 +92,17 @@ export default function PricingPage() {
       toast.info("Pagamento annullato.");
     }
   }, [searchParams, checkSubscription]);
+
+  // Show welcome toast when premium is detected after checkout
+  useEffect(() => {
+    if (tier === "premium" && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
+      setWelcomeShown(true);
+      toast.success("🎉 Benvenuto nel piano Premium!", {
+        description: "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
+        duration: 8000,
+      });
+    }
+  }, [tier, subscribed, searchParams, welcomeShown]);
 
   const currentPlan = isAdmin ? "admin" : tier;
 

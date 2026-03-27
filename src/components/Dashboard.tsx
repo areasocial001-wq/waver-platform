@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import { ApiStatusWidget } from "./ApiStatusWidget";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Badge } from "@/components/ui/badge";
+import { Crown, Lock, Unlock } from "lucide-react";
 
 interface Stats {
   totalVideos: number;
