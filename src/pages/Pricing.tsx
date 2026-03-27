@@ -76,8 +76,16 @@ export default function PricingPage() {
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
-      toast.success("Pagamento completato! Il tuo piano verrà aggiornato a breve.");
+      toast.success("Pagamento completato! Aggiornamento del piano in corso...");
+      // Poll subscription status for up to 30s to catch webhook processing
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        await checkSubscription();
+        attempts++;
+        if (attempts >= 6) clearInterval(interval);
+      }, 5000);
       checkSubscription();
+      return () => clearInterval(interval);
     }
     if (searchParams.get("canceled") === "true") {
       toast.info("Pagamento annullato.");
