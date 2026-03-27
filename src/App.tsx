@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ImageGalleryProvider } from "@/contexts/ImageGalleryContext";
+import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import History from "./pages/History";
@@ -32,11 +33,15 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Index />} />
+            {/* Public routes */}
+            <Route path="/landing" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/storyboard/:id" element={<ViewStoryboard />} />
+            
+            {/* Authenticated routes */}
+            <Route path="/" element={<Index />} />
             <Route path="/history" element={<History />} />
             <Route path="/my-storyboards" element={<MyStoryboards />} />
-            <Route path="/storyboard/:id" element={<ViewStoryboard />} />
             <Route path="/content-generator" element={<ContentGenerator />} />
             <Route path="/freepik" element={<FreepikPage />} />
             <Route path="/api-monitoring" element={<ApiMonitoring />} />
