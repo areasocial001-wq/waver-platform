@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
 import { AudioExtractorDialog } from "./AudioExtractorDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,7 @@ export const Navbar = () => {
   const [user, setUser] = useState<User | null>(null);
   const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
   const [audioExtractorOpen, setAudioExtractorOpen] = useState(false);
+  const { isAdmin } = useUserRole();
   
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
@@ -48,7 +50,8 @@ export const Navbar = () => {
   const isLTXToolsPage = location.pathname === "/ltx-tools";
   const isNLtoJSONPage = location.pathname === "/nl-to-json";
   const isTimelineEditorPage = location.pathname === "/timeline-editor";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage;
+  const isAdminPage = location.pathname === "/admin";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage || isAdminPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -247,6 +250,12 @@ export const Navbar = () => {
                     <Settings className="w-4 h-4 mr-2" />
                     Impostazioni
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => navigate("/admin")}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin Dashboard
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
