@@ -1207,22 +1207,26 @@ export const ImageToVideoForm = () => {
         />
       )}
 
+      <QuotaGuard />
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || splitState.isSplitting || !startImage || (requiresEndFrame && !endImage)}
+        disabled={isLoading || splitState.isSplitting || !startImage || (requiresEndFrame && !endImage) || !canGenerate}
         className="w-full bg-gradient-accent text-accent-foreground hover:opacity-90 shadow-glow-accent transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {splitState.isSplitting 
-          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
-          : isLoading 
-            ? "Preparazione..." 
-            : requiresEndFrame && !endImage
-              ? "Carica entrambi i frame"
-              : endImage 
-                ? "Genera Video Keyframe" 
-                : "Genera Video da Immagine"
+        {!canGenerate
+          ? "Limite raggiunto"
+          : splitState.isSplitting 
+            ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+            : isLoading 
+              ? "Preparazione..." 
+              : requiresEndFrame && !endImage
+                ? "Carica entrambi i frame"
+                : endImage 
+                  ? "Genera Video Keyframe" 
+                  : "Genera Video da Immagine"
         }
       </Button>
 

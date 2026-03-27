@@ -814,16 +814,20 @@ export const TextToVideoForm = () => {
         />
       )}
 
+      <QuotaGuard />
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || splitState.isSplitting || !prompt.trim()}
+        disabled={isLoading || splitState.isSplitting || !prompt.trim() || !canGenerate}
         className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow-primary transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {splitState.isSplitting 
-          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
-          : isLoading ? "Preparazione..." : "Genera Video"
+        {!canGenerate
+          ? "Limite raggiunto"
+          : splitState.isSplitting 
+            ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+            : isLoading ? "Preparazione..." : "Genera Video"
         }
       </Button>
 
