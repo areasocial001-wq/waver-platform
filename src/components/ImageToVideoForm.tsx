@@ -23,6 +23,8 @@ import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 import { resolveAimlModelId } from "@/lib/aimlModelIds";
 import { Badge } from "@/components/ui/badge";
 import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
+import { QuotaGuard } from "@/components/QuotaGuard";
+import { useQuotas } from "@/hooks/useQuotas";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);
@@ -49,6 +51,7 @@ export const ImageToVideoForm = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
+  const { canGenerate, remainingGenerations } = useQuotas();
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   
   // Track original values before auto-correction for warning display
@@ -301,6 +304,13 @@ export const ImageToVideoForm = () => {
   const handleGenerate = async () => {
     if (!startImage) {
       toast.error("Carica almeno lo start frame per procedere");
+      return;
+    }
+
+    if (!canGenerate) {
+      toast.error("Limite mensile raggiunto", {
+        description: "Hai esaurito le generazioni disponibili per il tuo piano. Passa a un piano superiore."
+      });
       return;
     }
 
@@ -1197,22 +1207,26 @@ export const ImageToVideoForm = () => {
         />
       )}
 
+      <QuotaGuard />
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || splitState.isSplitting || !startImage || (requiresEndFrame && !endImage)}
+        disabled={isLoading || splitState.isSplitting || !startImage || (requiresEndFrame && !endImage) || !canGenerate}
         className="w-full bg-gradient-accent text-accent-foreground hover:opacity-90 shadow-glow-accent transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {splitState.isSplitting 
-          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
-          : isLoading 
-            ? "Preparazione..." 
-            : requiresEndFrame && !endImage
-              ? "Carica entrambi i frame"
-              : endImage 
-                ? "Genera Video Keyframe" 
-                : "Genera Video da Immagine"
+        {!canGenerate
+          ? "Limite raggiunto"
+          : splitState.isSplitting 
+            ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+            : isLoading 
+              ? "Preparazione..." 
+              : requiresEndFrame && !endImage
+                ? "Carica entrambi i frame"
+                : endImage 
+                  ? "Genera Video Keyframe" 
+                  : "Genera Video da Immagine"
         }
       </Button>
 

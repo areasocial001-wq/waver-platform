@@ -24,6 +24,8 @@ import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
+import { QuotaGuard } from "@/components/QuotaGuard";
+import { useQuotas } from "@/hooks/useQuotas";
 interface PiAPIBalance {
   credits: number;
   equivalent_in_usd: number;
@@ -59,6 +61,7 @@ export const TextToVideoForm = () => {
   const [videoTitle, setVideoTitle] = useState("");
   const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
+  const { canGenerate, remainingGenerations } = useQuotas();
   
   // Track original values before auto-correction for warning display
   const [originalDuration, setOriginalDuration] = useState<number | null>(null);
@@ -159,6 +162,13 @@ export const TextToVideoForm = () => {
   const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Inserisci una descrizione per il video");
+      return;
+    }
+
+    if (!canGenerate) {
+      toast.error("Limite mensile raggiunto", {
+        description: "Hai esaurito le generazioni disponibili per il tuo piano. Passa a un piano superiore."
+      });
       return;
     }
 
@@ -804,16 +814,20 @@ export const TextToVideoForm = () => {
         />
       )}
 
+      <QuotaGuard />
+
       <Button 
         onClick={handleGenerate}
-        disabled={isLoading || splitState.isSplitting || !prompt.trim()}
+        disabled={isLoading || splitState.isSplitting || !prompt.trim() || !canGenerate}
         className="w-full bg-gradient-primary text-primary-foreground hover:opacity-90 shadow-glow-primary transition-all duration-300"
         size="lg"
       >
         <Sparkles className="w-5 h-5 mr-2" />
-        {splitState.isSplitting 
-          ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
-          : isLoading ? "Preparazione..." : "Genera Video"
+        {!canGenerate
+          ? "Limite raggiunto"
+          : splitState.isSplitting 
+            ? `Auto-split ${splitState.currentClip}/${splitState.totalClips}...`
+            : isLoading ? "Preparazione..." : "Genera Video"
         }
       </Button>
 
