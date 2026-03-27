@@ -190,7 +190,7 @@ export default function PricingPage() {
                       {plan.features.map((feature) => (
                         <li key={feature.name} className="flex items-center gap-2 text-sm">
                           {feature.included ? (
-                            <Check className="h-4 w-4 text-green-500 shrink-0" />
+                            <Check className="h-4 w-4 text-primary shrink-0" />
                           ) : (
                             <X className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                           )}
