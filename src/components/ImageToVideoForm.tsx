@@ -23,6 +23,8 @@ import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 import { resolveAimlModelId } from "@/lib/aimlModelIds";
 import { Badge } from "@/components/ui/badge";
 import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
+import { QuotaGuard } from "@/components/QuotaGuard";
+import { useQuotas } from "@/hooks/useQuotas";
 
 export const ImageToVideoForm = () => {
   const [startImage, setStartImage] = useState<File | null>(null);

@@ -24,6 +24,8 @@ import { AutoCorrectionBadge } from "@/components/AutoCorrectionBadge";
 import { PromptSafetyChecker } from "@/components/PromptSafetyChecker";
 import { PromptBuilderWizard } from "@/components/PromptBuilderWizard";
 import { PromptTemplatesLibrary } from "@/components/PromptTemplatesLibrary";
+import { QuotaGuard } from "@/components/QuotaGuard";
+import { useQuotas } from "@/hooks/useQuotas";
 interface PiAPIBalance {
   credits: number;
   equivalent_in_usd: number;
