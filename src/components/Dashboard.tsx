@@ -20,6 +20,10 @@ import {
 } from "lucide-react";
 import { ApiStatusWidget } from "./ApiStatusWidget";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useUserRole } from "@/hooks/useUserRole";
+import { Badge } from "@/components/ui/badge";
+import { Crown, Lock, Unlock } from "lucide-react";
 
 interface Stats {
   totalVideos: number;
@@ -47,6 +51,8 @@ export const Dashboard = () => {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
+  const { tier, subscribed } = useSubscription();
+  const { isAdmin } = useUserRole();
   
   const { apis, isRefreshing, checkApiStatus } = useApiMonitoring();
 
@@ -381,6 +387,67 @@ export const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Premium Features Indicator */}
+        <Card className="bg-card/50 border-border/50 mb-6">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Crown className="w-4 h-4 text-primary" />
+                Funzionalità Premium
+              </CardTitle>
+              {(tier === "premium" || isAdmin) ? (
+                <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">
+                  <Unlock className="w-3 h-3 mr-1" /> Sbloccato
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-xs">
+                  <Lock className="w-3 h-3 mr-1" /> Piano Free
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {[
+                { label: "Video 1080p", free: false },
+                { label: "Voice Cloning", free: false },
+                { label: "Timeline Editor", free: false },
+                { label: "Multi-provider", free: false },
+              ].map((feat) => {
+                const unlocked = tier === "premium" || isAdmin;
+                return (
+                  <div
+                    key={feat.label}
+                    className={`flex items-center gap-2 p-2 rounded-lg transition-colors ${
+                      unlocked 
+                        ? "bg-primary/5 border border-primary/20" 
+                        : "bg-muted/30 border border-border/50 opacity-60"
+                    }`}
+                  >
+                    {unlocked ? (
+                      <Unlock className="w-3.5 h-3.5 text-primary shrink-0" />
+                    ) : (
+                      <Lock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="text-xs font-medium">{feat.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+            {tier !== "premium" && !isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 w-full text-xs border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => navigate("/pricing")}
+              >
+                <Crown className="w-3 h-3 mr-1" />
+                Passa a Premium
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
         {/* System Info */}
         <Card className="bg-card/50 border-border/50">
