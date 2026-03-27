@@ -250,8 +250,15 @@ export const StoryboardEditor = () => {
       setSelectedTemplate(data.template_type as TemplateType);
       resetPanels((data.panels as unknown as StoryboardPanel[]) || []);
       setTags((data.tags as string[]) || []);
-      setIsPasswordProtected(!!data.share_password);
-      setSharePassword(data.share_password || "");
+
+      // Check for share password in separate table
+      const { data: pwData } = await supabase
+        .from('storyboard_share_passwords' as any)
+        .select('share_password')
+        .eq('storyboard_id', data.id)
+        .maybeSingle();
+      setIsPasswordProtected(!!pwData?.share_password);
+      setSharePassword(pwData?.share_password || "");
       toast.success("Storyboard caricato!");
     } catch (error: any) {
       console.error("Error loading storyboard:", error);
@@ -509,7 +516,6 @@ export const StoryboardEditor = () => {
         template_type: selectedTemplate,
         panels: panels as any,
         tags,
-        share_password: hashedPassword,
         user_id: user.id,
       };
 

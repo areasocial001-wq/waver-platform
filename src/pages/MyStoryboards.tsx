@@ -21,7 +21,7 @@ interface Storyboard {
   panels: any[];
   tags: string[];
   is_public: boolean;
-  share_password: string | null;
+  has_password: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -53,13 +53,21 @@ export default function MyStoryboards() {
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
+      // Check which storyboards have passwords
+      const ids = (data || []).map(d => d.id);
+      const { data: pwRows } = await supabase
+        .from('storyboard_share_passwords' as any)
+        .select('storyboard_id')
+        .in('storyboard_id', ids);
+      const pwSet = new Set((pwRows || []).map((r: any) => r.storyboard_id));
+
       setStoryboards((data || []).map(item => ({
         id: item.id,
         title: item.title,
         layout: item.layout,
         template_type: item.template_type,
         is_public: item.is_public,
-        share_password: item.share_password,
+        has_password: pwSet.has(item.id),
         created_at: item.created_at,
         updated_at: item.updated_at,
         tags: (item.tags as string[]) || [],
@@ -364,7 +372,7 @@ export default function MyStoryboards() {
                       <CardTitle className="flex items-center justify-between gap-2">
                         <span className="truncate">{storyboard.title}</span>
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          {storyboard.share_password && (
+                          {storyboard.has_password && (
                             <Lock className="h-4 w-4 text-amber-500" />
                           )}
                           {storyboard.is_public && (
