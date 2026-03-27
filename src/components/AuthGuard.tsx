@@ -29,7 +29,7 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate("/auth");
+      navigate("/landing");
     }
   }, [user, loading, navigate]);
 
