@@ -22,8 +22,10 @@ import { ApiStatusWidget } from "./ApiStatusWidget";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useQuotas } from "@/hooks/useQuotas";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Lock, Unlock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Crown, Lock, Unlock, AlertTriangle } from "lucide-react";
 
 interface Stats {
   totalVideos: number;
@@ -53,6 +55,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { tier, subscribed } = useSubscription();
   const { isAdmin } = useUserRole();
+  const { quota, usedGenerations, remainingGenerations, isUnlimited } = useQuotas();
   
   const { apis, isRefreshing, checkApiStatus } = useApiMonitoring();
 
