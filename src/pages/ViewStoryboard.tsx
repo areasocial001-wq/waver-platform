@@ -28,7 +28,7 @@ interface Storyboard {
   panels: StoryboardPanel[];
   tags: string[];
   created_at: string;
-  share_password: string | null;
+  
 }
 
 const LAYOUT_CONFIG: Record<string, { cols: number; rows: number }> = {
