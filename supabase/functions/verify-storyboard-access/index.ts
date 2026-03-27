@@ -154,7 +154,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true,
-        storyboard: safeStoryboard
+        storyboard
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
