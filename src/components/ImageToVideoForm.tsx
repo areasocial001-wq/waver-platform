@@ -51,6 +51,7 @@ export const ImageToVideoForm = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>("none");
   const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
+  const { canGenerate, remainingGenerations } = useQuotas();
   const [preferredProvider, setPreferredProvider] = useProviderPreference("auto");
   
   // Track original values before auto-correction for warning display

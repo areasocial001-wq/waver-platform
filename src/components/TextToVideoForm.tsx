@@ -61,6 +61,7 @@ export const TextToVideoForm = () => {
   const [videoTitle, setVideoTitle] = useState("");
   const { state: splitState, runSplitGeneration } = useAutoSplitGeneration();
   const [isLoading, setIsLoading] = useState(false);
+  const { canGenerate, remainingGenerations } = useQuotas();
   
   // Track original values before auto-correction for warning display
   const [originalDuration, setOriginalDuration] = useState<number | null>(null);
