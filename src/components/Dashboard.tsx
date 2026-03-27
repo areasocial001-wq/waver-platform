@@ -51,6 +51,8 @@ export const Dashboard = () => {
     recentActivity: []
   });
   const [loading, setLoading] = useState(true);
+  const { tier, subscribed } = useSubscription();
+  const { isAdmin } = useUserRole();
   
   const { apis, isRefreshing, checkApiStatus } = useApiMonitoring();
 
