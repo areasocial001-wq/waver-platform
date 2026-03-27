@@ -54,6 +54,7 @@ const App = () => (
             <Route path="/ltx-tools" element={<LTXToolsPage />} />
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
             <Route path="/timeline-editor" element={<TimelineEditorPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
