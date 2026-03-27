@@ -22,8 +22,10 @@ import { ApiStatusWidget } from "./ApiStatusWidget";
 import { useApiMonitoring } from "@/hooks/useApiMonitoring";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useQuotas } from "@/hooks/useQuotas";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Lock, Unlock } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Crown, Lock, Unlock, AlertTriangle } from "lucide-react";
 
 interface Stats {
   totalVideos: number;
@@ -53,6 +55,7 @@ export const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { tier, subscribed } = useSubscription();
   const { isAdmin } = useUserRole();
+  const { quota, usedGenerations, remainingGenerations, isUnlimited } = useQuotas();
   
   const { apis, isRefreshing, checkApiStatus } = useApiMonitoring();
 
@@ -244,7 +247,62 @@ export const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Quick Actions */}
+        {/* Video Generation Quota */}
+        <Card className={`bg-card/50 mb-6 ${
+          !isUnlimited && remainingGenerations <= 2 
+            ? "border-destructive/50" 
+            : !isUnlimited && remainingGenerations <= Math.ceil(quota.max_video_generations_monthly * 0.2) 
+              ? "border-yellow-500/50" 
+              : "border-border/50"
+        }`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Video className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">Generazioni Video</span>
+              </div>
+              {isUnlimited ? (
+                <Badge className="bg-primary/10 text-primary border-primary/30 text-xs">Illimitate</Badge>
+              ) : (
+                <span className="text-sm font-bold">
+                  {remainingGenerations} / {quota.max_video_generations_monthly}
+                  <span className="text-xs text-muted-foreground ml-1">rimanenti</span>
+                </span>
+              )}
+            </div>
+            {!isUnlimited && (
+              <>
+                <Progress 
+                  value={(usedGenerations / quota.max_video_generations_monthly) * 100} 
+                  className="h-2"
+                />
+                {remainingGenerations <= 2 && remainingGenerations > 0 && (
+                  <div className="flex items-center gap-1.5 mt-2 text-destructive">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium">
+                      Attenzione: solo {remainingGenerations} generazion{remainingGenerations === 1 ? "e" : "i"} rimast{remainingGenerations === 1 ? "a" : "e"}!
+                    </span>
+                  </div>
+                )}
+                {remainingGenerations === 0 && (
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-destructive font-medium flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Limite raggiunto
+                    </span>
+                    {tier !== "premium" && !isAdmin && (
+                      <Button variant="outline" size="sm" className="h-6 text-xs border-primary/30 text-primary" onClick={() => navigate("/pricing")}>
+                        <Crown className="w-3 h-3 mr-1" /> Upgrade
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+
         <div className="mb-6">
           <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
             <Activity className="w-4 h-4 text-primary" />
