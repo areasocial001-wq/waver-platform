@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
+import { AudioExtractorDialog } from "./AudioExtractorDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 import { AudioExtractorDialog } from "./AudioExtractorDialog";
 import {
   AlertDialog,
