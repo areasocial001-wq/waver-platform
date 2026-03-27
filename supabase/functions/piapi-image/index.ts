@@ -28,7 +28,7 @@ const PIAPI_IMAGE_MODELS: Record<string, string> = {
   "nano-banana": "nano-banana",
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
