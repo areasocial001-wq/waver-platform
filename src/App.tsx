@@ -21,6 +21,7 @@ import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
 import TimelineEditorPage from "./pages/TimelineEditorPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import PricingPage from "./pages/Pricing";
 
 import NotFound from "./pages/NotFound";
 
