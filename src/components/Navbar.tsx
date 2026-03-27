@@ -35,6 +35,7 @@ export const Navbar = () => {
   const [user, setUser] = useState<User | null>(null);
   const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
   const [audioExtractorOpen, setAudioExtractorOpen] = useState(false);
+  const { isAdmin } = useUserRole();
   
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
