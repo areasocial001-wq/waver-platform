@@ -307,6 +307,13 @@ export const ImageToVideoForm = () => {
       return;
     }
 
+    if (!canGenerate) {
+      toast.error("Limite mensile raggiunto", {
+        description: "Hai esaurito le generazioni disponibili per il tuo piano. Passa a un piano superiore."
+      });
+      return;
+    }
+
     // Validate reference video for Runway Act Two
     if (isRunwayActTwo && !referenceVideo) {
       toast.error("Video di riferimento obbligatorio", {
