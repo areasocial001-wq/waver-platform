@@ -28,7 +28,7 @@ interface Storyboard {
   panels: StoryboardPanel[];
   tags: string[];
   created_at: string;
-  share_password: string | null;
+  
 }
 
 const LAYOUT_CONFIG: Record<string, { cols: number; rows: number }> = {
@@ -95,7 +95,7 @@ export default function ViewStoryboard() {
           created_at: data.created_at || new Date().toISOString(),
           tags: (data.tags as string[]) || [],
           panels: (data.panels as unknown as StoryboardPanel[]) || [],
-          share_password: null, // Never expose password to client
+          
         });
         setShowPasswordPrompt(false);
       } else {

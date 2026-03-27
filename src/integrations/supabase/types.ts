@@ -481,6 +481,32 @@ export type Database = {
           },
         ]
       }
+      storyboard_share_passwords: {
+        Row: {
+          created_at: string
+          share_password: string
+          storyboard_id: string
+        }
+        Insert: {
+          created_at?: string
+          share_password: string
+          storyboard_id: string
+        }
+        Update: {
+          created_at?: string
+          share_password?: string
+          storyboard_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storyboard_share_passwords_storyboard_id_fkey"
+            columns: ["storyboard_id"]
+            isOneToOne: true
+            referencedRelation: "storyboards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       storyboard_video_batches: {
         Row: {
           audio_prompt: string | null
@@ -550,7 +576,6 @@ export type Database = {
           is_public: boolean
           layout: string
           panels: Json
-          share_password: string | null
           tags: string[] | null
           template_type: string
           title: string
@@ -563,7 +588,6 @@ export type Database = {
           is_public?: boolean
           layout: string
           panels?: Json
-          share_password?: string | null
           tags?: string[] | null
           template_type: string
           title: string
@@ -576,7 +600,6 @@ export type Database = {
           is_public?: boolean
           layout?: string
           panels?: Json
-          share_password?: string | null
           tags?: string[] | null
           template_type?: string
           title?: string
