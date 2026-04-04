@@ -53,6 +53,10 @@ export interface ModelCapabilities {
   supportsMotionControl?: boolean;   // Supports motion video input
   supportsReferenceVideo?: boolean;  // Supports video-to-video
   
+  // FPS options (if undefined, fps is not user-selectable)
+  fpsOptions?: FpsOption[];
+  defaultFps?: number;
+  
   // Default values when not specified
   defaultDuration: number;
   defaultAspectRatio?: string;
