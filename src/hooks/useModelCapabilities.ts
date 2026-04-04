@@ -66,6 +66,9 @@ export interface UseModelCapabilitiesResult {
   
   /** Default aspect ratio for this provider (if supported) */
   defaultAspectRatio: string | undefined;
+  
+  /** Default FPS for this provider (if supported) */
+  defaultFps: number | undefined;
 }
 
 /**
