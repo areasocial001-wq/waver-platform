@@ -2006,11 +2006,12 @@ serve(async (req) => {
         taskType = modelConfig.task_type_txt2video || "txt2video";
       }
       
+      const truncatedPrompt = (normalizedPrompt || "").substring(0, 2000);
       const piApiPayload: any = {
         model: modelConfig.model,
         task_type: taskType,
         input: {
-          prompt: normalizedPrompt,
+          prompt: truncatedPrompt,
         }
       };
       
