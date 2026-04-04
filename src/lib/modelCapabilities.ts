@@ -10,6 +10,11 @@ export interface DurationOption {
   label: string;
 }
 
+export interface FpsOption {
+  value: number;
+  label: string;
+}
+
 export interface AspectRatioOption {
   value: string;
   label: string;
