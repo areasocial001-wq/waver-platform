@@ -22,6 +22,9 @@ export interface UseModelCapabilitiesResult {
   /** Valid aspect ratio options (if supported) */
   aspectRatioOptions: { value: string; label: string }[] | undefined;
   
+  /** Valid FPS options (if supported) */
+  fpsOptions: { value: number; label: string }[] | undefined;
+  
   /** Check if a specific duration is valid */
   isDurationValid: (duration: number) => boolean;
   
@@ -63,6 +66,9 @@ export interface UseModelCapabilitiesResult {
   
   /** Default aspect ratio for this provider (if supported) */
   defaultAspectRatio: string | undefined;
+  
+  /** Default FPS for this provider (if supported) */
+  defaultFps: number | undefined;
 }
 
 /**
@@ -92,6 +98,7 @@ export function useModelCapabilities(provider: VideoProviderType): UseModelCapab
     durationOptions: capabilities.durations,
     resolutionOptions: capabilities.resolutions,
     aspectRatioOptions: capabilities.aspectRatios,
+    fpsOptions: capabilities.fpsOptions,
     isDurationValid,
     getValidDuration,
     getValidResolution,
@@ -106,6 +113,7 @@ export function useModelCapabilities(provider: VideoProviderType): UseModelCapab
     defaultDuration: capabilities.defaultDuration,
     defaultResolution: capabilities.defaultResolution,
     defaultAspectRatio: capabilities.defaultAspectRatio,
+    defaultFps: capabilities.defaultFps,
   }), [capabilities, isDurationValid, getValidDuration, getValidResolution]);
 }
 

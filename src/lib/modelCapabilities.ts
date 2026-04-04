@@ -10,6 +10,11 @@ export interface DurationOption {
   label: string;
 }
 
+export interface FpsOption {
+  value: number;
+  label: string;
+}
+
 export interface AspectRatioOption {
   value: string;
   label: string;
@@ -47,6 +52,10 @@ export interface ModelCapabilities {
   // Special features
   supportsMotionControl?: boolean;   // Supports motion video input
   supportsReferenceVideo?: boolean;  // Supports video-to-video
+  
+  // FPS options (if undefined, fps is not user-selectable)
+  fpsOptions?: FpsOption[];
+  defaultFps?: number;
   
   // Default values when not specified
   defaultDuration: number;
@@ -1226,6 +1235,11 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsImageToVideo: true,
     supportsEndFrame: true,
     supportsAudio: true,
+    fpsOptions: [
+      { value: 24, label: '24 fps' },
+      { value: 30, label: '30 fps' },
+    ],
+    defaultFps: 30,
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
@@ -1246,6 +1260,11 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsImageToVideo: true,
     supportsEndFrame: true,
     supportsAudio: true,
+    fpsOptions: [
+      { value: 24, label: '24 fps' },
+      { value: 30, label: '30 fps' },
+    ],
+    defaultFps: 30,
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
@@ -1261,6 +1280,11 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsTextToVideo: true,
     supportsImageToVideo: true,
     supportsAudio: true,
+    fpsOptions: [
+      { value: 24, label: '24 fps' },
+      { value: 30, label: '30 fps' },
+    ],
+    defaultFps: 30,
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
@@ -1275,6 +1299,10 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsTextToVideo: true,
     supportsImageToVideo: true,
     supportsAudio: true,
+    fpsOptions: [
+      { value: 30, label: '30 fps' },
+    ],
+    defaultFps: 30,
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
