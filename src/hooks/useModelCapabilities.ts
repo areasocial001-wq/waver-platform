@@ -22,6 +22,9 @@ export interface UseModelCapabilitiesResult {
   /** Valid aspect ratio options (if supported) */
   aspectRatioOptions: { value: string; label: string }[] | undefined;
   
+  /** Valid FPS options (if supported) */
+  fpsOptions: { value: number; label: string }[] | undefined;
+  
   /** Check if a specific duration is valid */
   isDurationValid: (duration: number) => boolean;
   
