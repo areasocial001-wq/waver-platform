@@ -1132,6 +1132,7 @@ serve(async (req) => {
           model: ltxModel,
           duration: sanitizeDuration(ltxModel, duration || 8),
           resolution: ltxResolution,
+          fps: 30,
           generate_audio: generate_audio !== false,
         };
 
