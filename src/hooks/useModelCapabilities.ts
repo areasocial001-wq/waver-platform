@@ -98,6 +98,7 @@ export function useModelCapabilities(provider: VideoProviderType): UseModelCapab
     durationOptions: capabilities.durations,
     resolutionOptions: capabilities.resolutions,
     aspectRatioOptions: capabilities.aspectRatios,
+    fpsOptions: capabilities.fpsOptions,
     isDurationValid,
     getValidDuration,
     getValidResolution,
@@ -112,6 +113,7 @@ export function useModelCapabilities(provider: VideoProviderType): UseModelCapab
     defaultDuration: capabilities.defaultDuration,
     defaultResolution: capabilities.defaultResolution,
     defaultAspectRatio: capabilities.defaultAspectRatio,
+    defaultFps: capabilities.defaultFps,
   }), [capabilities, isDurationValid, getValidDuration, getValidResolution]);
 }
 
