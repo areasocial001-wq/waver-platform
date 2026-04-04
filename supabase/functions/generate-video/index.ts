@@ -1098,11 +1098,22 @@ serve(async (req) => {
 
       // Map resolution to LTX format
       const ltxResolutionMap: Record<string, Record<string, string>> = {
-        '16:9': { '1080p': '1920x1080', '1440p': '2560x1440', '4k': '3840x2160' },
-        '9:16': { '1080p': '1080x1920', '1440p': '1440x2560', '4k': '2160x3840' },
+        '16:9': {
+          '720p': '1280x720',
+          '1080p': '1920x1080',
+          '1440p': '2560x1440',
+          '4k': '3840x2160',
+        },
+        '9:16': {
+          '720p': '720x1280',
+          '1080p': '1080x1920',
+          '1440p': '1440x2560',
+          '4k': '2160x3840',
+        },
       };
       const ar = aspect_ratio || '16:9';
-      const ltxResolution = ltxResolutionMap[ar]?.[resolution || '1080p'] || '1920x1080';
+      const requestedResolution = resolution || '720p';
+      const ltxResolution = ltxResolutionMap[ar]?.[requestedResolution] || ltxResolutionMap['16:9']['720p'];
 
       // Map camera movements to LTX format
       const ltxCameraMotion = body.camera_motion && body.camera_motion !== 'none' ? body.camera_motion : undefined;
