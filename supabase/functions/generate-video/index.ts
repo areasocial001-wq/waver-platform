@@ -1156,9 +1156,11 @@ serve(async (req) => {
           model: ltxModel,
           duration: sanitizeDuration(ltxModel, duration || 8),
           resolution: ltxResolution,
-          fps: 30,
           generate_audio: generate_audio !== false,
         };
+        if (ltxModel !== 'ltx-2-pro') {
+          ltxPayload.fps = 30;
+        }
         if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
       }
 
