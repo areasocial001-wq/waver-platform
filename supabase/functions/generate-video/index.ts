@@ -1810,11 +1810,12 @@ serve(async (req) => {
                 ? piapiConfig.task_type_img2video 
                 : piapiConfig.task_type_txt2video;
               
+              const fallbackPrompt = (prompt || "").substring(0, 2000);
               const piApiPayload: any = {
                 model: piapiConfig.model,
                 task_type: taskType,
                 input: {
-                  prompt: prompt || "",
+                  prompt: fallbackPrompt,
                 }
               };
               
