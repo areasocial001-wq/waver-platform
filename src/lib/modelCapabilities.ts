@@ -1299,10 +1299,6 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     supportsTextToVideo: true,
     supportsImageToVideo: true,
     supportsAudio: true,
-    fpsOptions: [
-      { value: 30, label: '30 fps' },
-    ],
-    defaultFps: 30,
     defaultDuration: 8,
     defaultAspectRatio: '16:9',
     defaultResolution: '1080p',
