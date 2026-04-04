@@ -1132,9 +1132,12 @@ serve(async (req) => {
           model: ltxModel,
           duration: sanitizeDuration(ltxModel, duration || 8),
           resolution: ltxResolution,
-          fps: 30,
           generate_audio: generate_audio !== false,
         };
+        // Only send fps for models that support explicit fps (not ltx-2-pro)
+        if (ltxModel !== 'ltx-2-pro') {
+          ltxPayload.fps = 30;
+        }
 
         // End frame support (LTX 2.3 models only)
         if (end_image && ltxModel.includes('2-3')) {
@@ -1153,9 +1156,11 @@ serve(async (req) => {
           model: ltxModel,
           duration: sanitizeDuration(ltxModel, duration || 8),
           resolution: ltxResolution,
-          fps: 30,
           generate_audio: generate_audio !== false,
         };
+        if (ltxModel !== 'ltx-2-pro') {
+          ltxPayload.fps = 30;
+        }
         if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
       }
 
