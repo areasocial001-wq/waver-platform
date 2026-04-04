@@ -1147,11 +1147,12 @@ serve(async (req) => {
         if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
       } else {
         ltxEndpoint = 'https://api.ltx.video/v1/text-to-video';
-        ltxPayload = {
+      ltxPayload = {
           prompt: normalizedLtxPrompt,
           model: ltxModel,
           duration: sanitizeDuration(ltxModel, duration || 8),
           resolution: ltxResolution,
+          fps: 30,
           generate_audio: generate_audio !== false,
         };
         if (ltxCameraMotion) ltxPayload.camera_motion = ltxCameraMotion;
