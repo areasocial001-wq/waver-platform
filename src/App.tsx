@@ -40,6 +40,7 @@ const App = () => (
             <Route path="/landing" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/storyboard/:id" element={<ViewStoryboard />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Authenticated routes */}
             <Route path="/" element={<Index />} />
