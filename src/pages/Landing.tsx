@@ -320,19 +320,19 @@ export default function Landing() {
           >
             {[
               {
-                name: "Marco Bianchi",
+                name: "Marco Giustini",
                 role: "Video Producer",
                 text: "AI Production Hub ha rivoluzionato il mio flusso di lavoro. Creo in poche ore ciò che prima richiedeva giorni interi di produzione.",
                 stars: 5,
               },
               {
-                name: "Giulia Ferri",
+                name: "Giulia Ventelli",
                 role: "Content Creator",
                 text: "Lo storyboard intelligente è fantastico. Posso pianificare e generare video complessi con una facilità incredibile. Strumento indispensabile!",
                 stars: 5,
               },
               {
-                name: "Alessandro Rossi",
+                name: "Alessandro Ralli",
                 role: "Marketing Manager",
                 text: "La qualità dei video generati è impressionante. I nostri contenuti social hanno avuto un incremento del 300% in engagement.",
                 stars: 5,
