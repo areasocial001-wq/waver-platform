@@ -424,6 +424,7 @@ export const VoiceCloneDialog = ({
           )}
         </div>
       </div>
+      </PremiumGate>
     </DialogContent>
   );
 
