@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star } from "lucide-react";
+import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote } from "lucide-react";
 import { motion } from "framer-motion";
 
 const fadeUp = {
@@ -292,7 +292,77 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Testimonials */}
+      <section className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)]">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={staggerContainer}
+            className="text-center mb-16"
+          >
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold mb-4">
+              Cosa dicono i{" "}
+              <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">nostri utenti</span>
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,65%)] text-lg max-w-2xl mx-auto">
+              Professionisti e creativi che hanno trasformato il loro workflow con AI Production Hub.
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.15 }}
+            variants={staggerContainer}
+            className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto"
+          >
+            {[
+              {
+                name: "Marco Bianchi",
+                role: "Video Producer",
+                text: "AI Production Hub ha rivoluzionato il mio flusso di lavoro. Creo in poche ore ciò che prima richiedeva giorni interi di produzione.",
+                stars: 5,
+              },
+              {
+                name: "Giulia Ferri",
+                role: "Content Creator",
+                text: "Lo storyboard intelligente è fantastico. Posso pianificare e generare video complessi con una facilità incredibile. Strumento indispensabile!",
+                stars: 5,
+              },
+              {
+                name: "Alessandro Rossi",
+                role: "Marketing Manager",
+                text: "La qualità dei video generati è impressionante. I nostri contenuti social hanno avuto un incremento del 300% in engagement.",
+                stars: 5,
+              },
+            ].map((testimonial, i) => (
+              <motion.div
+                key={testimonial.name}
+                variants={fadeUp}
+                custom={i}
+                className="group relative rounded-xl p-6 border border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.4)] backdrop-blur-sm hover:border-[hsl(217,91%,60%/0.3)] transition-all duration-300"
+              >
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[hsl(217,91%,60%/0.03)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative">
+                  <Quote className="w-8 h-8 text-[hsl(217,91%,60%/0.3)] mb-4" />
+                  <p className="text-[hsl(215,20%,75%)] text-sm leading-relaxed mb-6">"{testimonial.text}"</p>
+                  <div className="flex items-center gap-1 mb-3">
+                    {Array.from({ length: testimonial.stars }).map((_, s) => (
+                      <Star key={s} className="w-4 h-4 fill-[hsl(45,93%,58%)] text-[hsl(45,93%,58%)]" />
+                    ))}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-sm">{testimonial.name}</div>
+                    <div className="text-xs text-[hsl(215,20%,55%)]">{testimonial.role}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
       <motion.footer
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
