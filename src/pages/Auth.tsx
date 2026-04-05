@@ -38,10 +38,17 @@ export default function Auth() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const ALLOWED_EMAIL = "maxferro66@gmail.com";
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
       toast.error("Compila tutti i campi");
+      return;
+    }
+
+    if (email.toLowerCase() !== ALLOWED_EMAIL) {
+      toast.error("Accesso non autorizzato. Questa area è riservata.");
       return;
     }
 
