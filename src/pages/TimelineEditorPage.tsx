@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { TimelineEditor } from "@/components/timeline/TimelineEditor";
 import { useStoryboardToTimeline } from "@/hooks/useStoryboardToTimeline";
+import { PremiumGate } from "@/components/PremiumGate";
 import { Badge } from "@/components/ui/badge";
 import { Film, Loader2 } from "lucide-react";
 
