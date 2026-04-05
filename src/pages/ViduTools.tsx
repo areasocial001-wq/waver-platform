@@ -1,6 +1,7 @@
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { ViduAdvancedTools } from "@/components/ViduAdvancedTools";
+import { PremiumGate } from "@/components/PremiumGate";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Video } from "lucide-react";
 
