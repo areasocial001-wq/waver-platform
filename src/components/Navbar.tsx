@@ -183,6 +183,7 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => setVoiceCloneOpen(true)}>
                     <Mic className="w-4 h-4 mr-2" />
                     Clona Voce
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setAudioExtractorOpen(true)}>
                     <Music className="w-4 h-4 mr-2" />
