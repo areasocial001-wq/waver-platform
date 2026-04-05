@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote } from "lucide-react";
+import studioBg from "@/assets/studio-bg.jpg";
 import { motion } from "framer-motion";
 
 const fadeUp = {
