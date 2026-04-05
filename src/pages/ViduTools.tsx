@@ -27,7 +27,9 @@ export default function ViduToolsPage() {
             </p>
           </div>
           
-          <ViduAdvancedTools />
+          <PremiumGate featureName="Vidu Advanced Tools">
+            <ViduAdvancedTools />
+          </PremiumGate>
         </main>
       </div>
     </AuthGuard>
