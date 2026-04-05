@@ -1,6 +1,7 @@
 import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 import { ContentGenerator as ContentGeneratorComponent } from "@/components/ContentGenerator";
+import { PremiumGate } from "@/components/PremiumGate";
 import { Footer } from "@/components/Footer";
 
 const ContentGenerator = () => {
@@ -9,7 +10,9 @@ const ContentGenerator = () => {
       <div className="min-h-screen bg-background dark">
         <Navbar />
         <div className="pt-24">
-          <ContentGeneratorComponent />
+          <PremiumGate featureName="AI Content Generator">
+            <ContentGeneratorComponent />
+          </PremiumGate>
         </div>
         <Footer />
       </div>

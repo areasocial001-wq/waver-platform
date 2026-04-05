@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Mic, Upload, Loader2, Trash2, Play, Volume2 } from "lucide-react";
+import { PremiumGate } from "@/components/PremiumGate";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -261,6 +262,7 @@ export const VoiceCloneDialog = ({
         </DialogDescription>
       </DialogHeader>
 
+      <PremiumGate featureName="Clonazione Vocale">
       <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
         {/* Clone New Voice Section */}
         <Card className="border-primary/20">
@@ -422,6 +424,7 @@ export const VoiceCloneDialog = ({
           )}
         </div>
       </div>
+      </PremiumGate>
     </DialogContent>
   );
 
