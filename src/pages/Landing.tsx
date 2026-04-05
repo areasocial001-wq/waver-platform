@@ -110,8 +110,12 @@ export default function Landing() {
       </motion.nav>
 
       {/* Hero */}
-      <section className="relative z-10 py-24 md:py-36">
-        <div className="container mx-auto px-4 text-center max-w-4xl">
+      <section className="relative z-10 py-24 md:py-36 overflow-hidden">
+        <div className="absolute inset-0">
+          <img src={heroBg} alt="" width={1920} height={1080} className="w-full h-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220,26%,7%/0.4)] via-[hsl(220,26%,7%/0.6)] to-[hsl(220,26%,7%)]" />
+        </div>
+        <div className="relative container mx-auto px-4 text-center max-w-4xl">
           <motion.div
             initial="hidden"
             whileInView="visible"
