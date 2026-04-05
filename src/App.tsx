@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ImageGalleryProvider } from "@/contexts/ImageGalleryContext";
 import Landing from "./pages/Landing";
+import ResetPassword from "./pages/ResetPassword";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import History from "./pages/History";
