@@ -4,6 +4,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { TimelineEditor } from "@/components/timeline/TimelineEditor";
 import { useStoryboardToTimeline } from "@/hooks/useStoryboardToTimeline";
+import { PremiumGate } from "@/components/PremiumGate";
 import { Badge } from "@/components/ui/badge";
 import { Film, Loader2 } from "lucide-react";
 
@@ -39,14 +40,16 @@ const TimelineEditorPage = () => {
               </Badge>
             )}
           </div>
-          <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ height: 'calc(100vh - 220px)' }}>
-            {!loading && <TimelineEditor initialItems={initialItems} />}
-            {loading && (
-              <div className="flex items-center justify-center h-full">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            )}
-          </div>
+          <PremiumGate featureName="Timeline Editor">
+            <div className="rounded-xl border border-border bg-card overflow-hidden" style={{ height: 'calc(100vh - 220px)' }}>
+              {!loading && <TimelineEditor initialItems={initialItems} />}
+              {loading && (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              )}
+            </div>
+          </PremiumGate>
         </div>
       </main>
       <Footer />
