@@ -262,6 +262,7 @@ export const VoiceCloneDialog = ({
         </DialogDescription>
       </DialogHeader>
 
+      <PremiumGate featureName="Clonazione Vocale">
       <div className="space-y-6 flex-1 overflow-hidden flex flex-col">
         {/* Clone New Voice Section */}
         <Card className="border-primary/20">
