@@ -27,7 +27,9 @@ export default function LTXToolsPage() {
             </p>
           </div>
           
-          <LTXAdvancedTools />
+          <PremiumGate featureName="LTX Video Advanced">
+            <LTXAdvancedTools />
+          </PremiumGate>
         </main>
       </div>
     </AuthGuard>
