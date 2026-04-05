@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote } from "lucide-react";
 import studioBg from "@/assets/studio-bg.jpg";
+import heroBg from "@/assets/hero-studio-bg.jpg";
 import { motion } from "framer-motion";
 
 const fadeUp = {
@@ -109,8 +110,12 @@ export default function Landing() {
       </motion.nav>
 
       {/* Hero */}
-      <section className="relative z-10 py-24 md:py-36">
-        <div className="container mx-auto px-4 text-center max-w-4xl">
+      <section className="relative z-10 py-24 md:py-36 overflow-hidden">
+        <div className="absolute inset-0">
+          <img src={heroBg} alt="" width={1920} height={1080} className="w-full h-full object-cover opacity-30" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220,26%,7%/0.4)] via-[hsl(220,26%,7%/0.6)] to-[hsl(220,26%,7%)]" />
+        </div>
+        <div className="relative container mx-auto px-4 text-center max-w-4xl">
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -296,7 +301,7 @@ export default function Landing() {
       {/* Testimonials */}
       <section className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)] overflow-hidden">
         <div className="absolute inset-0">
-          <img src={studioBg} alt="" loading="lazy" width={1920} height={1080} className="w-full h-full object-cover opacity-20" />
+          <img src={studioBg} alt="" loading="lazy" width={1920} height={1080} className="w-full h-full object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220,26%,7%)] via-[hsl(220,26%,7%/0.7)] to-[hsl(220,26%,7%)]" />
         </div>
         <div className="relative container mx-auto px-4">
