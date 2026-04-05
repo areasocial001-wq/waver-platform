@@ -311,8 +311,8 @@ export default function Landing() {
               Cosa dicono i{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">nostri utenti</span>
             </motion.h2>
-            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,65%)] text-lg max-w-2xl mx-auto">
-              Professionisti e creativi che hanno trasformato il loro workflow con AI Production Hub.
+            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,65%)] max-w-2xl mx-auto text-xl font-sans font-extrabold">
+              Professionisti e creativi che hanno trasformato il loro workflow con <br /> AI Production Hub.
             </motion.p>
           </motion.div>
 
