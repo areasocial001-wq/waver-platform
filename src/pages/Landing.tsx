@@ -1,6 +1,21 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star } from "lucide-react";
+import { motion } from "framer-motion";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (i: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, delay: i * 0.1, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  }),
+};
+
+const staggerContainer = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12 } },
+};
 
 const features = [
   {
@@ -65,7 +80,12 @@ export default function Landing() {
       </div>
 
       {/* Navbar */}
-      <nav className="relative z-50 border-b border-[hsl(224,30%,18%)] bg-[hsl(220,26%,7%/0.8)] backdrop-blur-xl sticky top-0">
+      <motion.nav
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative z-50 border-b border-[hsl(224,30%,18%)] bg-[hsl(220,26%,7%/0.8)] backdrop-blur-xl sticky top-0"
+      >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] flex items-center justify-center">
@@ -85,79 +105,110 @@ export default function Landing() {
             </Button>
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
       {/* Hero */}
       <section className="relative z-10 py-24 md:py-36">
         <div className="container mx-auto px-4 text-center max-w-4xl">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,75%)] text-sm font-medium mb-8 backdrop-blur-sm">
-            <Zap className="w-4 h-4" />
-            La piattaforma AI per la produzione video
-          </div>
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-            Crea Video Professionali{" "}
-            <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
-              con l'Intelligenza Artificiale
-            </span>
-          </h1>
-          <p className="text-lg md:text-xl text-[hsl(215,20%,65%)] mb-10 max-w-2xl mx-auto leading-relaxed">
-            Genera, edita e produci video straordinari utilizzando i migliori modelli AI.
-            Dalla sceneggiatura al video finale, tutto in un'unica piattaforma.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              size="lg"
-              onClick={() => navigate("/auth")}
-              className="text-lg px-8 bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_30px_hsl(217,91%,60%/0.4)] transition-all duration-300"
-            >
-              Inizia Gratuitamente
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-              className="text-lg px-8 border-[hsl(224,30%,22%)] bg-[hsl(224,30%,10%/0.5)] text-[hsl(210,40%,98%)] hover:bg-[hsl(224,30%,15%)] hover:border-[hsl(217,91%,60%/0.4)] backdrop-blur-sm transition-all duration-300"
-            >
-              Scopri le Funzionalità
-            </Button>
-          </div>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={staggerContainer}
+          >
+            <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,75%)] text-sm font-medium mb-8 backdrop-blur-sm">
+              <Zap className="w-4 h-4" />
+              La piattaforma AI per la produzione video
+            </motion.div>
+
+            <motion.h1 variants={fadeUp} custom={1} className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
+              Crea Video Professionali{" "}
+              <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
+                con l'Intelligenza Artificiale
+              </span>
+            </motion.h1>
+
+            <motion.p variants={fadeUp} custom={2} className="text-lg md:text-xl text-[hsl(215,20%,65%)] mb-10 max-w-2xl mx-auto leading-relaxed">
+              Genera, edita e produci video straordinari utilizzando i migliori modelli AI.
+              Dalla sceneggiatura al video finale, tutto in un'unica piattaforma.
+            </motion.p>
+
+            <motion.div variants={fadeUp} custom={3} className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                size="lg"
+                onClick={() => navigate("/auth")}
+                className="text-lg px-8 bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_30px_hsl(217,91%,60%/0.4)] transition-all duration-300"
+              >
+                Inizia Gratuitamente
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+                className="text-lg px-8 border-[hsl(224,30%,22%)] bg-[hsl(224,30%,10%/0.5)] text-[hsl(210,40%,98%)] hover:bg-[hsl(224,30%,15%)] hover:border-[hsl(217,91%,60%/0.4)] backdrop-blur-sm transition-all duration-300"
+              >
+                Scopri le Funzionalità
+              </Button>
+            </motion.div>
+          </motion.div>
 
           {/* Stats row */}
-          <div className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={staggerContainer}
+            className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto"
+          >
             {[
               { value: "1080p", label: "Ultra HD" },
               { value: "10+", label: "Modelli AI" },
               { value: "4-8s", label: "Video Generation" },
-            ].map((stat) => (
-              <div key={stat.label} className="relative group">
+            ].map((stat, i) => (
+              <motion.div key={stat.label} variants={fadeUp} custom={i} className="relative group">
                 <div className="absolute inset-0 bg-gradient-to-br from-[hsl(217,91%,60%/0.1)] to-[hsl(270,60%,55%/0.05)] rounded-xl blur-sm group-hover:blur-none transition-all duration-300" />
                 <div className="relative p-6 rounded-xl border border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.6)] backdrop-blur-sm group-hover:border-[hsl(217,91%,60%/0.3)] transition-all duration-300">
                   <div className="text-3xl font-bold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent mb-1">{stat.value}</div>
                   <div className="text-sm text-[hsl(215,20%,65%)]">{stat.label}</div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Features */}
       <section id="features" className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)]">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={staggerContainer}
+            className="text-center mb-16"
+          >
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold mb-4">
               Tutto ciò che ti serve per{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">produrre video AI</span>
-            </h2>
-            <p className="text-[hsl(215,20%,65%)] text-lg max-w-2xl mx-auto">
+            </motion.h2>
+            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,65%)] text-lg max-w-2xl mx-auto">
               Una suite completa di strumenti AI per ogni fase della produzione video.
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature) => (
-              <div
+            </motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={staggerContainer}
+            className="grid md:grid-cols-2 lg:grid-cols-4 gap-6"
+          >
+            {features.map((feature, i) => (
+              <motion.div
                 key={feature.title}
+                variants={fadeUp}
+                custom={i}
                 className="group relative rounded-xl p-6 border border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.4)] backdrop-blur-sm hover:border-[hsl(217,91%,60%/0.4)] hover:bg-[hsl(224,30%,12%/0.6)] transition-all duration-300"
               >
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[hsl(217,91%,60%/0.05)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -168,23 +219,38 @@ export default function Landing() {
                   <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                   <p className="text-[hsl(215,20%,65%)] text-sm leading-relaxed">{feature.description}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Pricing */}
       <section id="pricing" className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)]">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Piani e Prezzi</h2>
-            <p className="text-[hsl(215,20%,65%)] text-lg">Scegli il piano più adatto alle tue esigenze</p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {plans.map((plan) => (
-              <div
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={staggerContainer}
+            className="text-center mb-16"
+          >
+            <motion.h2 variants={fadeUp} className="text-3xl md:text-4xl font-bold mb-4">Piani e Prezzi</motion.h2>
+            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,65%)] text-lg">Scegli il piano più adatto alle tue esigenze</motion.p>
+          </motion.div>
+
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.2 }}
+            variants={staggerContainer}
+            className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto"
+          >
+            {plans.map((plan, i) => (
+              <motion.div
                 key={plan.name}
+                variants={fadeUp}
+                custom={i}
                 className={`relative rounded-xl p-8 border transition-all duration-300 ${
                   plan.highlighted
                     ? "border-[hsl(217,91%,60%/0.5)] bg-gradient-to-b from-[hsl(217,91%,60%/0.08)] to-[hsl(224,30%,10%/0.8)] shadow-[0_0_40px_hsl(217,91%,60%/0.15)] scale-105"
@@ -220,14 +286,20 @@ export default function Landing() {
                 >
                   {plan.cta}
                 </Button>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-[hsl(224,30%,14%)] py-10">
+      <motion.footer
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 border-t border-[hsl(224,30%,14%)] py-10"
+      >
         <div className="container mx-auto px-4 text-center text-sm text-[hsl(215,20%,50%)]">
           <div className="flex items-center justify-center gap-2 mb-3">
             <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] flex items-center justify-center">
@@ -239,7 +311,7 @@ export default function Landing() {
           </div>
           <p>© {new Date().getFullYear()} AI Production Hub. Tutti i diritti riservati.</p>
         </div>
-      </footer>
+      </motion.footer>
     </div>
   );
 }
