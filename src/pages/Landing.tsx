@@ -301,7 +301,7 @@ export default function Landing() {
       {/* Testimonials */}
       <section className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)] overflow-hidden">
         <div className="absolute inset-0">
-          <img src={studioBg} alt="" loading="lazy" width={1920} height={1080} className="w-full h-full object-cover opacity-20" />
+          <img src={studioBg} alt="" loading="lazy" width={1920} height={1080} className="w-full h-full object-cover opacity-35" />
           <div className="absolute inset-0 bg-gradient-to-b from-[hsl(220,26%,7%)] via-[hsl(220,26%,7%/0.7)] to-[hsl(220,26%,7%)]" />
         </div>
         <div className="relative container mx-auto px-4">
