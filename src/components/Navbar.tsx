@@ -225,6 +225,7 @@ export const Navbar = () => {
                     <DropdownMenuItem onClick={() => navigate("/timeline-editor")}>
                       <Gauge className="w-4 h-4 mr-2" />
                       Timeline Editor
+                      <Crown className="w-3 h-3 ml-auto text-amber-400" />
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/talking-avatar")}>
                       <UserCircle className="w-4 h-4 mr-2" />
