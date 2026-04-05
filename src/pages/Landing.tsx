@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star } from "lucide-react";
 
 const features = [
   {
@@ -56,19 +56,30 @@ export default function Landing() {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-[hsl(220,26%,7%)] text-[hsl(210,40%,98%)] overflow-hidden">
+      {/* Floating orbs background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-[hsl(217,91%,60%/0.12)] blur-[120px] animate-float" />
+        <div className="absolute top-[30%] right-[-10%] w-[600px] h-[600px] rounded-full bg-[hsl(270,60%,55%/0.10)] blur-[140px] animate-float" style={{ animationDelay: "3s" }} />
+        <div className="absolute bottom-[-10%] left-[30%] w-[500px] h-[500px] rounded-full bg-[hsl(25,95%,63%/0.08)] blur-[120px] animate-float" style={{ animationDelay: "5s" }} />
+      </div>
+
       {/* Navbar */}
-      <nav className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+      <nav className="relative z-50 border-b border-[hsl(224,30%,18%)] bg-[hsl(220,26%,7%/0.8)] backdrop-blur-xl sticky top-0">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-6 h-6 text-primary" />
-            <span className="text-xl font-bold">AI Production Hub</span>
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] flex items-center justify-center">
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <span className="text-xl font-bold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
+              AI Production Hub
+            </span>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate("/auth")}>
+            <Button variant="ghost" onClick={() => navigate("/auth")} className="text-[hsl(215,20%,65%)] hover:text-[hsl(210,40%,98%)] hover:bg-[hsl(224,30%,15%)]">
               Accedi
             </Button>
-            <Button onClick={() => navigate("/auth")}>
+            <Button onClick={() => navigate("/auth")} className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_20px_hsl(217,91%,60%/0.3)]">
               Registrati
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
@@ -77,51 +88,86 @@ export default function Landing() {
       </nav>
 
       {/* Hero */}
-      <section className="py-20 md:py-32">
+      <section className="relative z-10 py-24 md:py-36">
         <div className="container mx-auto px-4 text-center max-w-4xl">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,75%)] text-sm font-medium mb-8 backdrop-blur-sm">
             <Zap className="w-4 h-4" />
             La piattaforma AI per la produzione video
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
-            Crea Video Professionali con l'
-            <span className="text-primary">Intelligenza Artificiale</span>
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
+            Crea Video Professionali{" "}
+            <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
+              con l'Intelligenza Artificiale
+            </span>
           </h1>
-          <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Genera, edita e produci video straordinari utilizzando i migliori modelli AI. 
+          <p className="text-lg md:text-xl text-[hsl(215,20%,65%)] mb-10 max-w-2xl mx-auto leading-relaxed">
+            Genera, edita e produci video straordinari utilizzando i migliori modelli AI.
             Dalla sceneggiatura al video finale, tutto in un'unica piattaforma.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" onClick={() => navigate("/auth")} className="text-lg px-8">
+            <Button
+              size="lg"
+              onClick={() => navigate("/auth")}
+              className="text-lg px-8 bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_30px_hsl(217,91%,60%/0.4)] transition-all duration-300"
+            >
               Inizia Gratuitamente
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => {
-              document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-            }} className="text-lg px-8">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+              className="text-lg px-8 border-[hsl(224,30%,22%)] bg-[hsl(224,30%,10%/0.5)] text-[hsl(210,40%,98%)] hover:bg-[hsl(224,30%,15%)] hover:border-[hsl(217,91%,60%/0.4)] backdrop-blur-sm transition-all duration-300"
+            >
               Scopri le Funzionalità
             </Button>
+          </div>
+
+          {/* Stats row */}
+          <div className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            {[
+              { value: "1080p", label: "Ultra HD" },
+              { value: "10+", label: "Modelli AI" },
+              { value: "4-8s", label: "Video Generation" },
+            ].map((stat) => (
+              <div key={stat.label} className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-br from-[hsl(217,91%,60%/0.1)] to-[hsl(270,60%,55%/0.05)] rounded-xl blur-sm group-hover:blur-none transition-all duration-300" />
+                <div className="relative p-6 rounded-xl border border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.6)] backdrop-blur-sm group-hover:border-[hsl(217,91%,60%/0.3)] transition-all duration-300">
+                  <div className="text-3xl font-bold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent mb-1">{stat.value}</div>
+                  <div className="text-sm text-[hsl(215,20%,65%)]">{stat.label}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Features */}
-      <section id="features" className="py-20 bg-muted/30">
+      <section id="features" className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">Tutto ciò che ti serve per produrre video AI</h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Tutto ciò che ti serve per{" "}
+              <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">produrre video AI</span>
+            </h2>
+            <p className="text-[hsl(215,20%,65%)] text-lg max-w-2xl mx-auto">
               Una suite completa di strumenti AI per ogni fase della produzione video.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature) => (
-              <div key={feature.title} className="bg-card rounded-xl p-6 border border-border hover:shadow-lg transition-shadow">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                  <feature.icon className="w-6 h-6 text-primary" />
+              <div
+                key={feature.title}
+                className="group relative rounded-xl p-6 border border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.4)] backdrop-blur-sm hover:border-[hsl(217,91%,60%/0.4)] hover:bg-[hsl(224,30%,12%/0.6)] transition-all duration-300"
+              >
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[hsl(217,91%,60%/0.05)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%/0.2)] to-[hsl(270,60%,55%/0.1)] flex items-center justify-center mb-4 group-hover:shadow-[0_0_20px_hsl(217,91%,60%/0.2)] transition-all duration-300">
+                    <feature.icon className="w-6 h-6 text-[hsl(217,91%,70%)]" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                  <p className="text-[hsl(215,20%,65%)] text-sm leading-relaxed">{feature.description}</p>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm">{feature.description}</p>
               </div>
             ))}
           </div>
@@ -129,37 +175,46 @@ export default function Landing() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="py-20">
+      <section id="pricing" className="relative z-10 py-24 border-t border-[hsl(224,30%,14%)]">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">Piani e Prezzi</h2>
-            <p className="text-muted-foreground text-lg">Scegli il piano più adatto alle tue esigenze</p>
+            <p className="text-[hsl(215,20%,65%)] text-lg">Scegli il piano più adatto alle tue esigenze</p>
           </div>
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {plans.map((plan) => (
               <div
                 key={plan.name}
-                className={`rounded-xl p-8 border ${
+                className={`relative rounded-xl p-8 border transition-all duration-300 ${
                   plan.highlighted
-                    ? "border-primary bg-primary/5 shadow-lg scale-105"
-                    : "border-border bg-card"
+                    ? "border-[hsl(217,91%,60%/0.5)] bg-gradient-to-b from-[hsl(217,91%,60%/0.08)] to-[hsl(224,30%,10%/0.8)] shadow-[0_0_40px_hsl(217,91%,60%/0.15)] scale-105"
+                    : "border-[hsl(224,30%,18%)] bg-[hsl(224,30%,10%/0.4)] hover:border-[hsl(224,30%,25%)]"
                 }`}
               >
+                {plan.highlighted && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-xs font-semibold text-white flex items-center gap-1">
+                    <Star className="w-3 h-3" /> Più Popolare
+                  </div>
+                )}
                 <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
                 <div className="mb-6">
                   <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground">{plan.period}</span>
+                  <span className="text-[hsl(215,20%,65%)]">{plan.period}</span>
                 </div>
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm">
-                      <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                    <li key={f} className="flex items-start gap-2 text-sm text-[hsl(215,20%,75%)]">
+                      <CheckCircle2 className="w-4 h-4 text-[hsl(217,91%,60%)] shrink-0 mt-0.5" />
                       {f}
                     </li>
                   ))}
                 </ul>
                 <Button
-                  className="w-full"
+                  className={`w-full ${
+                    plan.highlighted
+                      ? "bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_20px_hsl(217,91%,60%/0.3)]"
+                      : "border-[hsl(224,30%,22%)] bg-[hsl(224,30%,12%)] text-[hsl(210,40%,98%)] hover:bg-[hsl(224,30%,18%)] hover:border-[hsl(217,91%,60%/0.3)]"
+                  }`}
                   variant={plan.highlighted ? "default" : "outline"}
                   onClick={() => navigate("/auth")}
                 >
@@ -172,11 +227,15 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="font-semibold text-foreground">AI Production Hub</span>
+      <footer className="relative z-10 border-t border-[hsl(224,30%,14%)] py-10">
+        <div className="container mx-auto px-4 text-center text-sm text-[hsl(215,20%,50%)]">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] flex items-center justify-center">
+              <Sparkles className="w-3 h-3 text-white" />
+            </div>
+            <span className="font-semibold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
+              AI Production Hub
+            </span>
           </div>
           <p>© {new Date().getFullYear()} AI Production Hub. Tutti i diritti riservati.</p>
         </div>
