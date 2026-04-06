@@ -387,29 +387,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     defaultResolution: '720p',
   },
 
-  // ============ LUMA DIRECT ============
-  'luma-ray-2': {
-    durations: LUMA_RAY_2_DURATIONS,
-    resolutions: STANDARD_RESOLUTIONS,
-    aspectRatios: EXTENDED_ASPECT_RATIOS,
-    supportsTextToVideo: true,
-    supportsImageToVideo: true,
-    supportsEndFrame: true,
-    defaultDuration: 5,
-    defaultAspectRatio: '16:9',
-    defaultResolution: '720p',
-  },
-  'luma-ray-flash-2': {
-    durations: LUMA_DURATIONS,
-    resolutions: BASIC_RESOLUTIONS,
-    aspectRatios: EXTENDED_ASPECT_RATIOS,
-    supportsTextToVideo: true,
-    supportsImageToVideo: true,
-    supportsEndFrame: true,
-    defaultDuration: 5,
-    defaultAspectRatio: '16:9',
-    defaultResolution: '720p',
-  },
+  // ============ AI/ML API - SORA (OPENAI) ============
   'aiml-sora-2-t2v': {
     durations: SORA_DURATIONS,
     resolutions: PREMIUM_RESOLUTIONS,

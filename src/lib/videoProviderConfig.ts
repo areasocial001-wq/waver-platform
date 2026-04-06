@@ -105,12 +105,9 @@ export type VideoProviderType =
   | 'ltx-2-3-fast'
   | 'ltx-2-3-pro'
   | 'ltx-2-fast'
-  | 'ltx-2-pro'
-  // Luma Direct
-  | 'luma-ray-2'
-  | 'luma-ray-flash-2';
+  | 'ltx-2-pro';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'luma' | 'auto';
+export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
@@ -2768,76 +2765,6 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     modelId: 'ltx-2-pro',
     category: 'LTX Video',
   },
-
-  // ============ LUMA DIRECT (via LUMA_API_KEY) ============
-  'luma-ray-2': {
-    id: 'luma-ray-2',
-    name: 'Luma Ray 2 (Diretto)',
-    shortName: 'Ray 2 Diretto',
-    group: 'luma',
-    description: 'API diretta Luma Labs — Ray 2, keyframe, extend, loop',
-    color: 'bg-cyan-600',
-    badgeColor: 'bg-cyan-600/20',
-    textColor: 'text-cyan-600',
-    speed: 2,
-    quality: 3,
-    cost: 2,
-    features: ['API Diretta', 'Keyframe', 'Extend', 'Loop', 'T2V + I2V'],
-    estimatedTime: '2-5 min',
-    fallbackOrder: ['aiml-luma-ray-2', 'luma-ray-flash-2'],
-    durations: [
-      { value: '5', label: '5 secondi' },
-      { value: '10', label: '10 secondi' },
-    ],
-    resolutions: [
-      { value: '720p', label: '720p (HD)' },
-      { value: '1080p', label: '1080p (Full HD)' },
-    ],
-    aspectRatios: [
-      { value: '16:9', label: '16:9 (Orizzontale)' },
-      { value: '9:16', label: '9:16 (Verticale)' },
-      { value: '1:1', label: '1:1 (Quadrato)' },
-    ],
-    supportsImageToVideo: true,
-    supportsTextToVideo: true,
-    supportsEndFrame: true,
-    requiresApiKey: 'LUMA_API_KEY',
-    modelId: 'ray-2',
-    category: 'Luma Direct',
-  },
-  'luma-ray-flash-2': {
-    id: 'luma-ray-flash-2',
-    name: 'Luma Ray Flash 2 (Diretto)',
-    shortName: 'Ray Flash 2 Diretto',
-    group: 'luma',
-    description: 'API diretta Luma Labs — Ray Flash 2, veloce e economico',
-    color: 'bg-cyan-400',
-    badgeColor: 'bg-cyan-400/20',
-    textColor: 'text-cyan-400',
-    speed: 3,
-    quality: 2,
-    cost: 1,
-    features: ['API Diretta', 'Veloce', 'Flash', 'T2V + I2V'],
-    estimatedTime: '1-2 min',
-    fallbackOrder: ['aiml-luma-ray-flash-2', 'luma-ray-2'],
-    durations: [
-      { value: '5', label: '5 secondi' },
-    ],
-    resolutions: [
-      { value: '720p', label: '720p (HD)' },
-    ],
-    aspectRatios: [
-      { value: '16:9', label: '16:9 (Orizzontale)' },
-      { value: '9:16', label: '9:16 (Verticale)' },
-      { value: '1:1', label: '1:1 (Quadrato)' },
-    ],
-    supportsImageToVideo: true,
-    supportsTextToVideo: true,
-    supportsEndFrame: true,
-    requiresApiKey: 'LUMA_API_KEY',
-    modelId: 'ray-flash-2',
-    category: 'Luma Direct',
-  },
 };
 
 // Helper per ottenere provider per gruppo
@@ -2862,7 +2789,6 @@ export function getGroupLabel(group: ProviderGroup): string {
     freepik: 'Freepik',
     vidu: 'Vidu',
     ltx: 'LTX Video',
-    luma: 'Luma Direct',
   };
   return labels[group];
 }
@@ -2877,7 +2803,6 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
     vidu: { bg: 'bg-teal-500/20', text: 'text-teal-500' },
     ltx: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
-    luma: { bg: 'bg-cyan-500/20', text: 'text-cyan-500' },
   };
   return styles[group];
 }
@@ -2894,7 +2819,6 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   if (providerId === 'freepik') return 'freepik';
   if (providerId.startsWith('vidu-')) return 'vidu';
   if (providerId.startsWith('ltx-')) return 'ltx';
-  if (providerId.startsWith('luma-')) return 'luma';
   return 'auto';
 }
 
@@ -3042,9 +2966,6 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'ltx-2-3-pro': { perSecond: 0.06, perGeneration: 0.48 },
   'ltx-2-fast': { perSecond: 0.02, perGeneration: 0.16 },
   'ltx-2-pro': { perSecond: 0.05, perGeneration: 0.40 },
-  // Luma Direct
-  'luma-ray-2': { perSecond: 0.07, perGeneration: 0.35 },
-  'luma-ray-flash-2': { perSecond: 0.03, perGeneration: 0.15 },
 };
 
 // Ordine di visualizzazione per provider (raggruppati)
@@ -3151,7 +3072,4 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'ltx-2-3-fast',
   'ltx-2-pro',
   'ltx-2-fast',
-  // Luma Direct
-  'luma-ray-2',
-  'luma-ray-flash-2',
 ];
