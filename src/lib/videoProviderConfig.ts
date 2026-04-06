@@ -105,9 +105,12 @@ export type VideoProviderType =
   | 'ltx-2-3-fast'
   | 'ltx-2-3-pro'
   | 'ltx-2-fast'
-  | 'ltx-2-pro';
+  | 'ltx-2-pro'
+  // Luma Direct
+  | 'luma-ray-2'
+  | 'luma-ray-flash-2';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
+export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'luma' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
