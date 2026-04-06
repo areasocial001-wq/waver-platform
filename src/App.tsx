@@ -23,6 +23,9 @@ import NLtoJSONPage from "./pages/NLtoJSON";
 import TimelineEditorPage from "./pages/TimelineEditorPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PricingPage from "./pages/Pricing";
+import LumaToolsPage from "./pages/LumaTools";
+import FacelessVideoPage from "./pages/FacelessVideo";
+import TrailerGeneratorPage from "./pages/TrailerGenerator";
 
 import NotFound from "./pages/NotFound";
 
