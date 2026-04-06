@@ -86,3 +86,9 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.luma-video]
+verify_jwt = false
+
+[functions.luma-image]
+verify_jwt = false
