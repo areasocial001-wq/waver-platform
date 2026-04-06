@@ -2877,6 +2877,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
     vidu: { bg: 'bg-teal-500/20', text: 'text-teal-500' },
     ltx: { bg: 'bg-emerald-500/20', text: 'text-emerald-500' },
+    luma: { bg: 'bg-cyan-500/20', text: 'text-cyan-500' },
   };
   return styles[group];
 }
