@@ -2894,6 +2894,7 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   if (providerId === 'freepik') return 'freepik';
   if (providerId.startsWith('vidu-')) return 'vidu';
   if (providerId.startsWith('ltx-')) return 'ltx';
+  if (providerId.startsWith('luma-')) return 'luma';
   return 'auto';
 }
 
