@@ -572,6 +572,73 @@ serve(async (req) => {
         }
       }
 
+      // Luma Direct polling (format: luma:model:gen_id)
+      if (body.operationId.startsWith('luma:')) {
+        const LUMA_API_KEY = Deno.env.get('LUMA_API_KEY');
+        if (!LUMA_API_KEY) {
+          throw new Error("LUMA_API_KEY is not configured");
+        }
+        
+        const parts = body.operationId.split(':');
+        const genId = parts.slice(2).join(':');
+        console.log("[Luma Direct] Polling generation:", genId);
+        
+        const lumaResponse = await fetch(`https://api.lumalabs.ai/dream-machine/v1/generations/video/${genId}`, {
+          headers: {
+            "Authorization": `Bearer ${LUMA_API_KEY}`,
+            "Accept": "application/json",
+          },
+        });
+
+        if (!lumaResponse.ok) {
+          const error = await lumaResponse.text();
+          throw new Error(`Luma API error: ${lumaResponse.status} - ${error}`);
+        }
+
+        const lumaData = await lumaResponse.json();
+        console.log("[Luma Direct] Poll result:", JSON.stringify(lumaData));
+        
+        if (lumaData.state === "completed") {
+          const videoUrl = lumaData.assets?.video || lumaData.video?.url;
+          
+          if (!videoUrl) {
+            throw new Error("Luma completed but no video URL found");
+          }
+          
+          if (body.generationId) {
+            const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+            const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+            await supabaseClient
+              .from('video_generations')
+              .update({
+                status: 'completed',
+                video_url: videoUrl,
+              })
+              .eq('id', body.generationId);
+          }
+
+          return new Response(JSON.stringify({ 
+            status: "succeeded",
+            output: videoUrl 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        } else if (lumaData.state === "failed") {
+          throw new Error(`Luma generation failed: ${lumaData.failure_reason || "Unknown error"}`);
+        } else {
+          return new Response(JSON.stringify({ 
+            status: "processing"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+      }
+
       // Replicate polling
       if (body.operationId.startsWith('replicate:')) {
         const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
