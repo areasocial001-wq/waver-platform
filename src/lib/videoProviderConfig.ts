@@ -3042,6 +3042,9 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'ltx-2-3-pro': { perSecond: 0.06, perGeneration: 0.48 },
   'ltx-2-fast': { perSecond: 0.02, perGeneration: 0.16 },
   'ltx-2-pro': { perSecond: 0.05, perGeneration: 0.40 },
+  // Luma Direct
+  'luma-ray-2': { perSecond: 0.07, perGeneration: 0.35 },
+  'luma-ray-flash-2': { perSecond: 0.03, perGeneration: 0.15 },
 };
 
 // Ordine di visualizzazione per provider (raggruppati)
