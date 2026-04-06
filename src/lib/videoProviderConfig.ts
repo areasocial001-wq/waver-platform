@@ -2862,6 +2862,7 @@ export function getGroupLabel(group: ProviderGroup): string {
     freepik: 'Freepik',
     vidu: 'Vidu',
     ltx: 'LTX Video',
+    luma: 'Luma Direct',
   };
   return labels[group];
 }
