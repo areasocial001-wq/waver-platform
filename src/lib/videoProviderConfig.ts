@@ -3151,4 +3151,7 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'ltx-2-3-fast',
   'ltx-2-pro',
   'ltx-2-fast',
+  // Luma Direct
+  'luma-ray-2',
+  'luma-ray-flash-2',
 ];
