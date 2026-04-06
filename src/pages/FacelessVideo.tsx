@@ -5,14 +5,13 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { PremiumGate } from "@/components/PremiumGate";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, Video, Play, ChevronRight, Mic, Image, Music, FileText, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Loader2, Video, Play, ChevronRight, FileText, Sparkles, Eye, Download } from "lucide-react";
 
 interface SceneConfig {
   id: string;
@@ -32,13 +31,15 @@ const FacelessVideoPage = () => {
   const [scenes, setScenes] = useState<SceneConfig[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isProducing, setIsProducing] = useState(false);
+  const [isConcatenating, setIsConcatenating] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [scriptApproved, setScriptApproved] = useState(false);
+  const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
   // Step 1: Generate script from topic using AI
   const generateScript = useCallback(async () => {
     if (!topic.trim()) { toast.error("Inserisci un argomento"); return; }
     setIsGeneratingScript(true);
+    setFinalVideoUrl(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
@@ -52,7 +53,6 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
       });
       if (error) throw new Error(error.message);
 
-      // Parse scenes from AI response
       const content = data?.content || data?.text || "";
       const jsonMatch = content.match(/\[[\s\S]*\]/);
       if (!jsonMatch) throw new Error("Formato risposta non valido");
@@ -75,10 +75,55 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
     }
   }, [topic, style, platform]);
 
+  // Concatenate completed scenes into a single video
+  const concatenateScenes = useCallback(async (completedScenes: SceneConfig[]) => {
+    const videoUrls = completedScenes.filter(s => s.videoUrl).map(s => s.videoUrl!);
+    if (videoUrls.length < 2) {
+      if (videoUrls.length === 1) setFinalVideoUrl(videoUrls[0]);
+      return;
+    }
+
+    setIsConcatenating(true);
+    toast.info("Concatenazione scene in corso...");
+
+    try {
+      const aspectRatio = platform === "youtube-shorts" || platform === "tiktok" || platform === "instagram" ? "9:16" : "16:9";
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: {
+          videoUrls,
+          transition: "crossfade",
+          transitionDuration: 0.5,
+          resolution: "hd",
+          aspectRatio,
+          fps: "24",
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      // The concat function may return a direct URL or need polling
+      if (data?.videoUrl) {
+        setFinalVideoUrl(data.videoUrl);
+        toast.success("Video finale generato!");
+      } else if (data?.publicUrl) {
+        setFinalVideoUrl(data.publicUrl);
+        toast.success("Video finale generato!");
+      } else {
+        toast.warning("Concatenazione completata ma nessun URL restituito. Usa il Timeline Editor.");
+      }
+    } catch (err) {
+      console.error("Concat error:", err);
+      toast.error("Errore nella concatenazione: " + (err as Error).message);
+    } finally {
+      setIsConcatenating(false);
+    }
+  }, [platform]);
+
   // Step 2: Approve script and produce videos
   const produceVideo = useCallback(async () => {
     setIsProducing(true);
     setCurrentStep(2);
+    setFinalVideoUrl(null);
     const updatedScenes = [...scenes];
 
     for (let i = 0; i < updatedScenes.length; i++) {
@@ -86,12 +131,11 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
       setScenes([...updatedScenes]);
 
       try {
-        // Generate B-roll video for each scene
         const { data, error } = await supabase.functions.invoke("luma-video", {
           body: {
             prompt: updatedScenes[i].visualPrompt,
             model: "ray-flash-2",
-            aspect_ratio: platform === "youtube-shorts" ? "9:16" : "16:9",
+            aspect_ratio: platform === "youtube-shorts" || platform === "tiktok" || platform === "instagram" ? "9:16" : "16:9",
             duration: updatedScenes[i].duration,
             resolution: "720p",
           },
@@ -99,7 +143,6 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
         if (error) throw new Error(error.message);
         if (data?.error) throw new Error(data.error);
 
-        // Poll for result
         const genId = data.id;
         for (let j = 0; j < 60; j++) {
           await new Promise(r => setTimeout(r, 5000));
@@ -127,7 +170,10 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
     setCurrentStep(3);
     const doneCount = updatedScenes.filter(s => s.status === "done").length;
     toast.success(`Produzione completata: ${doneCount}/${updatedScenes.length} scene`);
-  }, [scenes, platform]);
+
+    // Auto-concatenate completed scenes
+    await concatenateScenes(updatedScenes);
+  }, [scenes, platform, concatenateScenes]);
 
   const progress = scenes.length > 0
     ? Math.round((scenes.filter(s => s.status === "done").length / scenes.length) * 100)
@@ -144,7 +190,7 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
                 Faceless Video Generator
               </h1>
               <p className="text-muted-foreground">
-                Crea video YouTube e Shorts completi senza camera — Script AI → B-Roll → Voiceover → Video finale
+                Crea video YouTube e Shorts completi senza camera — Script AI → B-Roll → Video finale concatenato
               </p>
             </div>
 
@@ -291,22 +337,64 @@ Crea ${platform === "youtube-shorts" ? "4-6" : "10-15"} scene.`,
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Video className="w-5 h-5 text-emerald-400" /> 3. Video Prodotti
+                    <Video className="w-5 h-5 text-emerald-400" /> 3. Video Finale
                   </CardTitle>
-                  <CardDescription>Le clip B-Roll sono pronte. Importale nel Timeline Editor per il montaggio finale con voiceover.</CardDescription>
+                  <CardDescription>
+                    {finalVideoUrl
+                      ? "Il video finale è stato concatenato automaticamente."
+                      : isConcatenating
+                      ? "Concatenazione delle scene in corso..."
+                      : "Le clip B-Roll sono pronte."}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {scenes.filter(s => s.videoUrl).map((scene, i) => (
-                      <div key={scene.id} className="relative">
-                        <video src={scene.videoUrl} controls className="w-full rounded-lg" />
-                        <Badge className="absolute top-2 left-2 bg-black/70">Scena {i + 1}</Badge>
+                <CardContent className="space-y-4">
+                  {isConcatenating && (
+                    <div className="flex items-center justify-center gap-2 py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                      <span className="text-muted-foreground">Unione delle scene in un video unico...</span>
+                    </div>
+                  )}
+
+                  {finalVideoUrl && (
+                    <div className="space-y-3">
+                      <video src={finalVideoUrl} controls className="w-full rounded-lg border border-emerald-500/30" />
+                      <div className="flex gap-2">
+                        <Button asChild className="flex-1 bg-emerald-600 hover:bg-emerald-700">
+                          <a href={finalVideoUrl} download="faceless-video.mp4" target="_blank" rel="noopener noreferrer">
+                            <Download className="w-4 h-4 mr-2" /> Scarica Video Finale
+                          </a>
+                        </Button>
+                        <Button onClick={() => window.location.href = "/timeline-editor"} variant="outline" className="flex-1">
+                          Apri nel Timeline Editor
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  <Button onClick={() => window.location.href = "/timeline-editor"} className="w-full mt-4" variant="outline">
-                    Apri nel Timeline Editor per il montaggio finale
-                  </Button>
+                    </div>
+                  )}
+
+                  {!finalVideoUrl && !isConcatenating && (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {scenes.filter(s => s.videoUrl).map((scene, i) => (
+                          <div key={scene.id} className="relative">
+                            <video src={scene.videoUrl} controls className="w-full rounded-lg" />
+                            <Badge className="absolute top-2 left-2 bg-black/70">Scena {i + 1}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => concatenateScenes(scenes)}
+                          disabled={scenes.filter(s => s.videoUrl).length < 2}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <Video className="w-4 h-4 mr-2" /> Concatena in Video Unico
+                        </Button>
+                        <Button onClick={() => window.location.href = "/timeline-editor"} className="flex-1" variant="outline">
+                          Apri nel Timeline Editor
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}

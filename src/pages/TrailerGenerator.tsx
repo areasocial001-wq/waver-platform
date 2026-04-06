@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { Loader2, Film, Play, ChevronRight, Sparkles, Music, Clapperboard } from "lucide-react";
+import { Loader2, Film, Play, ChevronRight, Sparkles, Music, Clapperboard, Download, Video } from "lucide-react";
 
 interface TrailerScene {
   id: string;
@@ -32,12 +32,14 @@ const TrailerGeneratorPage = () => {
   const [scenes, setScenes] = useState<TrailerScene[]>([]);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [isProducing, setIsProducing] = useState(false);
+  const [isConcatenating, setIsConcatenating] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
-  // Generate trailer script
   const generateTrailerScript = useCallback(async () => {
     if (!title.trim() || !synopsis.trim()) { toast.error("Inserisci titolo e sinossi"); return; }
     setIsGeneratingScript(true);
+    setFinalVideoUrl(null);
     try {
       const { data, error } = await supabase.functions.invoke("generate-content", {
         body: {
@@ -83,10 +85,52 @@ Crea 6-8 scene.`,
     }
   }, [title, synopsis, genre, mediaType]);
 
-  // Produce trailer videos
+  // Concatenate completed scenes into a single trailer
+  const concatenateScenes = useCallback(async (completedScenes: TrailerScene[]) => {
+    const videoUrls = completedScenes.filter(s => s.videoUrl).map(s => s.videoUrl!);
+    if (videoUrls.length < 2) {
+      if (videoUrls.length === 1) setFinalVideoUrl(videoUrls[0]);
+      return;
+    }
+
+    setIsConcatenating(true);
+    toast.info("Concatenazione trailer in corso...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: {
+          videoUrls,
+          transition: "crossfade",
+          transitionDuration: 0.8,
+          resolution: "fhd",
+          aspectRatio: "16:9",
+          fps: "24",
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.videoUrl) {
+        setFinalVideoUrl(data.videoUrl);
+        toast.success("Trailer finale generato!");
+      } else if (data?.publicUrl) {
+        setFinalVideoUrl(data.publicUrl);
+        toast.success("Trailer finale generato!");
+      } else {
+        toast.warning("Concatenazione completata ma nessun URL restituito.");
+      }
+    } catch (err) {
+      console.error("Concat error:", err);
+      toast.error("Errore nella concatenazione: " + (err as Error).message);
+    } finally {
+      setIsConcatenating(false);
+    }
+  }, []);
+
   const produceTrailer = useCallback(async () => {
     setIsProducing(true);
     setCurrentStep(2);
+    setFinalVideoUrl(null);
     const updated = [...scenes];
 
     for (let i = 0; i < updated.length; i++) {
@@ -98,7 +142,7 @@ Crea 6-8 scene.`,
           body: {
             prompt: `${updated[i].visualPrompt}. Cinematic ${genre} movie trailer style, dramatic lighting, film grain, anamorphic lens flare.`,
             model: "ray-2",
-            aspect_ratio: "21:9",
+            aspect_ratio: "16:9",
             duration: updated[i].duration,
             resolution: "1080p",
           },
@@ -133,7 +177,10 @@ Crea 6-8 scene.`,
     setCurrentStep(3);
     const doneCount = updated.filter(s => s.status === "done").length;
     toast.success(`Trailer completato: ${doneCount}/${updated.length} scene`);
-  }, [scenes, genre]);
+
+    // Auto-concatenate completed scenes
+    await concatenateScenes(updated);
+  }, [scenes, genre, concatenateScenes]);
 
   const progress = scenes.length > 0
     ? Math.round((scenes.filter(s => s.status === "done").length / scenes.length) * 100)
@@ -158,7 +205,7 @@ Crea 6-8 scene.`,
                 🎬 Trailer Generator
               </h1>
               <p className="text-muted-foreground">
-                Genera trailer cinematografici per libri, giochi e film — Script AI → Scene → Montaggio
+                Genera trailer cinematografici — Script AI → Scene → Concatenazione automatica → Video finale
               </p>
             </div>
 
@@ -289,24 +336,66 @@ Crea 6-8 scene.`,
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Film className="w-5 h-5 text-red-400" /> 3. Trailer Prodotto
+                    <Film className="w-5 h-5 text-red-400" /> 3. Trailer Finale
                   </CardTitle>
-                  <CardDescription>Le clip sono pronte. Usa il Timeline Editor per aggiungere musica, sound design e titoli.</CardDescription>
+                  <CardDescription>
+                    {finalVideoUrl
+                      ? "Il trailer è stato concatenato automaticamente con transizioni crossfade."
+                      : isConcatenating
+                      ? "Concatenazione del trailer in corso..."
+                      : "Le clip sono pronte."}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {scenes.filter(s => s.videoUrl).map((scene, i) => (
-                      <div key={scene.id} className="relative">
-                        <video src={scene.videoUrl} controls className="w-full rounded-lg" />
-                        <Badge className={`absolute top-2 left-2 ${moodColors[scene.mood] || "bg-black/70"}`}>
-                          {scene.mood}
-                        </Badge>
+                <CardContent className="space-y-4">
+                  {isConcatenating && (
+                    <div className="flex items-center justify-center gap-2 py-6">
+                      <Loader2 className="w-6 h-6 animate-spin text-red-400" />
+                      <span className="text-muted-foreground">Unione delle scene in un trailer unico...</span>
+                    </div>
+                  )}
+
+                  {finalVideoUrl && (
+                    <div className="space-y-3">
+                      <video src={finalVideoUrl} controls className="w-full rounded-lg border border-red-500/30" />
+                      <div className="flex gap-2">
+                        <Button asChild className="flex-1 bg-red-600 hover:bg-red-700">
+                          <a href={finalVideoUrl} download={`trailer-${title || 'video'}.mp4`} target="_blank" rel="noopener noreferrer">
+                            <Download className="w-4 h-4 mr-2" /> Scarica Trailer
+                          </a>
+                        </Button>
+                        <Button onClick={() => window.location.href = "/timeline-editor"} variant="outline" className="flex-1">
+                          <Music className="w-4 h-4 mr-2" /> Apri nel Timeline Editor
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  <Button onClick={() => window.location.href = "/timeline-editor"} className="w-full mt-4" variant="outline">
-                    <Music className="w-4 h-4 mr-2" /> Apri nel Timeline Editor per il montaggio
-                  </Button>
+                    </div>
+                  )}
+
+                  {!finalVideoUrl && !isConcatenating && (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {scenes.filter(s => s.videoUrl).map((scene, i) => (
+                          <div key={scene.id} className="relative">
+                            <video src={scene.videoUrl} controls className="w-full rounded-lg" />
+                            <Badge className={`absolute top-2 left-2 ${moodColors[scene.mood] || "bg-black/70"}`}>
+                              {scene.mood}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => concatenateScenes(scenes)}
+                          disabled={scenes.filter(s => s.videoUrl).length < 2}
+                          className="flex-1 bg-red-600 hover:bg-red-700"
+                        >
+                          <Video className="w-4 h-4 mr-2" /> Concatena in Trailer Unico
+                        </Button>
+                        <Button onClick={() => window.location.href = "/timeline-editor"} variant="outline" className="flex-1">
+                          <Music className="w-4 h-4 mr-2" /> Apri nel Timeline Editor
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}
