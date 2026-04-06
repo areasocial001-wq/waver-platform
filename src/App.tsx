@@ -60,6 +60,9 @@ const App = () => (
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
             <Route path="/timeline-editor" element={<TimelineEditorPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/luma-tools" element={<LumaToolsPage />} />
+            <Route path="/faceless-video" element={<FacelessVideoPage />} />
+            <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
