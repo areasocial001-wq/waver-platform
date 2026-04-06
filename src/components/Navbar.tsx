@@ -252,6 +252,21 @@ export const Navbar = () => {
                     LTX Advanced
                     <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/luma-tools")}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Luma AI Tools
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/faceless-video")}>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Faceless Video
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/trailer-generator")}>
+                    <Clapperboard className="w-4 h-4 mr-2" />
+                    Trailer Generator
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Freepik
