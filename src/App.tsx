@@ -23,6 +23,9 @@ import NLtoJSONPage from "./pages/NLtoJSON";
 import TimelineEditorPage from "./pages/TimelineEditorPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import PricingPage from "./pages/Pricing";
+import LumaToolsPage from "./pages/LumaTools";
+import FacelessVideoPage from "./pages/FacelessVideo";
+import TrailerGeneratorPage from "./pages/TrailerGenerator";
 
 import NotFound from "./pages/NotFound";
 
@@ -57,6 +60,9 @@ const App = () => (
             <Route path="/nl-to-json" element={<NLtoJSONPage />} />
             <Route path="/timeline-editor" element={<TimelineEditorPage />} />
             <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/luma-tools" element={<LumaToolsPage />} />
+            <Route path="/faceless-video" element={<FacelessVideoPage />} />
+            <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

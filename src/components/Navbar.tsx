@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, CreditCard, Crown } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, CreditCard, Crown, Clapperboard, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -54,7 +54,10 @@ export const Navbar = () => {
   const isNLtoJSONPage = location.pathname === "/nl-to-json";
   const isTimelineEditorPage = location.pathname === "/timeline-editor";
   const isAdminPage = location.pathname === "/admin";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage || isAdminPage;
+  const isLumaToolsPage = location.pathname === "/luma-tools";
+  const isFacelessVideoPage = location.pathname === "/faceless-video";
+  const isTrailerPage = location.pathname === "/trailer-generator";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage || isAdminPage || isLumaToolsPage || isFacelessVideoPage || isTrailerPage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -247,6 +250,21 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/ltx-tools")}>
                     <Film className="w-4 h-4 mr-2" />
                     LTX Advanced
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/luma-tools")}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Luma AI Tools
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/faceless-video")}>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Faceless Video
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/trailer-generator")}>
+                    <Clapperboard className="w-4 h-4 mr-2" />
+                    Trailer Generator
                     <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
