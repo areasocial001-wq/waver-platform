@@ -231,10 +231,11 @@ serve(async (req) => {
     const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
     const hasValidViduKey = VIDU_API_KEY && VIDU_API_KEY.trim().length > 0;
     const hasValidLtxKey = !!Deno.env.get('LTX_API_KEY')?.trim();
+    const hasValidLumaKey = !!Deno.env.get('LUMA_API_KEY')?.trim();
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, or LTX_API_KEY");
+    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey && !hasValidLumaKey) {
+      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, LTX_API_KEY, or LUMA_API_KEY");
     }
     
     console.log("API credentials check:", {
