@@ -2860,6 +2860,7 @@ export function getGroupLabel(group: ProviderGroup): string {
   const labels: Record<ProviderGroup, string> = {
     auto: 'Automatico',
     google: 'Google',
+    luma: 'Luma (Diretto)',
     aiml: 'AI/ML API',
     piapi: 'PiAPI',
     freepik: 'Freepik',
