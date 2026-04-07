@@ -114,6 +114,7 @@ const landingDemoVideos = {
   sampleLandscape: "/videos/landing-demo-640.mp4",
   jellyfish: "/videos/hero-jellyfish.mp4",
   sintel: "/videos/showcase-sintel.mp4",
+  mov: "/videos/showcase-mov.mp4",
 } as const;
 
 const showcaseSections = [
