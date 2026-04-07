@@ -2,6 +2,9 @@
 
 export type VideoProviderType = 
   | 'auto'
+  // Luma Direct
+  | 'luma-direct-ray2'
+  | 'luma-direct-flash2'
   | 'google-veo'
   // AI/ML API - Runway
   | 'aiml-runway-gen3-turbo'
