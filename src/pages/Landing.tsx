@@ -108,7 +108,7 @@ const highlights = [
 
 const landingDemoVideos = {
   flower: "/videos/landing-demo-flower.mp4",
-  bigBuckBunny: "/videos/landing-demo-bbb.mp4",
+  countdown: "/videos/showcase-countdown.mp4",
   sampleShort: "/videos/landing-demo-5s.mp4",
   sampleLong: "/videos/landing-demo-10s.mp4",
   sampleLandscape: "/videos/landing-demo-640.mp4",
@@ -128,7 +128,7 @@ const showcaseSections = [
     videos: [
       { url: landingDemoVideos.sampleLong, poster: "https://images.unsplash.com/photo-1518676590747-1e3dcf5a2e24?w=400&q=80", title: "Paesaggio AI" },
       { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80", title: "Natura Cinematica" },
-      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80", title: "Foresta AI" },
+      { url: landingDemoVideos.countdown, poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80", title: "Foresta AI" },
       { url: landingDemoVideos.mov, poster: "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80", title: "Oceano" },
     ],
     images: [],
