@@ -3,21 +3,57 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote, Play, Image as ImageIcon, Film, Music, ChevronRight } from "lucide-react";
 import heroBg from "@/assets/landing-hero-cinematic.jpg";
 import studioBg from "@/assets/studio-bg.jpg";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { motion, useScroll, useTransform, useInView, animate } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
 import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 import { LandingFAQ } from "@/components/landing/LandingFAQ";
 import { WaitlistForm } from "@/components/landing/WaitlistForm";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 40 },
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.7, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    transition: { duration: 0.8, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };
+
+const parallaxReveal = {
+  hidden: { opacity: 0, y: 80, scale: 0.92, rotateX: 8 },
+  visible: (i: number = 0) => ({
+    opacity: 1, y: 0, scale: 1, rotateX: 0,
+    transition: { duration: 0.9, delay: i * 0.15, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  }),
+};
+
+const slideInLeft = {
+  hidden: { opacity: 0, x: -80 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 80 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+};
+
+function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+    const controls = animate(0, target, {
+      duration: 2,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setValue(Math.round(v)),
+    });
+    return () => controls.stop();
+  }, [isInView, target]);
+
+  return <span ref={ref}>{value}{suffix}</span>;
+}
 
 const staggerContainer = {
   hidden: {},
@@ -301,14 +337,16 @@ export default function Landing() {
             className="mt-20 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto"
           >
             {[
-              { value: "30+", label: "Modelli AI" },
-              { value: "4K", label: "Max Resolution" },
-              { value: "5-10s", label: "Per Video" },
-              { value: "24/7", label: "Disponibilità" },
+              { value: 30, suffix: "+", label: "Modelli AI" },
+              { value: 4, suffix: "K", label: "Max Resolution" },
+              { value: 10, suffix: "s", label: "Per Video" },
+              { value: 24, suffix: "/7", label: "Disponibilità" },
             ].map((stat, i) => (
-              <motion.div key={stat.label} variants={fadeUp} custom={i} className="relative group">
-                <div className="p-5 rounded-xl border border-[hsl(224,30%,15%)] bg-[hsl(225,25%,8%/0.7)] backdrop-blur-md group-hover:border-[hsl(217,91%,60%/0.3)] transition-all duration-300">
-                  <div className="text-3xl font-bold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,65%)] bg-clip-text text-transparent">{stat.value}</div>
+              <motion.div key={stat.label} variants={parallaxReveal} custom={i} className="relative group" style={{ perspective: 600 }}>
+                <div className="p-5 rounded-xl border border-[hsl(224,30%,15%)] bg-[hsl(225,25%,8%/0.7)] backdrop-blur-md group-hover:border-[hsl(217,91%,60%/0.3)] transition-all duration-300 group-hover:shadow-[0_0_30px_hsl(217,91%,60%/0.1)]">
+                  <div className="text-3xl font-bold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,65%)] bg-clip-text text-transparent">
+                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
+                  </div>
                   <div className="text-xs text-[hsl(215,20%,55%)] mt-1">{stat.label}</div>
                 </div>
               </motion.div>
@@ -351,11 +389,12 @@ export default function Landing() {
             viewport={{ once: true, amount: 0.1 }}
             variants={staggerContainer}
             className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5"
+            style={{ perspective: 1000 }}
           >
             {highlights.map((item, i) => (
               <motion.div
                 key={item.title}
-                variants={fadeUp}
+                variants={parallaxReveal}
                 custom={i}
                 onClick={() => navigate(item.route)}
                 className="group relative rounded-2xl overflow-hidden border border-[hsl(224,30%,15%)] bg-[hsl(225,25%,8%)] hover:border-[hsl(217,91%,60%/0.4)] cursor-pointer transition-all duration-300 hover:shadow-[0_0_30px_hsl(217,91%,60%/0.1)]"
@@ -393,7 +432,7 @@ export default function Landing() {
                 className={`flex flex-col ${idx % 2 === 0 ? "lg:flex-row" : "lg:flex-row-reverse"} gap-12 items-center`}
               >
                 {/* Text side */}
-                <div className="flex-1 max-w-xl">
+                <motion.div className="flex-1 max-w-xl" variants={idx % 2 === 0 ? slideInLeft : slideInRight}>
                   <motion.div variants={fadeUp} custom={0} className="flex items-center gap-3 mb-4">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%/0.2)] to-[hsl(270,60%,55%/0.1)] flex items-center justify-center">
                       <section.icon className="w-5 h-5 text-[hsl(217,91%,70%)]" />
@@ -415,10 +454,10 @@ export default function Landing() {
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </motion.div>
-                </div>
+                </motion.div>
 
                 {/* Media grid side — mix videos + images */}
-                <motion.div variants={fadeUp} custom={2} className="flex-1 grid grid-cols-2 gap-3 max-w-lg">
+                <motion.div variants={idx % 2 === 0 ? slideInRight : slideInLeft} className="flex-1 grid grid-cols-2 gap-3 max-w-lg">
                   {section.videos?.map((vid, vidIdx) => (
                     <VideoShowcaseCard
                       key={`vid-${vidIdx}`}
@@ -474,8 +513,10 @@ export default function Landing() {
             {features.map((feature, i) => (
               <motion.div
                 key={feature.title}
-                variants={fadeUp}
+                variants={parallaxReveal}
                 custom={i}
+                style={{ perspective: 600 }}
+                whileHover={{ y: -8, scale: 1.03, transition: { duration: 0.3 } }}
                 className="group relative rounded-xl p-6 border border-[hsl(224,30%,15%)] bg-[hsl(225,25%,8%/0.5)] backdrop-blur-sm hover:border-[hsl(217,91%,60%/0.3)] hover:bg-[hsl(225,25%,10%/0.6)] transition-all duration-300"
               >
                 <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[hsl(217,91%,60%/0.04)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

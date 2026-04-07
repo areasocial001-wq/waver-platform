@@ -15,7 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail } from "lucide-react";
+import { WaitlistManager } from "@/components/admin/WaitlistManager";
 
 interface AdminUser {
   id: string;
@@ -142,6 +143,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="stats" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Statistiche
+              </TabsTrigger>
+              <TabsTrigger value="waitlist" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Waitlist
               </TabsTrigger>
             </TabsList>
 
@@ -334,6 +339,10 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="waitlist">
+              <WaitlistManager />
             </TabsContent>
           </Tabs>
         </div>
