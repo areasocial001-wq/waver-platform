@@ -218,9 +218,14 @@ function HeroReelParallax() {
         <div className="relative rounded-2xl overflow-hidden bg-[hsl(224,30%,10%)]">
           <div className="grid grid-cols-3 gap-0.5">
             {demos.map((demo, i) => (
-              <div key={i} className="relative aspect-video overflow-hidden group">
+              <div key={i} className="relative aspect-video overflow-hidden group bg-[hsl(224,30%,8%)]">
                 <video
-                  ref={(el) => { if (el) { el.play().catch(() => {}); } }}
+                  ref={(el) => {
+                    if (el) {
+                      el.muted = true;
+                      el.play().catch(() => {});
+                    }
+                  }}
                   src={demo.url}
                   autoPlay muted loop playsInline preload="auto"
                   className="w-full h-full object-cover"
