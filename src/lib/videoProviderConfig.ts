@@ -3054,6 +3054,9 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'auto',
   // Google Diretto
   'google-veo',
+  // Luma Diretto
+  'luma-direct-ray2',
+  'luma-direct-flash2',
   // AI/ML API - Runway
   'aiml-runway-gen4-turbo',
   'aiml-runway-gen3-turbo',
