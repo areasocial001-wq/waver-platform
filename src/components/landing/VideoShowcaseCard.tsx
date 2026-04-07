@@ -34,15 +34,23 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
 
   return (
     <div className={`relative rounded-xl overflow-hidden border border-[hsl(224,30%,15%)] group cursor-pointer ${className}`}>
+      {/* Poster image shown when not playing */}
+      {!isPlaying && (
+        <img
+          src={posterUrl}
+          alt={title}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+      )}
       <video
         ref={videoRef}
         src={videoUrl}
-        poster={posterUrl}
         muted={isMuted}
         loop
         playsInline
-        preload="metadata"
-        className="w-full h-full object-cover"
+        preload="none"
+        className={`w-full h-full object-cover ${!isPlaying ? "opacity-0" : "opacity-100"}`}
         onEnded={() => setIsPlaying(false)}
       />
 
