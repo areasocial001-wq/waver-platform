@@ -553,6 +553,12 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ===== FAQ ===== */}
+      <LandingFAQ />
+
+      {/* ===== Waitlist Form ===== */}
+      <WaitlistForm />
+
       {/* ===== Testimonials ===== */}
       <section className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
         <div className="absolute inset-0">
