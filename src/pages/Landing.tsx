@@ -334,7 +334,7 @@ export default function Landing() {
               All-in-one AI Video & Image Production Studio
             </motion.div>
 
-            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [text-shadow:0_4px_30px_hsl(225,25%,5%),0_8px_50px_hsl(225,25%,5%/0.8)]">
+            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [text-shadow:0_4px_40px_hsl(225,25%,2%),0_8px_60px_hsl(225,25%,2%),0_0_80px_hsl(225,25%,2%/0.9)]">
               <span className="block">All-in-one AI</span>
               <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
                 Video & Image
@@ -343,7 +343,7 @@ export default function Landing() {
             </motion.h1>
 
             {/* Model marquee subtitle */}
-            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_3px_20px_hsl(225,25%,5%),0_6px_40px_hsl(225,25%,5%/0.7)] font-bold text-white whitespace-pre-line">
+            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_3px_30px_hsl(225,25%,2%),0_6px_50px_hsl(225,25%,2%),0_0_70px_hsl(225,25%,2%/0.9)] font-bold text-white whitespace-pre-line">
               {aiModels.slice(0, 9).join(" | ")}{" |\n"}{aiModels.slice(9).join(" | ")}
             </motion.div>
 
