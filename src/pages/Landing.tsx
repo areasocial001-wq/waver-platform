@@ -5,6 +5,8 @@ import heroBg from "@/assets/landing-hero-cinematic.jpg";
 import studioBg from "@/assets/studio-bg.jpg";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
+import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
+import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
