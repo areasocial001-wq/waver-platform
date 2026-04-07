@@ -212,8 +212,8 @@ function HeroReelParallax() {
 
   const demos = [
     { url: landingDemoVideos.flower, label: "Text → Video" },
-    { url: landingDemoVideos.sampleLong, label: "Cinematic AI" },
-    { url: landingDemoVideos.sampleShort, label: "Image → Video" },
+    { url: landingDemoVideos.jellyfish, label: "Cinematic AI" },
+    { url: landingDemoVideos.sintel, label: "Image → Video" },
   ];
 
   return (
