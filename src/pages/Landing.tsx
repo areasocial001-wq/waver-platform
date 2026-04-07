@@ -62,7 +62,7 @@ const staggerContainer = {
 };
 
 const aiModels = [
-  "Luma Ray 2", "Luma Photon", "Runway Gen-4", "Kling V2.6", "Google Veo 3.1",
+  "Ray 2", "Luma Photon", "Runway Gen-4", "Kling V2.6", "GoogleLuma  Veo 3.1",
   "Hailuo 2.3", "Sora 2 Pro", "MiniMax", "PixVerse V5.5", "Wan 2.5",
   "ElevenLabs", "Flux Pro", "LTX Video", "Vidu Q1", "Seedance",
 ];
@@ -343,7 +343,7 @@ export default function Landing() {
             </motion.h1>
 
             {/* Model marquee subtitle */}
-            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg text-[hsl(215,20%,70%)] mb-8 font-medium [text-shadow:0_3px_20px_hsl(225,25%,5%),0_6px_40px_hsl(225,25%,5%/0.7)]">
+            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_3px_20px_hsl(225,25%,5%),0_6px_40px_hsl(225,25%,5%/0.7)] font-bold text-primary">
               {aiModels.join(" | ")}
             </motion.div>
 
