@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -13,16 +13,34 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [showPoster, setShowPoster] = useState(true);
+
+  // Attempt autoplay on mount
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    vid.muted = true;
+    vid.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      // autoplay blocked — user will click play
+    });
+  }, []);
+
+  const handlePlaying = () => {
+    setShowPoster(false);
+    setIsPlaying(true);
+  };
 
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
+      setIsPlaying(false);
     } else {
       videoRef.current.play();
     }
-    setIsPlaying(!isPlaying);
   };
 
   const toggleMute = (e: React.MouseEvent) => {
@@ -34,12 +52,12 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
 
   return (
     <div className={`relative rounded-xl overflow-hidden border border-[hsl(224,30%,15%)] group cursor-pointer ${className}`}>
-      {/* Poster image shown when not playing */}
-      {!isPlaying && (
+      {/* Poster overlay — shown until video actually plays frames */}
+      {showPoster && (
         <img
           src={posterUrl}
           alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
+          className="absolute inset-0 w-full h-full object-cover z-10"
           loading="lazy"
         />
       )}
@@ -49,17 +67,18 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
         muted={isMuted}
         loop
         playsInline
-        preload="metadata"
-        className={`w-full h-full object-cover ${!isPlaying ? "opacity-0" : "opacity-100"}`}
+        preload="auto"
+        className="w-full h-full object-cover"
+        onPlaying={handlePlaying}
         onEnded={() => setIsPlaying(false)}
       />
 
-      {/* Play overlay */}
+      {/* Play overlay — only when paused */}
       {!isPlaying && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 bg-[hsl(225,25%,5%/0.4)] flex items-center justify-center"
+          className="absolute inset-0 bg-[hsl(225,25%,5%/0.4)] flex items-center justify-center z-20"
         >
           <button
             onClick={togglePlay}
@@ -72,7 +91,7 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
 
       {/* Controls overlay */}
       {isPlaying && (
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[hsl(225,25%,5%/0.8)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+        <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[hsl(225,25%,5%/0.8)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity z-20 flex items-center gap-2">
           <button onClick={togglePlay} className="w-8 h-8 rounded-full bg-[hsl(224,30%,15%/0.8)] flex items-center justify-center hover:bg-[hsl(224,30%,20%)]">
             <Pause className="w-4 h-4 text-white" />
           </button>
