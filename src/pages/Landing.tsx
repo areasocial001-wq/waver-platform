@@ -330,8 +330,8 @@ export default function Landing() {
             </motion.div>
 
             <div className="relative mx-auto mb-8 max-w-5xl px-4 py-5 md:px-8 md:py-7">
-              <div className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-[hsl(225,25%,4%/0.72)] shadow-[0_30px_100px_hsl(225,25%,2%/0.85)] backdrop-blur-[10px]" />
-              <div className="pointer-events-none absolute inset-x-[6%] inset-y-[12%] -z-10 rounded-[1.75rem] border border-[hsl(210,40%,98%/0.08)] bg-gradient-to-b from-[hsl(225,25%,7%/0.55)] via-[hsl(225,25%,5%/0.78)] to-[hsl(225,25%,3%/0.92)]" />
+              <div className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-background/70 shadow-[0_30px_100px_hsl(var(--background)/0.92)] backdrop-blur-[10px]" />
+              <div className="pointer-events-none absolute inset-x-[6%] inset-y-[12%] -z-10 rounded-[1.75rem] border border-border/20 bg-gradient-to-b from-background/40 via-background/70 to-background/90" />
 
               <motion.div variants={fadeUp} custom={0.5} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md drop-shadow-[0_4px_16px_hsl(225,25%,5%)] shadow-[0_0_20px_hsl(225,25%,5%/0.8)]">
                 <Zap className="w-4 h-4 text-[hsl(45,93%,58%)]" />
