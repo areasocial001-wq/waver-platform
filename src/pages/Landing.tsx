@@ -75,9 +75,11 @@ const showcaseSections = [
     description: "Descrivi la tua idea e lascia che i migliori modelli AI la trasformino in un video cinematografico. Perfetto per storytelling, pubblicità e contenuti social.",
     cta: "Crea Video",
     route: "/index",
+    videos: [
+      { url: "https://cdn.pixabay.com/video/2024/05/31/214592_large.mp4", poster: "https://images.unsplash.com/photo-1518676590747-1e3dcf5a2e24?w=400&q=80", title: "Paesaggio AI" },
+      { url: "https://cdn.pixabay.com/video/2023/07/29/173813-849797498_large.mp4", poster: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80", title: "Natura Cinematica" },
+    ],
     images: [
-      "https://images.unsplash.com/photo-1518676590747-1e3dcf5a2e24?w=400&q=80",
-      "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80",
       "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80",
       "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80",
     ],
@@ -89,8 +91,10 @@ const showcaseSections = [
     description: "Carica un'immagine e trasformala in un video dinamico. Controlla il movimento, la durata e lo stile con i modelli più avanzati.",
     cta: "Anima Immagine",
     route: "/index",
+    videos: [
+      { url: "https://cdn.pixabay.com/video/2020/05/25/40130-424930032_large.mp4", poster: "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=400&q=80", title: "Animazione AI" },
+    ],
     images: [
-      "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=400&q=80",
       "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
       "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80",
       "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80",
@@ -103,6 +107,7 @@ const showcaseSections = [
     description: "Genera immagini fotorealistiche, illustrazioni e concept art con Flux, PIAPI, Luma Photon e altri modelli di punta.",
     cta: "Genera Immagine",
     route: "/index",
+    videos: [],
     images: [
       "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&q=80",
       "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=400&q=80",
