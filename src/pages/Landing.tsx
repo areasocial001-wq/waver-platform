@@ -112,6 +112,8 @@ const landingDemoVideos = {
   sampleShort: "/videos/landing-demo-5s.mp4",
   sampleLong: "/videos/landing-demo-10s.mp4",
   sampleLandscape: "/videos/landing-demo-640.mp4",
+  jellyfish: "/videos/hero-jellyfish.mp4",
+  sintel: "/videos/showcase-sintel.mp4",
 } as const;
 
 const showcaseSections = [
