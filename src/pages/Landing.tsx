@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote, Play, Image as ImageIcon, Film, Music, ChevronRight } from "lucide-react";
 import heroBg from "@/assets/landing-hero-cinematic.jpg";
 import studioBg from "@/assets/studio-bg.jpg";
-import { motion, useScroll, useTransform, useMotionValueEvent, useInView, animate } from "framer-motion";
+import { motion, useScroll, useTransform, useInView, animate } from "framer-motion";
 import { useRef, useEffect, useState } from "react";
 import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
