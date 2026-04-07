@@ -2875,6 +2875,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
   const styles: Record<ProviderGroup, { bg: string; text: string }> = {
     auto: { bg: 'bg-accent/20', text: 'text-accent' },
     google: { bg: 'bg-blue-500/20', text: 'text-blue-500' },
+    luma: { bg: 'bg-cyan-500/20', text: 'text-cyan-500' },
     aiml: { bg: 'bg-purple-500/20', text: 'text-purple-500' },
     piapi: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
