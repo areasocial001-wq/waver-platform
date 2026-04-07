@@ -110,7 +110,7 @@ export type VideoProviderType =
   | 'ltx-2-fast'
   | 'ltx-2-pro';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
+export type ProviderGroup = 'google' | 'luma' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
