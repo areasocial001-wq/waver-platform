@@ -266,6 +266,46 @@ serve(async (req) => {
     if (body.operationId) {
       console.log("Polling operation status:", body.operationId);
       
+      // Luma Direct polling (format: luma-direct:model:generationId)
+      if (body.operationId.startsWith('luma-direct:')) {
+        const LUMA_API_KEY = Deno.env.get('LUMA_API_KEY');
+        if (!LUMA_API_KEY) throw new Error("LUMA_API_KEY is not configured");
+        
+        const parts = body.operationId.split(':');
+        const generationId = parts[2];
+        
+        const LUMA_API_URL = "https://api.lumalabs.ai/dream-machine/v1";
+        const pollRes = await fetch(`${LUMA_API_URL}/generations/video/${generationId}`, {
+          headers: { "Authorization": `Bearer ${LUMA_API_KEY}`, "Accept": "application/json" },
+        });
+        
+        if (!pollRes.ok) {
+          const err = await pollRes.text();
+          throw new Error(`Luma poll error: ${pollRes.status} - ${err}`);
+        }
+        
+        const pollData = await pollRes.json();
+        
+        if (pollData.state === "completed") {
+          const videoUrl = pollData.assets?.video || pollData.video?.url;
+          return new Response(JSON.stringify({
+            status: "completed",
+            videoUrl,
+            thumbnail: pollData.assets?.thumbnail,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        } else if (pollData.state === "failed") {
+          return new Response(JSON.stringify({
+            status: "failed",
+            error: pollData.failure_reason || "Luma generation failed",
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        } else {
+          return new Response(JSON.stringify({
+            status: "processing",
+            state: pollData.state,
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 });
+        }
+      }
+
       // AI/ML API polling (format: aiml:model:task_id)
       if (body.operationId.startsWith('aiml:')) {
         if (!hasValidAIMLKey) {
