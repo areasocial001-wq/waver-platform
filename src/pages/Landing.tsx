@@ -446,6 +446,9 @@ export default function Landing() {
         ))}
       </section>
 
+      {/* ===== Live Video Counter ===== */}
+      <LiveVideoCounter />
+
       {/* ===== Features Grid ===== */}
       <section id="features" className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)]">
         <div className="container mx-auto px-4">
