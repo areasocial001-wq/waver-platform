@@ -112,6 +112,8 @@ const landingDemoVideos = {
   sampleShort: "/videos/landing-demo-5s.mp4",
   sampleLong: "/videos/landing-demo-10s.mp4",
   sampleLandscape: "/videos/landing-demo-640.mp4",
+  jellyfish: "/videos/hero-jellyfish.mp4",
+  sintel: "/videos/showcase-sintel.mp4",
 } as const;
 
 const showcaseSections = [
@@ -125,8 +127,8 @@ const showcaseSections = [
     videos: [
       { url: landingDemoVideos.flower, poster: "https://images.unsplash.com/photo-1518676590747-1e3dcf5a2e24?w=400&q=80", title: "Paesaggio AI" },
       { url: landingDemoVideos.sampleLong, poster: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80", title: "Natura Cinematica" },
-      { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80", title: "Foresta AI" },
-      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80", title: "Oceano" },
+      { url: landingDemoVideos.jellyfish, poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80", title: "Foresta AI" },
+      { url: landingDemoVideos.sintel, poster: "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80", title: "Oceano" },
     ],
     images: [],
   },
@@ -139,9 +141,9 @@ const showcaseSections = [
     route: "/index",
     videos: [
       { url: landingDemoVideos.sampleShort, poster: "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=400&q=80", title: "Animazione AI" },
-      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80", title: "Ritratto Animato" },
-      { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80", title: "Panorama" },
-      { url: landingDemoVideos.flower, poster: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80", title: "Montagne" },
+      { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80", title: "Ritratto Animato" },
+      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80", title: "Panorama" },
+      { url: landingDemoVideos.sampleLong, poster: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80", title: "Montagne" },
     ],
     images: [],
   },
@@ -210,8 +212,8 @@ function HeroReelParallax() {
 
   const demos = [
     { url: landingDemoVideos.flower, label: "Text → Video" },
-    { url: landingDemoVideos.sampleLong, label: "Cinematic AI" },
-    { url: landingDemoVideos.sampleShort, label: "Image → Video" },
+    { url: landingDemoVideos.jellyfish, label: "Cinematic AI" },
+    { url: landingDemoVideos.sintel, label: "Image → Video" },
   ];
 
   return (
