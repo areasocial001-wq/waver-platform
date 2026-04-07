@@ -415,12 +415,21 @@ export default function Landing() {
                   </motion.div>
                 </div>
 
-                {/* Image grid side */}
+                {/* Media grid side — mix videos + images */}
                 <motion.div variants={fadeUp} custom={2} className="flex-1 grid grid-cols-2 gap-3 max-w-lg">
+                  {section.videos?.map((vid, vidIdx) => (
+                    <VideoShowcaseCard
+                      key={`vid-${vidIdx}`}
+                      videoUrl={vid.url}
+                      posterUrl={vid.poster}
+                      title={vid.title}
+                      className={vidIdx === 0 && section.videos!.length + section.images.length > 2 ? "row-span-2 aspect-[3/4]" : "aspect-video"}
+                    />
+                  ))}
                   {section.images.map((img, imgIdx) => (
                     <div
-                      key={imgIdx}
-                      className={`rounded-xl overflow-hidden border border-[hsl(224,30%,15%)] ${imgIdx === 0 ? "row-span-2" : ""}`}
+                      key={`img-${imgIdx}`}
+                      className={`rounded-xl overflow-hidden border border-[hsl(224,30%,15%)] ${imgIdx === 0 && (!section.videos || section.videos.length === 0) ? "row-span-2" : ""}`}
                     >
                       <img
                         src={img}
