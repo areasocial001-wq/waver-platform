@@ -324,9 +324,8 @@ export default function Landing() {
               </Button>
             </motion.div>
 
-            {/* Hero Demo Video Reel */}
-            <motion.div variants={fadeUp} custom={5} className="mt-14 max-w-5xl mx-auto">
-              <div className="relative rounded-2xl overflow-hidden animate-glow-pulse">
+            {/* Hero Demo Video Reel with Parallax */}
+            <HeroReelParallax />
                 {/* Animated glow border */}
                 <div className="absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] opacity-60 blur-sm animate-glow-spin" />
                 <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] opacity-40" />
