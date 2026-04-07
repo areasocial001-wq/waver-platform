@@ -326,40 +326,6 @@ export default function Landing() {
 
             {/* Hero Demo Video Reel with Parallax */}
             <HeroReelParallax />
-                {/* Animated glow border */}
-                <div className="absolute -inset-[2px] rounded-2xl bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] opacity-60 blur-sm animate-glow-spin" />
-                <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,55%)] to-[hsl(25,95%,63%)] opacity-40" />
-                <div className="relative rounded-2xl overflow-hidden bg-[hsl(224,30%,10%)]">
-                  <div className="grid grid-cols-3 gap-0.5">
-                    {[
-                      { url: "https://cdn.pixabay.com/video/2024/05/31/214592_large.mp4", label: "Text → Video" },
-                      { url: "https://cdn.pixabay.com/video/2023/07/29/173813-849797498_large.mp4", label: "Cinematic AI" },
-                      { url: "https://cdn.pixabay.com/video/2020/05/25/40130-424930032_large.mp4", label: "Image → Video" },
-                    ].map((demo, i) => (
-                      <div key={i} className="relative aspect-video overflow-hidden group">
-                        <video
-                          ref={(el) => { if (el) { el.play().catch(() => {}); } }}
-                          src={demo.url}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          preload="auto"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[hsl(225,25%,5%/0.7)] via-transparent to-transparent" />
-                        <span className="absolute bottom-2 left-3 text-[10px] font-semibold text-[hsl(215,20%,80%)] bg-[hsl(225,25%,8%/0.7)] backdrop-blur-sm px-2 py-0.5 rounded-md">
-                          {demo.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <p className="text-[11px] text-[hsl(215,20%,45%)] text-center mt-3 font-medium">
-                ▲ Video generati interamente con AI Production Hub
-              </p>
-            </motion.div>
           </motion.div>
 
           {/* Stats */}
