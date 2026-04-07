@@ -8,7 +8,7 @@ import { useRef, useEffect, useState } from "react";
 import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 import { LandingFAQ } from "@/components/landing/LandingFAQ";
-import { WaitlistForm } from "@/components/landing/WaitlistForm";
+
 import logoImg from "@/assets/logo.png";
 
 const fadeUp = {
@@ -117,11 +117,10 @@ const showcaseSections = [
     videos: [
       { url: "https://cdn.pixabay.com/video/2024/05/31/214592_large.mp4", poster: "https://images.unsplash.com/photo-1518676590747-1e3dcf5a2e24?w=400&q=80", title: "Paesaggio AI" },
       { url: "https://cdn.pixabay.com/video/2023/07/29/173813-849797498_large.mp4", poster: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80", title: "Natura Cinematica" },
+      { url: "https://cdn.pixabay.com/video/2023/10/07/183925-871516498_large.mp4", poster: "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80", title: "Foresta AI" },
+      { url: "https://cdn.pixabay.com/video/2021/02/22/65767-515967522_large.mp4", poster: "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80", title: "Oceano" },
     ],
-    images: [
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&q=80",
-      "https://images.unsplash.com/photo-1494783367193-149034c05e8f?w=400&q=80",
-    ],
+    images: [],
   },
   {
     icon: ImageIcon,
@@ -132,12 +131,11 @@ const showcaseSections = [
     route: "/index",
     videos: [
       { url: "https://cdn.pixabay.com/video/2020/05/25/40130-424930032_large.mp4", poster: "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=400&q=80", title: "Animazione AI" },
+      { url: "https://cdn.pixabay.com/video/2022/07/21/125132-731757646_large.mp4", poster: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80", title: "Ritratto Animato" },
+      { url: "https://cdn.pixabay.com/video/2020/02/12/32078-391020tried_large.mp4", poster: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80", title: "Panorama" },
+      { url: "https://cdn.pixabay.com/video/2023/11/02/187354-881274069_large.mp4", poster: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80", title: "Montagne" },
     ],
-    images: [
-      "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-      "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80",
-      "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80",
-    ],
+    images: [],
   },
   {
     icon: Wand2,
@@ -596,8 +594,6 @@ export default function Landing() {
       {/* ===== FAQ ===== */}
       <LandingFAQ />
 
-      {/* ===== Waitlist Form ===== */}
-      <WaitlistForm />
 
       {/* ===== Testimonials ===== */}
       <section className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
