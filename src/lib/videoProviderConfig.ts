@@ -2,6 +2,9 @@
 
 export type VideoProviderType = 
   | 'auto'
+  // Luma Direct
+  | 'luma-direct-ray2'
+  | 'luma-direct-flash2'
   | 'google-veo'
   // AI/ML API - Runway
   | 'aiml-runway-gen3-turbo'
@@ -107,7 +110,7 @@ export type VideoProviderType =
   | 'ltx-2-fast'
   | 'ltx-2-pro';
 
-export type ProviderGroup = 'google' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
+export type ProviderGroup = 'google' | 'luma' | 'aiml' | 'piapi' | 'freepik' | 'vidu' | 'ltx' | 'auto';
 
 export interface VideoProviderInfo {
   id: VideoProviderType;
@@ -204,6 +207,79 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     supportsImageToVideo: true,
     supportsTextToVideo: true,
     requiresApiKey: 'GOOGLE_AI_API_KEY',
+  },
+
+  // ============ LUMA DIRECT (via LUMA_API_KEY) ============
+  'luma-direct-ray2': {
+    id: 'luma-direct-ray2',
+    name: 'Luma Ray 2 (Diretto)',
+    shortName: 'Ray 2 Diretto',
+    group: 'luma',
+    description: 'API Diretta Luma Ray 2, keyframe e loop nativi',
+    color: 'bg-cyan-500',
+    badgeColor: 'bg-cyan-500/20',
+    textColor: 'text-cyan-500',
+    speed: 2,
+    quality: 3,
+    cost: 2,
+    features: ['API Diretta', 'Keyframe', 'Loop', 'Extend'],
+    estimatedTime: '3-5 min',
+    fallbackOrder: ['luma-direct-flash2', 'aiml-luma-ray-2'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+      { value: '10', label: '10 secondi' },
+    ],
+    resolutions: [
+      { value: '720p', label: '720p (HD)' },
+      { value: '1080p', label: '1080p (Full HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+      { value: '4:3', label: '4:3 (Classico)' },
+      { value: '3:4', label: '3:4 (Ritratto)' },
+      { value: '21:9', label: '21:9 (Ultrawide)' },
+    ],
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    supportsEndFrame: true,
+    requiresApiKey: 'LUMA_API_KEY',
+    modelId: 'ray-2',
+    category: 'Luma Diretto',
+  },
+  'luma-direct-flash2': {
+    id: 'luma-direct-flash2',
+    name: 'Luma Ray Flash 2 (Diretto)',
+    shortName: 'Flash 2 Diretto',
+    group: 'luma',
+    description: 'API Diretta Luma Flash 2, veloce ed economico',
+    color: 'bg-cyan-400',
+    badgeColor: 'bg-cyan-400/20',
+    textColor: 'text-cyan-400',
+    speed: 3,
+    quality: 2,
+    cost: 1,
+    features: ['API Diretta', 'Veloce', 'Economico'],
+    estimatedTime: '1-2 min',
+    fallbackOrder: ['luma-direct-ray2', 'aiml-luma-ray-flash-2'],
+    durations: [
+      { value: '5', label: '5 secondi' },
+    ],
+    resolutions: [
+      { value: '720p', label: '720p (HD)' },
+    ],
+    aspectRatios: [
+      { value: '16:9', label: '16:9 (Orizzontale)' },
+      { value: '9:16', label: '9:16 (Verticale)' },
+      { value: '1:1', label: '1:1 (Quadrato)' },
+    ],
+    supportsImageToVideo: true,
+    supportsTextToVideo: true,
+    supportsEndFrame: true,
+    requiresApiKey: 'LUMA_API_KEY',
+    modelId: 'ray-flash-2',
+    category: 'Luma Diretto',
   },
 
   // ============ AI/ML API - RUNWAY ============
@@ -2784,6 +2860,7 @@ export function getGroupLabel(group: ProviderGroup): string {
   const labels: Record<ProviderGroup, string> = {
     auto: 'Automatico',
     google: 'Google',
+    luma: 'Luma (Diretto)',
     aiml: 'AI/ML API',
     piapi: 'PiAPI',
     freepik: 'Freepik',
@@ -2798,6 +2875,7 @@ export function getGroupBadgeStyles(group: ProviderGroup): { bg: string; text: s
   const styles: Record<ProviderGroup, { bg: string; text: string }> = {
     auto: { bg: 'bg-accent/20', text: 'text-accent' },
     google: { bg: 'bg-blue-500/20', text: 'text-blue-500' },
+    luma: { bg: 'bg-cyan-500/20', text: 'text-cyan-500' },
     aiml: { bg: 'bg-purple-500/20', text: 'text-purple-500' },
     piapi: { bg: 'bg-orange-500/20', text: 'text-orange-500' },
     freepik: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-500' },
@@ -2883,7 +2961,10 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'aiml-kling-v2.5-turbo-pro': { perSecond: 0.06, perGeneration: 0.30 },
   'aiml-kling-v2.6-pro': { perSecond: 0.08, perGeneration: 0.40 },
   'aiml-kling-o1': { perSecond: 0.10, perGeneration: 0.50 },
-  // Luma
+  // Luma Diretto
+  'luma-direct-ray2': { perSecond: 0.08, perGeneration: 0.40 },
+  'luma-direct-flash2': { perSecond: 0.04, perGeneration: 0.20 },
+  // Luma via AI/ML
   'aiml-luma-ray-1.6': { perSecond: 0.06, perGeneration: 0.30 },
   'aiml-luma-ray-2': { perSecond: 0.08, perGeneration: 0.40 },
   'aiml-luma-ray-flash-2': { perSecond: 0.04, perGeneration: 0.20 },
@@ -2973,6 +3054,9 @@ export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'auto',
   // Google Diretto
   'google-veo',
+  // Luma Diretto
+  'luma-direct-ray2',
+  'luma-direct-flash2',
   // AI/ML API - Runway
   'aiml-runway-gen4-turbo',
   'aiml-runway-gen3-turbo',
