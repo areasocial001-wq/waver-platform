@@ -20,12 +20,25 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
     const vid = videoRef.current;
     if (!vid) return;
     vid.muted = true;
+    vid.defaultMuted = true;
+    vid.autoplay = true;
+    vid.load();
     vid.play().then(() => {
       setIsPlaying(true);
     }).catch(() => {
       // autoplay blocked — user will click play
     });
   }, []);
+
+  const handleLoadedData = () => {
+    const vid = videoRef.current;
+    if (!vid || !vid.paused) return;
+    vid.play().then(() => {
+      setIsPlaying(true);
+    }).catch(() => {
+      // keep poster visible until user interaction if browser blocks it
+    });
+  };
 
   const handlePlaying = () => {
     setShowPoster(false);
@@ -69,6 +82,7 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
         playsInline
         preload="auto"
         className="w-full h-full object-cover"
+        onLoadedData={handleLoadedData}
         onPlaying={handlePlaying}
         onEnded={() => setIsPlaying(false)}
       />
