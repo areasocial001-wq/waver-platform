@@ -141,9 +141,9 @@ const showcaseSections = [
     route: "/index",
     videos: [
       { url: landingDemoVideos.sampleShort, poster: "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=400&q=80", title: "Animazione AI" },
-      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80", title: "Ritratto Animato" },
-      { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80", title: "Panorama" },
-      { url: landingDemoVideos.flower, poster: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80", title: "Montagne" },
+      { url: landingDemoVideos.sampleLandscape, poster: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80", title: "Ritratto Animato" },
+      { url: landingDemoVideos.bigBuckBunny, poster: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&q=80", title: "Panorama" },
+      { url: landingDemoVideos.sampleLong, poster: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=400&q=80", title: "Montagne" },
     ],
     images: [],
   },
