@@ -329,28 +329,23 @@ export default function Landing() {
               <img src={logoImg} alt="AI Production Hub" className="w-72 h-72 rounded-full object-cover shadow-[0_0_60px_hsl(217,91%,60%/0.5),0_0_120px_hsl(270,60%,55%/0.3)]" />
             </motion.div>
 
-            <div className="relative mx-auto mb-8 max-w-5xl px-4 py-5 md:px-8 md:py-7">
-              <div className="pointer-events-none absolute inset-0 -z-10 rounded-[2rem] bg-background/70 shadow-[0_30px_100px_hsl(var(--background)/0.92)] backdrop-blur-[10px]" />
-              <div className="pointer-events-none absolute inset-x-[6%] inset-y-[12%] -z-10 rounded-[1.75rem] border border-border/20 bg-gradient-to-b from-background/40 via-background/70 to-background/90" />
+            <motion.div variants={fadeUp} custom={0.5} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md drop-shadow-[0_4px_16px_hsl(225,25%,5%)] shadow-[0_0_20px_hsl(225,25%,5%/0.8)]">
+              <Zap className="w-4 h-4 text-[hsl(45,93%,58%)]" />
+              All-in-one AI Video & Image Production Studio
+            </motion.div>
 
-              <motion.div variants={fadeUp} custom={0.5} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md drop-shadow-[0_4px_16px_hsl(225,25%,5%)] shadow-[0_0_20px_hsl(225,25%,5%/0.8)]">
-                <Zap className="w-4 h-4 text-[hsl(45,93%,58%)]" />
-                All-in-one AI Video & Image Production Studio
-              </motion.div>
+            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)] [text-shadow:0_2px_20px_rgba(0,0,0,1),0_4px_40px_rgba(0,0,0,0.95),0_8px_80px_rgba(0,0,0,0.9),0_0_120px_rgba(0,0,0,0.8)]">
+              <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">All-in-one AI</span>
+              <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent drop-shadow-[0_4px_30px_rgba(0,0,0,1)]" style={{filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.95)) drop-shadow(0 8px 40px rgba(0,0,0,0.9))'}}>
+                Video & Image
+              </span>
+              <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">Generator</span>
+            </motion.h1>
 
-              <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] drop-shadow-[0_4px_30px_rgba(0,0,0,0.95)] [text-shadow:0_2px_20px_rgba(0,0,0,1),0_4px_40px_rgba(0,0,0,0.95),0_8px_80px_rgba(0,0,0,0.9),0_0_120px_rgba(0,0,0,0.8)]">
-                <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">All-in-one AI</span>
-                <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent drop-shadow-[0_4px_30px_rgba(0,0,0,1)]" style={{filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.95)) drop-shadow(0 8px 40px rgba(0,0,0,0.9))'}}>
-                  Video & Image
-                </span>
-                <span className="block drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">Generator</span>
-              </motion.h1>
-
-              {/* Model marquee subtitle */}
-              <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-0 [text-shadow:0_2px_15px_rgba(0,0,0,1),0_4px_30px_rgba(0,0,0,0.95),0_8px_60px_rgba(0,0,0,0.9),0_0_100px_rgba(0,0,0,0.8)] font-bold text-white whitespace-pre-line drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
-                {aiModels.slice(0, 9).join(" | ")}{" |\n"}{aiModels.slice(9).join(" | ")}
-              </motion.div>
-            </div>
+            {/* Model marquee subtitle */}
+            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_2px_15px_rgba(0,0,0,1),0_4px_30px_rgba(0,0,0,0.95),0_8px_60px_rgba(0,0,0,0.9),0_0_100px_rgba(0,0,0,0.8)] font-bold text-white whitespace-pre-line drop-shadow-[0_4px_20px_rgba(0,0,0,0.95)]">
+              {aiModels.slice(0, 9).join(" | ")}{" |\n"}{aiModels.slice(9).join(" | ")}
+            </motion.div>
 
             {/* Highlight badges */}
             <motion.div variants={fadeUp} custom={3} className="flex flex-wrap justify-center gap-3 mb-10 drop-shadow-[0_4px_20px_hsl(225,25%,5%)]">
@@ -757,12 +752,12 @@ export default function Landing() {
       >
         <div className="container mx-auto px-4 text-center text-sm text-[hsl(215,20%,45%)]">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover" />
+            <img src={logoImg} alt="AI Production Hub" className="w-8 h-8 rounded-full object-cover" />
             <span className="font-semibold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
               AI Production Hub
             </span>
           </div>
-          <p>© {new Date().getFullYear()} StudioBook — AI Production Hub. Tutti i diritti riservati.</p>
+          <p>© {new Date().getFullYear()} AI Production Hub. Tutti i diritti riservati.</p>
         </div>
       </motion.footer>
     </div>
