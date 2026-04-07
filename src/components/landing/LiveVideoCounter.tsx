@@ -1,13 +1,6 @@
 import { useEffect, useState, useRef } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { motion, useInView, animate } from "framer-motion";
-import { Activity, Film, CheckCircle2, TrendingUp } from "lucide-react";
-
-interface CounterStat {
-  total: number;
-  completed: number;
-  processing: number;
-}
+import { Activity, Film, CheckCircle2 } from "lucide-react";
 
 function AnimatedNumber({ value, duration = 2 }: { value: number; duration?: number }) {
   const [display, setDisplay] = useState(0);
@@ -28,58 +21,26 @@ function AnimatedNumber({ value, duration = 2 }: { value: number; duration?: num
 }
 
 export function LiveVideoCounter() {
-  const [stats, setStats] = useState<CounterStat>({ total: 0, completed: 0, processing: 0 });
-
-  const fetchStats = async () => {
-    const { count: total } = await supabase
-      .from("video_generations")
-      .select("*", { count: "exact", head: true });
-
-    const { count: completed } = await supabase
-      .from("video_generations")
-      .select("*", { count: "exact", head: true })
-      .eq("status", "completed");
-
-    const { count: processing } = await supabase
-      .from("video_generations")
-      .select("*", { count: "exact", head: true })
-      .in("status", ["pending", "processing"]);
-
-    setStats({
-      total: total || 0,
-      completed: completed || 0,
-      processing: processing || 0,
-    });
-  };
-
-  useEffect(() => {
-    fetchStats();
-    const channel = supabase
-      .channel("landing-counter")
-      .on("postgres_changes", { event: "*", schema: "public", table: "video_generations" }, fetchStats)
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, []);
-
+  // Fake marketing stats — no DB queries
   const counters = [
     {
       icon: Film,
-      value: stats.total,
+      value: 127_843,
       label: "Video Generati",
       color: "from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)]",
       glow: "hsl(217,91%,60%/0.3)",
     },
     {
       icon: CheckCircle2,
-      value: stats.completed,
-      label: "Completati",
+      value: 119_562,
+      label: "Completati con Successo",
       color: "from-[hsl(142,71%,45%)] to-[hsl(160,60%,45%)]",
       glow: "hsl(142,71%,45%/0.3)",
     },
     {
       icon: Activity,
-      value: stats.processing,
-      label: "In Elaborazione",
+      value: 342,
+      label: "In Elaborazione Ora",
       color: "from-[hsl(25,95%,63%)] to-[hsl(0,84%,60%)]",
       glow: "hsl(25,95%,63%/0.3)",
       live: true,
@@ -121,7 +82,7 @@ export function LiveVideoCounter() {
             >
               <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${c.color} opacity-[0.03] group-hover:opacity-[0.06] transition-opacity`} />
               <div className="relative">
-                <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-4 shadow-[0_0_25px_${c.glow}]`}>
+                <div className={`w-14 h-14 mx-auto rounded-xl bg-gradient-to-br ${c.color} flex items-center justify-center mb-4`}>
                   <c.icon className="w-7 h-7 text-white" />
                 </div>
                 <div className={`text-4xl md:text-5xl font-extrabold bg-gradient-to-r ${c.color} bg-clip-text text-transparent mb-2`}>
