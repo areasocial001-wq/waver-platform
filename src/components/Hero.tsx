@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { Sparkles, Video, Image } from "lucide-react";
+import { Video, Image } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 
 export const Hero = () => {
   const scrollToGenerate = () => {
@@ -17,8 +18,8 @@ export const Hero = () => {
       
       <div className="relative z-10 container mx-auto px-6 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary/20 bg-card/50 backdrop-blur-sm mb-8 animate-pulse-slow">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm text-muted-foreground">Powered by Waver 1.0</span>
+          <img src={logoImg} alt="AI Production Hub" className="w-6 h-6 rounded-full" />
+          <span className="text-sm text-muted-foreground">Powered by AI Production Hub</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent leading-tight">

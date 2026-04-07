@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
 import { VoiceCloneDialog } from "./VoiceCloneDialog";
+import logoImg from "@/assets/logo.png";
 import { AudioExtractorDialog } from "./AudioExtractorDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -89,7 +90,7 @@ export const Navbar = () => {
           onClick={() => navigate("/")}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0"
         >
-          <Sparkles className="w-6 h-6 text-primary" />
+          <img src={logoImg} alt="AI Production Hub" className="w-9 h-9 rounded-full object-cover" />
           <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent hidden sm:block">
             AI Production Hub
           </h1>
