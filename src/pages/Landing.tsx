@@ -343,7 +343,7 @@ export default function Landing() {
             </motion.h1>
 
             {/* Model marquee subtitle */}
-            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_3px_20px_hsl(225,25%,5%),0_6px_40px_hsl(225,25%,5%/0.7)] font-bold text-primary">
+            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg mb-8 [text-shadow:0_3px_20px_hsl(225,25%,5%),0_6px_40px_hsl(225,25%,5%/0.7)] font-bold text-white">
               {aiModels.join(" | ")}
             </motion.div>
 
