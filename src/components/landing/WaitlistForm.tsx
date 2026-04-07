@@ -57,6 +57,10 @@ export function WaitlistForm() {
       } else {
         setIsSubmitted(true);
         toast.success("Iscrizione completata!");
+        // Send notification to admins via edge function
+        supabase.functions.invoke("waitlist-notification", {
+          body: { email: trimmedEmail, name: name.trim() || null, message: message.trim() || null },
+        }).catch((err) => console.error("Notification error:", err));
       }
     } catch (err) {
       console.error("Waitlist error:", err);
