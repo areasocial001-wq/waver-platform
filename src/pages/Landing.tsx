@@ -9,6 +9,7 @@ import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 import { LandingFAQ } from "@/components/landing/LandingFAQ";
 import { WaitlistForm } from "@/components/landing/WaitlistForm";
+import logoImg from "@/assets/logo.png";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -225,9 +226,7 @@ export default function Landing() {
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] flex items-center justify-center shadow-[0_0_15px_hsl(217,91%,60%/0.4)]">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
+            <img src={logoImg} alt="AI Production Hub" className="w-10 h-10 rounded-full object-cover shadow-[0_0_15px_hsl(217,91%,60%/0.4)]" />
             <span className="text-xl font-bold tracking-tight">
               <span className="bg-gradient-to-r from-[hsl(210,40%,98%)] to-[hsl(215,20%,75%)] bg-clip-text text-transparent">AI Production</span>{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">Hub</span>

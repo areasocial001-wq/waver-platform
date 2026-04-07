@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Sparkles, Lock, Mail, KeyRound, ArrowRight, Loader2, ArrowLeft, CheckCircle, UserPlus, LogIn } from "lucide-react";
+import { Lock, Mail, KeyRound, ArrowRight, Loader2, ArrowLeft, CheckCircle, UserPlus, LogIn } from "lucide-react";
+import logoImg from "@/assets/logo.png";
 import { toast } from "sonner";
 
 export default function Auth() {
@@ -134,9 +135,7 @@ export default function Auth() {
         {/* Logo */}
         <div className={`text-center mb-8 ${getAnimationClass(0)}`} style={{ transitionDelay: "100ms" }}>
           <div className="inline-flex items-center justify-center gap-3 mb-6">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-secondary/20 backdrop-blur-sm border border-primary/20 animate-pulse" style={{ animationDuration: "3s" }}>
-              <Sparkles className="w-8 h-8 text-primary" />
-            </div>
+            <img src={logoImg} alt="AI Production Hub" className="w-16 h-16 rounded-full object-cover shadow-lg shadow-primary/20" />
           </div>
           <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
             AI Production Hub
