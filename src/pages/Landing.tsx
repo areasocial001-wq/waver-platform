@@ -108,7 +108,7 @@ const highlights = [
 
 const landingDemoVideos = {
   flower: "/videos/landing-demo-flower.mp4",
-  bigBuckBunny: "/videos/landing-demo-bbb.mp4",
+  countdown: "/videos/showcase-countdown.mp4",
   sampleShort: "/videos/landing-demo-5s.mp4",
   sampleLong: "/videos/landing-demo-10s.mp4",
   sampleLandscape: "/videos/landing-demo-640.mp4",
