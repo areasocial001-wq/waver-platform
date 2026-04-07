@@ -757,12 +757,12 @@ export default function Landing() {
       >
         <div className="container mx-auto px-4 text-center text-sm text-[hsl(215,20%,45%)]">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <img src={logoImg} alt="AI Production Hub" className="w-8 h-8 rounded-full object-cover" />
+            <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover" />
             <span className="font-semibold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
               AI Production Hub
             </span>
           </div>
-          <p>© {new Date().getFullYear()} AI Production Hub. Tutti i diritti riservati.</p>
+          <p>© {new Date().getFullYear()} StudioBook — AI Production Hub. Tutti i diritti riservati.</p>
         </div>
       </motion.footer>
     </div>
