@@ -291,7 +291,7 @@ export default function Landing() {
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={logoImg} alt="AI Production Hub" className="w-14 h-14 rounded-full object-cover shadow-[0_0_20px_hsl(217,91%,60%/0.5)]" />
+            <img src={logoImg} alt="AI Production Hub" className="w-28 h-28 rounded-full object-cover shadow-[0_0_25px_hsl(217,91%,60%/0.5)]" />
             <span className="text-xl font-bold tracking-tight">
               <span className="bg-gradient-to-r from-[hsl(210,40%,98%)] to-[hsl(215,20%,75%)] bg-clip-text text-transparent">AI Production</span>{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">Hub</span>
