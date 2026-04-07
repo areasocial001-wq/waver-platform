@@ -291,7 +291,7 @@ export default function Landing() {
       >
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img src={logoImg} alt="AI Production Hub" className="w-10 h-10 rounded-full object-cover shadow-[0_0_15px_hsl(217,91%,60%/0.4)]" />
+            <img src={logoImg} alt="AI Production Hub" className="w-14 h-14 rounded-full object-cover shadow-[0_0_20px_hsl(217,91%,60%/0.5)]" />
             <span className="text-xl font-bold tracking-tight">
               <span className="bg-gradient-to-r from-[hsl(210,40%,98%)] to-[hsl(215,20%,75%)] bg-clip-text text-transparent">AI Production</span>{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">Hub</span>
@@ -324,12 +324,17 @@ export default function Landing() {
 
         <motion.div style={{ opacity: heroOpacity }} className="relative container mx-auto px-4 text-center max-w-5xl">
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
-            <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md">
+            {/* Logo in Hero */}
+            <motion.div variants={fadeUp} custom={0} className="flex justify-center mb-6">
+              <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover shadow-[0_0_40px_hsl(217,91%,60%/0.5),0_0_80px_hsl(270,60%,55%/0.3)]" />
+            </motion.div>
+
+            <motion.div variants={fadeUp} custom={0.5} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md drop-shadow-[0_2px_8px_hsl(225,25%,5%/0.8)]">
               <Zap className="w-4 h-4 text-[hsl(45,93%,58%)]" />
               All-in-one AI Video & Image Production Studio
             </motion.div>
 
-            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05]">
+            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] drop-shadow-[0_4px_20px_hsl(225,25%,5%/0.9)]">
               <span className="block">All-in-one AI</span>
               <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
                 Video & Image
@@ -338,12 +343,12 @@ export default function Landing() {
             </motion.h1>
 
             {/* Model marquee subtitle */}
-            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg text-[hsl(215,20%,70%)] mb-8 font-medium">
+            <motion.div variants={fadeUp} custom={2} className="text-base md:text-lg text-[hsl(215,20%,70%)] mb-8 font-medium drop-shadow-[0_2px_10px_hsl(225,25%,5%/0.8)]">
               {aiModels.join(" | ")}
             </motion.div>
 
             {/* Highlight badges */}
-            <motion.div variants={fadeUp} custom={3} className="flex flex-wrap justify-center gap-3 mb-10">
+            <motion.div variants={fadeUp} custom={3} className="flex flex-wrap justify-center gap-3 mb-10 drop-shadow-[0_2px_12px_hsl(225,25%,5%/0.7)]">
               <button
                 onClick={() => navigate("/luma-tools")}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-[hsl(142,71%,45%/0.3)] bg-[hsl(142,71%,45%/0.08)] hover:bg-[hsl(142,71%,45%/0.15)] text-[hsl(142,71%,65%)] text-sm font-medium backdrop-blur-md transition-all"
@@ -363,7 +368,7 @@ export default function Landing() {
             </motion.div>
 
             {/* CTA Buttons */}
-            <motion.div variants={fadeUp} custom={4} className="flex flex-col sm:flex-row gap-4 justify-center">
+            <motion.div variants={fadeUp} custom={4} className="flex flex-col sm:flex-row gap-4 justify-center drop-shadow-[0_4px_16px_hsl(225,25%,5%/0.6)]">
               <Button
                 size="lg"
                 onClick={() => navigate("/index")}

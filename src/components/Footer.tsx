@@ -7,7 +7,7 @@ export const Footer = () => {
       <div className="container mx-auto px-6 py-6">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
-            <img src={logoImg} alt="AI Production Hub" className="w-6 h-6 rounded-full object-cover" />
+            <img src={logoImg} alt="AI Production Hub" className="w-10 h-10 rounded-full object-cover" />
             <span className="text-sm font-medium">AI Production Hub</span>
             <span className="text-xs text-muted-foreground">v1.0</span>
           </div>
