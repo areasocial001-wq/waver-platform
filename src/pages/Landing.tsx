@@ -326,7 +326,7 @@ export default function Landing() {
           <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
             {/* Logo in Hero */}
             <motion.div variants={fadeUp} custom={0} className="flex justify-center mb-6">
-              <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover shadow-[0_0_40px_hsl(217,91%,60%/0.5),0_0_80px_hsl(270,60%,55%/0.3)]" />
+              <img src={logoImg} alt="AI Production Hub" className="w-72 h-72 rounded-full object-cover shadow-[0_0_60px_hsl(217,91%,60%/0.5),0_0_120px_hsl(270,60%,55%/0.3)]" />
             </motion.div>
 
             <motion.div variants={fadeUp} custom={0.5} className="inline-flex items-center gap-2 px-5 py-2 rounded-full border border-[hsl(217,91%,60%/0.3)] bg-[hsl(217,91%,60%/0.08)] text-[hsl(217,91%,80%)] text-sm font-medium mb-8 backdrop-blur-md drop-shadow-[0_2px_8px_hsl(225,25%,5%/0.8)]">
