@@ -55,6 +55,11 @@ export default function ViewStoryboard() {
   }, [id]);
 
   const fetchStoryboard = async (attemptPassword?: string) => {
+    if (!id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      toast.error("ID storyboard non valido");
+      navigate("/");
+      return;
+    }
     try {
       // Use server-side verification for password-protected storyboards
       const { data: responseData, error: functionError } = await supabase.functions.invoke(
