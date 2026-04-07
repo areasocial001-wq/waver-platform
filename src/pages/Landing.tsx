@@ -7,6 +7,8 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
+import { LandingFAQ } from "@/components/landing/LandingFAQ";
+import { WaitlistForm } from "@/components/landing/WaitlistForm";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -550,6 +552,12 @@ export default function Landing() {
           </motion.div>
         </div>
       </section>
+
+      {/* ===== FAQ ===== */}
+      <LandingFAQ />
+
+      {/* ===== Waitlist Form ===== */}
+      <WaitlistForm />
 
       {/* ===== Testimonials ===== */}
       <section className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
