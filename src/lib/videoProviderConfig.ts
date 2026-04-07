@@ -2961,7 +2961,10 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
   'aiml-kling-v2.5-turbo-pro': { perSecond: 0.06, perGeneration: 0.30 },
   'aiml-kling-v2.6-pro': { perSecond: 0.08, perGeneration: 0.40 },
   'aiml-kling-o1': { perSecond: 0.10, perGeneration: 0.50 },
-  // Luma
+  // Luma Diretto
+  'luma-direct-ray2': { perSecond: 0.08, perGeneration: 0.40 },
+  'luma-direct-flash2': { perSecond: 0.04, perGeneration: 0.20 },
+  // Luma via AI/ML
   'aiml-luma-ray-1.6': { perSecond: 0.06, perGeneration: 0.30 },
   'aiml-luma-ray-2': { perSecond: 0.08, perGeneration: 0.40 },
   'aiml-luma-ray-flash-2': { perSecond: 0.04, perGeneration: 0.20 },
