@@ -1084,6 +1084,73 @@ serve(async (req) => {
       });
     }
 
+    // ==================== LUMA DIRECT PROVIDERS ====================
+    if (preferredProvider?.startsWith('luma-direct-')) {
+      const LUMA_API_KEY = Deno.env.get('LUMA_API_KEY');
+      if (!LUMA_API_KEY) {
+        throw new Error("LUMA_API_KEY is not configured. Add your Luma API key in settings.");
+      }
+
+      const lumaModel = preferredProvider === 'luma-direct-flash2' ? 'ray-flash-2' : 'ray-2';
+      const isI2V = type === "image_to_video";
+      const normalizedPrompt = normalizePrompt(prompt);
+      const startImageData = start_image || image || image_url;
+
+      const lumaPayload: Record<string, unknown> = {
+        prompt: normalizedPrompt,
+        model: lumaModel,
+        aspect_ratio: aspect_ratio || '16:9',
+        loop: !!loop,
+        duration: `${sanitizeDuration(lumaModel, duration || 5)}s`,
+        resolution: resolution || '720p',
+      };
+
+      // Keyframes for I2V or end frame interpolation
+      if (isI2V && startImageData) {
+        lumaPayload.keyframes = { frame0: { type: "image", url: startImageData } };
+        if (end_image) {
+          (lumaPayload.keyframes as Record<string, unknown>).frame1 = { type: "image", url: end_image };
+        }
+      } else if (end_image && startImageData) {
+        lumaPayload.keyframes = {
+          frame0: { type: "image", url: startImageData },
+          frame1: { type: "image", url: end_image },
+        };
+      }
+
+      console.log(`[Luma Direct] Starting generation: model=${lumaModel}, type=${type}`);
+
+      const LUMA_API_URL = "https://api.lumalabs.ai/dream-machine/v1";
+      const lumaResponse = await fetch(`${LUMA_API_URL}/generations/video`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${LUMA_API_KEY}`,
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(lumaPayload),
+      });
+
+      if (!lumaResponse.ok) {
+        const errText = await lumaResponse.text();
+        console.error(`[Luma Direct] Error: ${lumaResponse.status} - ${errText}`);
+        throw new Error(`Luma API error: ${lumaResponse.status} - ${errText}`);
+      }
+
+      const lumaData = await lumaResponse.json();
+      console.log(`[Luma Direct] Created: ${lumaData.id}`);
+
+      return new Response(JSON.stringify({
+        id: lumaData.id,
+        status: "starting",
+        operationId: `luma-direct:${lumaModel}:${lumaData.id}`,
+        provider: preferredProvider,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
     // ==================== LTX VIDEO PROVIDERS ====================
     if (preferredProvider?.startsWith('ltx-')) {
       const LTX_API_KEY = Deno.env.get('LTX_API_KEY');
