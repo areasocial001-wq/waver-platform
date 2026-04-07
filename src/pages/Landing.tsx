@@ -3,21 +3,57 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote, Play, Image as ImageIcon, Film, Music, ChevronRight } from "lucide-react";
 import heroBg from "@/assets/landing-hero-cinematic.jpg";
 import studioBg from "@/assets/studio-bg.jpg";
-import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { motion, useScroll, useTransform, useMotionValueEvent, useInView, animate } from "framer-motion";
+import { useRef, useEffect, useState } from "react";
 import { LiveVideoCounter } from "@/components/landing/LiveVideoCounter";
 import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 import { LandingFAQ } from "@/components/landing/LandingFAQ";
 import { WaitlistForm } from "@/components/landing/WaitlistForm";
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 40 },
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.7, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    transition: { duration: 0.8, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
   }),
 };
+
+const parallaxReveal = {
+  hidden: { opacity: 0, y: 80, scale: 0.92, rotateX: 8 },
+  visible: (i: number = 0) => ({
+    opacity: 1, y: 0, scale: 1, rotateX: 0,
+    transition: { duration: 0.9, delay: i * 0.15, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  }),
+};
+
+const slideInLeft = {
+  hidden: { opacity: 0, x: -80 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+};
+
+const slideInRight = {
+  hidden: { opacity: 0, x: 80 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.8, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+};
+
+function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+  const [value, setValue] = useState(0);
+
+  useEffect(() => {
+    if (!isInView) return;
+    const controls = animate(0, target, {
+      duration: 2,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setValue(Math.round(v)),
+    });
+    return () => controls.stop();
+  }, [isInView, target]);
+
+  return <span ref={ref}>{value}{suffix}</span>;
+}
 
 const staggerContainer = {
   hidden: {},
