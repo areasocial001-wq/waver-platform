@@ -49,7 +49,7 @@ export function VideoShowcaseCard({ videoUrl, posterUrl, title, className = "" }
         muted={isMuted}
         loop
         playsInline
-        preload="none"
+        preload="metadata"
         className={`w-full h-full object-cover ${!isPlaying ? "opacity-0" : "opacity-100"}`}
         onEnded={() => setIsPlaying(false)}
       />
