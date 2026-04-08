@@ -334,9 +334,9 @@ export default function Landing() {
               All-in-one AI Video & Image Production Studio
             </motion.div>
 
-            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [-webkit-text-stroke:2px_black] [text-shadow:-2px_-2px_0_black,2px_-2px_0_black,-2px_2px_0_black,2px_2px_0_black,0_0_20px_black,0_0_40px_black,0_0_80px_hsl(225,25%,2%/0.95)]">
+            <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [-webkit-text-stroke:3px_black] [text-shadow:-3px_-3px_0_black,3px_-3px_0_black,-3px_3px_0_black,3px_3px_0_black,0_0_20px_black,0_0_40px_black,0_0_80px_hsl(225,25%,2%/0.95)]">
               <span className="block">All-in-one AI</span>
-              <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent [-webkit-text-stroke:2px_black] drop-shadow-[0_0_30px_hsl(217,91%,60%/0.5)]">
+              <span className="block bg-gradient-to-r from-[hsl(217,91%,60%)] via-[hsl(270,60%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent [-webkit-text-stroke:3px_black] drop-shadow-[0_0_30px_hsl(217,91%,60%/0.5)]">
                 Video & Image
               </span>
               <span className="block">Generator</span>
