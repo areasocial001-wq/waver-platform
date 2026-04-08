@@ -298,10 +298,24 @@ export const useApiMonitoring = () => {
           result = await supabase.functions.invoke("generate-video", {
             body: { healthCheck: true }
           });
-          // Check specifically for Google key
           if (!result?.data?.hasGoogleKey) {
             result.error = "Google AI key not configured";
           }
+          break;
+        case "Luma AI":
+          result = await supabase.functions.invoke("luma-video", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "OpenAI":
+          result = await supabase.functions.invoke("generate-content", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "DashScope":
+          result = await supabase.functions.invoke("dashscope-video", {
+            body: { healthCheck: true }
+          });
           break;
       }
       
