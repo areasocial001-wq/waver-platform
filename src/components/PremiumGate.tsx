@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Crown, Lock, ArrowRight } from "lucide-react";
@@ -11,11 +12,12 @@ interface PremiumGateProps {
 
 export const PremiumGate = ({ children, featureName = "Questa funzionalità" }: PremiumGateProps) => {
   const { subscribed, tier, loading } = useSubscription();
+  const { isAdmin, loading: roleLoading } = useUserRole();
   const navigate = useNavigate();
 
-  if (loading) return <>{children}</>;
+  if (loading || roleLoading) return <>{children}</>;
 
-  if (subscribed && tier === "premium") {
+  if (isAdmin || (subscribed && tier === "premium")) {
     return <>{children}</>;
   }
 
