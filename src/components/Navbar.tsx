@@ -103,13 +103,18 @@ export const Navbar = () => {
             <ApiStatusNavWidget />
           </div>
           
-          {/* Premium Badge */}
-          {subscribed && tier === "premium" && (
+          {/* Role Badge */}
+          {isAdmin ? (
+            <Badge className="bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30 hidden sm:inline-flex gap-1">
+              <Shield className="w-3 h-3" />
+              Admin
+            </Badge>
+          ) : subscribed && tier === "premium" ? (
             <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30 hidden sm:inline-flex gap-1">
               <Crown className="w-3 h-3" />
               Premium
             </Badge>
-          )}
+          ) : null}
           
           {/* Email - hidden on small screens */}
           <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
