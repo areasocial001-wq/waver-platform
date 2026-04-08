@@ -41,6 +41,9 @@ const DEFAULT_THRESHOLDS: ThresholdSettings = {
   "PIAPI Audio": { warning: 1500, critical: 4000 },
   "AIML API": { warning: 1500, critical: 4000 },
   "Google AI": { warning: 1000, critical: 3000 },
+  "Luma AI": { warning: 1500, critical: 4000 },
+  "OpenAI": { warning: 1000, critical: 3000 },
+  "DashScope": { warning: 1500, critical: 4000 },
 };
 
 export const useApiMonitoring = () => {
@@ -54,6 +57,9 @@ export const useApiMonitoring = () => {
     { name: "PIAPI Audio", status: "checking", lastCheck: null, description: "Udio/DiffRhythm", retryCount: 0 },
     { name: "AIML API", status: "checking", lastCheck: null, description: "Wan/Kling/Flux/Luma", retryCount: 0 },
     { name: "Google AI", status: "checking", lastCheck: null, description: "Gemini/Veo", retryCount: 0 },
+    { name: "Luma AI", status: "checking", lastCheck: null, description: "Ray2/Photon/Flash", retryCount: 0 },
+    { name: "OpenAI", status: "checking", lastCheck: null, description: "GPT/DALL-E/Sora", retryCount: 0 },
+    { name: "DashScope", status: "checking", lastCheck: null, description: "Wan-X/Alibaba Cloud", retryCount: 0 },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [thresholds, setThresholds] = useState<ThresholdSettings>(DEFAULT_THRESHOLDS);
@@ -292,10 +298,24 @@ export const useApiMonitoring = () => {
           result = await supabase.functions.invoke("generate-video", {
             body: { healthCheck: true }
           });
-          // Check specifically for Google key
           if (!result?.data?.hasGoogleKey) {
             result.error = "Google AI key not configured";
           }
+          break;
+        case "Luma AI":
+          result = await supabase.functions.invoke("luma-video", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "OpenAI":
+          result = await supabase.functions.invoke("generate-content", {
+            body: { healthCheck: true }
+          });
+          break;
+        case "DashScope":
+          result = await supabase.functions.invoke("dashscope-video", {
+            body: { healthCheck: true }
+          });
           break;
       }
       

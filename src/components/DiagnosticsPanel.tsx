@@ -149,6 +149,9 @@ export const DiagnosticsPanel = () => {
       { name: "piapi-audio", label: "PIAPI Audio", body: { healthCheck: true } },
       { name: "aiml-balance", label: "AIML API", body: {} },
       { name: "ltx-video", label: "LTX Video", body: { healthCheck: true } },
+      { name: "luma-video", label: "Luma AI", body: { healthCheck: true } },
+      { name: "generate-content", label: "OpenAI", body: { healthCheck: true } },
+      { name: "dashscope-video", label: "DashScope", body: { healthCheck: true } },
     ];
 
     for (const check of checks) {
