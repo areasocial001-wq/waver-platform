@@ -18,6 +18,14 @@ const DEFAULT_THRESHOLDS: ThresholdSettings = {
   Freepik: { warning: 1000, critical: 3000 },
   Shotstack: { warning: 1000, critical: 3000 },
   ElevenLabs: { warning: 1000, critical: 3000 },
+  "PIAPI Video": { warning: 1500, critical: 4000 },
+  "PIAPI Image": { warning: 1500, critical: 4000 },
+  "PIAPI Audio": { warning: 1500, critical: 4000 },
+  "AIML API": { warning: 1500, critical: 4000 },
+  "Google AI": { warning: 1000, critical: 3000 },
+  "Luma AI": { warning: 1500, critical: 4000 },
+  "OpenAI": { warning: 1000, critical: 3000 },
+  "DashScope": { warning: 1500, critical: 4000 },
 };
 
 export const ApiThresholdSettings = ({ 
