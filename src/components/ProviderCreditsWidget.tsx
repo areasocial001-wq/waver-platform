@@ -46,6 +46,8 @@ export const ProviderCreditsWidget = () => {
     { name: "Google AI", hasKey: false, status: "loading" },
     { name: "Vidu", hasKey: false, status: "loading" },
     { name: "LTX Video", hasKey: false, status: "loading" },
+    { name: "Luma AI", hasKey: false, status: "loading" },
+    { name: "DashScope", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -247,6 +249,41 @@ export const ProviderCreditsWidget = () => {
         });
       } catch {
         results.push({ name: "LTX Video", hasKey: false, status: "error", supportedModels: ["2.3 Pro", "2.3 Fast", "2 Pro", "2 Fast"] });
+      }
+
+      // Luma AI Health Check
+      try {
+        const { data: lumaData } = await supabase.functions.invoke('luma-video', {
+          body: { healthCheck: true }
+        });
+        const hasLumaKey = !!lumaData && !lumaData.error;
+        results.push({
+          name: "Luma AI",
+          hasKey: hasLumaKey,
+          status: hasLumaKey ? "active" : "unknown",
+          details: hasLumaKey ? "Chiave configurata" : "Non configurato",
+          supportedModels: ["Ray2", "Ray Flash 2", "Photon"]
+        });
+      } catch {
+        results.push({ name: "Luma AI", hasKey: false, status: "error", supportedModels: ["Ray2", "Ray Flash 2", "Photon"] });
+      }
+
+      // DashScope Balance Check
+      try {
+        const { data: dashData } = await supabase.functions.invoke('dashscope-balance');
+        const hasDashKey = dashData?.hasKey || false;
+        results.push({
+          name: "DashScope",
+          hasKey: hasDashKey,
+          status: dashData?.status === "active" ? "active" : 
+                  dashData?.status === "invalid" ? "error" :
+                  hasDashKey ? "active" : "unknown",
+          details: dashData?.status === "active" ? "Alibaba Cloud attivo" : 
+                   dashData?.message || "Non configurato",
+          supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"]
+        });
+      } catch {
+        results.push({ name: "DashScope", hasKey: false, status: "error", supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"] });
       }
 
     } catch (error) {
