@@ -258,7 +258,8 @@ serve(async (req) => {
           hasGoogleKey: hasValidGoogleKey,
           hasPiAPIKey: hasValidPiAPIKey,
           hasAIMLKey: hasValidAIMLKey,
-          hasFreepikKey: !!Deno.env.get("FREEPIK_API_KEY")?.trim()
+          hasFreepikKey: !!Deno.env.get("FREEPIK_API_KEY")?.trim(),
+          hasOpenAIKey: !!Deno.env.get("OPENAI_API_KEY")?.trim()
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
