@@ -26,6 +26,8 @@ import PricingPage from "./pages/Pricing";
 import LumaToolsPage from "./pages/LumaTools";
 import FacelessVideoPage from "./pages/FacelessVideo";
 import TrailerGeneratorPage from "./pages/TrailerGenerator";
+import GuidePage from "./pages/Guide";
+import GuidePDF from "./pages/GuidePDF";
 
 import NotFound from "./pages/NotFound";
 
