@@ -616,6 +616,21 @@ export default function Landing() {
             <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,60%)] text-lg">Scegli il piano più adatto alle tue esigenze</motion.p>
           </motion.div>
 
+          {/* Billing toggle */}
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <span className={`text-sm font-medium ${!isAnnual ? "text-white" : "text-[hsl(215,20%,50%)]"}`}>Mensile</span>
+            <button
+              onClick={() => setIsAnnual(!isAnnual)}
+              className={`relative w-14 h-7 rounded-full transition-colors ${isAnnual ? "bg-[hsl(217,91%,60%)]" : "bg-[hsl(224,30%,20%)]"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform ${isAnnual ? "translate-x-7" : "translate-x-0"}`} />
+            </button>
+            <span className={`text-sm font-medium ${isAnnual ? "text-white" : "text-[hsl(215,20%,50%)]"}`}>
+              Annuale
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-[hsl(217,91%,60%/0.15)] text-[hsl(217,91%,70%)] border border-[hsl(217,91%,60%/0.3)]">-20%</span>
+            </span>
+          </div>
+
           <motion.div
             initial="hidden"
             whileInView="visible"
@@ -640,10 +655,14 @@ export default function Landing() {
                   </div>
                 )}
                 <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                <div className="mb-6">
+                <div className="mb-1">
                   <span className="text-5xl font-extrabold">{plan.price}</span>
                   <span className="text-[hsl(215,20%,55%)]">{plan.period}</span>
                 </div>
+                {plan.yearlyTotal && (
+                  <p className="text-xs text-[hsl(215,20%,50%)] mb-5">Fatturato {plan.yearlyTotal}</p>
+                )}
+                {!plan.yearlyTotal && <div className="mb-5" />}
                 <ul className="space-y-3 mb-8">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm text-[hsl(215,20%,70%)]">
