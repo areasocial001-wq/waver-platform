@@ -291,6 +291,10 @@ export const Navbar = () => {
                     <CreditCard className="w-4 h-4 mr-2" />
                     Prezzi & Upgrade
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/guide")}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Guida
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/settings")}>
                     <Settings className="w-4 h-4 mr-2" />
                     Impostazioni
