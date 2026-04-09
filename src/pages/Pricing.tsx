@@ -169,10 +169,13 @@ export default function PricingPage() {
   }, [searchParams, checkSubscription]);
 
   useEffect(() => {
-    if (tier === "premium" && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
+    if ((tier === "premium" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
       setWelcomeShown(true);
-      toast.success("🎉 Benvenuto nel piano Premium!", {
-        description: "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
+      const planName = tier === "business" ? "Business" : "Premium";
+      toast.success(`🎉 Benvenuto nel piano ${planName}!`, {
+        description: tier === "business"
+          ? "Hai sbloccato: Generazioni illimitate, 4K, API dedicata, supporto prioritario e molto altro!"
+          : "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
         duration: 8000,
       });
     }
