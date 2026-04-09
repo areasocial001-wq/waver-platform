@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -381,6 +382,29 @@ export default function PricingPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* FAQ */}
+          <div className="mt-20 max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-2">Domande Frequenti</h2>
+            <p className="text-muted-foreground text-center mb-10">Tutto ciò che devi sapere sui nostri piani</p>
+
+            <Accordion type="single" collapsible className="space-y-3">
+              {[
+                { q: "Posso cambiare piano in qualsiasi momento?", a: "Sì, puoi passare dal piano Free al Premium in qualsiasi momento. L'upgrade è immediato e paghi solo la differenza pro-rata. Puoi anche gestire o annullare il tuo abbonamento dal portale di gestione." },
+                { q: "Come funziona la fatturazione annuale?", a: "Con la fatturazione annuale risparmi il 20% rispetto al piano mensile. Paghi €190,80 una sola volta per un anno intero (equivalente a €15,90/mese invece di €19,90/mese)." },
+                { q: "Cosa succede se supero il limite di generazioni?", a: "Una volta raggiunto il limite mensile, le generazioni vengono temporaneamente sospese fino al rinnovo del mese successivo. Puoi passare al piano Premium per avere più generazioni." },
+                { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con Premium e Business hai generazione immagini illimitata, inpainting, editing e upscaling." },
+                { q: "Quali metodi di pagamento accettate?", a: "Accettiamo tutte le principali carte di credito e debito (Visa, Mastercard, American Express) tramite Stripe. I pagamenti sono sicuri e crittografati." },
+                { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto del piano Premium, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
+                { q: "Il piano Business è già disponibile?", a: "Il piano Business è attualmente in fase di lancio. Contattaci per discutere le tue esigenze specifiche e ricevere un'offerta personalizzata per il tuo team o la tua azienda." },
+              ].map((faq, i) => (
+                <AccordionItem key={i} value={`faq-${i}`} className="border rounded-lg px-4">
+                  <AccordionTrigger className="text-left text-sm font-medium py-4">{faq.q}</AccordionTrigger>
+                  <AccordionContent className="text-muted-foreground text-sm pb-4">{faq.a}</AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </div>
         </div>
       </div>
