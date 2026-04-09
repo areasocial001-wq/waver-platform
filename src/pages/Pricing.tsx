@@ -22,6 +22,7 @@ const plans = [
     icon: Zap,
     features: [
       { name: "5 generazioni video/mese", included: true },
+      { name: "Generazione immagini AI", included: true },
       { name: "Risoluzione 720p", included: true },
       { name: "1 storyboard", included: true },
       { name: "Voice cloning", included: false },
@@ -40,6 +41,7 @@ const plans = [
     popular: true,
     features: [
       { name: "50 generazioni video/mese", included: true },
+      { name: "Generazione immagini illimitata", included: true },
       { name: "Risoluzione 1080p", included: true },
       { name: "10 storyboard", included: true },
       { name: "Voice cloning", included: true },
@@ -57,6 +59,7 @@ const plans = [
     icon: Star,
     features: [
       { name: "Generazioni illimitate", included: true },
+      { name: "Generazione immagini illimitata", included: true },
       { name: "Risoluzione 4K", included: true },
       { name: "Storyboard illimitati", included: true },
       { name: "Voice cloning", included: true },
