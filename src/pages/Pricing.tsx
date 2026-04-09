@@ -111,13 +111,28 @@ const comparisonCategories = [
     ],
   },
   {
+    name: "Workflow AI & Automazioni",
+    features: [
+      { name: "Workflow visuale a nodi", free: false, premium: true, business: true },
+      { name: "Freepik (immagini & video)", free: false, premium: true, business: true },
+      { name: "Vidu AI", free: false, premium: true, business: true },
+      { name: "LTX Video", free: false, premium: true, business: true },
+      { name: "Luma (Photon & Ray 2)", free: false, premium: true, business: true },
+      { name: "Script-to-Storyboard AI", free: false, premium: true, business: true },
+      { name: "NL-to-JSON converter", free: false, premium: true, business: true },
+    ],
+  },
+  {
     name: "Strumenti di Produzione",
     features: [
       { name: "Storyboard", free: "1", premium: "10", business: "Illimitati" },
       { name: "Timeline editor", free: false, premium: true, business: true },
       { name: "Faceless video", free: false, premium: true, business: true },
       { name: "Trailer generator", free: false, premium: true, business: true },
-      { name: "Script-to-video", free: false, premium: true, business: true },
+      { name: "Talking Avatar", free: false, premium: true, business: true },
+      { name: "Animatic Maker", free: false, premium: true, business: true },
+      { name: "Character Locking", free: false, premium: true, business: true },
+      { name: "AI Content Generator", free: false, premium: true, business: true },
     ],
   },
   {
@@ -125,6 +140,7 @@ const comparisonCategories = [
     features: [
       { name: "Accesso API", free: false, premium: true, business: true },
       { name: "Webhook & notifiche", free: false, premium: true, business: true },
+      { name: "JSON2Video integration", free: false, premium: true, business: true },
       { name: "API dedicata", free: false, premium: false, business: true },
       { name: "Supporto prioritario", free: false, premium: false, business: true },
     ],
