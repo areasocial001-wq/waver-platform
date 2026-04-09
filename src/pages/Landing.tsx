@@ -174,7 +174,7 @@ const features = [
   { icon: Music, title: "Luma Photon & Ray 2", description: "Generazione immagini e video direttamente via API Luma Labs." },
 ];
 
-const plans = [
+const getPlans = (isAnnual: boolean) => [
   {
     name: "Free",
     price: "€0",
@@ -185,8 +185,9 @@ const plans = [
   },
   {
     name: "Premium",
-    price: "€19,90",
+    price: isAnnual ? "€15,90" : "€19,90",
     period: "/mese",
+    yearlyTotal: isAnnual ? "€190,80/anno" : undefined,
     features: ["50 generazioni video/mese", "Generazione immagini illimitata", "Risoluzione 1080p", "10 storyboard", "Clonazione vocale", "Timeline editor", "Accesso API", "Multi-provider"],
     cta: "Passa a Premium",
     highlighted: true,

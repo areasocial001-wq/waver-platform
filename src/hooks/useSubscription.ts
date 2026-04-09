@@ -3,8 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const STRIPE_TIERS = {
   premium: {
-    price_id: "price_1TFcd4R04kRDmaB2V69i8JZ7",
-    product_id: "prod_UE4miTNOOaQ5jZ",
+    price_id_monthly: "price_1TKRUyR04kRDmaB2O4c6RN6B",
+    price_id_yearly: "price_1TKRVPR04kRDmaB2BxZxHv7a",
+    product_id: "prod_UJ3ckIlkRtr8Y4",
   },
 } as const;
 
