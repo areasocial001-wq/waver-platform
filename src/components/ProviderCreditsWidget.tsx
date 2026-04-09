@@ -287,6 +287,24 @@ export const ProviderCreditsWidget = () => {
         results.push({ name: "DashScope", hasKey: false, status: "error", supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"] });
       }
 
+      // OpenAI Health Check
+      try {
+        const { data: openaiData } = await supabase.functions.invoke('inpaint-image', {
+          body: { healthCheck: true }
+        });
+        // If we get a response without error about missing key, key is configured
+        const hasOpenaiKey = !!openaiData && !openaiData.error?.includes("OPENAI_API_KEY");
+        results.push({
+          name: "OpenAI",
+          hasKey: hasOpenaiKey,
+          status: hasOpenaiKey ? "active" : "unknown",
+          details: hasOpenaiKey ? "Chiave configurata" : "Non configurato",
+          supportedModels: ["GPT-Image-1", "DALL·E", "Whisper"]
+        });
+      } catch {
+        results.push({ name: "OpenAI", hasKey: false, status: "error", supportedModels: ["GPT-Image-1", "DALL·E", "Whisper"] });
+      }
+
     } catch (error) {
       console.error("Error fetching provider balances:", error);
     }
