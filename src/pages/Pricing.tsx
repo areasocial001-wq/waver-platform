@@ -55,8 +55,9 @@ const getPlans = (isAnnual: boolean) => [
   {
     id: "business",
     name: "Business",
-    price: "Contattaci",
-    period: "",
+    price: isAnnual ? "€63,90" : "€79,90",
+    period: "/mese",
+    yearlyTotal: isAnnual ? "€766,80/anno" : undefined,
     description: "Per team e aziende",
     icon: Star,
     features: [
@@ -179,10 +180,11 @@ export default function PricingPage() {
 
   const currentPlan = isAdmin ? "admin" : tier;
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (planId: "premium" | "business") => {
     setCheckoutLoading(true);
     try {
-      const priceId = isAnnual ? STRIPE_TIERS.premium.price_id_yearly : STRIPE_TIERS.premium.price_id_monthly;
+      const tierConfig = STRIPE_TIERS[planId];
+      const priceId = isAnnual ? tierConfig.price_id_yearly : tierConfig.price_id_monthly;
       await startCheckout(priceId);
     } catch {
       toast.error("Errore durante l'avvio del checkout");
@@ -254,7 +256,8 @@ export default function PricingPage() {
             {plans.map((plan) => {
               const isCurrentPlan =
                 (plan.id === "free" && currentPlan === "free") ||
-                (plan.id === "premium" && (currentPlan === "premium" || currentPlan === "admin"));
+                (plan.id === "premium" && currentPlan === "premium") ||
+                (plan.id === "business" && (currentPlan === "business" || currentPlan === "admin"));
 
               return (
                 <Card
@@ -312,7 +315,7 @@ export default function PricingPage() {
                     {plan.id === "premium" && !isCurrentPlan && (
                       <Button
                         className="w-full"
-                        onClick={handleUpgrade}
+                        onClick={() => handleUpgrade("premium")}
                         disabled={checkoutLoading || subLoading}
                       >
                         {checkoutLoading ? (
@@ -327,9 +330,23 @@ export default function PricingPage() {
                         <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
                       </Button>
                     )}
-                    {plan.id === "business" && (
-                      <Button variant="secondary" className="w-full" disabled>
-                        Prossimamente
+                    {plan.id === "business" && !isCurrentPlan && (
+                      <Button
+                        className="w-full"
+                        variant="secondary"
+                        onClick={() => handleUpgrade("business")}
+                        disabled={checkoutLoading || subLoading}
+                      >
+                        {checkoutLoading ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Caricamento...</>
+                        ) : (
+                          <><Star className="h-4 w-4" /> Passa a Business</>
+                        )}
+                      </Button>
+                    )}
+                    {plan.id === "business" && isCurrentPlan && (
+                      <Button variant="outline" className="w-full" onClick={handleManage}>
+                        <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
                       </Button>
                     )}
                   </CardFooter>
