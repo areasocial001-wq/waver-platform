@@ -44,6 +44,8 @@ const App = () => (
             {/* Public routes */}
             <Route path="/landing" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/guide" element={<GuidePage />} />
+            <Route path="/guide-pdf" element={<GuidePDF />} />
             <Route path="/storyboard/:id" element={<ViewStoryboard />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             
