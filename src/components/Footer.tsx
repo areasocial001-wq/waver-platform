@@ -14,6 +14,13 @@ export const Footer = () => {
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <a 
+              href="/guide" 
+              className="hover:text-foreground transition-colors inline-flex items-center gap-1"
+            >
+              Guida
+            </a>
+            <span className="text-border">|</span>
+            <a 
               href="https://arxiv.org/pdf/2508.15761" 
               target="_blank" 
               rel="noopener noreferrer"
@@ -24,8 +31,6 @@ export const Footer = () => {
             </a>
             <span className="text-border">|</span>
             <span>Waver 1.0 Engine</span>
-            <span className="text-border">|</span>
-            <span>Replicate API</span>
           </div>
 
           <p className="text-xs text-muted-foreground">
