@@ -417,7 +417,7 @@ export default function PricingPage() {
                 { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con Premium e Business hai generazione immagini illimitata, inpainting, editing e upscaling." },
                 { q: "Quali metodi di pagamento accettate?", a: "Accettiamo tutte le principali carte di credito e debito (Visa, Mastercard, American Express) tramite Stripe. I pagamenti sono sicuri e crittografati." },
                 { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto del piano Premium, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
-                { q: "Il piano Business è già disponibile?", a: "Il piano Business è attualmente in fase di lancio. Contattaci per discutere le tue esigenze specifiche e ricevere un'offerta personalizzata per il tuo team o la tua azienda." },
+                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include generazioni video illimitate, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma senza limiti." },
               ].map((faq, i) => (
                 <AccordionItem key={i} value={`faq-${i}`} className="border rounded-lg px-4">
                   <AccordionTrigger className="text-left text-sm font-medium py-4">{faq.q}</AccordionTrigger>
