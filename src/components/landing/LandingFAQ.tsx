@@ -24,7 +24,7 @@ const faqs = [
   {
     question: "In cosa si differenzia il piano Free dal Pro?",
     answer:
-      "Il piano Free include 5 generazioni video al mese in 720p e 1 progetto storyboard. Il piano Pro offre 50 generazioni in Full HD, storyboard illimitati, clonazione vocale, timeline editor avanzato e supporto prioritario a €29/mese.",
+      "Il piano Free include 5 generazioni video al mese in 720p, generazione immagini AI e 1 progetto storyboard. Il piano Premium offre 50 generazioni video, immagini illimitate, Full HD, 10 storyboard, clonazione vocale, timeline editor e accesso API a €19,90/mese. Il piano Business è su misura con generazioni illimitate e risoluzione 4K.",
   },
   {
     question: "Posso generare video senza mostrare il volto (faceless)?",
