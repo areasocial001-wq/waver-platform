@@ -686,6 +686,135 @@ export default function Landing() {
               </motion.div>
             ))}
           </motion.div>
+
+          {/* Visual comparison grid */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.15 }}
+            variants={staggerContainer}
+            className="mt-20 max-w-5xl mx-auto"
+          >
+            <motion.h3
+              variants={fadeUp}
+              className="text-2xl md:text-3xl font-bold text-center mb-12"
+            >
+              Cosa ottieni con ogni{" "}
+              <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">piano</span>
+            </motion.h3>
+
+            {[
+              {
+                category: "Video & Immagini",
+                icon: Film,
+                items: [
+                  { name: "Generazioni video", free: "5/mese", premium: "50/mese", business: "Illimitate" },
+                  { name: "Risoluzione", free: "720p", premium: "1080p", business: "4K" },
+                  { name: "Immagini AI", free: "Incluse", premium: "Illimitate", business: "Illimitate" },
+                  { name: "Multi-provider", free: false, premium: true, business: true },
+                ],
+              },
+              {
+                category: "Workflow & Automazioni",
+                icon: Wand2,
+                items: [
+                  { name: "Workflow AI a nodi", free: false, premium: true, business: true },
+                  { name: "Freepik / Vidu / LTX / Luma", free: false, premium: true, business: true },
+                  { name: "Faceless Video & Trailer", free: false, premium: true, business: true },
+                  { name: "Talking Avatar", free: false, premium: true, business: true },
+                  { name: "Script-to-Storyboard AI", free: false, premium: true, business: true },
+                ],
+              },
+              {
+                category: "Audio & Produzione",
+                icon: Mic,
+                items: [
+                  { name: "Text-to-Speech", free: true, premium: true, business: true },
+                  { name: "Clonazione vocale", free: false, premium: true, business: true },
+                  { name: "Musica AI & mixing", free: false, premium: true, business: true },
+                  { name: "Timeline editor", free: false, premium: true, business: true },
+                  { name: "Storyboard", free: "1", premium: "10", business: "Illimitati" },
+                ],
+              },
+              {
+                category: "API & Supporto",
+                icon: Zap,
+                items: [
+                  { name: "Accesso API", free: false, premium: true, business: true },
+                  { name: "JSON2Video integration", free: false, premium: true, business: true },
+                  { name: "API dedicata", free: false, premium: false, business: true },
+                  { name: "Supporto prioritario", free: false, premium: false, business: true },
+                ],
+              },
+            ].map((section, si) => (
+              <motion.div
+                key={section.category}
+                variants={fadeUp}
+                custom={si}
+                className="mb-6"
+              >
+                <div className="flex items-center gap-3 mb-4 px-2">
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[hsl(217,91%,60%/0.15)] to-[hsl(270,60%,55%/0.08)] flex items-center justify-center">
+                    <section.icon className="w-4.5 h-4.5 text-[hsl(217,91%,70%)]" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-[hsl(215,20%,80%)] uppercase tracking-wider">{section.category}</h4>
+                </div>
+
+                <div className="rounded-xl border border-[hsl(224,30%,15%)] bg-[hsl(225,25%,8%/0.5)] backdrop-blur-sm overflow-hidden">
+                  {/* Column headers */}
+                  <div className="grid grid-cols-4 border-b border-[hsl(224,30%,13%)] bg-[hsl(225,25%,7%/0.8)]">
+                    <div className="p-3 text-xs font-medium text-[hsl(215,20%,45%)]">Funzionalità</div>
+                    <div className="p-3 text-center text-xs font-medium text-[hsl(215,20%,45%)]">Free</div>
+                    <div className="p-3 text-center text-xs font-medium text-[hsl(217,91%,70%)]">Premium</div>
+                    <div className="p-3 text-center text-xs font-medium text-[hsl(215,20%,45%)]">Business</div>
+                  </div>
+                  {section.items.map((item, ii) => (
+                    <motion.div
+                      key={item.name}
+                      initial={{ opacity: 0, x: -10 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: si * 0.05 + ii * 0.03, duration: 0.4 }}
+                      className={`grid grid-cols-4 border-b border-[hsl(224,30%,12%)] last:border-b-0 ${ii % 2 === 1 ? "bg-[hsl(225,25%,7%/0.3)]" : ""}`}
+                    >
+                      <div className="p-3 text-sm text-[hsl(215,20%,65%)]">{item.name}</div>
+                      {(["free", "premium", "business"] as const).map((plan) => {
+                        const val = item[plan];
+                        return (
+                          <div key={plan} className={`p-3 text-center text-sm ${plan === "premium" ? "bg-[hsl(217,91%,60%/0.04)]" : ""}`}>
+                            {typeof val === "boolean" ? (
+                              val ? (
+                                <CheckCircle2 className="w-4 h-4 text-[hsl(142,71%,45%)] mx-auto" />
+                              ) : (
+                                <span className="block w-4 h-[2px] bg-[hsl(215,20%,25%)] mx-auto rounded-full mt-[7px]" />
+                              )
+                            ) : (
+                              <span className="font-medium text-[hsl(215,20%,75%)]">{val}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+
+            <motion.div
+              variants={fadeUp}
+              custom={4}
+              className="text-center mt-10"
+            >
+              <Button
+                size="lg"
+                onClick={() => navigate("/auth")}
+                className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] text-white border-0 hover:opacity-90 shadow-[0_0_30px_hsl(217,91%,60%/0.3)] rounded-xl px-10 py-5"
+              >
+                Inizia Gratuitamente
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
+          </motion.div>
         </div>
       </section>
 
