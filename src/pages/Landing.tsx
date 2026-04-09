@@ -188,7 +188,7 @@ const getPlans = (isAnnual: boolean) => [
     price: isAnnual ? "€15,90" : "€19,90",
     period: "/mese",
     yearlyTotal: isAnnual ? "€190,80/anno" : undefined,
-    features: ["50 generazioni video/mese", "Immagini illimitate", "1080p", "10 storyboard", "Workflow AI (Freepik, Vidu, LTX)", "Faceless Video & Trailer", "Talking Avatar", "Voice cloning & Musica AI", "Timeline editor", "Multi-provider"],
+    features: ["50 generazioni video/mese", "Immagini illimitate", "1080p", "10 storyboard", "Workflow AI (Freepik, Vidu, LTX)", "Faceless Video & Trailer", "Talking Avatar", "Voice cloning & Musica AI", "Timeline editor", "Accesso API", "Multi-provider"],
     cta: "Passa a Premium",
     highlighted: true,
   },
