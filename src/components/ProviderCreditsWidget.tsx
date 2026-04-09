@@ -48,6 +48,7 @@ export const ProviderCreditsWidget = () => {
     { name: "LTX Video", hasKey: false, status: "loading" },
     { name: "Luma AI", hasKey: false, status: "loading" },
     { name: "DashScope", hasKey: false, status: "loading" },
+    { name: "OpenAI", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
