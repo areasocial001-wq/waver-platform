@@ -194,10 +194,11 @@ const getPlans = (isAnnual: boolean) => [
   },
   {
     name: "Business",
-    price: "Contattaci",
-    period: "",
+    price: isAnnual ? "€63,90" : "€79,90",
+    period: "/mese",
+    yearlyTotal: isAnnual ? "€766,80/anno" : undefined,
     features: ["Generazioni illimitate", "Generazione immagini illimitata", "Risoluzione 4K", "Storyboard illimitati", "Clonazione vocale", "Timeline editor", "Accesso API dedicato", "Multi-provider + priorità"],
-    cta: "Contattaci",
+    cta: "Passa a Business",
     highlighted: false,
   },
 ];

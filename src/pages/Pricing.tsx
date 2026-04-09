@@ -55,8 +55,9 @@ const getPlans = (isAnnual: boolean) => [
   {
     id: "business",
     name: "Business",
-    price: "Contattaci",
-    period: "",
+    price: isAnnual ? "€63,90" : "€79,90",
+    period: "/mese",
+    yearlyTotal: isAnnual ? "€766,80/anno" : undefined,
     description: "Per team e aziende",
     icon: Star,
     features: [
@@ -168,10 +169,13 @@ export default function PricingPage() {
   }, [searchParams, checkSubscription]);
 
   useEffect(() => {
-    if (tier === "premium" && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
+    if ((tier === "premium" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
       setWelcomeShown(true);
-      toast.success("🎉 Benvenuto nel piano Premium!", {
-        description: "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
+      const planName = tier === "business" ? "Business" : "Premium";
+      toast.success(`🎉 Benvenuto nel piano ${planName}!`, {
+        description: tier === "business"
+          ? "Hai sbloccato: Generazioni illimitate, 4K, API dedicata, supporto prioritario e molto altro!"
+          : "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
         duration: 8000,
       });
     }
@@ -179,10 +183,11 @@ export default function PricingPage() {
 
   const currentPlan = isAdmin ? "admin" : tier;
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (planId: "premium" | "business") => {
     setCheckoutLoading(true);
     try {
-      const priceId = isAnnual ? STRIPE_TIERS.premium.price_id_yearly : STRIPE_TIERS.premium.price_id_monthly;
+      const tierConfig = STRIPE_TIERS[planId];
+      const priceId = isAnnual ? tierConfig.price_id_yearly : tierConfig.price_id_monthly;
       await startCheckout(priceId);
     } catch {
       toast.error("Errore durante l'avvio del checkout");
@@ -254,7 +259,8 @@ export default function PricingPage() {
             {plans.map((plan) => {
               const isCurrentPlan =
                 (plan.id === "free" && currentPlan === "free") ||
-                (plan.id === "premium" && (currentPlan === "premium" || currentPlan === "admin"));
+                (plan.id === "premium" && currentPlan === "premium") ||
+                (plan.id === "business" && (currentPlan === "business" || currentPlan === "admin"));
 
               return (
                 <Card
@@ -312,7 +318,7 @@ export default function PricingPage() {
                     {plan.id === "premium" && !isCurrentPlan && (
                       <Button
                         className="w-full"
-                        onClick={handleUpgrade}
+                        onClick={() => handleUpgrade("premium")}
                         disabled={checkoutLoading || subLoading}
                       >
                         {checkoutLoading ? (
@@ -327,9 +333,23 @@ export default function PricingPage() {
                         <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
                       </Button>
                     )}
-                    {plan.id === "business" && (
-                      <Button variant="secondary" className="w-full" disabled>
-                        Prossimamente
+                    {plan.id === "business" && !isCurrentPlan && (
+                      <Button
+                        className="w-full"
+                        variant="secondary"
+                        onClick={() => handleUpgrade("business")}
+                        disabled={checkoutLoading || subLoading}
+                      >
+                        {checkoutLoading ? (
+                          <><Loader2 className="h-4 w-4 animate-spin" /> Caricamento...</>
+                        ) : (
+                          <><Star className="h-4 w-4" /> Passa a Business</>
+                        )}
+                      </Button>
+                    )}
+                    {plan.id === "business" && isCurrentPlan && (
+                      <Button variant="outline" className="w-full" onClick={handleManage}>
+                        <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
                       </Button>
                     )}
                   </CardFooter>
@@ -397,7 +417,7 @@ export default function PricingPage() {
                 { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con Premium e Business hai generazione immagini illimitata, inpainting, editing e upscaling." },
                 { q: "Quali metodi di pagamento accettate?", a: "Accettiamo tutte le principali carte di credito e debito (Visa, Mastercard, American Express) tramite Stripe. I pagamenti sono sicuri e crittografati." },
                 { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto del piano Premium, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
-                { q: "Il piano Business è già disponibile?", a: "Il piano Business è attualmente in fase di lancio. Contattaci per discutere le tue esigenze specifiche e ricevere un'offerta personalizzata per il tuo team o la tua azienda." },
+                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include generazioni video illimitate, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma senza limiti." },
               ].map((faq, i) => (
                 <AccordionItem key={i} value={`faq-${i}`} className="border rounded-lg px-4">
                   <AccordionTrigger className="text-left text-sm font-medium py-4">{faq.q}</AccordionTrigger>

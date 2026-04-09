@@ -7,6 +7,11 @@ export const STRIPE_TIERS = {
     price_id_yearly: "price_1TKRVPR04kRDmaB2BxZxHv7a",
     product_id: "prod_UJ3ckIlkRtr8Y4",
   },
+  business: {
+    price_id_monthly: "price_1TKRfhR04kRDmaB2Wur5VCM6",
+    price_id_yearly: "price_1TKRglR04kRDmaB26aDLMPTW",
+    product_id: "prod_UJ3nUlG2OGNxRA",
+  },
 } as const;
 
 interface SubscriptionState {
@@ -14,7 +19,7 @@ interface SubscriptionState {
   productId: string | null;
   subscriptionEnd: string | null;
   loading: boolean;
-  tier: "free" | "premium";
+  tier: "free" | "premium" | "business";
 }
 
 export const useSubscription = () => {
@@ -31,7 +36,9 @@ export const useSubscription = () => {
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) throw error;
 
-      const tier = data?.product_id === STRIPE_TIERS.premium.product_id ? "premium" : "free";
+      let tier: "free" | "premium" | "business" = "free";
+      if (data?.product_id === STRIPE_TIERS.business.product_id) tier = "business";
+      else if (data?.product_id === STRIPE_TIERS.premium.product_id) tier = "premium";
 
       setState({
         subscribed: data?.subscribed || false,
