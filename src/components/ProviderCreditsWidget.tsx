@@ -48,6 +48,7 @@ export const ProviderCreditsWidget = () => {
     { name: "LTX Video", hasKey: false, status: "loading" },
     { name: "Luma AI", hasKey: false, status: "loading" },
     { name: "DashScope", hasKey: false, status: "loading" },
+    { name: "OpenAI", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -285,6 +286,15 @@ export const ProviderCreditsWidget = () => {
       } catch {
         results.push({ name: "DashScope", hasKey: false, status: "error", supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"] });
       }
+
+      // OpenAI
+      results.push({
+        name: "OpenAI",
+        hasKey: healthData?.hasOpenAIKey || false,
+        status: healthData?.hasOpenAIKey ? "active" : "unknown",
+        details: healthData?.hasOpenAIKey ? "Chiave configurata" : "Non configurato",
+        supportedModels: ["GPT-Image-1", "DALL·E", "Whisper"]
+      });
 
     } catch (error) {
       console.error("Error fetching provider balances:", error);
