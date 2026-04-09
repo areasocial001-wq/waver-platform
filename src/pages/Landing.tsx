@@ -264,6 +264,8 @@ export default function Landing() {
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const plans = getPlans(isAnnual);
 
   return (
     <div className="min-h-screen bg-[hsl(225,25%,5%)] text-[hsl(210,40%,98%)] overflow-hidden">
