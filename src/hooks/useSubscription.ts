@@ -33,6 +33,12 @@ export const useSubscription = () => {
 
   const checkSubscription = useCallback(async () => {
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        setState((prev) => ({ ...prev, loading: false }));
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) throw error;
 
