@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote, Play, Image as ImageIcon, Film, Music, ChevronRight } from "lucide-react";
+import { Sparkles, Video, Wand2, Mic, Layout, Zap, ArrowRight, CheckCircle2, Star, Quote, Play, Image as ImageIcon, Film, Music, ChevronRight, BookOpen } from "lucide-react";
 import heroBg from "@/assets/landing-hero-cinematic.jpg";
 import studioBg from "@/assets/studio-bg.jpg";
 import { motion, useScroll, useTransform, useInView, animate } from "framer-motion";
@@ -305,6 +305,7 @@ export default function Landing() {
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Funzionalità</button>
             <button onClick={() => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Showcase</button>
             <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Prezzi</button>
+            <button onClick={() => navigate("/guide")} className="hover:text-white transition-colors inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />Guida</button>
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={() => navigate("/auth")} className="text-[hsl(215,20%,65%)] hover:text-white hover:bg-[hsl(224,30%,12%)]">
