@@ -336,7 +336,8 @@ const GuidePage = () => {
             Guida alla Piattaforma
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-            Tutto ciò che devi sapere per utilizzare al meglio tutti gli strumenti di produzione video AI.
+            Tutto ciò che devi sapere per utilizzare al meglio <br />
+            tutti gli strumenti di produzione video AI.
           </p>
           <Button onClick={handleDownloadPDF} size="lg" className="gap-2">
             <Download className="h-5 w-5" />
