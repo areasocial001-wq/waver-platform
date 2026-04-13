@@ -213,13 +213,16 @@ export default function PricingPage() {
   }, [searchParams, checkSubscription]);
 
   useEffect(() => {
-    if ((tier === "premium" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
+    if ((tier === "premium" || tier === "creator" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
       setWelcomeShown(true);
-      const planName = tier === "business" ? "Business" : "Premium";
+      const planNames: Record<string, string> = { business: "Business", creator: "Creator", premium: "Premium" };
+      const planName = planNames[tier] || "Premium";
       toast.success(`🎉 Benvenuto nel piano ${planName}!`, {
         description: tier === "business"
-          ? "Hai sbloccato: Generazioni illimitate, 4K, API dedicata, supporto prioritario e molto altro!"
-          : "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
+          ? "Hai sbloccato: 200 video/mese, 4K, API dedicata, supporto prioritario e molto altro!"
+          : tier === "creator"
+          ? "Hai sbloccato: 100 video/mese, storyboard illimitati, supporto prioritario e molto altro!"
+          : "Hai sbloccato: 30 video/mese, Voice Cloning, Timeline Editor, Multi-provider e molto altro!",
         duration: 8000,
       });
     }
@@ -227,7 +230,7 @@ export default function PricingPage() {
 
   const currentPlan = isAdmin ? "admin" : tier;
 
-  const handleUpgrade = async (planId: "premium" | "business") => {
+  const handleUpgrade = async (planId: "premium" | "creator" | "business") => {
     setCheckoutLoading(true);
     try {
       const tierConfig = STRIPE_TIERS[planId];
@@ -272,7 +275,7 @@ export default function PricingPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Piano attuale</p>
                   <Badge variant="secondary" className="mt-1 text-sm">
-                    {currentPlan === "admin" ? "Admin (illimitato)" : currentPlan === "premium" ? "Premium" : "Free"}
+                    {currentPlan === "admin" ? "Admin (illimitato)" : currentPlan === "business" ? "Business" : currentPlan === "creator" ? "Creator" : currentPlan === "premium" ? "Premium" : "Free"}
                   </Badge>
                 </div>
                 <div>
