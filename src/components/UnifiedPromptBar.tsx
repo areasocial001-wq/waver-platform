@@ -192,19 +192,31 @@ export const UnifiedPromptBar = () => {
         {/* Mode Tabs */}
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           {modes.map((m) => (
-            <button
+            <motion.button
               key={m.id}
               onClick={() => setMode(m.id)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              layout
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                "relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
                 mode === m.id
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  ? "text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <m.icon className="w-4 h-4" />
-              {m.label}
-            </button>
+              {mode === m.id && (
+                <motion.div
+                  layoutId="activeMode"
+                  className="absolute inset-0 bg-primary rounded-full shadow-lg shadow-primary/25"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-2">
+                <m.icon className="w-4 h-4" />
+                {m.label}
+              </span>
+            </motion.button>
           ))}
         </div>
 
