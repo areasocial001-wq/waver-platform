@@ -135,17 +135,27 @@ interface StyleGalleryProps {
 
 export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start end", "end start"],
+  });
+
+  const headerY = useTransform(scrollYProgress, [0, 1], [30, -20]);
+  const gridY = useTransform(scrollYProgress, [0, 1], [50, -30]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0.4, 1, 1, 0.6]);
 
   const filtered = activeCategory
     ? VIDEO_STYLES.filter((s) => s.category === activeCategory)
     : VIDEO_STYLES;
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
+    <div ref={containerRef}>
+      <motion.div style={{ y: headerY, opacity }} className="flex items-center gap-3 mb-4">
         <Palette className="w-5 h-5 text-primary" />
         <h3 className="text-lg font-semibold text-foreground">Stili Visivi</h3>
-      </div>
+      </motion.div>
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2 mb-4">
