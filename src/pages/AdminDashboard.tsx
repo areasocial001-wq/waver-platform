@@ -299,7 +299,7 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {["admin", "premium", "moderator", "user"].map((role) => {
+                      {["admin", "business", "creator", "premium", "moderator", "user"].map((role) => {
                         const count = users.filter((u) => u.roles.includes(role)).length;
                         const pct = totalUsers > 0 ? (count / totalUsers) * 100 : 0;
                         return (
