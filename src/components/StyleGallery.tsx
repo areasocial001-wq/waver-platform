@@ -3,11 +3,25 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Check, Palette } from "lucide-react";
 
+// Import preview images
+import animationImg from "@/assets/styles/animation.jpg";
+import claymationImg from "@/assets/styles/claymation.jpg";
+import comicNoirImg from "@/assets/styles/comic-noir.jpg";
+import watercolorImg from "@/assets/styles/watercolor.jpg";
+import cinemaImg from "@/assets/styles/cinema.jpg";
+import vintagePosterImg from "@/assets/styles/vintage-poster.jpg";
+import sciFiImg from "@/assets/styles/sci-fi.jpg";
+import collageImg from "@/assets/styles/collage.jpg";
+import penInkImg from "@/assets/styles/pen-ink.jpg";
+import plasticBlocksImg from "@/assets/styles/plastic-blocks.jpg";
+import halftoneImg from "@/assets/styles/halftone.jpg";
+import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
+
 export interface VideoStyle {
   id: string;
   name: string;
   category: string;
-  preview: string; // emoji or color placeholder
+  preview: string;
   description: string;
   promptModifier: string;
 }
@@ -17,7 +31,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "animation",
     name: "Animation",
     category: "Cartoon",
-    preview: "",
+    preview: animationImg,
     description: "Stile animazione 3D fluida e colorata",
     promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation",
   },
@@ -25,7 +39,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "claymation",
     name: "Claymation",
     category: "Cartoon",
-    preview: "",
+    preview: claymationImg,
     description: "Stop-motion in plastilina artigianale",
     promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting",
   },
@@ -33,7 +47,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "comic-noir",
     name: "Comic Noir",
     category: "Artistico",
-    preview: "",
+    preview: comicNoirImg,
     description: "Fumetto dark con contrasti forti",
     promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes",
   },
@@ -41,7 +55,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "watercolor",
     name: "Watercolor",
     category: "Artistico",
-    preview: "",
+    preview: watercolorImg,
     description: "Acquerello delicato con sfumature morbide",
     promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones",
   },
@@ -49,7 +63,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "cinema",
     name: "Cinema",
     category: "Realistico",
-    preview: "",
+    preview: cinemaImg,
     description: "Cinematografico con color grading professionale",
     promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
   },
@@ -57,7 +71,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "vintage-poster",
     name: "Vintage Poster",
     category: "Retrò",
-    preview: "",
+    preview: vintagePosterImg,
     description: "Poster retrò anni '50-'60",
     promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette",
   },
@@ -65,7 +79,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "sci-fi",
     name: "Sci-Fi",
     category: "Genere",
-    preview: "",
+    preview: sciFiImg,
     description: "Fantascienza con atmosfere futuristiche",
     promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere",
   },
@@ -73,7 +87,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "collage",
     name: "Collage",
     category: "Artistico",
-    preview: "",
+    preview: collageImg,
     description: "Collage misto con texture e ritagli",
     promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design",
   },
@@ -81,7 +95,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "pen-ink",
     name: "Pen & Ink",
     category: "Artistico",
-    preview: "",
+    preview: penInkImg,
     description: "Illustrazione a penna e inchiostro dettagliata",
     promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel",
   },
@@ -89,7 +103,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "plastic-blocks",
     name: "Plastic Blocks",
     category: "Cartoon",
-    preview: "",
+    preview: plasticBlocksImg,
     description: "Costruzioni in blocchetti colorati stile LEGO",
     promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors",
   },
@@ -97,7 +111,7 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "halftone",
     name: "Halftone",
     category: "Retrò",
-    preview: "",
+    preview: halftoneImg,
     description: "Effetto mezzetinte pop art",
     promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic",
   },
@@ -105,42 +119,11 @@ const VIDEO_STYLES: VideoStyle[] = [
     id: "motion-graphics",
     name: "Motion Graphics",
     category: "Moderno",
-    preview: "",
+    preview: motionGraphicsImg,
     description: "Grafica in movimento pulita e moderna",
     promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style",
   },
 ];
-
-// Color palette per style (gradient backgrounds)
-const STYLE_COLORS: Record<string, string> = {
-  animation: "from-blue-500/20 to-purple-500/20",
-  claymation: "from-amber-500/20 to-orange-500/20",
-  "comic-noir": "from-gray-800/40 to-gray-600/20",
-  watercolor: "from-pink-300/20 to-sky-300/20",
-  cinema: "from-yellow-600/20 to-red-800/20",
-  "vintage-poster": "from-red-400/20 to-yellow-500/20",
-  "sci-fi": "from-cyan-500/20 to-violet-600/20",
-  collage: "from-green-400/20 to-yellow-400/20",
-  "pen-ink": "from-gray-400/20 to-gray-200/20",
-  "plastic-blocks": "from-red-500/20 to-blue-500/20",
-  halftone: "from-rose-500/20 to-fuchsia-400/20",
-  "motion-graphics": "from-indigo-500/20 to-sky-400/20",
-};
-
-const STYLE_EMOJIS: Record<string, string> = {
-  animation: "🎬",
-  claymation: "🧱",
-  "comic-noir": "🦇",
-  watercolor: "🎨",
-  cinema: "📽️",
-  "vintage-poster": "📯",
-  "sci-fi": "🚀",
-  collage: "✂️",
-  "pen-ink": "✒️",
-  "plastic-blocks": "🧩",
-  halftone: "🔵",
-  "motion-graphics": "◆",
-};
 
 const categories = [...new Set(VIDEO_STYLES.map((s) => s.category))];
 
@@ -201,20 +184,22 @@ export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps
               key={style.id}
               onClick={() => onSelectStyle(style)}
               className={cn(
-                "relative flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all hover:scale-105",
+                "group relative flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all hover:scale-105",
                 isSelected
                   ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
                   : "border-border bg-card hover:border-primary/40"
               )}
             >
-              {/* Style Preview */}
-              <div
-                className={cn(
-                  "w-full aspect-square rounded-lg flex items-center justify-center text-2xl bg-gradient-to-br",
-                  STYLE_COLORS[style.id] || "from-muted to-muted"
-                )}
-              >
-                {STYLE_EMOJIS[style.id] || "🎥"}
+              {/* Style Preview Image */}
+              <div className="w-full aspect-square rounded-lg overflow-hidden">
+                <img
+                  src={style.preview}
+                  alt={style.name}
+                  loading="lazy"
+                  width={512}
+                  height={512}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                />
               </div>
 
               {/* Selected Checkmark */}
