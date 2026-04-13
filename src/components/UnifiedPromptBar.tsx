@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -191,19 +192,31 @@ export const UnifiedPromptBar = () => {
         {/* Mode Tabs */}
         <div className="flex flex-wrap justify-center gap-2 mb-6">
           {modes.map((m) => (
-            <button
+            <motion.button
               key={m.id}
               onClick={() => setMode(m.id)}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              layout
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                "relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors",
                 mode === m.id
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+                  ? "text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               )}
             >
-              <m.icon className="w-4 h-4" />
-              {m.label}
-            </button>
+              {mode === m.id && (
+                <motion.div
+                  layoutId="activeMode"
+                  className="absolute inset-0 bg-primary rounded-full shadow-lg shadow-primary/25"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-2">
+                <m.icon className="w-4 h-4" />
+                {m.label}
+              </span>
+            </motion.button>
           ))}
         </div>
 
@@ -232,44 +245,61 @@ export const UnifiedPromptBar = () => {
           {/* Style + Attached file + Input Row */}
           <div className="flex items-start gap-3">
             {/* Style Indicator */}
-            {selectedStyle && (
-              <div className="shrink-0 flex flex-col items-center gap-1 pt-1">
-                <div className="w-10 h-10 rounded-lg overflow-hidden border-2 border-primary/40">
-                  <img
-                    src={selectedStyle.preview}
-                    alt={selectedStyle.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[60px]">
-                  {selectedStyle.name}
-                </span>
-              </div>
-            )}
+            <AnimatePresence mode="wait">
+              {selectedStyle && (
+                <motion.div
+                  key={selectedStyle.id}
+                  initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="shrink-0 flex flex-col items-center gap-1 pt-1"
+                >
+                  <div className="w-10 h-10 rounded-lg overflow-hidden border-2 border-primary/40">
+                    <img
+                      src={selectedStyle.preview}
+                      alt={selectedStyle.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-[10px] text-muted-foreground font-medium truncate max-w-[60px]">
+                    {selectedStyle.name}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Attached File Preview */}
-            {attachedFile && (
-              <div className="shrink-0 relative pt-1">
-                {filePreview ? (
-                  <div className="w-14 h-14 rounded-lg overflow-hidden border-2 border-accent/40">
-                    <img src={filePreview} alt="Attached" className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-14 h-14 rounded-lg border-2 border-accent/40 bg-accent/10 flex items-center justify-center">
-                    <Music className="w-6 h-6 text-accent" />
-                  </div>
-                )}
-                <button
-                  onClick={removeFile}
-                  className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center"
+            <AnimatePresence>
+              {attachedFile && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  className="shrink-0 relative pt-1"
                 >
-                  <X className="w-3 h-3 text-destructive-foreground" />
-                </button>
-                <span className="text-[10px] text-muted-foreground truncate block max-w-[60px] text-center mt-0.5">
-                  {attachedFile.name}
-                </span>
-              </div>
-            )}
+                  {filePreview ? (
+                    <div className="w-14 h-14 rounded-lg overflow-hidden border-2 border-accent/40">
+                      <img src={filePreview} alt="Attached" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg border-2 border-accent/40 bg-accent/10 flex items-center justify-center">
+                      <Music className="w-6 h-6 text-accent" />
+                    </div>
+                  )}
+                  <button
+                    onClick={removeFile}
+                    className="absolute -top-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center"
+                  >
+                    <X className="w-3 h-3 text-destructive-foreground" />
+                  </button>
+                  <span className="text-[10px] text-muted-foreground truncate block max-w-[60px] text-center mt-0.5">
+                    {attachedFile.name}
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Textarea */}
             <Textarea

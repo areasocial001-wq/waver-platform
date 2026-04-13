@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Check, Palette } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Import preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -176,52 +177,69 @@ export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps
       </div>
 
       {/* Style Grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-        {filtered.map((style) => {
-          const isSelected = selectedStyle?.id === style.id;
-          return (
-            <button
-              key={style.id}
-              onClick={() => onSelectStyle(style)}
-              className={cn(
-                "group relative flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all hover:scale-105",
-                isSelected
-                  ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
-                  : "border-border bg-card hover:border-primary/40"
-              )}
-            >
-              {/* Style Preview Image */}
-              <div className="w-full aspect-square rounded-lg overflow-hidden">
-                <img
-                  src={style.preview}
-                  alt={style.name}
-                  loading="lazy"
-                  width={512}
-                  height={512}
-                  className="w-full h-full object-cover transition-transform group-hover:scale-110"
-                />
-              </div>
-
-              {/* Selected Checkmark */}
-              {isSelected && (
-                <div className="absolute top-1.5 right-1.5 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                  <Check className="w-3 h-3 text-primary-foreground" />
+      <motion.div layout className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+        <AnimatePresence mode="popLayout">
+          {filtered.map((style, index) => {
+            const isSelected = selectedStyle?.id === style.id;
+            return (
+              <motion.button
+                key={style.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25, delay: index * 0.03 }}
+                whileHover={{ scale: 1.08, y: -4 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => onSelectStyle(style)}
+                className={cn(
+                  "group relative flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-colors",
+                  isSelected
+                    ? "border-primary bg-primary/10 shadow-lg shadow-primary/20"
+                    : "border-border bg-card hover:border-primary/40"
+                )}
+              >
+                {/* Style Preview Image */}
+                <div className="w-full aspect-square rounded-lg overflow-hidden">
+                  <img
+                    src={style.preview}
+                    alt={style.name}
+                    loading="lazy"
+                    width={512}
+                    height={512}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  />
                 </div>
-              )}
 
-              {/* Label */}
-              <span className="text-xs font-medium text-foreground truncate w-full text-center">
-                {style.name}
-              </span>
+                {/* Selected Checkmark */}
+                <AnimatePresence>
+                  {isSelected && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                      className="absolute top-1.5 right-1.5 w-5 h-5 bg-primary rounded-full flex items-center justify-center"
+                    >
+                      <Check className="w-3 h-3 text-primary-foreground" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              {/* Category Badge */}
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                {style.category}
-              </Badge>
-            </button>
-          );
-        })}
-      </div>
+                {/* Label */}
+                <span className="text-xs font-medium text-foreground truncate w-full text-center">
+                  {style.name}
+                </span>
+
+                {/* Category Badge */}
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                  {style.category}
+                </Badge>
+              </motion.button>
+            );
+          })}
+        </AnimatePresence>
+      </motion.div>
     </div>
   );
 };
