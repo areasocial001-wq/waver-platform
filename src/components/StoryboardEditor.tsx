@@ -251,15 +251,15 @@ export const StoryboardEditor = () => {
       resetPanels((data.panels as unknown as StoryboardPanel[]) || []);
       setTags((data.tags as string[]) || []);
 
-      // Check for share password in separate table
+      // Check if share password exists (don't read back the hash)
       const { data: pwData } = await supabase
         .from('storyboard_share_passwords' as any)
-        .select('share_password')
+        .select('storyboard_id')
         .eq('storyboard_id', data.id)
         .maybeSingle();
-      const pwRecord = pwData as any;
-      setIsPasswordProtected(!!pwRecord?.share_password);
-      setSharePassword(pwRecord?.share_password || "");
+      const hasExistingPassword = !!pwData;
+      setIsPasswordProtected(hasExistingPassword);
+      setSharePassword("");
       toast.success("Storyboard caricato!");
     } catch (error: any) {
       console.error("Error loading storyboard:", error);
