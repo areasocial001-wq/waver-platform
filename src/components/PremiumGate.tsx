@@ -17,7 +17,7 @@ export const PremiumGate = ({ children, featureName = "Questa funzionalità" }: 
 
   if (loading || roleLoading) return <>{children}</>;
 
-  if (isAdmin || (subscribed && (tier === "premium" || tier === "business"))) {
+  if (isAdmin || (subscribed && (tier === "premium" || tier === "creator" || tier === "business"))) {
     return <>{children}</>;
   }
 
