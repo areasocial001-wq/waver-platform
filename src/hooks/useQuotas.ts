@@ -47,7 +47,7 @@ export const useQuotas = () => {
       const { data } = await supabase
         .from("plan_quotas")
         .select("*")
-        .eq("role", effectiveRole)
+        .eq("role", effectiveRole as any)
         .single();
 
       if (data) {
