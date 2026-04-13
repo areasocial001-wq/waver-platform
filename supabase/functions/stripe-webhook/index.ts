@@ -11,6 +11,15 @@ const logStep = (step: string, details?: unknown) => {
   console.log(`[STRIPE-WEBHOOK] ${step}${detailsStr}`);
 };
 
+// Map Stripe product IDs to app roles
+const PRODUCT_TO_ROLE: Record<string, string> = {
+  "prod_UJ3ckIlkRtr8Y4": "premium",
+  "prod_UKCUBt1UvmhELT": "creator",
+  "prod_UJ3nUlG2OGNxRA": "business",
+};
+
+const PAID_ROLES = ["premium", "creator", "business"];
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,7 +65,16 @@ Deno.serve(async (req) => {
         logStep("Checkout completed", { customerEmail, mode: session.mode });
 
         if (session.mode === "subscription" && customerEmail) {
-          await upgradeUserRole(supabase, customerEmail);
+          // Retrieve the subscription to get the product ID
+          const subscriptionId = session.subscription as string;
+          if (subscriptionId) {
+            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+            const productId = subscription.items.data[0]?.price?.product as string;
+            const role = PRODUCT_TO_ROLE[productId] || "premium";
+            await upgradeUserRole(supabase, customerEmail, role);
+          } else {
+            await upgradeUserRole(supabase, customerEmail, "premium");
+          }
         }
         break;
       }
@@ -67,8 +85,10 @@ Deno.serve(async (req) => {
         if (subscription.status === "active") {
           const customer = await stripe.customers.retrieve(subscription.customer as string);
           if ("email" in customer && customer.email) {
-            logStep("Active subscription, upgrading role", { email: customer.email });
-            await upgradeUserRole(supabase, customer.email);
+            const productId = subscription.items.data[0]?.price?.product as string;
+            const role = PRODUCT_TO_ROLE[productId] || "premium";
+            logStep("Active subscription, upgrading role", { email: customer.email, role, productId });
+            await upgradeUserRole(supabase, customer.email, role);
           }
         }
         break;
@@ -98,8 +118,7 @@ Deno.serve(async (req) => {
   });
 });
 
-async function upgradeUserRole(supabase: ReturnType<typeof createClient>, email: string) {
-  // Find user by email in profiles
+async function upgradeUserRole(supabase: ReturnType<typeof createClient>, email: string, role: string) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
@@ -113,15 +132,24 @@ async function upgradeUserRole(supabase: ReturnType<typeof createClient>, email:
 
   const userId = profile.id;
 
-  // Add premium role (upsert to avoid duplicates)
+  // Remove any existing paid roles first
+  for (const paidRole of PAID_ROLES) {
+    await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", paidRole);
+  }
+
+  // Add the new role
   const { error: insertError } = await supabase
     .from("user_roles")
-    .upsert({ user_id: userId, role: "premium" }, { onConflict: "user_id,role" });
+    .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
 
   if (insertError) {
-    logStep("ERROR: Failed to add premium role", { userId, error: insertError.message });
+    logStep("ERROR: Failed to add role", { userId, role, error: insertError.message });
   } else {
-    logStep("Successfully upgraded user to premium", { userId, email });
+    logStep(`Successfully upgraded user to ${role}`, { userId, email });
   }
 }
 
@@ -139,16 +167,14 @@ async function downgradeUserRole(supabase: ReturnType<typeof createClient>, emai
 
   const userId = profile.id;
 
-  // Remove premium role
-  const { error: deleteError } = await supabase
-    .from("user_roles")
-    .delete()
-    .eq("user_id", userId)
-    .eq("role", "premium");
-
-  if (deleteError) {
-    logStep("ERROR: Failed to remove premium role", { userId, error: deleteError.message });
-  } else {
-    logStep("Successfully downgraded user from premium", { userId, email });
+  // Remove all paid roles
+  for (const paidRole of PAID_ROLES) {
+    await supabase
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("role", paidRole);
   }
+
+  logStep("Successfully downgraded user", { userId, email });
 }

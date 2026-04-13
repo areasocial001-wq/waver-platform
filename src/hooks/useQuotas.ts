@@ -32,8 +32,17 @@ export const useQuotas = () => {
     if (rolesLoading) return;
 
     const fetchQuota = async () => {
-      // Get the highest role quota
-      const effectiveRole = isAdmin ? "admin" : roles.includes("premium") ? "premium" : "user";
+      // Determine effective role with priority: admin > business > creator > premium > user
+      let effectiveRole: string = "user";
+      if (isAdmin) {
+        effectiveRole = "admin";
+      } else if (roles.includes("business" as any)) {
+        effectiveRole = "business";
+      } else if (roles.includes("creator" as any)) {
+        effectiveRole = "creator";
+      } else if (roles.includes("premium")) {
+        effectiveRole = "premium";
+      }
 
       const { data } = await supabase
         .from("plan_quotas")
