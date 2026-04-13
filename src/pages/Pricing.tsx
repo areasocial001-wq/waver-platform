@@ -444,13 +444,14 @@ export default function PricingPage() {
 
             <Accordion type="single" collapsible className="space-y-3">
               {[
-                { q: "Posso cambiare piano in qualsiasi momento?", a: "Sì, puoi passare dal piano Free al Premium in qualsiasi momento. L'upgrade è immediato e paghi solo la differenza pro-rata. Puoi anche gestire o annullare il tuo abbonamento dal portale di gestione." },
-                { q: "Come funziona la fatturazione annuale?", a: "Con la fatturazione annuale risparmi il 20% rispetto al piano mensile. Paghi €190,80 una sola volta per un anno intero (equivalente a €15,90/mese invece di €19,90/mese)." },
-                { q: "Cosa succede se supero il limite di generazioni?", a: "Una volta raggiunto il limite mensile, le generazioni vengono temporaneamente sospese fino al rinnovo del mese successivo. Puoi passare al piano Premium per avere più generazioni." },
-                { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con Premium e Business hai generazione immagini illimitata, inpainting, editing e upscaling." },
+                { q: "Posso cambiare piano in qualsiasi momento?", a: "Sì, puoi passare a un piano superiore in qualsiasi momento. L'upgrade è immediato e paghi solo la differenza pro-rata. Puoi anche gestire o annullare il tuo abbonamento dal portale di gestione." },
+                { q: "Come funziona la fatturazione annuale?", a: "Con la fatturazione annuale risparmi il 20% rispetto al piano mensile. Ad esempio, Premium a €23,90/mese (€286,80/anno) invece di €29,90/mese." },
+                { q: "Cosa succede se supero il limite di generazioni?", a: "Una volta raggiunto il limite mensile, le generazioni vengono temporaneamente sospese fino al rinnovo del mese successivo. Puoi passare a un piano superiore per avere più generazioni." },
+                { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con i piani a pagamento hai generazione immagini illimitata, inpainting, editing e upscaling." },
                 { q: "Quali metodi di pagamento accettate?", a: "Accettiamo tutte le principali carte di credito e debito (Visa, Mastercard, American Express) tramite Stripe. I pagamenti sono sicuri e crittografati." },
-                { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto del piano Premium, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
-                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include generazioni video illimitate, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma senza limiti." },
+                { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
+                { q: "Quanti modelli video sono disponibili?", a: "La piattaforma offre accesso a 60+ modelli video AI da 7+ provider: Kling, Runway, Veo, Sora, MiniMax, PixVerse, Wan, Seedance, Luma, Vidu, LTX e Freepik. Tutti disponibili nei piani a pagamento." },
+                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include 200 generazioni video/mese, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma." },
               ].map((faq, i) => (
                 <AccordionItem key={i} value={`faq-${i}`} className="border rounded-lg px-4">
                   <AccordionTrigger className="text-left text-sm font-medium py-4">{faq.q}</AccordionTrigger>
