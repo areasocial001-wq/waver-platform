@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Check, Palette } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Import preview images
 import animationImg from "@/assets/styles/animation.jpg";
