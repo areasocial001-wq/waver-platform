@@ -109,10 +109,10 @@ export const Navbar = () => {
               <Shield className="w-3 h-3" />
               Admin
             </Badge>
-          ) : subscribed && tier === "premium" ? (
+          ) : subscribed && (tier === "premium" || tier === "creator" || tier === "business") ? (
             <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30 hidden sm:inline-flex gap-1">
               <Crown className="w-3 h-3" />
-              Premium
+              {tier === "business" ? "Business" : tier === "creator" ? "Creator" : "Premium"}
             </Badge>
           ) : null}
           

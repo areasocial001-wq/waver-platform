@@ -38,14 +38,13 @@ const getPlans = (isAnnual: boolean) => [
   {
     id: "premium",
     name: "Premium",
-    price: isAnnual ? "€15,90" : "€19,90",
+    price: isAnnual ? "€23,90" : "€29,90",
     period: "/mese",
-    yearlyTotal: isAnnual ? "€190,80/anno" : undefined,
-    description: "Per professionisti e creator",
+    yearlyTotal: isAnnual ? "€286,80/anno" : undefined,
+    description: "Per creator e professionisti",
     icon: Crown,
-    popular: true,
     features: [
-      { name: "50 generazioni video/mese", included: true },
+      { name: "30 generazioni video/mese", included: true },
       { name: "Generazione immagini illimitata", included: true },
       { name: "Risoluzione 1080p", included: true },
       { name: "10 storyboard", included: true },
@@ -54,8 +53,30 @@ const getPlans = (isAnnual: boolean) => [
       { name: "Talking Avatar", included: true },
       { name: "Voice cloning & Musica AI", included: true },
       { name: "Timeline editor", included: true },
+      { name: "Multi-provider (60+ modelli)", included: true },
+    ],
+  },
+  {
+    id: "creator",
+    name: "Creator",
+    price: isAnnual ? "€39,90" : "€49,90",
+    period: "/mese",
+    yearlyTotal: isAnnual ? "€478,80/anno" : undefined,
+    description: "Per creator ad alto volume",
+    icon: Crown,
+    popular: true,
+    features: [
+      { name: "100 generazioni video/mese", included: true },
+      { name: "Generazione immagini illimitata", included: true },
+      { name: "Risoluzione 1080p", included: true },
+      { name: "Storyboard illimitati", included: true },
+      { name: "Tutti i Workflow AI", included: true },
+      { name: "Faceless, Trailer & Avatar", included: true },
+      { name: "Voice cloning & Musica AI", included: true },
+      { name: "Timeline editor", included: true },
       { name: "Accesso API", included: true },
-      { name: "Multi-provider", included: true },
+      { name: "Multi-provider (60+ modelli)", included: true },
+      { name: "Supporto prioritario email", included: true },
     ],
   },
   {
@@ -67,7 +88,7 @@ const getPlans = (isAnnual: boolean) => [
     description: "Per team e aziende",
     icon: Star,
     features: [
-      { name: "Generazioni illimitate", included: true },
+      { name: "200 generazioni video/mese", included: true },
       { name: "Generazione immagini illimitata", included: true },
       { name: "Risoluzione 4K", included: true },
       { name: "Storyboard illimitati", included: true },
@@ -76,77 +97,75 @@ const getPlans = (isAnnual: boolean) => [
       { name: "Voice cloning & Musica AI", included: true },
       { name: "Timeline editor avanzato", included: true },
       { name: "API dedicata + priorità", included: true },
-      { name: "Multi-provider + priorità", included: true },
-      { name: "Supporto prioritario", included: true },
+      { name: "Multi-provider (60+ modelli)", included: true },
+      { name: "Supporto prioritario dedicato", included: true },
     ],
   },
 ];
-
 const comparisonCategories = [
   {
     name: "Generazione Video",
     features: [
-      { name: "Video al mese", free: "5", premium: "50", business: "Illimitati" },
-      { name: "Risoluzione massima", free: "720p", premium: "1080p", business: "4K" },
-      { name: "Durata max per video", free: "10s", premium: "30s", business: "60s" },
-      { name: "Multi-provider", free: false, premium: true, business: true },
-      { name: "Priorità di generazione", free: false, premium: false, business: true },
+      { name: "Video al mese", free: "5", premium: "30", creator: "100", business: "200" },
+      { name: "Risoluzione massima", free: "720p", premium: "1080p", creator: "1080p", business: "4K" },
+      { name: "Durata max per video", free: "10s", premium: "30s", creator: "30s", business: "60s" },
+      { name: "Multi-provider (60+ modelli)", free: false, premium: true, creator: true, business: true },
+      { name: "Priorità di generazione", free: false, premium: false, creator: true, business: true },
     ],
   },
   {
     name: "Generazione Immagini",
     features: [
-      { name: "Immagini AI", free: "Incluse", premium: "Illimitate", business: "Illimitate" },
-      { name: "Inpainting & editing", free: false, premium: true, business: true },
-      { name: "Upscaling immagini", free: false, premium: true, business: true },
+      { name: "Immagini AI", free: "Incluse", premium: "Illimitate", creator: "Illimitate", business: "Illimitate" },
+      { name: "Inpainting & editing", free: false, premium: true, creator: true, business: true },
+      { name: "Upscaling immagini", free: false, premium: true, creator: true, business: true },
     ],
   },
   {
     name: "Audio & Voiceover",
     features: [
-      { name: "Text-to-Speech", free: true, premium: true, business: true },
-      { name: "Clonazione vocale", free: false, premium: true, business: true },
-      { name: "Musica AI", free: false, premium: true, business: true },
-      { name: "Audio mixing", free: false, premium: true, business: true },
+      { name: "Text-to-Speech", free: true, premium: true, creator: true, business: true },
+      { name: "Clonazione vocale", free: false, premium: true, creator: true, business: true },
+      { name: "Musica AI", free: false, premium: true, creator: true, business: true },
+      { name: "Audio mixing", free: false, premium: true, creator: true, business: true },
     ],
   },
   {
     name: "Workflow AI & Automazioni",
     features: [
-      { name: "Workflow visuale a nodi", free: false, premium: true, business: true },
-      { name: "Freepik (immagini & video)", free: false, premium: true, business: true },
-      { name: "Vidu AI", free: false, premium: true, business: true },
-      { name: "LTX Video", free: false, premium: true, business: true },
-      { name: "Luma (Photon & Ray 2)", free: false, premium: true, business: true },
-      { name: "Script-to-Storyboard AI", free: false, premium: true, business: true },
-      { name: "NL-to-JSON converter", free: false, premium: true, business: true },
+      { name: "Workflow visuale a nodi", free: false, premium: true, creator: true, business: true },
+      { name: "Freepik (immagini & video)", free: false, premium: true, creator: true, business: true },
+      { name: "Vidu AI", free: false, premium: true, creator: true, business: true },
+      { name: "LTX Video", free: false, premium: true, creator: true, business: true },
+      { name: "Luma (Photon & Ray 2)", free: false, premium: true, creator: true, business: true },
+      { name: "Script-to-Storyboard AI", free: false, premium: true, creator: true, business: true },
+      { name: "NL-to-JSON converter", free: false, premium: true, creator: true, business: true },
     ],
   },
   {
     name: "Strumenti di Produzione",
     features: [
-      { name: "Storyboard", free: "1", premium: "10", business: "Illimitati" },
-      { name: "Timeline editor", free: false, premium: true, business: true },
-      { name: "Faceless video", free: false, premium: true, business: true },
-      { name: "Trailer generator", free: false, premium: true, business: true },
-      { name: "Talking Avatar", free: false, premium: true, business: true },
-      { name: "Animatic Maker", free: false, premium: true, business: true },
-      { name: "Character Locking", free: false, premium: true, business: true },
-      { name: "AI Content Generator", free: false, premium: true, business: true },
+      { name: "Storyboard", free: "1", premium: "10", creator: "Illimitati", business: "Illimitati" },
+      { name: "Timeline editor", free: false, premium: true, creator: true, business: true },
+      { name: "Faceless video", free: false, premium: true, creator: true, business: true },
+      { name: "Trailer generator", free: false, premium: true, creator: true, business: true },
+      { name: "Talking Avatar", free: false, premium: true, creator: true, business: true },
+      { name: "Animatic Maker", free: false, premium: true, creator: true, business: true },
+      { name: "Character Locking", free: false, premium: true, creator: true, business: true },
+      { name: "AI Content Generator", free: false, premium: true, creator: true, business: true },
     ],
   },
   {
     name: "Integrazioni & API",
     features: [
-      { name: "Accesso API", free: false, premium: true, business: true },
-      { name: "Webhook & notifiche", free: false, premium: true, business: true },
-      { name: "JSON2Video integration", free: false, premium: true, business: true },
-      { name: "API dedicata", free: false, premium: false, business: true },
-      { name: "Supporto prioritario", free: false, premium: false, business: true },
+      { name: "Accesso API", free: false, premium: true, creator: true, business: true },
+      { name: "Webhook & notifiche", free: false, premium: true, creator: true, business: true },
+      { name: "JSON2Video integration", free: false, premium: true, creator: true, business: true },
+      { name: "API dedicata", free: false, premium: false, creator: false, business: true },
+      { name: "Supporto prioritario", free: false, premium: false, creator: true, business: true },
     ],
   },
 ];
-
 function BillingToggle({ isAnnual, onToggle }: { isAnnual: boolean; onToggle: () => void }) {
   return (
     <div className="flex items-center justify-center gap-3 mb-10">
@@ -194,13 +213,16 @@ export default function PricingPage() {
   }, [searchParams, checkSubscription]);
 
   useEffect(() => {
-    if ((tier === "premium" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
+    if ((tier === "premium" || tier === "creator" || tier === "business") && subscribed && searchParams.get("success") === "true" && !welcomeShown) {
       setWelcomeShown(true);
-      const planName = tier === "business" ? "Business" : "Premium";
+      const planNames: Record<string, string> = { business: "Business", creator: "Creator", premium: "Premium" };
+      const planName = planNames[tier] || "Premium";
       toast.success(`🎉 Benvenuto nel piano ${planName}!`, {
         description: tier === "business"
-          ? "Hai sbloccato: Generazioni illimitate, 4K, API dedicata, supporto prioritario e molto altro!"
-          : "Hai sbloccato: Video 1080p, Voice Cloning, Timeline Editor, Multi-provider e molto altro. Buona creazione!",
+          ? "Hai sbloccato: 200 video/mese, 4K, API dedicata, supporto prioritario e molto altro!"
+          : tier === "creator"
+          ? "Hai sbloccato: 100 video/mese, storyboard illimitati, supporto prioritario e molto altro!"
+          : "Hai sbloccato: 30 video/mese, Voice Cloning, Timeline Editor, Multi-provider e molto altro!",
         duration: 8000,
       });
     }
@@ -208,7 +230,7 @@ export default function PricingPage() {
 
   const currentPlan = isAdmin ? "admin" : tier;
 
-  const handleUpgrade = async (planId: "premium" | "business") => {
+  const handleUpgrade = async (planId: "premium" | "creator" | "business") => {
     setCheckoutLoading(true);
     try {
       const tierConfig = STRIPE_TIERS[planId];
@@ -253,7 +275,7 @@ export default function PricingPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Piano attuale</p>
                   <Badge variant="secondary" className="mt-1 text-sm">
-                    {currentPlan === "admin" ? "Admin (illimitato)" : currentPlan === "premium" ? "Premium" : "Free"}
+                    {currentPlan === "admin" ? "Admin (illimitato)" : currentPlan === "business" ? "Business" : currentPlan === "creator" ? "Creator" : currentPlan === "premium" ? "Premium" : "Free"}
                   </Badge>
                 </div>
                 <div>
@@ -280,12 +302,15 @@ export default function PricingPage() {
           <BillingToggle isAnnual={isAnnual} onToggle={() => setIsAnnual(!isAnnual)} />
 
           {/* Plan cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => {
               const isCurrentPlan =
                 (plan.id === "free" && currentPlan === "free") ||
                 (plan.id === "premium" && currentPlan === "premium") ||
+                (plan.id === "creator" && currentPlan === "creator") ||
                 (plan.id === "business" && (currentPlan === "business" || currentPlan === "admin"));
+
+              const isPaidPlan = plan.id === "premium" || plan.id === "creator" || plan.id === "business";
 
               return (
                 <Card
@@ -340,39 +365,21 @@ export default function PricingPage() {
                         {isCurrentPlan ? "Piano attuale" : "Piano base"}
                       </Button>
                     )}
-                    {plan.id === "premium" && !isCurrentPlan && (
+                    {isPaidPlan && !isCurrentPlan && (
                       <Button
                         className="w-full"
-                        onClick={() => handleUpgrade("premium")}
+                        variant={plan.id === "business" ? "secondary" : "default"}
+                        onClick={() => handleUpgrade(plan.id as "premium" | "creator" | "business")}
                         disabled={checkoutLoading || subLoading}
                       >
                         {checkoutLoading ? (
                           <><Loader2 className="h-4 w-4 animate-spin" /> Caricamento...</>
                         ) : (
-                          <><Crown className="h-4 w-4" /> Passa a Premium</>
+                          <>{plan.id === "business" ? <Star className="h-4 w-4" /> : <Crown className="h-4 w-4" />} Passa a {plan.name}</>
                         )}
                       </Button>
                     )}
-                    {plan.id === "premium" && isCurrentPlan && (
-                      <Button variant="outline" className="w-full" onClick={handleManage}>
-                        <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
-                      </Button>
-                    )}
-                    {plan.id === "business" && !isCurrentPlan && (
-                      <Button
-                        className="w-full"
-                        variant="secondary"
-                        onClick={() => handleUpgrade("business")}
-                        disabled={checkoutLoading || subLoading}
-                      >
-                        {checkoutLoading ? (
-                          <><Loader2 className="h-4 w-4 animate-spin" /> Caricamento...</>
-                        ) : (
-                          <><Star className="h-4 w-4" /> Passa a Business</>
-                        )}
-                      </Button>
-                    )}
-                    {plan.id === "business" && isCurrentPlan && (
+                    {isPaidPlan && isCurrentPlan && (
                       <Button variant="outline" className="w-full" onClick={handleManage}>
                         <ExternalLink className="h-4 w-4" /> Gestisci abbonamento
                       </Button>
@@ -388,32 +395,33 @@ export default function PricingPage() {
             <h2 className="text-3xl font-bold text-center mb-2">Confronto dettagliato</h2>
             <p className="text-muted-foreground text-center mb-10">Tutte le funzionalità a colpo d'occhio</p>
 
-            <div className="border rounded-xl overflow-hidden">
+            <div className="border rounded-xl overflow-hidden overflow-x-auto">
               {/* Table header */}
-              <div className="grid grid-cols-4 bg-muted/50 border-b">
+              <div className="grid grid-cols-5 bg-muted/50 border-b min-w-[600px]">
                 <div className="p-4 font-semibold text-sm">Funzionalità</div>
                 <div className="p-4 text-center font-semibold text-sm">Free</div>
-                <div className="p-4 text-center font-semibold text-sm text-primary">Premium</div>
+                <div className="p-4 text-center font-semibold text-sm">Premium</div>
+                <div className="p-4 text-center font-semibold text-sm text-primary">Creator</div>
                 <div className="p-4 text-center font-semibold text-sm">Business</div>
               </div>
 
-              {comparisonCategories.map((category, ci) => (
+              {comparisonCategories.map((category) => (
                 <div key={category.name}>
                   {/* Category header */}
-                  <div className="grid grid-cols-4 bg-muted/30 border-b">
-                    <div className="p-3 col-span-4 font-semibold text-sm text-primary">{category.name}</div>
+                  <div className="grid grid-cols-5 bg-muted/30 border-b min-w-[600px]">
+                    <div className="p-3 col-span-5 font-semibold text-sm text-primary">{category.name}</div>
                   </div>
                   {/* Features */}
                   {category.features.map((feature, fi) => (
                     <div
                       key={feature.name}
-                      className={`grid grid-cols-4 border-b last:border-b-0 ${fi % 2 === 0 ? "" : "bg-muted/10"}`}
+                      className={`grid grid-cols-5 border-b last:border-b-0 min-w-[600px] ${fi % 2 === 0 ? "" : "bg-muted/10"}`}
                     >
                       <div className="p-3 text-sm">{feature.name}</div>
-                      {(["free", "premium", "business"] as const).map((plan) => {
+                      {(["free", "premium", "creator", "business"] as const).map((plan) => {
                         const val = feature[plan];
                         return (
-                          <div key={plan} className={`p-3 text-center text-sm ${plan === "premium" ? "bg-primary/5" : ""}`}>
+                          <div key={plan} className={`p-3 text-center text-sm ${plan === "creator" ? "bg-primary/5" : ""}`}>
                             {typeof val === "boolean" ? (
                               val ? <Check className="h-4 w-4 text-primary mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
                             ) : (
@@ -436,13 +444,14 @@ export default function PricingPage() {
 
             <Accordion type="single" collapsible className="space-y-3">
               {[
-                { q: "Posso cambiare piano in qualsiasi momento?", a: "Sì, puoi passare dal piano Free al Premium in qualsiasi momento. L'upgrade è immediato e paghi solo la differenza pro-rata. Puoi anche gestire o annullare il tuo abbonamento dal portale di gestione." },
-                { q: "Come funziona la fatturazione annuale?", a: "Con la fatturazione annuale risparmi il 20% rispetto al piano mensile. Paghi €190,80 una sola volta per un anno intero (equivalente a €15,90/mese invece di €19,90/mese)." },
-                { q: "Cosa succede se supero il limite di generazioni?", a: "Una volta raggiunto il limite mensile, le generazioni vengono temporaneamente sospese fino al rinnovo del mese successivo. Puoi passare al piano Premium per avere più generazioni." },
-                { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con Premium e Business hai generazione immagini illimitata, inpainting, editing e upscaling." },
+                { q: "Posso cambiare piano in qualsiasi momento?", a: "Sì, puoi passare a un piano superiore in qualsiasi momento. L'upgrade è immediato e paghi solo la differenza pro-rata. Puoi anche gestire o annullare il tuo abbonamento dal portale di gestione." },
+                { q: "Come funziona la fatturazione annuale?", a: "Con la fatturazione annuale risparmi il 20% rispetto al piano mensile. Ad esempio, Premium a €23,90/mese (€286,80/anno) invece di €29,90/mese." },
+                { q: "Cosa succede se supero il limite di generazioni?", a: "Una volta raggiunto il limite mensile, le generazioni vengono temporaneamente sospese fino al rinnovo del mese successivo. Puoi passare a un piano superiore per avere più generazioni." },
+                { q: "La generazione immagini è inclusa nel piano Free?", a: "Sì, la generazione immagini AI è inclusa in tutti i piani. Con il piano Free hai accesso alla generazione base, mentre con i piani a pagamento hai generazione immagini illimitata, inpainting, editing e upscaling." },
                 { q: "Quali metodi di pagamento accettate?", a: "Accettiamo tutte le principali carte di credito e debito (Visa, Mastercard, American Express) tramite Stripe. I pagamenti sono sicuri e crittografati." },
-                { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto del piano Premium, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
-                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include generazioni video illimitate, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma senza limiti." },
+                { q: "Posso ottenere un rimborso?", a: "Offriamo una garanzia soddisfatti o rimborsati di 14 giorni. Se non sei soddisfatto, contattaci entro 14 giorni dall'acquisto per un rimborso completo." },
+                { q: "Quanti modelli video sono disponibili?", a: "La piattaforma offre accesso a 60+ modelli video AI da 7+ provider: Kling, Runway, Veo, Sora, MiniMax, PixVerse, Wan, Seedance, Luma, Vidu, LTX e Freepik. Tutti disponibili nei piani a pagamento." },
+                { q: "Cosa include il piano Business?", a: "Il piano Business a €79,90/mese (€63,90/mese con fatturazione annuale) include 200 generazioni video/mese, risoluzione 4K, storyboard illimitati, API dedicata, supporto prioritario e tutti gli strumenti della piattaforma." },
               ].map((faq, i) => (
                 <AccordionItem key={i} value={`faq-${i}`} className="border rounded-lg px-4">
                   <AccordionTrigger className="text-left text-sm font-medium py-4">{faq.q}</AccordionTrigger>

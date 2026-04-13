@@ -930,7 +930,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user" | "premium"
+      app_role:
+        | "admin"
+        | "moderator"
+        | "user"
+        | "premium"
+        | "creator"
+        | "business"
       generation_type: "text_to_video" | "image_to_video"
     }
     CompositeTypes: {
@@ -1059,7 +1065,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user", "premium"],
+      app_role: [
+        "admin",
+        "moderator",
+        "user",
+        "premium",
+        "creator",
+        "business",
+      ],
       generation_type: ["text_to_video", "image_to_video"],
     },
   },

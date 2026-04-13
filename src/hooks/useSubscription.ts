@@ -3,9 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const STRIPE_TIERS = {
   premium: {
-    price_id_monthly: "price_1TKRUyR04kRDmaB2O4c6RN6B",
-    price_id_yearly: "price_1TKRVPR04kRDmaB2BxZxHv7a",
+    price_id_monthly: "price_1TLYCgR04kRDmaB2yYJAqTk4",
+    price_id_yearly: "price_1TLYEJR04kRDmaB20EqvTwj6",
     product_id: "prod_UJ3ckIlkRtr8Y4",
+  },
+  creator: {
+    price_id_monthly: "price_1TLY5WR04kRDmaB2cuDWkY9c",
+    price_id_yearly: "price_1TLYEoR04kRDmaB2Dgcb4eQ1",
+    product_id: "prod_UKCUBt1UvmhELT",
   },
   business: {
     price_id_monthly: "price_1TKRfhR04kRDmaB2Wur5VCM6",
@@ -14,12 +19,14 @@ export const STRIPE_TIERS = {
   },
 } as const;
 
+export type SubscriptionTier = "free" | "premium" | "creator" | "business";
+
 interface SubscriptionState {
   subscribed: boolean;
   productId: string | null;
   subscriptionEnd: string | null;
   loading: boolean;
-  tier: "free" | "premium" | "business";
+  tier: SubscriptionTier;
 }
 
 export const useSubscription = () => {
@@ -42,8 +49,9 @@ export const useSubscription = () => {
       const { data, error } = await supabase.functions.invoke("check-subscription");
       if (error) throw error;
 
-      let tier: "free" | "premium" | "business" = "free";
+      let tier: SubscriptionTier = "free";
       if (data?.product_id === STRIPE_TIERS.business.product_id) tier = "business";
+      else if (data?.product_id === STRIPE_TIERS.creator.product_id) tier = "creator";
       else if (data?.product_id === STRIPE_TIERS.premium.product_id) tier = "premium";
 
       setState({
