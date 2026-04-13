@@ -187,7 +187,7 @@ export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps
       </div>
 
       {/* Style Grid */}
-      <motion.div layout className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+      <motion.div layout style={{ y: gridY }} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
         <AnimatePresence mode="popLayout">
           {filtered.map((style, index) => {
             const isSelected = selectedStyle?.id === style.id;
