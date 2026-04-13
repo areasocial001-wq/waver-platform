@@ -3,19 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const STRIPE_TIERS = {
   premium: {
-    price_id_monthly: "price_1TLYCgR04kRDmaB2yYJAqTk4",
-    price_id_yearly: "price_1TLYEJR04kRDmaB20EqvTwj6",
-    product_id: "prod_UJ3ckIlkRtr8Y4",
+    price_id_monthly: "price_1TLlDXF6OSGE0tWONqMn6jHF",
+    price_id_yearly: "price_1TLlE6F6OSGE0tWOHnoP1PHY",
+    product_id: "prod_UKQ3SIkQD1YRRq",
   },
   creator: {
-    price_id_monthly: "price_1TLY5WR04kRDmaB2cuDWkY9c",
-    price_id_yearly: "price_1TLYEoR04kRDmaB2Dgcb4eQ1",
-    product_id: "prod_UKCUBt1UvmhELT",
+    price_id_monthly: "price_1TLlGSF6OSGE0tWOirsB01wH",
+    price_id_yearly: "price_1TLli0F6OSGE0tWOfvXjmhQV",
+    product_id: "prod_UKQ6uV2WdYYFcC",
   },
   business: {
-    price_id_monthly: "price_1TKRfhR04kRDmaB2Wur5VCM6",
-    price_id_yearly: "price_1TKRglR04kRDmaB26aDLMPTW",
-    product_id: "prod_UJ3nUlG2OGNxRA",
+    price_id_monthly: "price_1TLlhgF6OSGE0tWOOqqHFWd9",
+    price_id_yearly: "price_1TLlvDF6OSGE0tWOrPUuCYjg",
+    product_id: "prod_UKQYpXd3Ztk0Ov",
   },
 } as const;
 

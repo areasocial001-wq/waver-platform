@@ -13,9 +13,9 @@ const logStep = (step: string, details?: unknown) => {
 
 // Map Stripe product IDs to app roles
 const PRODUCT_TO_ROLE: Record<string, string> = {
-  "prod_UJ3ckIlkRtr8Y4": "premium",
-  "prod_UKCUBt1UvmhELT": "creator",
-  "prod_UJ3nUlG2OGNxRA": "business",
+  "prod_UKQ3SIkQD1YRRq": "premium",
+  "prod_UKQ6uV2WdYYFcC": "creator",
+  "prod_UKQYpXd3Ztk0Ov": "business",
 };
 
 const PAID_ROLES = ["premium", "creator", "business"];
