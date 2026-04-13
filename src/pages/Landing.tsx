@@ -185,11 +185,20 @@ const getPlans = (isAnnual: boolean) => [
   },
   {
     name: "Premium",
-    price: isAnnual ? "€15,90" : "€19,90",
+    price: isAnnual ? "€23,90" : "€29,90",
     period: "/mese",
-    yearlyTotal: isAnnual ? "€190,80/anno" : undefined,
-    features: ["50 generazioni video/mese", "Immagini illimitate", "1080p", "10 storyboard", "Workflow AI (Freepik, Vidu, LTX)", "Faceless Video & Trailer", "Talking Avatar", "Voice cloning & Musica AI", "Timeline editor", "Accesso API", "Multi-provider"],
+    yearlyTotal: isAnnual ? "€286,80/anno" : undefined,
+    features: ["30 generazioni video/mese", "Immagini illimitate", "1080p", "10 storyboard", "Workflow AI (Freepik, Vidu, LTX)", "Faceless Video & Trailer", "Talking Avatar", "Voice cloning & Musica AI", "Timeline editor", "Multi-provider"],
     cta: "Passa a Premium",
+    highlighted: false,
+  },
+  {
+    name: "Creator",
+    price: isAnnual ? "€39,90" : "€49,90",
+    period: "/mese",
+    yearlyTotal: isAnnual ? "€478,80/anno" : undefined,
+    features: ["100 generazioni video/mese", "Immagini illimitate", "1080p", "Storyboard illimitati", "Tutti i Workflow AI", "Faceless, Trailer & Avatar", "Voice cloning & Musica AI", "Timeline editor", "Accesso API", "Supporto prioritario email"],
+    cta: "Passa a Creator",
     highlighted: true,
   },
   {
@@ -197,7 +206,7 @@ const getPlans = (isAnnual: boolean) => [
     price: isAnnual ? "€63,90" : "€79,90",
     period: "/mese",
     yearlyTotal: isAnnual ? "€766,80/anno" : undefined,
-    features: ["Generazioni illimitate", "Immagini illimitate", "4K", "Storyboard illimitati", "Tutti i Workflow AI", "Faceless, Trailer & Avatar", "Voice cloning & Musica AI", "Timeline avanzato", "API dedicata + priorità", "Supporto prioritario"],
+    features: ["200 generazioni video/mese", "Immagini illimitate", "4K", "Storyboard illimitati", "Tutti i Workflow AI", "Faceless, Trailer & Avatar", "Voice cloning & Musica AI", "Timeline avanzato", "API dedicata + priorità", "Supporto prioritario dedicato"],
     cta: "Passa a Business",
     highlighted: false,
   },
@@ -638,7 +647,7 @@ export default function Landing() {
             whileInView="visible"
             viewport={{ once: true, amount: 0.2 }}
             variants={staggerContainer}
-            className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto"
+            className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto"
           >
             {plans.map((plan, i) => (
               <motion.div
