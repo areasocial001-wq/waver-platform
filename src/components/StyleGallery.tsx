@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Check, Palette } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 
 // Import preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -135,17 +135,27 @@ interface StyleGalleryProps {
 
 export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps) => {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start end", "end start"],
+  });
+
+  const headerY = useTransform(scrollYProgress, [0, 1], [30, -20]);
+  const gridY = useTransform(scrollYProgress, [0, 1], [50, -30]);
+  const opacity = useTransform(scrollYProgress, [0, 0.2, 0.8, 1], [0.4, 1, 1, 0.6]);
 
   const filtered = activeCategory
     ? VIDEO_STYLES.filter((s) => s.category === activeCategory)
     : VIDEO_STYLES;
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-4">
+    <div ref={containerRef}>
+      <motion.div style={{ y: headerY, opacity }} className="flex items-center gap-3 mb-4">
         <Palette className="w-5 h-5 text-primary" />
         <h3 className="text-lg font-semibold text-foreground">Stili Visivi</h3>
-      </div>
+      </motion.div>
 
       {/* Category filters */}
       <div className="flex flex-wrap gap-2 mb-4">
@@ -177,7 +187,7 @@ export const StyleGallery = ({ selectedStyle, onSelectStyle }: StyleGalleryProps
       </div>
 
       {/* Style Grid */}
-      <motion.div layout className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+      <motion.div layout style={{ y: gridY }} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
         <AnimatePresence mode="popLayout">
           {filtered.map((style, index) => {
             const isSelected = selectedStyle?.id === style.id;
