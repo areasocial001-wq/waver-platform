@@ -395,32 +395,33 @@ export default function PricingPage() {
             <h2 className="text-3xl font-bold text-center mb-2">Confronto dettagliato</h2>
             <p className="text-muted-foreground text-center mb-10">Tutte le funzionalità a colpo d'occhio</p>
 
-            <div className="border rounded-xl overflow-hidden">
+            <div className="border rounded-xl overflow-hidden overflow-x-auto">
               {/* Table header */}
-              <div className="grid grid-cols-4 bg-muted/50 border-b">
+              <div className="grid grid-cols-5 bg-muted/50 border-b min-w-[600px]">
                 <div className="p-4 font-semibold text-sm">Funzionalità</div>
                 <div className="p-4 text-center font-semibold text-sm">Free</div>
-                <div className="p-4 text-center font-semibold text-sm text-primary">Premium</div>
+                <div className="p-4 text-center font-semibold text-sm">Premium</div>
+                <div className="p-4 text-center font-semibold text-sm text-primary">Creator</div>
                 <div className="p-4 text-center font-semibold text-sm">Business</div>
               </div>
 
-              {comparisonCategories.map((category, ci) => (
+              {comparisonCategories.map((category) => (
                 <div key={category.name}>
                   {/* Category header */}
-                  <div className="grid grid-cols-4 bg-muted/30 border-b">
-                    <div className="p-3 col-span-4 font-semibold text-sm text-primary">{category.name}</div>
+                  <div className="grid grid-cols-5 bg-muted/30 border-b min-w-[600px]">
+                    <div className="p-3 col-span-5 font-semibold text-sm text-primary">{category.name}</div>
                   </div>
                   {/* Features */}
                   {category.features.map((feature, fi) => (
                     <div
                       key={feature.name}
-                      className={`grid grid-cols-4 border-b last:border-b-0 ${fi % 2 === 0 ? "" : "bg-muted/10"}`}
+                      className={`grid grid-cols-5 border-b last:border-b-0 min-w-[600px] ${fi % 2 === 0 ? "" : "bg-muted/10"}`}
                     >
                       <div className="p-3 text-sm">{feature.name}</div>
-                      {(["free", "premium", "business"] as const).map((plan) => {
+                      {(["free", "premium", "creator", "business"] as const).map((plan) => {
                         const val = feature[plan];
                         return (
-                          <div key={plan} className={`p-3 text-center text-sm ${plan === "premium" ? "bg-primary/5" : ""}`}>
+                          <div key={plan} className={`p-3 text-center text-sm ${plan === "creator" ? "bg-primary/5" : ""}`}>
                             {typeof val === "boolean" ? (
                               val ? <Check className="h-4 w-4 text-primary mx-auto" /> : <X className="h-4 w-4 text-muted-foreground/30 mx-auto" />
                             ) : (
