@@ -15,8 +15,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign } from "lucide-react";
 import { WaitlistManager } from "@/components/admin/WaitlistManager";
+import { CostMarginDashboard } from "@/components/admin/CostMarginDashboard";
 
 interface AdminUser {
   id: string;
@@ -147,6 +148,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="waitlist" className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 Waitlist
+              </TabsTrigger>
+              <TabsTrigger value="costs" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Costi & Margini
               </TabsTrigger>
             </TabsList>
 
@@ -294,7 +299,7 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {["admin", "premium", "moderator", "user"].map((role) => {
+                      {["admin", "business", "creator", "premium", "moderator", "user"].map((role) => {
                         const count = users.filter((u) => u.roles.includes(role)).length;
                         const pct = totalUsers > 0 ? (count / totalUsers) * 100 : 0;
                         return (
@@ -343,6 +348,10 @@ export default function AdminDashboard() {
 
             <TabsContent value="waitlist">
               <WaitlistManager />
+            </TabsContent>
+
+            <TabsContent value="costs">
+              <CostMarginDashboard />
             </TabsContent>
           </Tabs>
         </div>
