@@ -96,7 +96,11 @@ const mapTransition = (transition: string): string | null => {
   switch (transition) {
     case 'fade': return 'fade';
     case 'crossfade': return 'fade';
+    case 'fade_black': return 'fade';
+    case 'dissolve': return 'fade'; // Shotstack maps dissolve to fade
     case 'wipe': return 'wipeRight';
+    case 'wipe_left': return 'wipeLeft';
+    case 'wipe_right': return 'wipeRight';
     default: return null;
   }
 };
