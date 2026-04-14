@@ -28,6 +28,7 @@ import FacelessVideoPage from "./pages/FacelessVideo";
 import TrailerGeneratorPage from "./pages/TrailerGenerator";
 import GuidePage from "./pages/Guide";
 import GuidePDF from "./pages/GuidePDF";
+import StoryMode from "./pages/StoryMode";
 
 import NotFound from "./pages/NotFound";
 
