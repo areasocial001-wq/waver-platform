@@ -422,6 +422,49 @@ serve(async (req) => {
           });
         }
 
+        // Add per-scene narration audio tracks
+        if (audioUrls && audioUrls.length > 0) {
+          const narrationClips: any[] = [];
+          let narrationStart = introDuration;
+          for (let i = 0; i < audioUrls.length; i++) {
+            if (!audioUrls[i]) continue;
+            let narrationSrc = audioUrls[i];
+            // Upload blob URLs won't work with Shotstack - skip blob: URLs
+            if (narrationSrc.startsWith('blob:')) continue;
+            const clipLen = clipDurations?.[i] || 5;
+            narrationClips.push({
+              asset: {
+                type: 'audio',
+                src: narrationSrc,
+                volume: 1,
+              },
+              start: narrationStart,
+              length: clipLen,
+            });
+            narrationStart += clipLen;
+          }
+          if (narrationClips.length > 0) {
+            timeline.tracks.push({ clips: narrationClips });
+          }
+        }
+
+        // Add background music track
+        if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
+          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
+          timeline.tracks.push({
+            clips: [{
+              asset: {
+                type: 'audio',
+                src: backgroundMusicUrl,
+                volume: musicVolume,
+              },
+              start: 0,
+              length: totalDur,
+            }],
+          });
+        }
+
         // Build render request with aspect ratio
         const aspectSize = getAspectRatioSize(aspectRatio, resolution);
         const output: any = {
