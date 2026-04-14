@@ -311,12 +311,13 @@ export const StoryModeWizard = () => {
   // Production time estimate (seconds)
   const estimatedProductionTime = script ? (() => {
     const n = script.scenes.length;
-    const imgTime = n * 15;   // ~15s per image
-    const ttsTime = n * 8;    // ~8s per TTS
-    const videoTime = n * 45; // ~45s per video
-    const musicTime = 30;     // ~30s for background music
-    const concatTime = 10;    // ~10s for concat
-    return imgTime + ttsTime + videoTime + musicTime + concatTime;
+    const imgTime = n * 15;
+    const ttsTime = n * 8;
+    const videoTime = n * 45;
+    const sfxTime = n * 5;    // ~5s per SFX
+    const musicTime = 30;
+    const concatTime = 10;
+    return imgTime + ttsTime + videoTime + sfxTime + musicTime + concatTime;
   })() : 0;
 
   const formatTime = (seconds: number) => {
