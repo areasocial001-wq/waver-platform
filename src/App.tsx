@@ -28,6 +28,7 @@ import FacelessVideoPage from "./pages/FacelessVideo";
 import TrailerGeneratorPage from "./pages/TrailerGenerator";
 import GuidePage from "./pages/Guide";
 import GuidePDF from "./pages/GuidePDF";
+import StoryMode from "./pages/StoryMode";
 
 import NotFound from "./pages/NotFound";
 
@@ -67,6 +68,7 @@ const App = () => (
             <Route path="/luma-tools" element={<LumaToolsPage />} />
             <Route path="/faceless-video" element={<FacelessVideoPage />} />
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
+            <Route path="/story-mode" element={<StoryMode />} />
             <Route path="/admin" element={<AdminDashboard />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

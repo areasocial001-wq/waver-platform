@@ -58,7 +58,8 @@ export const Navbar = () => {
   const isLumaToolsPage = location.pathname === "/luma-tools";
   const isFacelessVideoPage = location.pathname === "/faceless-video";
   const isTrailerPage = location.pathname === "/trailer-generator";
-  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage || isAdminPage || isLumaToolsPage || isFacelessVideoPage || isTrailerPage;
+  const isStoryModePage = location.pathname === "/story-mode";
+  const isSubPage = isHistoryPage || isStoryboardsPage || isContentGeneratorPage || isFreepikPage || isApiMonitoringPage || isVideoEditorPage || isTalkingAvatarPage || isSettingsPage || isExportTestPage || isViduToolsPage || isLTXToolsPage || isNLtoJSONPage || isTimelineEditorPage || isAdminPage || isLumaToolsPage || isFacelessVideoPage || isTrailerPage || isStoryModePage;
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -271,6 +272,11 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/trailer-generator")}>
                     <Clapperboard className="w-4 h-4 mr-2" />
                     Trailer Generator
+                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/story-mode")}>
+                    <Film className="w-4 h-4 mr-2" />
+                    Story Mode
                     <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
