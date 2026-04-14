@@ -585,11 +585,31 @@ export const StoryModeWizard = () => {
     const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
     if (vids.length >= 2) {
       try {
-        toast.info("Concatenazione...");
-        const { data, error } = await supabase.functions.invoke("video-concat", { body: { videoUrls: vids.map(s => s.videoUrl), transition: "crossfade", transitionDuration: 0.5 } });
+        toast.info("Concatenazione e mix audio...");
+        // Build per-scene transition config
+        const transitions = vids.map((s, i) => ({
+          type: s.transition || "crossfade",
+          duration: s.transitionDuration || 0.5,
+        }));
+        // Collect narration audio URLs for mixing
+        const narrationUrls = scenes
+          .filter(s => s.videoStatus === "completed" && s.audioUrl)
+          .map(s => s.audioUrl);
+
+        const { data, error } = await supabase.functions.invoke("video-concat", {
+          body: {
+            videoUrls: vids.map(s => s.videoUrl),
+            transition: transitions[0]?.type || "crossfade",
+            transitionDuration: transitions[0]?.duration || 0.5,
+            transitions, // per-scene transitions
+            audioUrls: narrationUrls, // narration audio tracks
+            backgroundMusicUrl: backgroundMusicUrl, // mix background music
+            musicVolume: 0.25, // background music at 25% volume
+          },
+        });
         if (error) throw error;
         setFinalVideoUrl(data.videoUrl || data.url);
-        toast.success("Video finale generato! 🎬");
+        toast.success("Video finale con audio mixato generato! 🎬");
       } catch { toast.error("Errore concatenazione"); }
     }
     setStep("complete");
