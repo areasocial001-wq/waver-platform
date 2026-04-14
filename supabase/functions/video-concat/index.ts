@@ -279,8 +279,9 @@ serve(async (req) => {
     }
     
     const { 
-      videoUrls, clipDurations, clipEffects, transition, transitionDuration, 
-      resolution, aspectRatio, fps, audioUrl, audioVolume, intro, outro 
+      videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
+      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
+      intro, outro 
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
