@@ -774,6 +774,37 @@ export const StoryModeWizard = () => {
             </CardHeader>
           </Card>
 
+          {/* Volume Controls */}
+          <Card className="border-secondary/20 bg-card/50">
+            <CardContent className="py-3 px-4 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><Volume2 className="w-4 h-4 text-primary" />Controllo Volumi</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center justify-between">
+                    <span>🎙️ Narrazione</span>
+                    <span className="font-mono text-muted-foreground">{script.narrationVolume ?? 100}%</span>
+                  </Label>
+                  <Slider
+                    value={[script.narrationVolume ?? 100]}
+                    onValueChange={([v]) => setScript({ ...script, narrationVolume: v })}
+                    min={0} max={100} step={5}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center justify-between">
+                    <span>🎵 Musica di Sottofondo</span>
+                    <span className="font-mono text-muted-foreground">{script.musicVolume ?? 25}%</span>
+                  </Label>
+                  <Slider
+                    value={[script.musicVolume ?? 25]}
+                    onValueChange={([v]) => setScript({ ...script, musicVolume: v })}
+                    min={0} max={100} step={5}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="text-xs text-muted-foreground text-center">
             Trascina le scene per riordinarle • Clicca 🔊 per l'anteprima audio • ✏️ per modificare
           </div>
@@ -810,7 +841,7 @@ export const StoryModeWizard = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Tempo stimato di produzione</p>
                 <p className="text-xs text-muted-foreground">
-                  {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s) + musica + montaggio
+                  {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s + SFX ~5s) + musica + montaggio
                 </p>
               </div>
               <Badge variant="secondary" className="text-base font-bold px-3 py-1">
