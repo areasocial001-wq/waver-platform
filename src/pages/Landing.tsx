@@ -1022,8 +1022,8 @@ export default function Landing() {
               Pronto a creare il tuo prossimo{" "}
               <span className="bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">capolavoro?</span>
             </motion.h2>
-            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,60%)] text-lg mb-10">
-              Unisciti a migliaia di creativi che stanno già usando AI Production Hub per produrre contenuti straordinari.
+            <motion.p variants={fadeUp} custom={1} className="text-[hsl(215,20%,60%)] text-lg mb-10 whitespace-pre-line">
+              {"Unisciti a migliaia di creativi che stanno già usando AI Production Hub\nper produrre contenuti straordinari."}
             </motion.p>
             <motion.div variants={fadeUp} custom={2}>
               <Button
