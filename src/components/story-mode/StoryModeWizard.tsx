@@ -296,6 +296,152 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Production time estimate (seconds)
+  const estimatedProductionTime = script ? (() => {
+    const n = script.scenes.length;
+    const imgTime = n * 15;   // ~15s per image
+    const ttsTime = n * 8;    // ~8s per TTS
+    const videoTime = n * 45; // ~45s per video
+    const musicTime = 30;     // ~30s for background music
+    const concatTime = 10;    // ~10s for concat
+    return imgTime + ttsTime + videoTime + musicTime + concatTime;
+  })() : 0;
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  };
+
+  // Export script as PDF
+  const exportScriptPDF = async () => {
+    if (!script) return;
+    try {
+      toast.info("Generazione PDF in corso...");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const margin = 15;
+      const contentW = pageW - margin * 2;
+      let y = 20;
+
+      const checkPage = (needed: number) => {
+        if (y + needed > pdf.internal.pageSize.getHeight() - 20) {
+          pdf.addPage();
+          y = 20;
+        }
+      };
+
+      // Title
+      pdf.setFontSize(22);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(script.title, pageW / 2, y, { align: "center" });
+      y += 10;
+
+      // Synopsis
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "italic");
+      const synLines = pdf.splitTextToSize(script.synopsis, contentW);
+      pdf.text(synLines, margin, y);
+      y += synLines.length * 5 + 5;
+
+      // Meta
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(`Stile: ${input.styleName}  |  Scene: ${script.scenes.length}  |  Musica: ${script.suggestedMusic}`, margin, y);
+      y += 10;
+
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, y, pageW - margin, y);
+      y += 8;
+
+      // Scenes
+      for (let i = 0; i < script.scenes.length; i++) {
+        const scene = script.scenes[i];
+        checkPage(60);
+
+        // Scene header
+        pdf.setFontSize(13);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(`Scena ${scene.sceneNumber}`, margin, y);
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`${scene.duration}s  |  ${scene.cameraMovement.replace(/_/g, " ")}  |  ${scene.mood}`, margin + 25, y);
+        y += 7;
+
+        // Image thumbnail if available
+        if (scene.imageUrl) {
+          try {
+            const img = await loadImageAsBase64(scene.imageUrl);
+            checkPage(45);
+            pdf.addImage(img, "JPEG", margin, y, 60, 34);
+            // Narration next to image
+            pdf.setFontSize(10);
+            pdf.setFont("helvetica", "normal");
+            const narrationLines = pdf.splitTextToSize(`🎙️ ${scene.narration}`, contentW - 65);
+            pdf.text(narrationLines, margin + 64, y + 3);
+            y += Math.max(36, narrationLines.length * 5) + 3;
+          } catch {
+            // Image failed to load, just show text
+            pdf.setFontSize(10);
+            const narrationLines = pdf.splitTextToSize(`🎙️ ${scene.narration}`, contentW);
+            pdf.text(narrationLines, margin, y);
+            y += narrationLines.length * 5 + 3;
+          }
+        } else {
+          pdf.setFontSize(10);
+          const narrationLines = pdf.splitTextToSize(`🎙️ ${scene.narration}`, contentW);
+          pdf.text(narrationLines, margin, y);
+          y += narrationLines.length * 5 + 3;
+        }
+
+        // Image prompt
+        checkPage(15);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "italic");
+        pdf.setTextColor(120, 120, 120);
+        const promptLines = pdf.splitTextToSize(`Prompt: ${scene.imagePrompt}`, contentW);
+        pdf.text(promptLines, margin, y);
+        pdf.setTextColor(0, 0, 0);
+        y += promptLines.length * 4 + 6;
+
+        // Separator
+        if (i < script.scenes.length - 1) {
+          checkPage(5);
+          pdf.setDrawColor(230, 230, 230);
+          pdf.line(margin, y, pageW - margin, y);
+          y += 6;
+        }
+      }
+
+      // Footer
+      pdf.setFontSize(7);
+      pdf.setTextColor(150, 150, 150);
+      pdf.text(`Generato il ${new Date().toLocaleString("it-IT")}`, margin, pdf.internal.pageSize.getHeight() - 10);
+
+      pdf.save(`${script.title.replace(/\s+/g, "-")}-script.pdf`);
+      toast.success("PDF scaricato!");
+    } catch (err: any) {
+      console.error("PDF export error:", err);
+      toast.error("Errore esportazione PDF");
+    }
+  };
+
+  const loadImageAsBase64 = (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = document.createElement("img");
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d")?.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
   const handleGenerateScript = async () => {
     if (!input.description.trim()) { toast.error("Inserisci una descrizione"); return; }
     setIsGeneratingScript(true);
