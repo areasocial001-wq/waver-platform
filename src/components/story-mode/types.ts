@@ -5,6 +5,7 @@ export interface StoryScene {
   imagePrompt: string;
   cameraMovement: string;
   mood: string;
+  voiceId?: string; // per-scene voice override
   // Generation state
   imageUrl?: string;
   videoUrl?: string;
