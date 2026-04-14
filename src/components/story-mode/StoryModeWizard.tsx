@@ -78,6 +78,18 @@ export const StoryModeWizard = () => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [regeneratingScene, setRegeneratingScene] = useState<{ idx: number; type: string } | null>(null);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  // Elapsed timer
+  useEffect(() => {
+    if (!generationStartTime || !isGenerating) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - generationStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [generationStartTime, isGenerating]);
 
   // DB persistence
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -479,11 +491,51 @@ export const StoryModeWizard = () => {
     } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
   };
 
+  // Upload PDF/text file for description
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingDoc(true);
+    try {
+      if (file.type === "text/plain" || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+        const text = await file.text();
+        setInput(prev => ({ ...prev, description: text.slice(0, 5000) }));
+        toast.success("Testo caricato!");
+      } else if (file.type === "application/pdf") {
+        toast.info("Estrazione testo dal PDF...");
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = (reader.result as string).split(",")[1];
+          const { data, error } = await supabase.functions.invoke("extract-pdf-text", {
+            body: { pdfBase64: base64 },
+          });
+          if (error) throw error;
+          if (data?.text) {
+            setInput(prev => ({ ...prev, description: data.text.slice(0, 5000) }));
+            toast.success("Testo estratto dal PDF!");
+          } else {
+            toast.error("Nessun testo estratto");
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error("Formato non supportato. Usa PDF o TXT.");
+      }
+    } catch (err: any) {
+      console.error("Doc upload error:", err);
+      toast.error("Errore nel caricamento del documento");
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
   const handleGenerateAll = async () => {
     if (!script) return;
     setIsGenerating(true);
     setStep("generation");
     setGenerationProgress(0);
+    setGenerationStartTime(Date.now());
+    setElapsedSeconds(0);
     const totalSteps = script.scenes.length * 3 + 1;
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
@@ -651,7 +703,16 @@ export const StoryModeWizard = () => {
             <Card className="border-secondary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Film className="w-5 h-5 text-secondary" />Descrizione della Storia</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Textarea placeholder="Descrivi la storia che vuoi raccontare..." value={input.description} onChange={e => setInput(p => ({ ...p, description: e.target.value }))} className="min-h-[120px]" />
+                <div className="relative">
+                  <Textarea placeholder="Descrivi la storia che vuoi raccontare, oppure carica un PDF/TXT..." value={input.description} onChange={e => setInput(p => ({ ...p, description: e.target.value }))} className="min-h-[120px]" />
+                  <label className="absolute top-2 right-2 cursor-pointer">
+                    <Button variant="outline" size="sm" className="pointer-events-none" disabled={isUploadingDoc}>
+                      {isUploadingDoc ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
+                      PDF/TXT
+                    </Button>
+                    <input type="file" accept=".pdf,.txt,.md,text/plain,application/pdf" className="hidden" onChange={handleDocUpload} disabled={isUploadingDoc} />
+                  </label>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Lingua</Label>
@@ -758,6 +819,32 @@ export const StoryModeWizard = () => {
                   <span className="text-sm text-muted-foreground">{generationProgress}%</span>
                 </div>
                 <Progress value={generationProgress} className="h-3" />
+                {/* Real-time elapsed vs estimated timer */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Timer className={cn("w-4 h-4", elapsedSeconds > estimatedProductionTime ? "text-destructive" : "text-primary")} />
+                    <span className="font-mono font-medium">
+                      {formatTime(elapsedSeconds)}
+                    </span>
+                    <span className="text-muted-foreground">trascorso</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">stimato</span>
+                    <span className="font-mono font-medium">~{formatTime(estimatedProductionTime)}</span>
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
+                {elapsedSeconds > 0 && (
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-1000",
+                        elapsedSeconds > estimatedProductionTime ? "bg-destructive" : "bg-primary/60"
+                      )}
+                      style={{ width: `${Math.min((elapsedSeconds / estimatedProductionTime) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
                 {backgroundMusicUrl && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Music className="w-3 h-3 text-primary" />Colonna sonora generata</div>}
               </div>
             </CardContent>
