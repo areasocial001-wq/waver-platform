@@ -844,21 +844,31 @@ export const StoryModeWizard = () => {
             <Card className="border-accent/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-accent" />Stile Visivo</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-2">
-                  {VIDEO_STYLES.map(style => (
-                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
-                      <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
-                      <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
-                        <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
-                      </div>
-                      {input.styleId === style.id && (
-                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <div className="grid grid-cols-3 gap-2">
+                    {VIDEO_STYLES.map(style => (
+                      <Tooltip key={style.id}>
+                        <TooltipTrigger asChild>
+                          <button onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
+                            <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
+                            <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
+                              <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
+                            </div>
+                            {input.styleId === style.id && (
+                              <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px]">
+                          <p className="font-medium text-xs">{style.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{style.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
               </CardContent>
             </Card>
           </div>
