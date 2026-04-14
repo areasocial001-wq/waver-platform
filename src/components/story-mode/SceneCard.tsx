@@ -19,6 +19,11 @@ const CAMERA_MOVEMENTS = [
   "pan_right", "tilt_up", "tilt_down", "dolly_forward",
 ];
 
+export interface VoiceOption {
+  id: string;
+  name: string;
+}
+
 interface SceneCardProps {
   scene: StoryScene;
   index: number;
@@ -26,6 +31,8 @@ interface SceneCardProps {
   isPreviewLoading: boolean;
   isDragging?: boolean;
   mode: "review" | "generation" | "complete";
+  voices?: VoiceOption[];
+  defaultVoiceId?: string;
   onToggleEdit: () => void;
   onUpdate: (field: keyof StoryScene, value: any) => void;
   onPreviewAudio: () => void;
@@ -40,7 +47,7 @@ interface SceneCardProps {
 
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
-  mode, onToggleEdit, onUpdate, onPreviewAudio,
+  mode, voices, defaultVoiceId, onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
