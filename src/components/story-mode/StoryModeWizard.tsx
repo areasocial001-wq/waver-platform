@@ -272,7 +272,7 @@ export const StoryModeWizard = () => {
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text: scene.narration, voiceId: input.voiceId, language_code: input.language }),
+          body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
         });
         if (!response.ok) throw new Error("TTS failed");
         const blob = await response.blob();
