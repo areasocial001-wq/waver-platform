@@ -819,6 +819,32 @@ export const StoryModeWizard = () => {
                   <span className="text-sm text-muted-foreground">{generationProgress}%</span>
                 </div>
                 <Progress value={generationProgress} className="h-3" />
+                {/* Real-time elapsed vs estimated timer */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Timer className={cn("w-4 h-4", elapsedSeconds > estimatedProductionTime ? "text-destructive" : "text-primary")} />
+                    <span className="font-mono font-medium">
+                      {formatTime(elapsedSeconds)}
+                    </span>
+                    <span className="text-muted-foreground">trascorso</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">stimato</span>
+                    <span className="font-mono font-medium">~{formatTime(estimatedProductionTime)}</span>
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </div>
+                {elapsedSeconds > 0 && (
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-1000",
+                        elapsedSeconds > estimatedProductionTime ? "bg-destructive" : "bg-primary/60"
+                      )}
+                      style={{ width: `${Math.min((elapsedSeconds / estimatedProductionTime) * 100, 100)}%` }}
+                    />
+                  </div>
+                )}
                 {backgroundMusicUrl && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Music className="w-3 h-3 text-primary" />Colonna sonora generata</div>}
               </div>
             </CardContent>
