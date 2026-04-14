@@ -37,18 +37,18 @@ import halftoneImg from "@/assets/styles/halftone.jpg";
 import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
 
 const VIDEO_STYLES = [
-  { id: "animation", name: "Animation", preview: animationImg, promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
-  { id: "claymation", name: "Claymation", preview: claymationImg, promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
-  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
-  { id: "watercolor", name: "Watercolor", preview: watercolorImg, promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
-  { id: "cinema", name: "Cinema", preview: cinemaImg, promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
-  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
-  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
-  { id: "collage", name: "Collage", preview: collageImg, promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
-  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
-  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
-  { id: "halftone", name: "Halftone", preview: halftoneImg, promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
-  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
+  { id: "animation", name: "Animation", preview: animationImg, description: "Stile animazione 3D fluida e colorata", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
+  { id: "claymation", name: "Claymation", preview: claymationImg, description: "Stop-motion in plastilina artigianale", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
+  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, description: "Fumetto dark con contrasti forti", promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
+  { id: "watercolor", name: "Watercolor", preview: watercolorImg, description: "Acquerello delicato con sfumature morbide", promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
+  { id: "cinema", name: "Cinema", preview: cinemaImg, description: "Cinematografico con color grading professionale", promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
+  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, description: "Poster retrò anni '50-'60", promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
+  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, description: "Fantascienza con atmosfere futuristiche", promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
+  { id: "collage", name: "Collage", preview: collageImg, description: "Collage misto con texture e ritagli", promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
+  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, description: "Illustrazione a penna e inchiostro", promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
+  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, description: "Costruzioni in blocchetti colorati stile LEGO", promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
+  { id: "halftone", name: "Halftone", preview: halftoneImg, description: "Effetto mezzetinte pop art", promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
+  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, description: "Grafica in movimento pulita e moderna", promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
 ];
 
 const LANGUAGES = [
