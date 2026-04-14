@@ -703,7 +703,16 @@ export const StoryModeWizard = () => {
             <Card className="border-secondary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Film className="w-5 h-5 text-secondary" />Descrizione della Storia</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <Textarea placeholder="Descrivi la storia che vuoi raccontare..." value={input.description} onChange={e => setInput(p => ({ ...p, description: e.target.value }))} className="min-h-[120px]" />
+                <div className="relative">
+                  <Textarea placeholder="Descrivi la storia che vuoi raccontare, oppure carica un PDF/TXT..." value={input.description} onChange={e => setInput(p => ({ ...p, description: e.target.value }))} className="min-h-[120px]" />
+                  <label className="absolute top-2 right-2 cursor-pointer">
+                    <Button variant="outline" size="sm" className="pointer-events-none" disabled={isUploadingDoc}>
+                      {isUploadingDoc ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
+                      PDF/TXT
+                    </Button>
+                    <input type="file" accept=".pdf,.txt,.md,text/plain,application/pdf" className="hidden" onChange={handleDocUpload} disabled={isUploadingDoc} />
+                  </label>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Lingua</Label>
