@@ -78,6 +78,18 @@ export const StoryModeWizard = () => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [regeneratingScene, setRegeneratingScene] = useState<{ idx: number; type: string } | null>(null);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  // Elapsed timer
+  useEffect(() => {
+    if (!generationStartTime || !isGenerating) return;
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - generationStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [generationStartTime, isGenerating]);
 
   // DB persistence
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -479,11 +491,51 @@ export const StoryModeWizard = () => {
     } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
   };
 
+  // Upload PDF/text file for description
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingDoc(true);
+    try {
+      if (file.type === "text/plain" || file.name.endsWith(".txt") || file.name.endsWith(".md")) {
+        const text = await file.text();
+        setInput(prev => ({ ...prev, description: text.slice(0, 5000) }));
+        toast.success("Testo caricato!");
+      } else if (file.type === "application/pdf") {
+        toast.info("Estrazione testo dal PDF...");
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = (reader.result as string).split(",")[1];
+          const { data, error } = await supabase.functions.invoke("extract-pdf-text", {
+            body: { pdfBase64: base64 },
+          });
+          if (error) throw error;
+          if (data?.text) {
+            setInput(prev => ({ ...prev, description: data.text.slice(0, 5000) }));
+            toast.success("Testo estratto dal PDF!");
+          } else {
+            toast.error("Nessun testo estratto");
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        toast.error("Formato non supportato. Usa PDF o TXT.");
+      }
+    } catch (err: any) {
+      console.error("Doc upload error:", err);
+      toast.error("Errore nel caricamento del documento");
+    } finally {
+      setIsUploadingDoc(false);
+    }
+  };
+
   const handleGenerateAll = async () => {
     if (!script) return;
     setIsGenerating(true);
     setStep("generation");
     setGenerationProgress(0);
+    setGenerationStartTime(Date.now());
+    setElapsedSeconds(0);
     const totalSteps = script.scenes.length * 3 + 1;
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
