@@ -89,6 +89,7 @@ export const SceneCard = ({
           <div className="flex items-center gap-2 text-xs">
             <StatusDot status={scene.imageStatus} /><span>Img</span>
             <StatusDot status={scene.audioStatus} /><span>Audio</span>
+            <StatusDot status={scene.sfxStatus} /><span>SFX</span>
             <StatusDot status={scene.videoStatus} /><span>Video</span>
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
