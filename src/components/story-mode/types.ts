@@ -9,6 +9,7 @@ export interface StoryScene {
   imageUrl?: string;
   videoUrl?: string;
   audioUrl?: string;
+  previewAudioUrl?: string;
   imageStatus?: "idle" | "generating" | "completed" | "error";
   videoStatus?: "idle" | "generating" | "completed" | "error";
   audioStatus?: "idle" | "generating" | "completed" | "error";
