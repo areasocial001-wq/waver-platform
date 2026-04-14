@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,11 +13,11 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Eye, Pencil, Music, RefreshCw,
+  Save, FolderOpen, Trash2, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 
-// Style data (imported inline to avoid circular deps)
 const VIDEO_STYLES = [
   { id: "animation", name: "Animation", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
   { id: "claymation", name: "Claymation", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
@@ -50,6 +50,14 @@ const LANGUAGES = [
   { code: "de", name: "🇩🇪 Deutsch" },
 ];
 
+interface SavedProject {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const StoryModeWizard = () => {
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>({
@@ -68,6 +76,126 @@ export const StoryModeWizard = () => {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
+  const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
+
+  // DB persistence
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showProjectList, setShowProjectList] = useState(false);
+
+  // Load saved projects on mount
+  useEffect(() => {
+    loadProjectList();
+  }, []);
+
+  const loadProjectList = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from("story_mode_projects")
+      .select("id, title, status, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (data) setSavedProjects(data);
+  };
+
+  const saveProject = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !script) return;
+    setIsSaving(true);
+    try {
+      const projectData = {
+        user_id: user.id,
+        title: script.title,
+        synopsis: script.synopsis,
+        suggested_music: script.suggestedMusic,
+        scenes: script.scenes as any,
+        input_config: input as any,
+        status: step === "complete" ? "completed" : step === "generation" ? "generating" : "draft",
+        final_video_url: finalVideoUrl,
+        background_music_url: backgroundMusicUrl,
+      };
+
+      if (projectId) {
+        const { error } = await supabase
+          .from("story_mode_projects")
+          .update(projectData)
+          .eq("id", projectId);
+        if (error) throw error;
+        toast.success("Progetto aggiornato!");
+      } else {
+        const { data, error } = await supabase
+          .from("story_mode_projects")
+          .insert(projectData)
+          .select("id")
+          .single();
+        if (error) throw error;
+        setProjectId(data.id);
+        toast.success("Progetto salvato!");
+      }
+      loadProjectList();
+    } catch (err: any) {
+      toast.error(err.message || "Errore nel salvataggio");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const loadProject = async (id: string) => {
+    const { data, error } = await supabase
+      .from("story_mode_projects")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error || !data) {
+      toast.error("Errore nel caricamento del progetto");
+      return;
+    }
+    setProjectId(data.id);
+    const config = data.input_config as any;
+    setInput({
+      imageUrl: config.imageUrl || "",
+      imageFile: null,
+      styleId: config.styleId || "cinema",
+      styleName: config.styleName || "Cinema",
+      stylePromptModifier: config.stylePromptModifier || "",
+      description: config.description || "",
+      language: config.language || "it",
+      voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL",
+      numScenes: config.numScenes || 8,
+    });
+    setScript({
+      title: data.title,
+      synopsis: data.synopsis || "",
+      scenes: (data.scenes as any) || [],
+      suggestedMusic: data.suggested_music || "",
+    });
+    setFinalVideoUrl(data.final_video_url);
+    setBackgroundMusicUrl(data.background_music_url);
+
+    if (data.status === "completed") setStep("complete");
+    else if (data.status === "generating") setStep("generation");
+    else setStep("script");
+
+    setShowProjectList(false);
+    toast.success(`Progetto "${data.title}" caricato`);
+  };
+
+  const deleteProject = async (id: string) => {
+    const { error } = await supabase.from("story_mode_projects").delete().eq("id", id);
+    if (error) {
+      toast.error("Errore nell'eliminazione");
+      return;
+    }
+    if (projectId === id) {
+      setProjectId(null);
+    }
+    toast.success("Progetto eliminato");
+    loadProjectList();
+  };
 
   // Handle image upload
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +205,6 @@ export const StoryModeWizard = () => {
     setInput(prev => ({ ...prev, imageUrl: url, imageFile: file }));
   }, []);
 
-  // Select style
   const handleStyleSelect = useCallback((styleId: string) => {
     const style = VIDEO_STYLES.find(s => s.id === styleId);
     if (style) {
@@ -89,6 +216,14 @@ export const StoryModeWizard = () => {
       }));
     }
   }, []);
+
+  // Scene editing
+  const updateScene = (index: number, field: keyof StoryScene, value: any) => {
+    if (!script) return;
+    const updatedScenes = [...script.scenes];
+    updatedScenes[index] = { ...updatedScenes[index], [field]: value };
+    setScript({ ...script, scenes: updatedScenes });
+  };
 
   // Generate script
   const handleGenerateScript = async () => {
@@ -127,14 +262,37 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Convert image to base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  // Generate background music
+  const generateBackgroundMusic = async (): Promise<string | null> => {
+    if (!script?.suggestedMusic) return null;
+    try {
+      toast.info("Generazione colonna sonora in corso...");
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            prompt: script.suggestedMusic,
+            duration: Math.min(script.scenes.reduce((acc, s) => acc + s.duration, 0), 120),
+          }),
+        }
+      );
+      if (!response.ok) throw new Error(`Music generation failed: ${response.status}`);
+      const audioBlob = await response.blob();
+      const musicUrl = URL.createObjectURL(audioBlob);
+      setBackgroundMusicUrl(musicUrl);
+      toast.success("Colonna sonora generata! 🎵");
+      return musicUrl;
+    } catch (err: any) {
+      console.error("Music generation error:", err);
+      toast.error("Errore nella generazione della colonna sonora");
+      return null;
+    }
   };
 
   // Generate all assets
@@ -144,7 +302,8 @@ export const StoryModeWizard = () => {
     setStep("generation");
     setGenerationProgress(0);
 
-    const totalSteps = script.scenes.length * 3; // image + audio + video per scene
+    // +1 for music generation
+    const totalSteps = script.scenes.length * 3 + 1;
     let completed = 0;
 
     const updateProgress = () => {
@@ -154,7 +313,10 @@ export const StoryModeWizard = () => {
 
     const updatedScenes = [...script.scenes];
 
-    // Step 1: Generate images for all scenes
+    // Step 0: Generate background music in parallel
+    const musicPromise = generateBackgroundMusic().then(() => updateProgress());
+
+    // Step 1: Generate images
     for (let i = 0; i < updatedScenes.length; i++) {
       const scene = updatedScenes[i];
       try {
@@ -168,7 +330,6 @@ export const StoryModeWizard = () => {
             style: input.stylePromptModifier,
           },
         });
-
         if (error) throw error;
         updatedScenes[i] = { ...updatedScenes[i], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
       } catch (err: any) {
@@ -179,7 +340,7 @@ export const StoryModeWizard = () => {
       setScript(prev => prev ? { ...prev, scenes: [...updatedScenes] } : prev);
     }
 
-    // Step 2: Generate voiceover for all scenes
+    // Step 2: Generate voiceover
     for (let i = 0; i < updatedScenes.length; i++) {
       const scene = updatedScenes[i];
       try {
@@ -202,7 +363,6 @@ export const StoryModeWizard = () => {
             }),
           }
         );
-
         if (!response.ok) throw new Error("TTS generation failed");
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
@@ -235,7 +395,6 @@ export const StoryModeWizard = () => {
             model: "kling-2.1",
           },
         });
-
         if (error) throw error;
         updatedScenes[i] = { ...updatedScenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
       } catch (err: any) {
@@ -245,6 +404,9 @@ export const StoryModeWizard = () => {
       updateProgress();
       setScript(prev => prev ? { ...prev, scenes: [...updatedScenes] } : prev);
     }
+
+    // Wait for music
+    await musicPromise;
 
     // Step 4: Concatenate videos
     const completedVideos = updatedScenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
@@ -269,46 +431,118 @@ export const StoryModeWizard = () => {
 
     setStep("complete");
     setIsGenerating(false);
+
+    // Auto-save
+    setTimeout(() => saveProject(), 500);
   };
 
-  // Render step indicators
-  const steps: { key: StoryStep; label: string; icon: React.ReactNode }[] = [
+  // Step indicators
+  const stepsConfig: { key: StoryStep; label: string; icon: React.ReactNode }[] = [
     { key: "input", label: "Input", icon: <Upload className="w-4 h-4" /> },
     { key: "script", label: "Script", icon: <Pencil className="w-4 h-4" /> },
     { key: "generation", label: "Generazione", icon: <Sparkles className="w-4 h-4" /> },
     { key: "complete", label: "Video Finale", icon: <Film className="w-4 h-4" /> },
   ];
 
-  const stepIndex = steps.findIndex(s => s.key === step);
+  const stepIndex = stepsConfig.findIndex(s => s.key === step);
 
   return (
     <div className="space-y-6">
-      {/* Progress Steps */}
-      <div className="flex items-center justify-center gap-2">
-        {steps.map((s, idx) => (
-          <div key={s.key} className="flex items-center gap-2">
-            <div
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
-                idx <= stepIndex
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
+      {/* Top bar: progress + actions */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          {stepsConfig.map((s, idx) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <div
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all",
+                  idx <= stepIndex
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {idx < stepIndex ? <Check className="w-4 h-4" /> : s.icon}
+                <span className="hidden sm:inline">{s.label}</span>
+              </div>
+              {idx < stepsConfig.length - 1 && (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               )}
-            >
-              {idx < stepIndex ? <Check className="w-4 h-4" /> : s.icon}
-              <span className="hidden sm:inline">{s.label}</span>
             </div>
-            {idx < steps.length - 1 && (
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          {script && (
+            <Button variant="outline" size="sm" onClick={saveProject} disabled={isSaving}>
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              <span className="hidden sm:inline ml-1">Salva</span>
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowProjectList(!showProjectList)}
+          >
+            <FolderOpen className="w-4 h-4" />
+            <span className="hidden sm:inline ml-1">Progetti</span>
+            {savedProjects.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">{savedProjects.length}</Badge>
             )}
-          </div>
-        ))}
+          </Button>
+        </div>
       </div>
+
+      {/* Saved Projects Panel */}
+      {showProjectList && (
+        <Card className="border-accent/20 bg-card/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-accent" />
+              Progetti Salvati
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {savedProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nessun progetto salvato</p>
+            ) : (
+              <div className="grid gap-2 max-h-60 overflow-y-auto">
+                {savedProjects.map(p => (
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors",
+                      projectId === p.id ? "border-primary bg-primary/5" : "border-border"
+                    )}
+                    onClick={() => loadProject(p.id)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{p.title}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="outline" className="text-xs">{p.status}</Badge>
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(p.updated_at).toLocaleDateString("it-IT")}
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={(e) => { e.stopPropagation(); deleteProject(p.id); }}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Step 1: Input */}
       {step === "input" && (
         <div className="grid gap-6 md:grid-cols-2">
-          {/* Left: Image + Style */}
           <div className="space-y-4">
             <Card className="border-primary/20 bg-card/50">
               <CardHeader>
@@ -320,11 +554,7 @@ export const StoryModeWizard = () => {
               <CardContent>
                 {input.imageUrl ? (
                   <div className="relative">
-                    <img
-                      src={input.imageUrl}
-                      alt="Reference"
-                      className="w-full rounded-lg max-h-48 object-cover"
-                    />
+                    <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg max-h-48 object-cover" />
                     <Button
                       variant="secondary"
                       size="sm"
@@ -337,16 +567,9 @@ export const StoryModeWizard = () => {
                 ) : (
                   <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors">
                     <Upload className="w-8 h-8 text-primary/50 mb-2" />
-                    <span className="text-sm text-muted-foreground">
-                      Carica un'immagine di riferimento
-                    </span>
+                    <span className="text-sm text-muted-foreground">Carica un'immagine di riferimento</span>
                     <span className="text-xs text-muted-foreground mt-1">(opzionale)</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
+                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </label>
                 )}
               </CardContent>
@@ -380,7 +603,6 @@ export const StoryModeWizard = () => {
             </Card>
           </div>
 
-          {/* Right: Description + Settings */}
           <div className="space-y-4">
             <Card className="border-secondary/20 bg-card/50">
               <CardHeader>
@@ -396,46 +618,26 @@ export const StoryModeWizard = () => {
                   onChange={e => setInput(prev => ({ ...prev, description: e.target.value }))}
                   className="min-h-[120px]"
                 />
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs">Lingua</Label>
-                    <Select
-                      value={input.language}
-                      onValueChange={val => setInput(prev => ({ ...prev, language: val }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={input.language} onValueChange={val => setInput(prev => ({ ...prev, language: val }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {LANGUAGES.map(l => (
-                          <SelectItem key={l.code} value={l.code}>
-                            {l.name}
-                          </SelectItem>
-                        ))}
+                        {LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
                     <Label className="text-xs">Voce Narrante</Label>
-                    <Select
-                      value={input.voiceId}
-                      onValueChange={val => setInput(prev => ({ ...prev, voiceId: val }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                    <Select value={input.voiceId} onValueChange={val => setInput(prev => ({ ...prev, voiceId: val }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {VOICES.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name}
-                          </SelectItem>
-                        ))}
+                        {VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-
                 <div>
                   <Label className="text-xs">
                     Numero Scene: {input.numScenes} (~{input.numScenes * 8}s totali)
@@ -443,10 +645,7 @@ export const StoryModeWizard = () => {
                   <Slider
                     value={[input.numScenes]}
                     onValueChange={([val]) => setInput(prev => ({ ...prev, numScenes: val }))}
-                    min={4}
-                    max={12}
-                    step={1}
-                    className="mt-2"
+                    min={4} max={12} step={1} className="mt-2"
                   />
                 </div>
               </CardContent>
@@ -459,55 +658,133 @@ export const StoryModeWizard = () => {
               size="lg"
             >
               {isGeneratingScript ? (
-                <>
-                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                  Generazione Script...
-                </>
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generazione Script...</>
               ) : (
-                <>
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Genera Script AI
-                </>
+                <><Sparkles className="w-5 h-5 mr-2" />Genera Script AI</>
               )}
             </Button>
           </div>
         </div>
       )}
 
-      {/* Step 2: Script Review */}
+      {/* Step 2: Script Review with Editing */}
       {step === "script" && script && (
         <div className="space-y-4">
           <Card className="border-primary/20 bg-card/50">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl">{script.title}</CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">{script.synopsis}</p>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex-1 min-w-0">
+                  <Input
+                    value={script.title}
+                    onChange={e => setScript({ ...script, title: e.target.value })}
+                    className="text-xl font-bold bg-transparent border-none p-0 h-auto focus-visible:ring-0"
+                  />
+                  <Textarea
+                    value={script.synopsis}
+                    onChange={e => setScript({ ...script, synopsis: e.target.value })}
+                    className="mt-2 text-sm text-muted-foreground bg-transparent border-none p-0 min-h-0 resize-none focus-visible:ring-0"
+                    rows={2}
+                  />
                 </div>
-                <Badge variant="secondary" className="shrink-0">
-                  <Music className="w-3 h-3 mr-1" />
-                  {script.suggestedMusic}
-                </Badge>
+                <div className="shrink-0 space-y-1">
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Music className="w-3 h-3" />
+                    Colonna sonora
+                  </Badge>
+                  <Input
+                    value={script.suggestedMusic}
+                    onChange={e => setScript({ ...script, suggestedMusic: e.target.value })}
+                    className="text-xs h-7"
+                    placeholder="Descrivi la musica..."
+                  />
+                </div>
               </div>
             </CardHeader>
           </Card>
 
           <div className="grid gap-3">
             {script.scenes.map((scene, idx) => (
-              <Card key={idx} className="bg-card/50 border-border/50">
+              <Card
+                key={idx}
+                className={cn(
+                  "bg-card/50 transition-all",
+                  editingSceneIndex === idx ? "border-primary ring-1 ring-primary/20" : "border-border/50"
+                )}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm shrink-0">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary font-bold text-sm shrink-0 mt-1">
                       {scene.sceneNumber}
                     </div>
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant="outline" className="text-xs">{scene.duration}s</Badge>
-                        <Badge variant="outline" className="text-xs">{scene.cameraMovement.replace(/_/g, " ")}</Badge>
-                        <Badge variant="outline" className="text-xs">{scene.mood}</Badge>
+                        <Select
+                          value={String(scene.duration)}
+                          onValueChange={val => updateScene(idx, "duration", Number(val))}
+                        >
+                          <SelectTrigger className="w-20 h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[5, 6, 7, 8, 9, 10].map(d => (
+                              <SelectItem key={d} value={String(d)}>{d}s</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={scene.cameraMovement}
+                          onValueChange={val => updateScene(idx, "cameraMovement", val)}
+                        >
+                          <SelectTrigger className="w-36 h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {["static", "slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "tilt_up", "tilt_down", "dolly_forward"].map(m => (
+                              <SelectItem key={m} value={m}>{m.replace(/_/g, " ")}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={scene.mood}
+                          onChange={e => updateScene(idx, "mood", e.target.value)}
+                          className="h-7 text-xs flex-1 min-w-[100px]"
+                          placeholder="Mood..."
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setEditingSceneIndex(editingSceneIndex === idx ? null : idx)}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
                       </div>
-                      <p className="text-sm font-medium">🎙️ {scene.narration}</p>
-                      <p className="text-xs text-muted-foreground">🎨 {scene.imagePrompt}</p>
+
+                      {editingSceneIndex === idx ? (
+                        <div className="space-y-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">🎙️ Narrazione</Label>
+                            <Textarea
+                              value={scene.narration}
+                              onChange={e => updateScene(idx, "narration", e.target.value)}
+                              className="text-sm min-h-[60px]"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">🎨 Prompt Immagine (EN)</Label>
+                            <Textarea
+                              value={scene.imagePrompt}
+                              onChange={e => updateScene(idx, "imagePrompt", e.target.value)}
+                              className="text-xs min-h-[80px] font-mono"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-medium">🎙️ {scene.narration}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">🎨 {scene.imagePrompt}</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -515,29 +792,18 @@ export const StoryModeWizard = () => {
             ))}
           </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setStep("input")}
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" />
-              Modifica Input
+          <div className="flex gap-3 flex-wrap">
+            <Button variant="outline" onClick={() => setStep("input")}>
+              <ChevronLeft className="w-4 h-4 mr-2" />Modifica Input
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleGenerateScript}
-              disabled={isGeneratingScript}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Rigenera Script
+            <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}>
+              <RefreshCw className="w-4 h-4 mr-2" />Rigenera Script
             </Button>
-            <Button
-              onClick={handleGenerateAll}
-              className="flex-1"
-              size="lg"
-            >
-              <Play className="w-5 h-5 mr-2" />
-              Avvia Produzione Completa
+            <Button variant="outline" onClick={saveProject} disabled={isSaving}>
+              <Save className="w-4 h-4 mr-2" />Salva Bozza
+            </Button>
+            <Button onClick={handleGenerateAll} className="flex-1" size="lg">
+              <Play className="w-5 h-5 mr-2" />Avvia Produzione Completa
             </Button>
           </div>
         </div>
@@ -554,6 +820,12 @@ export const StoryModeWizard = () => {
                   <span className="text-sm text-muted-foreground">{generationProgress}%</span>
                 </div>
                 <Progress value={generationProgress} className="h-3" />
+                {backgroundMusicUrl && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Music className="w-3 h-3 text-primary" />
+                    Colonna sonora generata
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -574,19 +846,14 @@ export const StoryModeWizard = () => {
                     </div>
                   )}
                   <div className="absolute top-2 left-2">
-                    <Badge className="bg-background/80 text-foreground text-xs">
-                      Scena {scene.sceneNumber}
-                    </Badge>
+                    <Badge className="bg-background/80 text-foreground text-xs">Scena {scene.sceneNumber}</Badge>
                   </div>
                 </div>
                 <CardContent className="p-3 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
-                    <StatusDot status={scene.imageStatus} />
-                    <span>Immagine</span>
-                    <StatusDot status={scene.audioStatus} />
-                    <span>Audio</span>
-                    <StatusDot status={scene.videoStatus} />
-                    <span>Video</span>
+                    <StatusDot status={scene.imageStatus} /><span>Img</span>
+                    <StatusDot status={scene.audioStatus} /><span>Audio</span>
+                    <StatusDot status={scene.videoStatus} /><span>Video</span>
                   </div>
                   <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
                 </CardContent>
@@ -603,67 +870,66 @@ export const StoryModeWizard = () => {
             <Card className="border-primary/20 bg-card/50">
               <CardHeader>
                 <CardTitle className="text-xl flex items-center gap-2">
-                  <Film className="w-6 h-6 text-primary" />
-                  {script.title}
+                  <Film className="w-6 h-6 text-primary" />{script.title}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <video
-                  src={finalVideoUrl}
-                  controls
-                  className="w-full rounded-lg max-h-[500px]"
-                />
-                <div className="flex gap-3 mt-4">
+              <CardContent className="space-y-4">
+                <video src={finalVideoUrl} controls className="w-full rounded-lg max-h-[500px]" />
+                {backgroundMusicUrl && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
+                    <Music className="w-5 h-5 text-primary shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Colonna Sonora</p>
+                      <audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" />
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={backgroundMusicUrl} download="soundtrack.mp3">
+                        <Download className="w-3 h-3" />
+                      </a>
+                    </Button>
+                  </div>
+                )}
+                <div className="flex gap-3 flex-wrap">
                   <Button asChild>
                     <a href={finalVideoUrl} download={`${script.title}.mp4`}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Scarica Video
+                      <Download className="w-4 h-4 mr-2" />Scarica Video
                     </a>
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setStep("input");
-                      setScript(null);
-                      setFinalVideoUrl(null);
-                      setGenerationProgress(0);
-                    }}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Nuova Storia
+                  <Button variant="outline" onClick={() => {
+                    setStep("input");
+                    setScript(null);
+                    setFinalVideoUrl(null);
+                    setBackgroundMusicUrl(null);
+                    setGenerationProgress(0);
+                    setProjectId(null);
+                  }}>
+                    <RotateCcw className="w-4 h-4 mr-2" />Nuova Storia
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <Card className="border-yellow-500/20 bg-card/50">
+            <Card className="border-accent/20 bg-card/50">
               <CardContent className="pt-6">
                 <div className="text-center space-y-3">
                   <p className="text-muted-foreground">
                     La concatenazione non è riuscita, ma puoi scaricare le singole scene:
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {script.scenes
-                      .filter(s => s.videoStatus === "completed" && s.videoUrl)
-                      .map((s, i) => (
-                        <Button key={i} variant="outline" size="sm" asChild>
-                          <a href={s.videoUrl} download>
-                            <Download className="w-3 h-3 mr-1" />
-                            Scena {s.sceneNumber}
-                          </a>
-                        </Button>
-                      ))}
+                    {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).map((s, i) => (
+                      <Button key={i} variant="outline" size="sm" asChild>
+                        <a href={s.videoUrl} download><Download className="w-3 h-3 mr-1" />Scena {s.sceneNumber}</a>
+                      </Button>
+                    ))}
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setStep("input");
-                      setScript(null);
-                      setFinalVideoUrl(null);
-                    }}
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Nuova Storia
+                  <Button variant="outline" onClick={() => {
+                    setStep("input");
+                    setScript(null);
+                    setFinalVideoUrl(null);
+                    setBackgroundMusicUrl(null);
+                    setProjectId(null);
+                  }}>
+                    <RotateCcw className="w-4 h-4 mr-2" />Nuova Storia
                   </Button>
                 </div>
               </CardContent>
@@ -687,9 +953,7 @@ export const StoryModeWizard = () => {
                     )}
                     {scene.videoUrl && (
                       <Button variant="ghost" size="sm" className="h-6 px-2" asChild>
-                        <a href={scene.videoUrl} target="_blank" rel="noopener">
-                          <Eye className="w-3 h-3" />
-                        </a>
+                        <a href={scene.videoUrl} target="_blank" rel="noopener"><Eye className="w-3 h-3" /></a>
                       </Button>
                     )}
                   </div>
@@ -703,15 +967,11 @@ export const StoryModeWizard = () => {
   );
 };
 
-// Status dot component
 const StatusDot = ({ status }: { status?: string }) => {
   const color =
-    status === "completed"
-      ? "bg-green-500"
-      : status === "generating"
-      ? "bg-yellow-500 animate-pulse"
-      : status === "error"
-      ? "bg-red-500"
-      : "bg-muted-foreground/30";
+    status === "completed" ? "bg-green-500"
+    : status === "generating" ? "bg-amber-500 animate-pulse"
+    : status === "error" ? "bg-destructive"
+    : "bg-muted-foreground/30";
   return <div className={cn("w-2 h-2 rounded-full", color)} />;
 };
