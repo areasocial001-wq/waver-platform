@@ -7,9 +7,12 @@ export interface StoryScene {
   imagePrompt: string;
   cameraMovement: string;
   mood: string;
-  voiceId?: string; // per-scene voice override
-  transition?: TransitionType; // transition to next scene
-  transitionDuration?: number; // seconds (0.3-1.5)
+  voiceId?: string;
+  transition?: TransitionType;
+  transitionDuration?: number;
+  sfxPrompt?: string;
+  sfxUrl?: string;
+  sfxStatus?: "idle" | "generating" | "completed" | "error";
   // Generation state
   imageUrl?: string;
   videoUrl?: string;
@@ -26,6 +29,8 @@ export interface StoryScript {
   synopsis: string;
   scenes: StoryScene[];
   suggestedMusic: string;
+  narrationVolume?: number; // 0-100, default 100
+  musicVolume?: number; // 0-100, default 25
 }
 
 export type StoryStep = "input" | "script" | "generation" | "complete";
