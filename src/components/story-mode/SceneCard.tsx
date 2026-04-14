@@ -19,6 +19,11 @@ const CAMERA_MOVEMENTS = [
   "pan_right", "tilt_up", "tilt_down", "dolly_forward",
 ];
 
+export interface VoiceOption {
+  id: string;
+  name: string;
+}
+
 interface SceneCardProps {
   scene: StoryScene;
   index: number;
@@ -26,6 +31,8 @@ interface SceneCardProps {
   isPreviewLoading: boolean;
   isDragging?: boolean;
   mode: "review" | "generation" | "complete";
+  voices?: VoiceOption[];
+  defaultVoiceId?: string;
   onToggleEdit: () => void;
   onUpdate: (field: keyof StoryScene, value: any) => void;
   onPreviewAudio: () => void;
@@ -40,7 +47,7 @@ interface SceneCardProps {
 
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
-  mode, onToggleEdit, onUpdate, onPreviewAudio,
+  mode, voices, defaultVoiceId, onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
@@ -49,7 +56,9 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className="aspect-video bg-muted/30 relative">
-          {scene.imageUrl ? (
+          {scene.videoStatus === "completed" && scene.videoUrl ? (
+            <video src={scene.videoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+          ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -63,6 +72,9 @@ export const SceneCard = ({
           <Badge className="absolute top-2 left-2 bg-background/80 text-foreground text-xs">
             Scena {scene.sceneNumber}
           </Badge>
+          {scene.videoStatus === "completed" && (
+            <Badge className="absolute top-2 right-2 bg-green-500/90 text-white text-xs">▶ Video</Badge>
+          )}
         </div>
         <CardContent className="p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs">
@@ -156,6 +168,15 @@ export const SceneCard = ({
                 </SelectContent>
               </Select>
               <Input value={scene.mood} onChange={e => onUpdate("mood", e.target.value)} className="h-7 text-xs flex-1 min-w-[80px]" placeholder="Mood..." />
+              {/* Per-scene voice selector */}
+              {voices && voices.length > 0 && (
+                <Select value={scene.voiceId || defaultVoiceId || ""} onValueChange={val => onUpdate("voiceId", val)}>
+                  <SelectTrigger className="w-32 h-7 text-xs"><SelectValue placeholder="Voce..." /></SelectTrigger>
+                  <SelectContent>
+                    {voices.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
               
               {/* Actions */}
               <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onPreviewAudio} disabled={isPreviewLoading} title="Anteprima audio">
