@@ -13,35 +13,41 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
-  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer,
+  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
+import { useVoiceOptions } from "@/hooks/useVoiceOptions";
+
+// Style preview images
+import animationImg from "@/assets/styles/animation.jpg";
+import claymationImg from "@/assets/styles/claymation.jpg";
+import comicNoirImg from "@/assets/styles/comic-noir.jpg";
+import watercolorImg from "@/assets/styles/watercolor.jpg";
+import cinemaImg from "@/assets/styles/cinema.jpg";
+import vintagePosterImg from "@/assets/styles/vintage-poster.jpg";
+import sciFiImg from "@/assets/styles/sci-fi.jpg";
+import collageImg from "@/assets/styles/collage.jpg";
+import penInkImg from "@/assets/styles/pen-ink.jpg";
+import plasticBlocksImg from "@/assets/styles/plastic-blocks.jpg";
+import halftoneImg from "@/assets/styles/halftone.jpg";
+import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
 
 const VIDEO_STYLES = [
-  { id: "animation", name: "Animation", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
-  { id: "claymation", name: "Claymation", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
-  { id: "comic-noir", name: "Comic Noir", promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
-  { id: "watercolor", name: "Watercolor", promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
-  { id: "cinema", name: "Cinema", promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
-  { id: "vintage-poster", name: "Vintage Poster", promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
-  { id: "sci-fi", name: "Sci-Fi", promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
-  { id: "collage", name: "Collage", promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
-  { id: "pen-ink", name: "Pen & Ink", promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
-  { id: "plastic-blocks", name: "Plastic Blocks", promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
-  { id: "halftone", name: "Halftone", promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
-  { id: "motion-graphics", name: "Motion Graphics", promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
-];
-
-const VOICES = [
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (F)" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (M)" },
-  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily (F)" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel (M)" },
-  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura (F)" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam (M)" },
+  { id: "animation", name: "Animation", preview: animationImg, promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
+  { id: "claymation", name: "Claymation", preview: claymationImg, promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
+  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
+  { id: "watercolor", name: "Watercolor", preview: watercolorImg, promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
+  { id: "cinema", name: "Cinema", preview: cinemaImg, promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
+  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
+  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
+  { id: "collage", name: "Collage", preview: collageImg, promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
+  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
+  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
+  { id: "halftone", name: "Halftone", preview: halftoneImg, promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
+  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
 ];
 
 const LANGUAGES = [
@@ -61,6 +67,7 @@ interface SavedProject {
 }
 
 export const StoryModeWizard = () => {
+  const { voiceOptions } = useVoiceOptions();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>({
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
@@ -811,7 +818,17 @@ export const StoryModeWizard = () => {
               <CardContent>
                 <div className="grid grid-cols-3 gap-2">
                   {VIDEO_STYLES.map(style => (
-                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("p-2 rounded-lg text-xs font-medium text-center transition-all border-2", input.styleId === style.id ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted")}>{style.name}</button>
+                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
+                      <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
+                      <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
+                        <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
+                      </div>
+                      {input.styleId === style.id && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -837,8 +854,28 @@ export const StoryModeWizard = () => {
                     <Select value={input.language} onValueChange={v => setInput(p => ({ ...p, language: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}</SelectContent></Select>
                   </div>
                   <div>
-                    <Label className="text-xs">Voce Narrante</Label>
-                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select>
+                    <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
+                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                          <>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
+                            {voiceOptions.filter(v => !v.isCloned).map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                          <>
+                            <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-amber-400 uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                            {voiceOptions.filter(v => v.isCloned).map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div>
@@ -914,7 +951,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="review"
-                voices={VOICES}
+                voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={editingSceneIndex === idx}
                 isPreviewLoading={previewLoadingIndex === idx}
