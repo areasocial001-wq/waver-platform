@@ -509,6 +509,51 @@ export type Database = {
         }
         Relationships: []
       }
+      story_mode_projects: {
+        Row: {
+          background_music_url: string | null
+          created_at: string
+          final_video_url: string | null
+          id: string
+          input_config: Json
+          scenes: Json
+          status: string
+          suggested_music: string | null
+          synopsis: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          background_music_url?: string | null
+          created_at?: string
+          final_video_url?: string | null
+          id?: string
+          input_config?: Json
+          scenes?: Json
+          status?: string
+          suggested_music?: string | null
+          synopsis?: string | null
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          background_music_url?: string | null
+          created_at?: string
+          final_video_url?: string | null
+          id?: string
+          input_config?: Json
+          scenes?: Json
+          status?: string
+          suggested_music?: string | null
+          synopsis?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       storyboard_characters: {
         Row: {
           color: string
