@@ -67,6 +67,7 @@ interface SavedProject {
 }
 
 export const StoryModeWizard = () => {
+  const { voiceOptions } = useVoiceOptions();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>({
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
@@ -817,7 +818,17 @@ export const StoryModeWizard = () => {
               <CardContent>
                 <div className="grid grid-cols-3 gap-2">
                   {VIDEO_STYLES.map(style => (
-                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("p-2 rounded-lg text-xs font-medium text-center transition-all border-2", input.styleId === style.id ? "border-primary bg-primary/10 text-primary" : "border-transparent bg-muted/50 text-muted-foreground hover:bg-muted")}>{style.name}</button>
+                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
+                      <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
+                      <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
+                        <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
+                      </div>
+                      {input.styleId === style.id && (
+                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                        </div>
+                      )}
+                    </button>
                   ))}
                 </div>
               </CardContent>
@@ -843,8 +854,28 @@ export const StoryModeWizard = () => {
                     <Select value={input.language} onValueChange={v => setInput(p => ({ ...p, language: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LANGUAGES.map(l => <SelectItem key={l.code} value={l.code}>{l.name}</SelectItem>)}</SelectContent></Select>
                   </div>
                   <div>
-                    <Label className="text-xs">Voce Narrante</Label>
-                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select>
+                    <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
+                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                          <>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
+                            {voiceOptions.filter(v => !v.isCloned).map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                          <>
+                            <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-amber-400 uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                            {voiceOptions.filter(v => v.isCloned).map(v => (
+                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div>
@@ -920,7 +951,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="review"
-                voices={VOICES}
+                voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={editingSceneIndex === idx}
                 isPreviewLoading={previewLoadingIndex === idx}
