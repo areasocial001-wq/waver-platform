@@ -455,6 +455,65 @@ export const StoryModeWizard = () => {
     });
   };
 
+  // Map scene mood to SFX prompt
+  const moodToSfxPrompt = (mood: string): string => {
+    const m = mood.toLowerCase();
+    const map: Record<string, string> = {
+      outdoor: "gentle wind blowing through trees, birds chirping",
+      nature: "forest ambiance, gentle stream, birds singing",
+      city: "city ambiance, distant traffic, crowd murmur",
+      urban: "urban street sounds, footsteps, distant cars",
+      rain: "rain falling on a roof, gentle thunder in the distance",
+      storm: "heavy rain, thunder, wind howling",
+      night: "crickets chirping, gentle night breeze, owl hooting",
+      horror: "creepy atmosphere, eerie whispers, creaking wood",
+      suspense: "tense atmosphere, low rumble, heartbeat",
+      tension: "tense atmosphere, low rumble, rising suspense",
+      war: "distant explosions, gunfire, helicopters",
+      battle: "sword clashing, battle cries, shields hitting",
+      space: "deep space ambiance, electronic hum, cosmic whoosh",
+      ocean: "ocean waves crashing, seagulls, wind",
+      beach: "waves on beach, seagulls, gentle wind",
+      forest: "forest ambiance, rustling leaves, bird calls",
+      desert: "desert wind, sand blowing, distant eagle cry",
+      celebration: "crowd cheering, applause, festive sounds",
+      romantic: "soft piano notes, gentle breeze, heartbeat",
+      sad: "gentle rain, melancholic wind, distant church bell",
+      happy: "cheerful atmosphere, birds singing, children laughing",
+      mysterious: "mysterious ambiance, echoing footsteps, distant whispers",
+      epic: "epic whoosh, rising tension, powerful rumble",
+      calm: "gentle stream, soft breeze, birds in the distance",
+      peaceful: "peaceful meadow, gentle wind, soft birdsong",
+    };
+    for (const [key, prompt] of Object.entries(map)) {
+      if (m.includes(key)) return prompt;
+    }
+    // Fallback: use the mood itself as a prompt
+    return `ambient sound for a ${mood} scene, subtle background atmosphere`;
+  };
+
+  // Generate SFX for a scene
+  const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
+    const sfxPrompt = moodToSfxPrompt(scene.mood);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+      });
+      if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (err) {
+      console.error("SFX generation error:", err);
+      return null;
+    }
+  };
+
   const handleGenerateScript = async () => {
     if (!input.description.trim()) { toast.error("Inserisci una descrizione"); return; }
     setIsGeneratingScript(true);
