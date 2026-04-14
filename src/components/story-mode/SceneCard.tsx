@@ -217,6 +217,11 @@ export const SceneCard = ({
                   {[0.3, 0.5, 0.8, 1.0, 1.5].map(d => <SelectItem key={d} value={String(d)}>{d}s</SelectItem>)}
                 </SelectContent>
               </Select>
+              {scene.sfxPrompt && (
+                <Badge variant="outline" className="text-xs gap-1">
+                  🔊 SFX: {scene.sfxPrompt.slice(0, 25)}{scene.sfxPrompt.length > 25 ? "…" : ""}
+                </Badge>
+              )}
             </div>
 
             {/* Preview audio player */}
