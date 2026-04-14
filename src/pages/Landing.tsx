@@ -10,6 +10,7 @@ import { VideoShowcaseCard } from "@/components/landing/VideoShowcaseCard";
 import { LandingFAQ } from "@/components/landing/LandingFAQ";
 
 import logoImg from "@/assets/logo.png";
+import storyModeHero from "@/assets/story-mode-hero.jpg";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -501,6 +502,138 @@ export default function Landing() {
                 </div>
               </motion.div>
             ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ===== STORY MODE — Dedicated Showcase ===== */}
+      <section className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
+        {/* Ambient glow */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full bg-[hsl(270,60%,55%/0.08)] blur-[160px] pointer-events-none" />
+
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.15 }}
+            variants={staggerContainer}
+            className="flex flex-col lg:flex-row gap-12 items-center"
+          >
+            {/* Text side */}
+            <motion.div className="flex-1 max-w-xl" variants={slideInLeft}>
+              <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[hsl(270,60%,55%/0.3)] bg-[hsl(270,60%,55%/0.08)] text-[hsl(270,60%,75%)] text-xs font-semibold mb-5 uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                Novità Assoluta
+              </motion.div>
+
+              <motion.h2 variants={fadeUp} custom={1} className="text-3xl md:text-5xl font-extrabold mb-5 leading-tight">
+                <span className="block">Story Mode</span>
+                <span className="block bg-gradient-to-r from-[hsl(270,60%,65%)] via-[hsl(217,91%,65%)] to-[hsl(25,95%,63%)] bg-clip-text text-transparent">
+                  Da un'idea al video finito
+                </span>
+              </motion.h2>
+
+              <motion.p variants={fadeUp} custom={2} className="text-[hsl(215,20%,60%)] text-lg leading-relaxed mb-6">
+                Descrivi la tua storia, carica un PDF o scrivi un concept. L'AI genera automaticamente sceneggiatura, immagini, voci narranti personalizzabili per ogni scena, effetti sonori, colonna sonora e transizioni cinematografiche — tutto in un unico workflow.
+              </motion.p>
+
+              {/* Feature pills */}
+              <motion.div variants={fadeUp} custom={3} className="flex flex-wrap gap-2 mb-8">
+                {[
+                  { icon: "🎬", label: "Script AI da testo/PDF" },
+                  { icon: "🎙️", label: "Voci multiple per scena" },
+                  { icon: "🔊", label: "SFX automatici" },
+                  { icon: "🎵", label: "Mix audio narrazione + musica" },
+                  { icon: "✨", label: "Transizioni personalizzabili" },
+                  { icon: "📊", label: "Timer di produzione" },
+                  { icon: "📄", label: "Export PDF dello script" },
+                  { icon: "🎥", label: "Anteprima video live" },
+                ].map((pill) => (
+                  <span
+                    key={pill.label}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[hsl(224,30%,12%)] border border-[hsl(224,30%,18%)] text-xs text-[hsl(215,20%,75%)] font-medium"
+                  >
+                    {pill.icon} {pill.label}
+                  </span>
+                ))}
+              </motion.div>
+
+              <motion.div variants={fadeUp} custom={4} className="flex gap-3">
+                <Button
+                  size="lg"
+                  onClick={() => navigate("/story-mode")}
+                  className="bg-gradient-to-r from-[hsl(270,60%,55%)] to-[hsl(217,91%,60%)] text-white border-0 hover:opacity-90 shadow-[0_0_30px_hsl(270,60%,55%/0.35)] rounded-xl px-8 py-6 text-lg font-semibold"
+                >
+                  <Film className="w-5 h-5 mr-2" />
+                  Prova Story Mode
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </motion.div>
+            </motion.div>
+
+            {/* Visual side */}
+            <motion.div variants={slideInRight} className="flex-1 max-w-lg relative">
+              <div className="relative rounded-2xl overflow-hidden group">
+                {/* Glow border */}
+                <div className="absolute -inset-[2px] rounded-2xl bg-gradient-to-br from-[hsl(270,60%,55%)] via-[hsl(217,91%,60%)] to-[hsl(25,95%,63%)] opacity-50 blur-sm group-hover:opacity-70 transition-opacity duration-500" />
+                <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-br from-[hsl(270,60%,55%)] via-[hsl(217,91%,60%)] to-[hsl(25,95%,63%)] opacity-30" />
+                <div className="relative rounded-2xl overflow-hidden bg-[hsl(224,30%,8%)]">
+                  <img
+                    src={storyModeHero}
+                    alt="Story Mode — workflow di produzione cinematografica AI"
+                    width={1280}
+                    height={720}
+                    loading="lazy"
+                    className="w-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[hsl(225,25%,5%/0.8)] via-transparent to-transparent" />
+
+                  {/* Overlay info */}
+                  <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-[hsl(142,71%,45%)] animate-pulse" />
+                      <span className="text-xs font-medium text-[hsl(215,20%,80%)]">Produzione automatica</span>
+                    </div>
+                    <span className="text-[10px] text-[hsl(215,20%,55%)] bg-[hsl(225,25%,8%/0.8)] backdrop-blur-sm px-2 py-1 rounded-md">
+                      ~3 min per 8 scene
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Floating mini-cards */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.6 }}
+                className="absolute -bottom-6 -left-4 bg-[hsl(225,25%,10%)] border border-[hsl(224,30%,18%)] rounded-xl p-3 shadow-2xl backdrop-blur-md"
+              >
+                <div className="flex items-center gap-2 text-xs">
+                  <Volume2 className="w-4 h-4 text-[hsl(270,60%,65%)]" />
+                  <div>
+                    <p className="font-semibold text-[hsl(210,40%,95%)]">Mix Audio</p>
+                    <p className="text-[hsl(215,20%,50%)]">Narrazione + Musica + SFX</p>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.8 }}
+                className="absolute -top-4 -right-4 bg-[hsl(225,25%,10%)] border border-[hsl(224,30%,18%)] rounded-xl p-3 shadow-2xl backdrop-blur-md"
+              >
+                <div className="flex items-center gap-2 text-xs">
+                  <Wand2 className="w-4 h-4 text-[hsl(45,93%,58%)]" />
+                  <div>
+                    <p className="font-semibold text-[hsl(210,40%,95%)]">8 Scene AI</p>
+                    <p className="text-[hsl(215,20%,50%)]">Crossfade · Dissolve · Wipe</p>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
           </motion.div>
         </div>
       </section>
