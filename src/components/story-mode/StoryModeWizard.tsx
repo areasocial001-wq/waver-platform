@@ -13,8 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
-  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic,
+  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
@@ -36,18 +37,18 @@ import halftoneImg from "@/assets/styles/halftone.jpg";
 import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
 
 const VIDEO_STYLES = [
-  { id: "animation", name: "Animation", preview: animationImg, promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
-  { id: "claymation", name: "Claymation", preview: claymationImg, promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
-  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
-  { id: "watercolor", name: "Watercolor", preview: watercolorImg, promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
-  { id: "cinema", name: "Cinema", preview: cinemaImg, promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
-  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
-  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
-  { id: "collage", name: "Collage", preview: collageImg, promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
-  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
-  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
-  { id: "halftone", name: "Halftone", preview: halftoneImg, promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
-  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
+  { id: "animation", name: "Animation", preview: animationImg, description: "Stile animazione 3D fluida e colorata", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
+  { id: "claymation", name: "Claymation", preview: claymationImg, description: "Stop-motion in plastilina artigianale", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
+  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, description: "Fumetto dark con contrasti forti", promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
+  { id: "watercolor", name: "Watercolor", preview: watercolorImg, description: "Acquerello delicato con sfumature morbide", promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
+  { id: "cinema", name: "Cinema", preview: cinemaImg, description: "Cinematografico con color grading professionale", promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
+  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, description: "Poster retrò anni '50-'60", promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
+  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, description: "Fantascienza con atmosfere futuristiche", promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
+  { id: "collage", name: "Collage", preview: collageImg, description: "Collage misto con texture e ritagli", promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
+  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, description: "Illustrazione a penna e inchiostro", promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
+  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, description: "Costruzioni in blocchetti colorati stile LEGO", promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
+  { id: "halftone", name: "Halftone", preview: halftoneImg, description: "Effetto mezzetinte pop art", promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
+  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, description: "Grafica in movimento pulita e moderna", promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
 ];
 
 const LANGUAGES = [
@@ -88,6 +89,33 @@ export const StoryModeWizard = () => {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
+  const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+
+  const previewVoice = async (voiceId: string) => {
+    if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
+    if (isPreviewingVoice) { setIsPreviewingVoice(false); return; }
+    setIsPreviewingVoice(true);
+    try {
+      const sampleText = input.language === "it" ? "Ciao, questa è un'anteprima della mia voce." :
+        input.language === "es" ? "Hola, esta es una vista previa de mi voz." :
+        input.language === "fr" ? "Bonjour, ceci est un aperçu de ma voix." :
+        input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
+        "Hello, this is a preview of my voice.";
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
+      });
+      if (!response.ok) throw new Error("Preview failed");
+      const blob = await response.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
+      setVoicePreviewAudio(audio);
+      audio.play();
+    } catch { toast.error("Errore anteprima voce"); }
+    finally { setIsPreviewingVoice(false); }
+  };
 
   // Elapsed timer
   useEffect(() => {
@@ -816,21 +844,31 @@ export const StoryModeWizard = () => {
             <Card className="border-accent/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Sparkles className="w-5 h-5 text-accent" />Stile Visivo</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-2">
-                  {VIDEO_STYLES.map(style => (
-                    <button key={style.id} onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
-                      <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
-                      <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
-                        <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
-                      </div>
-                      {input.styleId === style.id && (
-                        <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-2.5 h-2.5 text-primary-foreground" />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                <TooltipProvider delayDuration={200}>
+                  <div className="grid grid-cols-3 gap-2">
+                    {VIDEO_STYLES.map(style => (
+                      <Tooltip key={style.id}>
+                        <TooltipTrigger asChild>
+                          <button onClick={() => handleStyleSelect(style.id)} className={cn("relative overflow-hidden rounded-lg transition-all border-2 group", input.styleId === style.id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-muted-foreground/30")}>
+                            <img src={style.preview} alt={style.name} className="w-full aspect-[4/3] object-cover" />
+                            <div className={cn("absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/70 to-transparent p-1.5", input.styleId === style.id && "from-primary/70")}>
+                              <span className="text-[10px] font-semibold text-white drop-shadow-sm">{style.name}</span>
+                            </div>
+                            {input.styleId === style.id && (
+                              <div className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary flex items-center justify-center">
+                                <Check className="w-2.5 h-2.5 text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-[200px]">
+                          <p className="font-medium text-xs">{style.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{style.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ))}
+                  </div>
+                </TooltipProvider>
               </CardContent>
             </Card>
           </div>
@@ -855,27 +893,45 @@ export const StoryModeWizard = () => {
                   </div>
                   <div>
                     <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
-                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {voiceOptions.filter(v => !v.isCloned).length > 0 && (
-                          <>
-                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
-                            {voiceOptions.filter(v => !v.isCloned).map(v => (
-                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                          </>
-                        )}
-                        {voiceOptions.filter(v => v.isCloned).length > 0 && (
-                          <>
-                            <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-amber-400 uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
-                            {voiceOptions.filter(v => v.isCloned).map(v => (
-                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-1.5">
+                      <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
+                        <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
+                              {voiceOptions.filter(v => !v.isCloned).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </>
+                          )}
+                          {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                            <>
+                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                              {voiceOptions.filter(v => v.isCloned).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="shrink-0 h-10 w-10"
+                              onClick={() => previewVoice(input.voiceId)}
+                              disabled={isPreviewingVoice}
+                            >
+                              {isPreviewingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : voicePreviewAudio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Anteprima voce</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </div>
                 <div>
