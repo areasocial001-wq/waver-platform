@@ -112,6 +112,11 @@ export const SceneCard = ({
                 <Volume2 className="w-3 h-3" />
               </Button>
             )}
+            {scene.sfxUrl && (
+              <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => new Audio(scene.sfxUrl!).play()} title="Ascolta SFX">
+                🔊
+              </Button>
+            )}
             {scene.videoUrl && (
               <Button variant="ghost" size="sm" className="h-6 px-2" asChild>
                 <a href={scene.videoUrl} target="_blank" rel="noopener"><Eye className="w-3 h-3" /></a>
@@ -218,11 +223,12 @@ export const SceneCard = ({
                   {[0.3, 0.5, 0.8, 1.0, 1.5].map(d => <SelectItem key={d} value={String(d)}>{d}s</SelectItem>)}
                 </SelectContent>
               </Select>
-              {scene.sfxPrompt && (
-                <Badge variant="outline" className="text-xs gap-1">
-                  🔊 SFX: {scene.sfxPrompt.slice(0, 25)}{scene.sfxPrompt.length > 25 ? "…" : ""}
-                </Badge>
-              )}
+              <Input
+                value={scene.sfxPrompt || ""}
+                onChange={e => onUpdate("sfxPrompt", e.target.value)}
+                className="h-7 text-xs flex-1 min-w-[120px]"
+                placeholder="🔊 SFX prompt (es. vento, pioggia...)"
+              />
             </div>
 
             {/* Preview audio player */}
