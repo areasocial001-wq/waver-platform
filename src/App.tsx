@@ -68,6 +68,7 @@ const App = () => (
             <Route path="/luma-tools" element={<LumaToolsPage />} />
             <Route path="/faceless-video" element={<FacelessVideoPage />} />
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
+            <Route path="/story-mode" element={<StoryMode />} />
             <Route path="/admin" element={<AdminDashboard />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
