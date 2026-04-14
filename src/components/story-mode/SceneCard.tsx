@@ -47,7 +47,7 @@ interface SceneCardProps {
   onPreviewAudio: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onRegenerate?: (type: "image" | "audio" | "video") => void;
+  onRegenerate?: (type: "image" | "audio" | "video" | "sfx") => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -132,6 +132,9 @@ export const SceneCard = ({
                 </Button>
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onRegenerate("video")} title="Rigenera video">
                   <RefreshCw className="w-3 h-3 mr-1" /><Eye className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => onRegenerate("sfx")} title="Rigenera SFX">
+                  <RefreshCw className="w-3 h-3 mr-1" />🔊
                 </Button>
               </>
             )}

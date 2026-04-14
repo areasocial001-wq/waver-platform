@@ -247,7 +247,7 @@ export const StoryModeWizard = () => {
   };
 
   // Regenerate single scene asset
-  const regenerateSceneAsset = async (index: number, type: "image" | "audio" | "video") => {
+  const regenerateSceneAsset = async (index: number, type: "image" | "audio" | "video" | "sfx") => {
     if (!script) return;
     const scene = script.scenes[index];
     setRegeneratingScene({ idx: index, type });
@@ -296,12 +296,32 @@ export const StoryModeWizard = () => {
         scenes[index] = { ...scenes[index], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
         setScript({ ...script, scenes });
         toast.success(`Video scena ${index + 1} rigenerato`);
+      } else if (type === "sfx") {
+        const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
+        updateScene(index, "sfxStatus", "generating");
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+        });
+        if (!response.ok) throw new Error("SFX generation failed");
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const scenes = [...script.scenes];
+        scenes[index] = { ...scenes[index], sfxUrl: url, sfxStatus: "completed" };
+        setScript({ ...script, scenes });
+        toast.success(`SFX scena ${index + 1} rigenerato`);
       }
     } catch (err: any) {
       console.error(`Regen ${type} scene ${index + 1}:`, err);
       toast.error(`Errore rigenerazione ${type} scena ${index + 1}`);
       if (type === "image") updateScene(index, "imageStatus", "error");
       else if (type === "audio") updateScene(index, "audioStatus", "error");
+      else if (type === "sfx") updateScene(index, "sfxStatus", "error");
       else updateScene(index, "videoStatus", "error");
     } finally {
       setRegeneratingScene(null);
