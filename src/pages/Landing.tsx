@@ -314,6 +314,7 @@ export default function Landing() {
           <div className="hidden md:flex items-center gap-6 text-sm text-[hsl(215,20%,65%)]">
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Funzionalità</button>
             <button onClick={() => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Showcase</button>
+            <button onClick={() => document.getElementById("story-mode")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Story Mode</button>
             <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Prezzi</button>
             <button onClick={() => navigate("/guide")} className="hover:text-white transition-colors inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />Guida</button>
           </div>
@@ -507,7 +508,7 @@ export default function Landing() {
       </section>
 
       {/* ===== STORY MODE — Dedicated Showcase ===== */}
-      <section className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
+      <section id="story-mode" className="relative z-10 py-24 border-t border-[hsl(224,30%,12%)] overflow-hidden">
         {/* Ambient glow */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full bg-[hsl(270,60%,55%/0.08)] blur-[160px] pointer-events-none" />
 
