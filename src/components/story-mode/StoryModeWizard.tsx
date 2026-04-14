@@ -89,6 +89,33 @@ export const StoryModeWizard = () => {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
+  const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+
+  const previewVoice = async (voiceId: string) => {
+    if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
+    if (isPreviewingVoice) { setIsPreviewingVoice(false); return; }
+    setIsPreviewingVoice(true);
+    try {
+      const sampleText = input.language === "it" ? "Ciao, questa è un'anteprima della mia voce." :
+        input.language === "es" ? "Hola, esta es una vista previa de mi voz." :
+        input.language === "fr" ? "Bonjour, ceci est un aperçu de ma voix." :
+        input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
+        "Hello, this is a preview of my voice.";
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
+      });
+      if (!response.ok) throw new Error("Preview failed");
+      const blob = await response.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
+      setVoicePreviewAudio(audio);
+      audio.play();
+    } catch { toast.error("Errore anteprima voce"); }
+    finally { setIsPreviewingVoice(false); }
+  };
 
   // Elapsed timer
   useEffect(() => {
