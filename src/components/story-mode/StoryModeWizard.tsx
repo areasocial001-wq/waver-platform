@@ -311,12 +311,13 @@ export const StoryModeWizard = () => {
   // Production time estimate (seconds)
   const estimatedProductionTime = script ? (() => {
     const n = script.scenes.length;
-    const imgTime = n * 15;   // ~15s per image
-    const ttsTime = n * 8;    // ~8s per TTS
-    const videoTime = n * 45; // ~45s per video
-    const musicTime = 30;     // ~30s for background music
-    const concatTime = 10;    // ~10s for concat
-    return imgTime + ttsTime + videoTime + musicTime + concatTime;
+    const imgTime = n * 15;
+    const ttsTime = n * 8;
+    const videoTime = n * 45;
+    const sfxTime = n * 5;    // ~5s per SFX
+    const musicTime = 30;
+    const concatTime = 10;
+    return imgTime + ttsTime + videoTime + sfxTime + musicTime + concatTime;
   })() : 0;
 
   const formatTime = (seconds: number) => {
@@ -454,6 +455,65 @@ export const StoryModeWizard = () => {
     });
   };
 
+  // Map scene mood to SFX prompt
+  const moodToSfxPrompt = (mood: string): string => {
+    const m = mood.toLowerCase();
+    const map: Record<string, string> = {
+      outdoor: "gentle wind blowing through trees, birds chirping",
+      nature: "forest ambiance, gentle stream, birds singing",
+      city: "city ambiance, distant traffic, crowd murmur",
+      urban: "urban street sounds, footsteps, distant cars",
+      rain: "rain falling on a roof, gentle thunder in the distance",
+      storm: "heavy rain, thunder, wind howling",
+      night: "crickets chirping, gentle night breeze, owl hooting",
+      horror: "creepy atmosphere, eerie whispers, creaking wood",
+      suspense: "tense atmosphere, low rumble, heartbeat",
+      tension: "tense atmosphere, low rumble, rising suspense",
+      war: "distant explosions, gunfire, helicopters",
+      battle: "sword clashing, battle cries, shields hitting",
+      space: "deep space ambiance, electronic hum, cosmic whoosh",
+      ocean: "ocean waves crashing, seagulls, wind",
+      beach: "waves on beach, seagulls, gentle wind",
+      forest: "forest ambiance, rustling leaves, bird calls",
+      desert: "desert wind, sand blowing, distant eagle cry",
+      celebration: "crowd cheering, applause, festive sounds",
+      romantic: "soft piano notes, gentle breeze, heartbeat",
+      sad: "gentle rain, melancholic wind, distant church bell",
+      happy: "cheerful atmosphere, birds singing, children laughing",
+      mysterious: "mysterious ambiance, echoing footsteps, distant whispers",
+      epic: "epic whoosh, rising tension, powerful rumble",
+      calm: "gentle stream, soft breeze, birds in the distance",
+      peaceful: "peaceful meadow, gentle wind, soft birdsong",
+    };
+    for (const [key, prompt] of Object.entries(map)) {
+      if (m.includes(key)) return prompt;
+    }
+    // Fallback: use the mood itself as a prompt
+    return `ambient sound for a ${mood} scene, subtle background atmosphere`;
+  };
+
+  // Generate SFX for a scene
+  const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
+    const sfxPrompt = moodToSfxPrompt(scene.mood);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+      });
+      if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+    } catch (err) {
+      console.error("SFX generation error:", err);
+      return null;
+    }
+  };
+
   const handleGenerateScript = async () => {
     if (!input.description.trim()) { toast.error("Inserisci una descrizione"); return; }
     setIsGeneratingScript(true);
@@ -536,12 +596,13 @@ export const StoryModeWizard = () => {
     setGenerationProgress(0);
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
-    const totalSteps = script.scenes.length * 3 + 1;
+    const totalSteps = script.scenes.length * 4 + 1; // img + tts + sfx + video + music
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
     const musicP = generateBackgroundMusic().then(tick);
 
+    // Images
     for (let i = 0; i < scenes.length; i++) {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
@@ -553,6 +614,7 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
+    // TTS narration
     for (let i = 0; i < scenes.length; i++) {
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
@@ -567,6 +629,18 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
+    // SFX per scene (based on mood)
+    for (let i = 0; i < scenes.length; i++) {
+      try {
+        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
+        setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+        const sfxUrl = await generateSceneSfx(scenes[i]);
+        scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+      } catch { scenes[i] = { ...scenes[i], sfxStatus: "error" }; }
+      tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+    }
+
+    // Video generation
     for (let i = 0; i < scenes.length; i++) {
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
@@ -586,25 +660,29 @@ export const StoryModeWizard = () => {
     if (vids.length >= 2) {
       try {
         toast.info("Concatenazione e mix audio...");
-        // Build per-scene transition config
-        const transitions = vids.map((s, i) => ({
+        const transitions = vids.map((s) => ({
           type: s.transition || "crossfade",
           duration: s.transitionDuration || 0.5,
         }));
-        // Collect narration audio URLs for mixing
         const narrationUrls = scenes
           .filter(s => s.videoStatus === "completed" && s.audioUrl)
           .map(s => s.audioUrl);
+        const sfxUrls = scenes
+          .filter(s => s.videoStatus === "completed" && s.sfxUrl)
+          .map(s => s.sfxUrl);
 
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: vids.map(s => s.videoUrl),
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
-            transitions, // per-scene transitions
-            audioUrls: narrationUrls, // narration audio tracks
-            backgroundMusicUrl: backgroundMusicUrl, // mix background music
-            musicVolume: 0.25, // background music at 25% volume
+            transitions,
+            audioUrls: narrationUrls,
+            sfxUrls, // sound effects tracks
+            backgroundMusicUrl: backgroundMusicUrl,
+            narrationVolume: (script.narrationVolume ?? 100) / 100,
+            musicVolume: (script.musicVolume ?? 25) / 100,
+            sfxVolume: 0.4, // SFX at 40% volume
           },
         });
         if (error) throw error;
@@ -774,6 +852,37 @@ export const StoryModeWizard = () => {
             </CardHeader>
           </Card>
 
+          {/* Volume Controls */}
+          <Card className="border-secondary/20 bg-card/50">
+            <CardContent className="py-3 px-4 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-2"><Volume2 className="w-4 h-4 text-primary" />Controllo Volumi</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center justify-between">
+                    <span>🎙️ Narrazione</span>
+                    <span className="font-mono text-muted-foreground">{script.narrationVolume ?? 100}%</span>
+                  </Label>
+                  <Slider
+                    value={[script.narrationVolume ?? 100]}
+                    onValueChange={([v]) => setScript({ ...script, narrationVolume: v })}
+                    min={0} max={100} step={5}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center justify-between">
+                    <span>🎵 Musica di Sottofondo</span>
+                    <span className="font-mono text-muted-foreground">{script.musicVolume ?? 25}%</span>
+                  </Label>
+                  <Slider
+                    value={[script.musicVolume ?? 25]}
+                    onValueChange={([v]) => setScript({ ...script, musicVolume: v })}
+                    min={0} max={100} step={5}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="text-xs text-muted-foreground text-center">
             Trascina le scene per riordinarle • Clicca 🔊 per l'anteprima audio • ✏️ per modificare
           </div>
@@ -810,7 +919,7 @@ export const StoryModeWizard = () => {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Tempo stimato di produzione</p>
                 <p className="text-xs text-muted-foreground">
-                  {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s) + musica + montaggio
+                  {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s + SFX ~5s) + musica + montaggio
                 </p>
               </div>
               <Badge variant="secondary" className="text-base font-bold px-3 py-1">
