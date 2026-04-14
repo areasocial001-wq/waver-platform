@@ -720,11 +720,29 @@ export const StoryModeWizard = () => {
             ))}
           </div>
 
+          {/* Production time estimate */}
+          <Card className="border-accent/20 bg-accent/5">
+            <CardContent className="py-3 px-4 flex items-center gap-3 flex-wrap">
+              <Timer className="w-5 h-5 text-accent shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Tempo stimato di produzione</p>
+                <p className="text-xs text-muted-foreground">
+                  {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s) + musica + montaggio
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-base font-bold px-3 py-1">
+                <Clock className="w-4 h-4 mr-1" />
+                ~{formatTime(estimatedProductionTime)}
+              </Badge>
+            </CardContent>
+          </Card>
+
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
-            <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione</Button>
+            <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
+            <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
           </div>
         </div>
       )}
