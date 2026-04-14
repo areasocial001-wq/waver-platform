@@ -893,27 +893,45 @@ export const StoryModeWizard = () => {
                   </div>
                   <div>
                     <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
-                    <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {voiceOptions.filter(v => !v.isCloned).length > 0 && (
-                          <>
-                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
-                            {voiceOptions.filter(v => !v.isCloned).map(v => (
-                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                          </>
-                        )}
-                        {voiceOptions.filter(v => v.isCloned).length > 0 && (
-                          <>
-                            <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-amber-400 uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
-                            {voiceOptions.filter(v => v.isCloned).map(v => (
-                              <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                            ))}
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex gap-1.5">
+                      <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
+                        <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                            <>
+                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
+                              {voiceOptions.filter(v => !v.isCloned).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </>
+                          )}
+                          {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                            <>
+                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                              {voiceOptions.filter(v => v.isCloned).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              ))}
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="shrink-0 h-10 w-10"
+                              onClick={() => previewVoice(input.voiceId)}
+                              disabled={isPreviewingVoice}
+                            >
+                              {isPreviewingVoice ? <Loader2 className="w-4 h-4 animate-spin" /> : voicePreviewAudio ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Anteprima voce</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
                 </div>
                 <div>
