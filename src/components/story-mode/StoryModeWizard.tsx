@@ -13,12 +13,27 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
-  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer,
+  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
+import { useVoiceOptions } from "@/hooks/useVoiceOptions";
+
+// Style preview images
+import animationImg from "@/assets/styles/animation.jpg";
+import claymationImg from "@/assets/styles/claymation.jpg";
+import comicNoirImg from "@/assets/styles/comic-noir.jpg";
+import watercolorImg from "@/assets/styles/watercolor.jpg";
+import cinemaImg from "@/assets/styles/cinema.jpg";
+import vintagePosterImg from "@/assets/styles/vintage-poster.jpg";
+import sciFiImg from "@/assets/styles/sci-fi.jpg";
+import collageImg from "@/assets/styles/collage.jpg";
+import penInkImg from "@/assets/styles/pen-ink.jpg";
+import plasticBlocksImg from "@/assets/styles/plastic-blocks.jpg";
+import halftoneImg from "@/assets/styles/halftone.jpg";
+import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
 
 const VIDEO_STYLES = [
   { id: "animation", name: "Animation", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
