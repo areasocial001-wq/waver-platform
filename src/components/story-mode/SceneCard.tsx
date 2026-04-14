@@ -56,7 +56,9 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className="aspect-video bg-muted/30 relative">
-          {scene.imageUrl ? (
+          {scene.videoStatus === "completed" && scene.videoUrl ? (
+            <video src={scene.videoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+          ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -70,6 +72,9 @@ export const SceneCard = ({
           <Badge className="absolute top-2 left-2 bg-background/80 text-foreground text-xs">
             Scena {scene.sceneNumber}
           </Badge>
+          {scene.videoStatus === "completed" && (
+            <Badge className="absolute top-2 right-2 bg-green-500/90 text-white text-xs">▶ Video</Badge>
+          )}
         </div>
         <CardContent className="p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs">
