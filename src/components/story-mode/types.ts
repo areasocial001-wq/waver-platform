@@ -1,3 +1,5 @@
+export type TransitionType = "crossfade" | "fade_black" | "dissolve" | "wipe_left" | "wipe_right" | "none";
+
 export interface StoryScene {
   sceneNumber: number;
   duration: number;
@@ -6,6 +8,8 @@ export interface StoryScene {
   cameraMovement: string;
   mood: string;
   voiceId?: string; // per-scene voice override
+  transition?: TransitionType; // transition to next scene
+  transitionDuration?: number; // seconds (0.3-1.5)
   // Generation state
   imageUrl?: string;
   videoUrl?: string;

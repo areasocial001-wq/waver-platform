@@ -33,6 +33,12 @@ const introOutroSchema = z.object({
   fontSize: z.enum(['small', 'medium', 'large']).default('medium'),
 });
 
+// Per-scene transition schema
+const perSceneTransitionSchema = z.object({
+  type: z.enum(['none', 'fade', 'crossfade', 'fade_black', 'dissolve', 'wipe_left', 'wipe_right']).default('crossfade'),
+  duration: z.number().min(0).max(3).default(0.5),
+});
+
 // Input validation schema
 const requestSchema = z.object({
   videoUrls: z.array(z.string().url()).min(1, 'Almeno un video richiesto'),
@@ -40,11 +46,15 @@ const requestSchema = z.object({
   clipEffects: z.array(clipEffectsSchema).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
+  transitions: z.array(perSceneTransitionSchema).optional(), // per-scene transitions
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   fps: z.enum(['24', '30', '60']).default('24'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
+  audioUrls: z.array(z.string()).optional(), // per-scene narration audio
+  backgroundMusicUrl: z.string().optional(), // background music track
+  musicVolume: z.number().min(0).max(1).default(0.25), // music volume (0-1)
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
 });
@@ -86,7 +96,11 @@ const mapTransition = (transition: string): string | null => {
   switch (transition) {
     case 'fade': return 'fade';
     case 'crossfade': return 'fade';
+    case 'fade_black': return 'fade';
+    case 'dissolve': return 'fade'; // Shotstack maps dissolve to fade
     case 'wipe': return 'wipeRight';
+    case 'wipe_left': return 'wipeLeft';
+    case 'wipe_right': return 'wipeRight';
     default: return null;
   }
 };
@@ -265,8 +279,9 @@ serve(async (req) => {
     }
     
     const { 
-      videoUrls, clipDurations, clipEffects, transition, transitionDuration, 
-      resolution, aspectRatio, fps, audioUrl, audioVolume, intro, outro 
+      videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
+      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
+      intro, outro 
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
@@ -337,15 +352,18 @@ serve(async (req) => {
             clip.transition = effectsResult.transition;
           }
 
-          // Add transition effect between clips
-          const shotstackTransition = mapTransition(transition);
+          // Add transition effect between clips (per-scene or global)
+          const sceneTransition = transitions?.[i];
+          const transType = sceneTransition?.type || transition;
+          const transDur = sceneTransition?.duration || transitionDuration;
+          const shotstackTransition = mapTransition(transType);
           if (shotstackTransition && i > 0) {
             clip.transition = {
               ...clip.transition,
               in: shotstackTransition,
             };
             // Overlap clips for smooth transition
-            clip.start = Math.max(0, currentStart - transitionDuration);
+            clip.start = Math.max(0, currentStart - transDur);
           }
 
           videoClips.push(clip);
@@ -400,6 +418,49 @@ serve(async (req) => {
               },
               start: 0,
               length: totalDuration,
+            }],
+          });
+        }
+
+        // Add per-scene narration audio tracks
+        if (audioUrls && audioUrls.length > 0) {
+          const narrationClips: any[] = [];
+          let narrationStart = introDuration;
+          for (let i = 0; i < audioUrls.length; i++) {
+            if (!audioUrls[i]) continue;
+            let narrationSrc = audioUrls[i];
+            // Upload blob URLs won't work with Shotstack - skip blob: URLs
+            if (narrationSrc.startsWith('blob:')) continue;
+            const clipLen = clipDurations?.[i] || 5;
+            narrationClips.push({
+              asset: {
+                type: 'audio',
+                src: narrationSrc,
+                volume: 1,
+              },
+              start: narrationStart,
+              length: clipLen,
+            });
+            narrationStart += clipLen;
+          }
+          if (narrationClips.length > 0) {
+            timeline.tracks.push({ clips: narrationClips });
+          }
+        }
+
+        // Add background music track
+        if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
+          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
+          timeline.tracks.push({
+            clips: [{
+              asset: {
+                type: 'audio',
+                src: backgroundMusicUrl,
+                volume: musicVolume,
+              },
+              start: 0,
+              length: totalDur,
             }],
           });
         }

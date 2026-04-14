@@ -12,7 +12,16 @@ import {
   Image, Eye, Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StoryScene } from "./types";
+import { StoryScene, TransitionType } from "./types";
+
+const TRANSITIONS: { value: TransitionType; label: string; icon: string }[] = [
+  { value: "crossfade", label: "Crossfade", icon: "✦" },
+  { value: "fade_black", label: "Fade Nero", icon: "◼" },
+  { value: "dissolve", label: "Dissolve", icon: "◇" },
+  { value: "wipe_left", label: "Wipe ←", icon: "◁" },
+  { value: "wipe_right", label: "Wipe →", icon: "▷" },
+  { value: "none", label: "Nessuna", icon: "—" },
+];
 
 const CAMERA_MOVEMENTS = [
   "static", "slow_zoom_in", "slow_zoom_out", "pan_left",
@@ -191,6 +200,23 @@ export const SceneCard = ({
               <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={onDelete} title="Elimina">
                 <Trash2 className="w-3 h-3" />
               </Button>
+            </div>
+
+            {/* Transition selector */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Label className="text-xs text-muted-foreground shrink-0">Transizione →</Label>
+              <Select value={scene.transition || "crossfade"} onValueChange={val => onUpdate("transition", val as TransitionType)}>
+                <SelectTrigger className="w-32 h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {TRANSITIONS.map(t => <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={String(scene.transitionDuration || 0.5)} onValueChange={val => onUpdate("transitionDuration", Number(val))}>
+                <SelectTrigger className="w-20 h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {[0.3, 0.5, 0.8, 1.0, 1.5].map(d => <SelectItem key={d} value={String(d)}>{d}s</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Preview audio player */}
