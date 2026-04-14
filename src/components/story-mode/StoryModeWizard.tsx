@@ -13,8 +13,9 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
-  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic,
+  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
