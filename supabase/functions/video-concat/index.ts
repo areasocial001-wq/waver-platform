@@ -352,15 +352,18 @@ serve(async (req) => {
             clip.transition = effectsResult.transition;
           }
 
-          // Add transition effect between clips
-          const shotstackTransition = mapTransition(transition);
+          // Add transition effect between clips (per-scene or global)
+          const sceneTransition = transitions?.[i];
+          const transType = sceneTransition?.type || transition;
+          const transDur = sceneTransition?.duration || transitionDuration;
+          const shotstackTransition = mapTransition(transType);
           if (shotstackTransition && i > 0) {
             clip.transition = {
               ...clip.transition,
               in: shotstackTransition,
             };
             // Overlap clips for smooth transition
-            clip.start = Math.max(0, currentStart - transitionDuration);
+            clip.start = Math.max(0, currentStart - transDur);
           }
 
           videoClips.push(clip);
