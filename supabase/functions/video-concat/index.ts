@@ -33,6 +33,12 @@ const introOutroSchema = z.object({
   fontSize: z.enum(['small', 'medium', 'large']).default('medium'),
 });
 
+// Per-scene transition schema
+const perSceneTransitionSchema = z.object({
+  type: z.enum(['none', 'fade', 'crossfade', 'fade_black', 'dissolve', 'wipe_left', 'wipe_right']).default('crossfade'),
+  duration: z.number().min(0).max(3).default(0.5),
+});
+
 // Input validation schema
 const requestSchema = z.object({
   videoUrls: z.array(z.string().url()).min(1, 'Almeno un video richiesto'),
@@ -40,11 +46,15 @@ const requestSchema = z.object({
   clipEffects: z.array(clipEffectsSchema).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
+  transitions: z.array(perSceneTransitionSchema).optional(), // per-scene transitions
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   fps: z.enum(['24', '30', '60']).default('24'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
+  audioUrls: z.array(z.string()).optional(), // per-scene narration audio
+  backgroundMusicUrl: z.string().optional(), // background music track
+  musicVolume: z.number().min(0).max(1).default(0.25), // music volume (0-1)
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
 });
