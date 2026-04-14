@@ -36,27 +36,18 @@ import halftoneImg from "@/assets/styles/halftone.jpg";
 import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
 
 const VIDEO_STYLES = [
-  { id: "animation", name: "Animation", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
-  { id: "claymation", name: "Claymation", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
-  { id: "comic-noir", name: "Comic Noir", promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
-  { id: "watercolor", name: "Watercolor", promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
-  { id: "cinema", name: "Cinema", promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
-  { id: "vintage-poster", name: "Vintage Poster", promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
-  { id: "sci-fi", name: "Sci-Fi", promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
-  { id: "collage", name: "Collage", promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
-  { id: "pen-ink", name: "Pen & Ink", promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
-  { id: "plastic-blocks", name: "Plastic Blocks", promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
-  { id: "halftone", name: "Halftone", promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
-  { id: "motion-graphics", name: "Motion Graphics", promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
-];
-
-const VOICES = [
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (F)" },
-  { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (M)" },
-  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily (F)" },
-  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel (M)" },
-  { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura (F)" },
-  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam (M)" },
+  { id: "animation", name: "Animation", preview: animationImg, promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
+  { id: "claymation", name: "Claymation", preview: claymationImg, promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
+  { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
+  { id: "watercolor", name: "Watercolor", preview: watercolorImg, promptModifier: "watercolor painting style, soft washes, delicate brushstrokes, pastel tones" },
+  { id: "cinema", name: "Cinema", preview: cinemaImg, promptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field" },
+  { id: "vintage-poster", name: "Vintage Poster", preview: vintagePosterImg, promptModifier: "vintage poster art style, retro 1950s aesthetic, bold typography, limited color palette" },
+  { id: "sci-fi", name: "Sci-Fi", preview: sciFiImg, promptModifier: "sci-fi style, futuristic, neon lighting, holographic elements, cyberpunk atmosphere" },
+  { id: "collage", name: "Collage", preview: collageImg, promptModifier: "mixed media collage style, paper textures, layered cutouts, editorial design" },
+  { id: "pen-ink", name: "Pen & Ink", preview: penInkImg, promptModifier: "pen and ink illustration style, detailed linework, cross-hatching, hand-drawn feel" },
+  { id: "plastic-blocks", name: "Plastic Blocks", preview: plasticBlocksImg, promptModifier: "plastic building blocks style, LEGO-like, miniature world, toy aesthetic, bright colors" },
+  { id: "halftone", name: "Halftone", preview: halftoneImg, promptModifier: "halftone dot pattern, pop art style, Ben-Day dots, comic print aesthetic" },
+  { id: "motion-graphics", name: "Motion Graphics", preview: motionGraphicsImg, promptModifier: "clean motion graphics, flat design, geometric shapes, smooth transitions, corporate style" },
 ];
 
 const LANGUAGES = [
