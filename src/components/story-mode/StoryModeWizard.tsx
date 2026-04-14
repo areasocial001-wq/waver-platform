@@ -596,12 +596,13 @@ export const StoryModeWizard = () => {
     setGenerationProgress(0);
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
-    const totalSteps = script.scenes.length * 3 + 1;
+    const totalSteps = script.scenes.length * 4 + 1; // img + tts + sfx + video + music
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
     const musicP = generateBackgroundMusic().then(tick);
 
+    // Images
     for (let i = 0; i < scenes.length; i++) {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
@@ -613,6 +614,7 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
+    // TTS narration
     for (let i = 0; i < scenes.length; i++) {
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
@@ -627,6 +629,18 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
+    // SFX per scene (based on mood)
+    for (let i = 0; i < scenes.length; i++) {
+      try {
+        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
+        setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+        const sfxUrl = await generateSceneSfx(scenes[i]);
+        scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+      } catch { scenes[i] = { ...scenes[i], sfxStatus: "error" }; }
+      tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+    }
+
+    // Video generation
     for (let i = 0; i < scenes.length; i++) {
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
@@ -646,25 +660,29 @@ export const StoryModeWizard = () => {
     if (vids.length >= 2) {
       try {
         toast.info("Concatenazione e mix audio...");
-        // Build per-scene transition config
-        const transitions = vids.map((s, i) => ({
+        const transitions = vids.map((s) => ({
           type: s.transition || "crossfade",
           duration: s.transitionDuration || 0.5,
         }));
-        // Collect narration audio URLs for mixing
         const narrationUrls = scenes
           .filter(s => s.videoStatus === "completed" && s.audioUrl)
           .map(s => s.audioUrl);
+        const sfxUrls = scenes
+          .filter(s => s.videoStatus === "completed" && s.sfxUrl)
+          .map(s => s.sfxUrl);
 
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: vids.map(s => s.videoUrl),
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
-            transitions, // per-scene transitions
-            audioUrls: narrationUrls, // narration audio tracks
-            backgroundMusicUrl: backgroundMusicUrl, // mix background music
-            musicVolume: 0.25, // background music at 25% volume
+            transitions,
+            audioUrls: narrationUrls,
+            sfxUrls, // sound effects tracks
+            backgroundMusicUrl: backgroundMusicUrl,
+            narrationVolume: (script.narrationVolume ?? 100) / 100,
+            musicVolume: (script.musicVolume ?? 25) / 100,
+            sfxVolume: 0.4, // SFX at 40% volume
           },
         });
         if (error) throw error;
