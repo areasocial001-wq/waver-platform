@@ -1263,6 +1263,24 @@ export const StoryModeWizard = () => {
           </div>
         </div>
       )}
+
+      {/* Cancel confirmation dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annullare la produzione?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La generazione verrà interrotta. Gli asset già completati verranno conservati e potrai riprendere dallo script.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={dismissCancel}>Continua produzione</AlertDialogCancel>
+            <AlertDialogAction onClick={cancelGeneration} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Sì, annulla
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
