@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
+import { useQuotas } from "@/hooks/useQuotas";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -70,6 +71,7 @@ interface SavedProject {
 
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
+  const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>({
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
