@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download,
+  Image, Eye, Download, Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
