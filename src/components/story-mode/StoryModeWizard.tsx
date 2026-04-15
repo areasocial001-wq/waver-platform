@@ -1176,10 +1176,12 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="complete"
+                voices={voiceOptions}
+                defaultVoiceId={input.voiceId}
                 isEditing={false}
                 isPreviewLoading={false}
                 onToggleEdit={() => {}}
-                onUpdate={() => {}}
+                onUpdate={(field, value) => updateScene(idx, field, value)}
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
