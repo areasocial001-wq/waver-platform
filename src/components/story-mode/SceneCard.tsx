@@ -117,6 +117,11 @@ export const SceneCard = ({
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
+  const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
+  const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
+  const authBlobUrl = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
+
   const voiceName = useMemo(() => {
     const vid = scene.voiceId || defaultVoiceId;
     if (!vid || !voices?.length) return null;
@@ -129,8 +134,8 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {scene.videoStatus === "completed" && scene.videoUrl ? (
-            <video src={scene.videoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+          {isVideoReady && playableVideoUrl ? (
+            <video src={playableVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
           ) : (
