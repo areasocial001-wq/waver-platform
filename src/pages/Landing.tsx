@@ -352,7 +352,7 @@ export default function Landing() {
 
             <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [-webkit-text-stroke:3px_black] [text-shadow:-3px_-3px_0_black,3px_-3px_0_black,-3px_3px_0_black,3px_3px_0_black,0_0_20px_black,0_0_40px_black,0_0_80px_hsl(225,25%,2%/0.95)]">
               <span className="block">All-in-one AI</span>
-              <span className="block relative">
+              <span className="block relative [-webkit-text-stroke:0px_transparent]">
                 {/* Stroke layer */}
                 <span className="[-webkit-text-stroke:3px_black]" style={{ textShadow: '-3px -3px 0 black, 3px -3px 0 black, -3px 3px 0 black, 3px 3px 0 black, 0 0 20px black, 0 0 40px black' }} aria-hidden="true">
                   Video & Image
