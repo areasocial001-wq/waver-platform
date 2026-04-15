@@ -1614,6 +1614,13 @@ export const StoryModeWizard = () => {
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
             <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
+            {/* Auto-regenerate error scenes */}
+            {script.scenes.some(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error") && (
+              <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
+                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                Rigenera Errori ({script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length})
+              </Button>
+            )}
             {/* Show reassemble button if project has existing video assets */}
             {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
               <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
