@@ -133,13 +133,14 @@ serve(async (req) => {
     // Build fidelity-aware prompt enhancement
     const fidelityInstructions: Record<string, string> = {
       low: "loosely inspired by the reference subject",
-      medium: "consistent character appearance matching reference photo, same face and body type",
-      high: "exact same person as the reference photo, identical face features, hair, body proportions, and clothing style",
+      medium: "consistent character appearance matching reference photo, same face and body type, same clothing",
+      high: "exact same person as the reference photo, identical face features, identical hair color and style, identical body proportions, identical clothing, photorealistic consistency",
     };
-    const anatomyGuard = "anatomically correct, natural human proportions, realistic body structure";
+    const anatomyGuard = "anatomically correct human anatomy, natural proportions, correct number of fingers and toes, realistic feet with five toes each, no deformed limbs, no extra appendages, no distorted body parts";
+    const styleConsistency = style ? `IMPORTANT: maintain this exact visual style throughout: ${style}. Do NOT mix styles.` : "";
     const prompt = referenceImageUrl
-      ? `${rawPrompt}, ${fidelityInstructions[characterFidelity]}, ${anatomyGuard}`
-      : `${rawPrompt}, ${anatomyGuard}`;
+      ? `${rawPrompt}, ${fidelityInstructions[characterFidelity]}, ${anatomyGuard}. ${styleConsistency}`
+      : `${rawPrompt}, ${anatomyGuard}. ${styleConsistency}`;
 
     // Map short model aliases to full Replicate model identifiers
     const MODEL_ALIASES: Record<string, string> = {
@@ -153,7 +154,24 @@ serve(async (req) => {
 
     const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
 
-    // Try Replicate first (if key is available)
+    // When a reference image is provided, SKIP Replicate (it doesn't support reference images)
+    // and go directly to Lovable AI which supports multimodal input
+    if (referenceImageUrl) {
+      console.log("Reference image provided — using Lovable AI for character-consistent generation");
+      const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+      if (lovableImageUrl) {
+        return new Response(
+          JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: 'SERVICE_UNAVAILABLE', fallback: true, message: 'Generazione con riferimento non disponibile.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // Try Replicate first (if key is available, and no reference image)
     if (REPLICATE_API_KEY) {
       const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
