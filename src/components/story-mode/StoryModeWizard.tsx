@@ -805,6 +805,101 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Re-assemble final video from existing scene assets (no re-generation)
+  const handleReassemble = async () => {
+    if (!script) return;
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    if (vids.length < 2) {
+      toast.error("Servono almeno 2 scene video completate per il montaggio.");
+      return;
+    }
+    setIsGenerating(true);
+    setFinalVideoUrl(null);
+    toast.info("Rimontaggio video finale in corso...");
+    try {
+      const transitions = vids.map((s) => ({
+        type: s.transition || "crossfade",
+        duration: s.transitionDuration || 0.5,
+      }));
+      const narrationUrls = script.scenes
+        .filter(s => s.videoStatus === "completed" && s.audioUrl)
+        .map(s => s.audioUrl)
+        .filter((u): u is string => !!u);
+      const sfxUrls = script.scenes
+        .filter(s => s.videoStatus === "completed" && s.sfxUrl)
+        .map(s => s.sfxUrl)
+        .filter((u): u is string => !!u);
+
+      const resolvedVideoUrls = await Promise.all(
+        vids.map(async (s) => {
+          const url = s.videoUrl!;
+          if (url.startsWith("storage://")) {
+            const path = url.replace("storage://", "");
+            const bucketName = path.split("/")[0];
+            const filePath = path.substring(bucketName.length + 1);
+            const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+            return urlData.publicUrl;
+          }
+          if (url.includes("/functions/v1/video-proxy")) {
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              const token = session?.access_token;
+              const res = await fetch(url, {
+                headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+              });
+              if (!res.ok) return url;
+              const blob = await res.blob();
+              const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
+              const arrayBuffer = await blob.arrayBuffer();
+              const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
+              if (upErr) return url;
+              const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
+              return urlData.publicUrl;
+            } catch { return url; }
+          }
+          return url;
+        })
+      );
+      const validVideoUrls = resolvedVideoUrls.filter((u): u is string => !!u && u.startsWith("http"));
+      if (validVideoUrls.length < 2) {
+        toast.error("Non abbastanza URL video validi per il montaggio.");
+        setIsGenerating(false);
+        return;
+      }
+      const clipDurations = vids.map(s => Math.min(s.duration, 10));
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: {
+          videoUrls: validVideoUrls,
+          clipDurations,
+          transition: transitions[0]?.type || "crossfade",
+          transitionDuration: transitions[0]?.duration || 0.5,
+          transitions,
+          resolution: input.videoQuality || "hd",
+          fps: input.videoFps || "24",
+          audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
+          backgroundMusicUrl: backgroundMusicUrl || undefined,
+          musicVolume: (script.musicVolume ?? 25) / 100,
+        },
+      });
+      if (error) throw error;
+      const finalUrl = data?.videoUrl || data?.url;
+      if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
+      if (finalUrl) {
+        setFinalVideoUrl(finalUrl);
+        setStep("complete");
+        toast.success("Video finale rimontato! 🎬");
+        setTimeout(() => saveProject(), 500);
+      } else {
+        toast.error("Nessun URL video ricevuto dal montaggio.");
+      }
+    } catch (err: any) {
+      console.error("Reassemble error:", err);
+      toast.error("Errore nel rimontaggio: " + (err.message || "sconosciuto"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerateAll = async () => {
     if (!script) return;
     if (!input.imageUrl && refImageError) {
