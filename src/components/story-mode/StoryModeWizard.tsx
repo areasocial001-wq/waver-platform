@@ -157,9 +157,10 @@ export const StoryModeWizard = () => {
         input.language === "fr" ? "Bonjour, ceci est un aperçu de ma voix." :
         input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
         "Hello, this is a preview of my voice.";
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: authHeaders,
         body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("Preview failed");
@@ -313,13 +314,10 @@ export const StoryModeWizard = () => {
     if (!scene.narration.trim()) { toast.error("La scena non ha testo di narrazione"); return; }
     setPreviewLoadingIndex(index);
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: authHeaders,
         body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("TTS preview failed");
@@ -355,13 +353,10 @@ export const StoryModeWizard = () => {
         toast.success(`Immagine scena ${index + 1} rigenerata`);
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: authHeaders,
           body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
         });
         if (!response.ok) throw new Error("TTS failed");
@@ -389,13 +384,10 @@ export const StoryModeWizard = () => {
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
         updateScene(index, "sfxStatus", "generating");
+        const authHeaders = await getAuthHeaders();
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
+          headers: authHeaders,
           body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
         });
         if (!response.ok) throw new Error("SFX generation failed");
@@ -606,13 +598,10 @@ export const StoryModeWizard = () => {
   const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
     const sfxPrompt = moodToSfxPrompt(scene.mood);
     try {
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+        headers: authHeaders,
         body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
@@ -647,9 +636,10 @@ export const StoryModeWizard = () => {
     if (!script?.suggestedMusic) return null;
     try {
       toast.info("Generazione colonna sonora...");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: authHeaders,
         body: JSON.stringify({ prompt: script.suggestedMusic, duration: Math.min(script.scenes.reduce((a, s) => a + s.duration, 0), 120) }),
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
@@ -742,8 +732,9 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+        const authHeaders = await getAuthHeaders();
         const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
-          method: "POST", headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+          method: "POST", headers: authHeaders,
           body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
         });
         if (!r.ok) throw new Error("TTS failed");
