@@ -35,6 +35,8 @@ export interface StoryScript {
 
 export type StoryStep = "input" | "script" | "generation" | "complete";
 
+export type VideoAspectRatio = "16:9" | "4:3" | "9:16";
+
 export interface StoryModeInput {
   imageUrl: string;
   imageFile: File | null;
@@ -45,4 +47,5 @@ export interface StoryModeInput {
   language: string;
   voiceId: string;
   numScenes: number;
+  videoAspectRatio: VideoAspectRatio;
 }
