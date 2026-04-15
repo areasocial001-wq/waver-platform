@@ -80,21 +80,26 @@ const getAuthHeaders = async () => {
   };
 };
 
-// Cross-origin safe download via fetch + blob
-const downloadFile = async (url: string, filename: string) => {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
-  } catch {
-    window.open(url, "_blank");
-  }
+// Cross-origin safe download via fetch + blob (returns a function that manages loading state)
+const useDownloadFile = (setLoadingId: (id: string | null) => void) => {
+  return async (url: string, filename: string, id?: string) => {
+    setLoadingId(id || filename);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
+    } catch {
+      window.open(url, "_blank");
+    } finally {
+      setLoadingId(null);
+    }
+  };
 };
 
 export const StoryModeWizard = () => {
