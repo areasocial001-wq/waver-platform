@@ -1609,6 +1609,32 @@ export const StoryModeWizard = () => {
             </CardContent>
           </Card>
 
+          {/* Asset status summary */}
+          {script.scenes.some(s => s.imageUrl || s.audioUrl || s.videoUrl) && (() => {
+            const total = script.scenes.length;
+            const readyCount = script.scenes.filter(s => s.imageStatus === "completed" && s.audioStatus === "completed" && s.videoStatus === "completed").length;
+            const errorCount = script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length;
+            const pendingCount = total - readyCount - errorCount;
+            return (
+              <div className="flex items-center gap-3 flex-wrap text-xs p-2 rounded-lg bg-muted/30 border border-border/50">
+                <span className="font-medium text-foreground">Stato asset:</span>
+                <Badge variant="secondary" className="gap-1 text-[11px]">
+                  <Check className="w-3 h-3 text-green-500" />{readyCount}/{total} pronte
+                </Badge>
+                {errorCount > 0 && (
+                  <Badge variant="destructive" className="gap-1 text-[11px]">
+                    ✗ {errorCount} in errore
+                  </Badge>
+                )}
+                {pendingCount > 0 && (
+                  <Badge variant="outline" className="gap-1 text-[11px] text-muted-foreground">
+                    — {pendingCount} da generare
+                  </Badge>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
