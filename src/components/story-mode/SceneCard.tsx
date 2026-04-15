@@ -21,17 +21,20 @@ import { supabase } from "@/integrations/supabase/client";
  */
 function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const prevUrl = useRef<string | undefined>();
 
   useEffect(() => {
     if (!isActive || !videoUrl) {
       setBlobUrl(null);
+      setIsLoading(false);
       return;
     }
     if (videoUrl === prevUrl.current) return;
     prevUrl.current = videoUrl;
 
     let cancelled = false;
+    setIsLoading(true);
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -52,6 +55,8 @@ function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
         }
       } catch (err) {
         console.error("useAuthVideo error:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
 
@@ -60,14 +65,13 @@ function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
     };
   }, [videoUrl, isActive]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
   }, [blobUrl]);
 
-  return blobUrl;
+  return { blobUrl, isLoading };
 }
 
 const TRANSITIONS: { value: TransitionType; label: string; icon: string }[] = [
@@ -119,7 +123,7 @@ export const SceneCard = ({
 }: SceneCardProps) => {
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
-  const authBlobUrl = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
 
   const voiceName = useMemo(() => {
@@ -134,7 +138,12 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {isVideoReady && playableVideoUrl ? (
+          {isVideoReady && isVideoLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="ml-2 text-xs text-muted-foreground">Caricamento video...</span>
+            </div>
+          ) : isVideoReady && playableVideoUrl ? (
             <video src={playableVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
