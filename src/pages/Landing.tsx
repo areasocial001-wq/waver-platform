@@ -352,7 +352,7 @@ export default function Landing() {
 
             <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [-webkit-text-stroke:3px_black] [text-shadow:-3px_-3px_0_black,3px_-3px_0_black,-3px_3px_0_black,3px_3px_0_black,0_0_20px_black,0_0_40px_black,0_0_80px_hsl(225,25%,2%/0.95)]">
               <span className="block">All-in-one AI</span>
-              <span className="block bg-gradient-to-b from-[hsl(0,0%,100%)] via-[hsl(220,20%,75%)] to-[hsl(220,15%,45%)] bg-clip-text text-transparent drop-shadow-[0_0_30px_hsl(217,91%,60%/0.5)] [filter:brightness(1.3)_contrast(1.1)] [-webkit-text-stroke:1px_hsl(220,20%,60%/0.3)]" style={{ textShadow: '0 2px 4px hsl(220,20%,30%/0.5), 0 0 40px hsl(217,91%,60%/0.3)' }}>
+              <span className="block bg-gradient-to-b from-[hsl(0,0%,100%)] via-[hsl(220,20%,75%)] to-[hsl(220,15%,45%)] bg-clip-text text-transparent drop-shadow-[0_0_30px_hsl(217,91%,60%/0.5)] [filter:brightness(1.3)_contrast(1.1)] [-webkit-text-stroke:0px_transparent]" style={{ textShadow: '0 2px 4px hsl(220,20%,30%/0.5), 0 0 40px hsl(217,91%,60%/0.3)' }}>
                 Video & Image
               </span>
               <span className="block">Generator</span>
