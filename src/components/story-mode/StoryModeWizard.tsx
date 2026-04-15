@@ -129,6 +129,8 @@ export const StoryModeWizard = () => {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
+  const [refImageError, setRefImageError] = useState(false);
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
