@@ -401,6 +401,7 @@ export type Database = {
           created_at: string
           id: string
           max_resolution: string
+          max_story_mode_monthly: number
           max_storyboards: number
           max_video_generations_monthly: number
           role: Database["public"]["Enums"]["app_role"]
@@ -414,6 +415,7 @@ export type Database = {
           created_at?: string
           id?: string
           max_resolution?: string
+          max_story_mode_monthly?: number
           max_storyboards?: number
           max_video_generations_monthly?: number
           role: Database["public"]["Enums"]["app_role"]
@@ -427,6 +429,7 @@ export type Database = {
           created_at?: string
           id?: string
           max_resolution?: string
+          max_story_mode_monthly?: number
           max_storyboards?: number
           max_video_generations_monthly?: number
           role?: Database["public"]["Enums"]["app_role"]
