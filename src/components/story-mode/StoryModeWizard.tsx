@@ -904,7 +904,10 @@ export const StoryModeWizard = () => {
     }
     toast.info(`Rigenerazione di ${errorScenes.length} scene con problemi...`);
     setIsGenerating(true);
-    for (const { scene, index } of errorScenes) {
+    setRegenProgress({ current: 0, total: errorScenes.length });
+    for (let i = 0; i < errorScenes.length; i++) {
+      const { scene, index } = errorScenes[i];
+      setRegenProgress({ current: i, total: errorScenes.length });
       if (scene.imageStatus === "error" || (!scene.imageUrl && scene.imageStatus !== "generating")) {
         await regenerateSceneAsset(index, "image");
       }
@@ -918,6 +921,7 @@ export const StoryModeWizard = () => {
         await regenerateSceneAsset(index, "video");
       }
     }
+    setRegenProgress(null);
     setIsGenerating(false);
     toast.success("Rigenerazione completata!");
   };
