@@ -2023,16 +2023,38 @@ export const StoryModeWizard = () => {
                     </Button>
                   ))}
                 </div>
+                {/* Failed/missing scenes banner */}
+                {(() => {
+                  const issues = failedOrMissingScenes(script.scenes);
+                  if (issues.length === 0) return null;
+                  const details = issues.map(({ scene, index }) => {
+                    const missing: string[] = [];
+                    if (scene.imageStatus === "error" || !scene.imageUrl) missing.push("Img");
+                    if (scene.audioStatus === "error" || !scene.audioUrl) missing.push("Audio");
+                    if (scene.videoStatus === "error" || !scene.videoUrl) missing.push("Video");
+                    if (scene.sfxStatus === "error") missing.push("SFX");
+                    return `Scena ${scene.sceneNumber}: ${missing.join(", ")}`;
+                  });
+                  return (
+                    <div className="p-4 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2 text-left">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                        <p className="text-sm font-medium">{issues.length} scene con asset mancanti o in errore</p>
+                      </div>
+                      <ul className="text-xs text-muted-foreground space-y-0.5 ml-7">
+                        {details.map((d, i) => <li key={i}>• {d}</li>)}
+                      </ul>
+                      <Button variant="destructive" size="sm" onClick={handleAutoRegenerateErrors} disabled={isGenerating} className="ml-7">
+                        {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        Rigenera Solo Scene Fallite ({issues.length})
+                      </Button>
+                    </div>
+                  );
+                })()}
                 <div className="flex gap-3 justify-center flex-wrap">
                   <Button onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
-                  {script.scenes.some(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error") && (
-                    <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
-                      {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                      Rigenera Errori ({script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length})
-                    </Button>
-                  )}
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
                     <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
