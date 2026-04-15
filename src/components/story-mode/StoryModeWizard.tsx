@@ -724,6 +724,20 @@ export const StoryModeWizard = () => {
     finally { setIsGeneratingScript(false); }
   };
 
+  // Upload a blob to Supabase storage and return the public URL
+  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3"): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const fileName = `${folder}/${user?.id || "anon"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const arrayBuffer = await blob.arrayBuffer();
+    const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
+      contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
+      upsert: true,
+    });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
+    return urlData.publicUrl;
+  };
+
   const generateBackgroundMusic = async (): Promise<string | null> => {
     if (!script?.suggestedMusic) return null;
     try {
@@ -736,10 +750,11 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setBackgroundMusicUrl(url);
+      // Upload to storage so Shotstack can access it
+      const storageUrl = await uploadBlobToStorage(blob, "story-music");
+      setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
-      return url;
+      return storageUrl;
     } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
   };
 
