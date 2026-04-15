@@ -770,8 +770,7 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
-      // Upload to storage so Shotstack can access it
-      const storageUrl = await uploadBlobToStorage(blob, "story-sfx");
+      const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena`);
       return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
