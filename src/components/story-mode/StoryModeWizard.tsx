@@ -123,6 +123,8 @@ export const StoryModeWizard = () => {
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
   const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
+  const [renderStartTime, setRenderStartTime] = useState<number | null>(null);
+  const [renderElapsed, setRenderElapsed] = useState(0);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
@@ -251,6 +253,24 @@ export const StoryModeWizard = () => {
     poll();
     return () => { cancelled = true; };
   }, [pendingRenderId, renderStatus]);
+
+  // Render elapsed timer
+  useEffect(() => {
+    if (renderStatus !== "processing" || !renderStartTime) return;
+    const iv = setInterval(() => {
+      setRenderElapsed(Math.floor((Date.now() - renderStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [renderStatus, renderStartTime]);
+
+  // Estimate total render time: ~15s per scene + 10s base, double for HD
+  const sceneCount = script.scenes.length || 1;
+  const isHD = input.videoQuality === "hd" || input.videoQuality === "fhd";
+  const estimatedRenderSeconds = (sceneCount * 15 + 10) * (isHD ? 2 : 1);
+  const renderProgressPct = renderStatus === "processing"
+    ? Math.min(95, (renderElapsed / estimatedRenderSeconds) * 100)
+    : renderStatus === "completed" ? 100 : 0;
+  const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
@@ -953,6 +973,8 @@ export const StoryModeWizard = () => {
       if (data?.method === "shotstack-pending" && data?.renderId) {
         setPendingRenderId(data.renderId);
         setRenderStatus("processing");
+        setRenderStartTime(Date.now());
+        setRenderElapsed(0);
         setStep("complete");
         toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
         setTimeout(() => saveProject(), 500);
@@ -1198,6 +1220,8 @@ export const StoryModeWizard = () => {
         if (data?.method === "shotstack-pending" && data?.renderId) {
           setPendingRenderId(data.renderId);
           setRenderStatus("processing");
+          setRenderStartTime(Date.now());
+          setRenderElapsed(0);
           toast.info("Rendering finale in corso… apparirà automaticamente.");
         } else if (finalUrl) {
           setFinalVideoUrl(finalUrl);
@@ -1827,13 +1851,27 @@ export const StoryModeWizard = () => {
         <div className="space-y-6">
           {/* Render status badge */}
           {renderStatus === "processing" && (
-            <div className="flex items-center gap-3 p-4 rounded-lg border border-primary/30 bg-primary/5">
-              <Loader2 className="w-5 h-5 animate-spin text-primary" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">Rendering in lavorazione…</p>
-                <p className="text-xs text-muted-foreground">Il video finale apparirà automaticamente. Puoi restare su questa pagina.</p>
+            <div className="p-4 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  <p className="text-sm font-medium">Rendering in lavorazione…</p>
+                </div>
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">In lavorazione</Badge>
               </div>
-              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">In lavorazione</Badge>
+              <Progress value={renderProgressPct} className="h-2" />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{Math.round(renderProgressPct)}% completato</span>
+                <span className="flex items-center gap-1">
+                  <Timer className="w-3 h-3" />
+                  {renderRemainingSeconds > 60
+                    ? `~${Math.ceil(renderRemainingSeconds / 60)} min rimanenti`
+                    : `~${renderRemainingSeconds}s rimanenti`}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {sceneCount} scene · {isHD ? "Alta qualità" : "Qualità standard"} · Tempo stimato ~{Math.ceil(estimatedRenderSeconds / 60)} min
+              </p>
             </div>
           )}
           {renderStatus === "failed" && !finalVideoUrl && (
