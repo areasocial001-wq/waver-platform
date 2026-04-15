@@ -798,19 +798,32 @@ export const StoryModeWizard = () => {
     finally { setIsGeneratingScript(false); }
   };
 
-  // Upload a blob to Supabase storage and return the public URL
-  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3"): Promise<string> => {
+  // Upload a blob to Supabase storage with retry (max 3 attempts, exponential backoff)
+  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3", sceneLabel?: string): Promise<string> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
     const fileName = `${user.id}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const arrayBuffer = await blob.arrayBuffer();
-    const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
-      contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
-      upsert: true,
-    });
-    if (error) throw error;
-    const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
-    return urlData.publicUrl;
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
+        contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
+        upsert: true,
+      });
+      if (!error) {
+        const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
+        return urlData.publicUrl;
+      }
+      lastError = error;
+      const label = sceneLabel || folder;
+      console.warn(`Upload ${label} tentativo ${attempt}/${maxAttempts} fallito:`, error.message);
+      if (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      }
+    }
+    const label = sceneLabel || folder;
+    throw new Error(`Upload fallito per "${label}" dopo ${maxAttempts} tentativi: ${lastError?.message}`);
   };
 
   const generateBackgroundMusic = async (): Promise<string | null> => {
