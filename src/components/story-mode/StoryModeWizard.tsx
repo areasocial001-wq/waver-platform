@@ -502,15 +502,22 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Quality/FPS rendering multiplier
+  const renderingMultiplier = (() => {
+    const qMul = input.videoQuality === "fhd" ? 1.8 : input.videoQuality === "sd" ? 0.6 : 1;
+    const fMul = input.videoFps === "60" ? 1.5 : input.videoFps === "30" ? 1.1 : 1;
+    return qMul * fMul;
+  })();
+
   // Production time estimate (seconds)
   const estimatedProductionTime = script ? (() => {
     const n = script.scenes.length;
     const imgTime = n * 15;
     const ttsTime = n * 8;
     const videoTime = n * 45;
-    const sfxTime = n * 5;    // ~5s per SFX
+    const sfxTime = n * 5;
     const musicTime = 30;
-    const concatTime = 10;
+    const concatTime = Math.round(10 * renderingMultiplier);
     return imgTime + ttsTime + videoTime + sfxTime + musicTime + concatTime;
   })() : 0;
 
