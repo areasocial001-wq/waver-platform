@@ -1111,6 +1111,9 @@ export const StoryModeWizard = () => {
                     <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
                       {isPaused ? <><Play className="w-3 h-3 mr-1" />Riprendi</> : <><Pause className="w-3 h-3 mr-1" />Pausa</>}
                     </Button>
+                    <Button variant="destructive" size="sm" className="h-7 px-3" onClick={cancelGeneration}>
+                      <Square className="w-3 h-3 mr-1" />Annulla
+                    </Button>
                     <span className="text-sm text-muted-foreground">{generationProgress}%</span>
                   </div>
                 </div>
