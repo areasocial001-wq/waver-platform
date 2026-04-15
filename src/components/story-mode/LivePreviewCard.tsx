@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Eye, ChevronLeft, ChevronRight, PlayCircle, StopCircle } from "lucide-react";
 import { useAuthVideo } from "@/hooks/useAuthVideo";
 import { StoryScene } from "./types";
 import { cn } from "@/lib/utils";
@@ -14,11 +14,32 @@ interface LivePreviewCardProps {
 export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
   const completedVideos = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
   const [selectedIndex, setSelectedIndex] = useState(completedVideos.length - 1);
+  const [playAll, setPlayAll] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Auto-advance to latest when new scenes complete
+  // Auto-advance to latest when new scenes complete (only if not in play-all mode)
   useEffect(() => {
-    setSelectedIndex(completedVideos.length - 1);
-  }, [completedVideos.length]);
+    if (!playAll) setSelectedIndex(completedVideos.length - 1);
+  }, [completedVideos.length, playAll]);
+
+  const handleVideoEnded = useCallback(() => {
+    if (!playAll) return;
+    const nextIndex = selectedIndex + 1;
+    if (nextIndex < completedVideos.length) {
+      setSelectedIndex(nextIndex);
+    } else {
+      setPlayAll(false); // finished all
+    }
+  }, [playAll, selectedIndex, completedVideos.length]);
+
+  const togglePlayAll = () => {
+    if (playAll) {
+      setPlayAll(false);
+    } else {
+      setSelectedIndex(0);
+      setPlayAll(true);
+    }
+  };
 
   if (completedVideos.length === 0) return null;
 
@@ -40,17 +61,30 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
             <Eye className="w-4 h-4 text-accent" />
             Anteprima Live — {completedVideos.length}/{totalScenes} scene completate
           </div>
-          {completedVideos.length > 1 && (
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="w-7 h-7" disabled={!canPrev} onClick={() => setSelectedIndex(i => i - 1)}>
-                <ChevronLeft className="w-4 h-4" />
+          <div className="flex items-center gap-1">
+            {completedVideos.length > 1 && (
+              <Button
+                variant={playAll ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                onClick={togglePlayAll}
+              >
+                {playAll ? <StopCircle className="w-3.5 h-3.5" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                {playAll ? "Stop" : "Play All"}
               </Button>
-              <span className="text-xs text-muted-foreground min-w-[3ch] text-center">{safeIndex + 1}/{completedVideos.length}</span>
-              <Button variant="ghost" size="icon" className="w-7 h-7" disabled={!canNext} onClick={() => setSelectedIndex(i => i + 1)}>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
+            )}
+            {completedVideos.length > 1 && (
+              <>
+                <Button variant="ghost" size="icon" className="w-7 h-7" disabled={!canPrev} onClick={() => { setPlayAll(false); setSelectedIndex(i => i - 1); }}>
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground min-w-[3ch] text-center">{safeIndex + 1}/{completedVideos.length}</span>
+                <Button variant="ghost" size="icon" className="w-7 h-7" disabled={!canNext} onClick={() => { setPlayAll(false); setSelectedIndex(i => i + 1); }}>
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -59,7 +93,16 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : playableUrl ? (
-          <video key={playableUrl} src={playableUrl} controls autoPlay muted className="w-full rounded-lg max-h-[300px]" />
+          <video
+            ref={videoRef}
+            key={playableUrl}
+            src={playableUrl}
+            controls
+            autoPlay
+            muted
+            className="w-full rounded-lg max-h-[300px]"
+            onEnded={handleVideoEnded}
+          />
         ) : (
           <div className="flex items-center justify-center h-[200px] bg-muted rounded-lg text-muted-foreground text-sm">
             Caricamento video...
@@ -72,7 +115,7 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
             {completedVideos.map((scene, i) => (
               <button
                 key={scene.sceneNumber}
-                onClick={() => setSelectedIndex(i)}
+                onClick={() => { setPlayAll(false); setSelectedIndex(i); }}
                 className={cn(
                   "shrink-0 w-14 h-10 rounded border-2 overflow-hidden transition-all text-[10px] flex items-center justify-center bg-muted",
                   i === safeIndex ? "border-primary ring-1 ring-primary/30" : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
@@ -89,7 +132,7 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
         )}
 
         <p className="text-xs text-muted-foreground text-center">
-          Scena {currentScene.sceneNumber}
+          Scena {currentScene.sceneNumber}{playAll && " — Riproduzione sequenziale"}
         </p>
       </CardContent>
     </Card>
