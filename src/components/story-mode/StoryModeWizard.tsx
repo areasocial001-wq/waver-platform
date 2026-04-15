@@ -801,7 +801,8 @@ export const StoryModeWizard = () => {
   // Upload a blob to Supabase storage and return the public URL
   const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3"): Promise<string> => {
     const { data: { user } } = await supabase.auth.getUser();
-    const fileName = `${folder}/${user?.id || "anon"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    if (!user) throw new Error("Utente non autenticato");
+    const fileName = `${user.id}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const arrayBuffer = await blob.arrayBuffer();
     const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
       contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
