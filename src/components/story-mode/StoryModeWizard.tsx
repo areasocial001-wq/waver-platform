@@ -88,6 +88,7 @@ export const StoryModeWizard = () => {
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
     description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
+    videoAspectRatio: "16:9",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
@@ -236,6 +237,7 @@ export const StoryModeWizard = () => {
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
+      videoAspectRatio: config.videoAspectRatio || "16:9",
     });
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
@@ -344,7 +346,7 @@ export const StoryModeWizard = () => {
       if (type === "image") {
         updateScene(index, "imageStatus", "generating");
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -382,6 +384,7 @@ export const StoryModeWizard = () => {
             prompt: `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}`,
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
+            aspect_ratio: input.videoAspectRatio,
           },
         });
         if (error) throw error;
@@ -726,7 +729,7 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier } });
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter
@@ -780,7 +783,7 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const { data, error } = await supabase.functions.invoke("generate-video", {
-          body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1" },
+          body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1", aspect_ratio: input.videoAspectRatio },
         });
         if (error) throw error;
         scenes[i] = { ...scenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
@@ -1031,6 +1034,30 @@ export const StoryModeWizard = () => {
                 <div>
                   <Label className="text-xs">Numero Scene: {input.numScenes} (~{input.numScenes * 8}s totali)</Label>
                   <Slider value={[input.numScenes]} onValueChange={([v]) => setInput(p => ({ ...p, numScenes: v }))} min={4} max={12} step={1} className="mt-2" />
+                </div>
+                <div>
+                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Formato Video</Label>
+                  <div className="flex gap-2 mt-1.5">
+                    {([
+                      { value: "16:9" as const, label: "16:9", desc: "Landscape" },
+                      { value: "4:3" as const, label: "4:3", desc: "Standard" },
+                      { value: "9:16" as const, label: "9:16", desc: "Verticale" },
+                    ]).map(fmt => (
+                      <button
+                        key={fmt.value}
+                        onClick={() => setInput(p => ({ ...p, videoAspectRatio: fmt.value }))}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-0.5 py-2 px-3 rounded-lg border-2 transition-all text-xs font-medium",
+                          input.videoAspectRatio === fmt.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:border-muted-foreground/40 text-muted-foreground"
+                        )}
+                      >
+                        <span className="font-bold">{fmt.label}</span>
+                        <span className="text-[10px] opacity-70">{fmt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
