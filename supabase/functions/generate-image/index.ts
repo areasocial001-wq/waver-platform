@@ -91,34 +91,59 @@ serve(async (req) => {
       model 
     });
 
-    const output = await replicate.run(
-      model,
-      {
-        input: {
-          prompt,
-          go_fast: true,
-          megapixels: "1",
-          num_outputs: 1,
-          aspect_ratio: aspectRatio,
-          output_format: outputFormat,
-          output_quality: outputQuality,
-          num_inference_steps: numInferenceSteps,
-          ...(width && height ? { width, height } : {})
+    // Retry with backoff on 429 rate limits
+    const MAX_RETRIES = 3;
+    let lastError: any = null;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const output = await replicate.run(
+          model,
+          {
+            input: {
+              prompt,
+              go_fast: true,
+              megapixels: "1",
+              num_outputs: 1,
+              aspect_ratio: aspectRatio,
+              output_format: outputFormat,
+              output_quality: outputQuality,
+              num_inference_steps: numInferenceSteps,
+              ...(width && height ? { width, height } : {})
+            }
+          }
+        );
+
+        console.log("Image generation successful:", output);
+
+        return new Response(
+          JSON.stringify({ 
+            imageUrl: Array.isArray(output) ? output[0] : output,
+            success: true 
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          }
+        );
+      } catch (err: any) {
+        lastError = err;
+        const msg = err.message || '';
+        // Extract retry_after from error message if present
+        const retryMatch = msg.match(/retry_after["\s:]+(\d+)/);
+        const isRateLimit = msg.includes('429') || msg.includes('Too Many Requests');
+
+        if (isRateLimit && attempt < MAX_RETRIES - 1) {
+          const waitSec = retryMatch ? parseInt(retryMatch[1], 10) + 1 : (attempt + 1) * 10;
+          console.log(`Rate limited, waiting ${waitSec}s before retry ${attempt + 2}/${MAX_RETRIES}`);
+          await new Promise(r => setTimeout(r, waitSec * 1000));
+          continue;
         }
+        throw err;
       }
-    );
+    }
 
-    console.log("Image generation successful:", output);
+    throw lastError;
 
-    return new Response(
-      JSON.stringify({ 
-        imageUrl: Array.isArray(output) ? output[0] : output,
-        success: true 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
   } catch (error: any) {
     console.error("Error in generate-image function:", error);
     return new Response(
