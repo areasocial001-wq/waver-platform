@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,62 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * Fetches a video URL with auth headers and returns a blob URL for playback.
+ * Needed because <video src> can't send Authorization headers.
+ */
+function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const prevUrl = useRef<string | undefined>();
+
+  useEffect(() => {
+    if (!isActive || !videoUrl) {
+      setBlobUrl(null);
+      return;
+    }
+    if (videoUrl === prevUrl.current) return;
+    prevUrl.current = videoUrl;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch(videoUrl, {
+          headers: token ? {
+            Authorization: `Bearer ${token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          } : {},
+        });
+        if (!res.ok) throw new Error(`Video fetch failed: ${res.status}`);
+        const blob = await res.blob();
+        if (!cancelled) {
+          setBlobUrl(prev => {
+            if (prev) URL.revokeObjectURL(prev);
+            return URL.createObjectURL(blob);
+          });
+        }
+      } catch (err) {
+        console.error("useAuthVideo error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoUrl, isActive]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
+
+  return blobUrl;
+}
 
 const TRANSITIONS: { value: TransitionType; label: string; icon: string }[] = [
   { value: "crossfade", label: "Crossfade", icon: "✦" },
@@ -61,6 +117,11 @@ export const SceneCard = ({
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
+  const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
+  const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
+  const authBlobUrl = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
+
   const voiceName = useMemo(() => {
     const vid = scene.voiceId || defaultVoiceId;
     if (!vid || !voices?.length) return null;
@@ -73,8 +134,8 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {scene.videoStatus === "completed" && scene.videoUrl ? (
-            <video src={scene.videoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+          {isVideoReady && playableVideoUrl ? (
+            <video src={playableVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
           ) : (
