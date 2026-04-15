@@ -372,7 +372,7 @@ export const StoryModeWizard = () => {
       if (type === "image") {
         updateScene(index, "imageStatus", "generating");
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl } : {}) },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -755,7 +755,7 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl } : {}) } });
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter
