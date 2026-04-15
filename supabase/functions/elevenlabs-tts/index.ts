@@ -39,13 +39,27 @@ serve(async (req) => {
     { global: { headers: { Authorization: authHeader } } }
   );
 
-  const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-  if (claimsError || !claimsData?.claims) {
-    console.error('JWT validation failed:', claimsError);
-    return new Response(
-      JSON.stringify({ error: 'Invalid authentication token' }),
-      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+  // Try getClaims first, fall back to getUser
+  let userId: string | undefined;
+  try {
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    if (!claimsError && claimsData?.claims) {
+      userId = claimsData.claims.sub as string;
+    }
+  } catch (_) {
+    // getClaims not available in this SDK version
+  }
+
+  if (!userId) {
+    const { data: userData, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError || !userData?.user) {
+      console.error('JWT validation failed:', userError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    userId = userData.user.id;
   }
 
   try {
