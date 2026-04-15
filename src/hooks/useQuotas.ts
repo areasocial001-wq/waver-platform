@@ -6,6 +6,7 @@ export interface PlanQuota {
   max_video_generations_monthly: number;
   max_resolution: string;
   max_storyboards: number;
+  max_story_mode_monthly: number;
   can_clone_voice: boolean;
   can_use_timeline: boolean;
   can_use_api_access: boolean;
@@ -16,6 +17,7 @@ const DEFAULT_QUOTA: PlanQuota = {
   max_video_generations_monthly: 5,
   max_resolution: "720p",
   max_storyboards: 1,
+  max_story_mode_monthly: 0,
   can_clone_voice: false,
   can_use_timeline: false,
   can_use_api_access: false,
@@ -55,6 +57,7 @@ export const useQuotas = () => {
           max_video_generations_monthly: data.max_video_generations_monthly,
           max_resolution: data.max_resolution,
           max_storyboards: data.max_storyboards,
+          max_story_mode_monthly: (data as any).max_story_mode_monthly ?? 0,
           can_clone_voice: data.can_clone_voice,
           can_use_timeline: data.can_use_timeline,
           can_use_api_access: data.can_use_api_access,
