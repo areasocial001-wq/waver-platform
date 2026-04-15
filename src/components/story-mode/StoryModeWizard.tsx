@@ -80,6 +80,23 @@ const getAuthHeaders = async () => {
   };
 };
 
+// Cross-origin safe download via fetch + blob
+const downloadFile = async (url: string, filename: string) => {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
+  } catch {
+    window.open(url, "_blank");
+  }
+};
+
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
