@@ -955,6 +955,8 @@ export const StoryModeWizard = () => {
       if (data?.method === "shotstack-pending" && data?.renderId) {
         setPendingRenderId(data.renderId);
         setRenderStatus("processing");
+        setRenderStartTime(Date.now());
+        setRenderElapsed(0);
         setStep("complete");
         toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
         setTimeout(() => saveProject(), 500);
@@ -1200,6 +1202,8 @@ export const StoryModeWizard = () => {
         if (data?.method === "shotstack-pending" && data?.renderId) {
           setPendingRenderId(data.renderId);
           setRenderStatus("processing");
+          setRenderStartTime(Date.now());
+          setRenderElapsed(0);
           toast.info("Rendering finale in corso… apparirà automaticamente.");
         } else if (finalUrl) {
           setFinalVideoUrl(finalUrl);
