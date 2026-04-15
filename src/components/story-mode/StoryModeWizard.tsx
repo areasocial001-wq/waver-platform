@@ -1331,7 +1331,7 @@ export const StoryModeWizard = () => {
           <Card className="border-secondary/20 bg-card/50">
             <CardContent className="py-3 px-4 space-y-3">
               <p className="text-sm font-medium flex items-center gap-2"><Volume2 className="w-4 h-4 text-primary" />Controllo Volumi & Qualità</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center justify-between">
                     <span>🎙️ Narrazione</span>
@@ -1355,7 +1355,7 @@ export const StoryModeWizard = () => {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Qualità Video Finale</Label>
+                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Qualità</Label>
                   <div className="flex gap-1.5 mt-1">
                     {([
                       { value: "sd" as const, label: "SD", desc: "480p" },
@@ -1374,6 +1374,30 @@ export const StoryModeWizard = () => {
                       >
                         <span className="font-bold text-[11px]">{q.label}</span>
                         <span className="text-[9px] opacity-70">{q.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Framerate</Label>
+                  <div className="flex gap-1.5 mt-1">
+                    {([
+                      { value: "24" as const, label: "24", desc: "Cinema" },
+                      { value: "30" as const, label: "30", desc: "Standard" },
+                      { value: "60" as const, label: "60", desc: "Fluido" },
+                    ]).map(f => (
+                      <button
+                        key={f.value}
+                        onClick={() => setInput(p => ({ ...p, videoFps: f.value }))}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-2 rounded-lg border-2 transition-all text-xs font-medium",
+                          input.videoFps === f.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:border-muted-foreground/40 text-muted-foreground"
+                        )}
+                      >
+                        <span className="font-bold text-[11px]">{f.label}fps</span>
+                        <span className="text-[9px] opacity-70">{f.desc}</span>
                       </button>
                     ))}
                   </div>
