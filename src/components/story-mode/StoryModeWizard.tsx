@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
-  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square,
+  Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square, Pause,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
@@ -91,6 +91,21 @@ export const StoryModeWizard = () => {
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const pauseRef = useRef(false);
+
+  const waitForResume = async () => {
+    while (pauseRef.current) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  };
+
+  const togglePause = () => {
+    const next = !pauseRef.current;
+    pauseRef.current = next;
+    setIsPaused(next);
+    toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
+  };
 
   const previewVoice = async (voiceId: string) => {
     if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
@@ -651,7 +666,9 @@ export const StoryModeWizard = () => {
     setGenerationProgress(0);
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
-    const totalSteps = script.scenes.length * 4 + 1; // img + tts + sfx + video + music
+    pauseRef.current = false;
+    setIsPaused(false);
+    const totalSteps = script.scenes.length * 4 + 1;
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
@@ -659,6 +676,7 @@ export const StoryModeWizard = () => {
 
     // Images
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -671,6 +689,7 @@ export const StoryModeWizard = () => {
 
     // TTS narration
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -686,6 +705,7 @@ export const StoryModeWizard = () => {
 
     // SFX per scene (based on mood)
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -697,6 +717,7 @@ export const StoryModeWizard = () => {
 
     // Video generation
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
@@ -1059,8 +1080,16 @@ export const StoryModeWizard = () => {
             <CardContent className="pt-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Progresso Produzione</span>
-                  <span className="text-sm text-muted-foreground">{generationProgress}%</span>
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    Progresso Produzione
+                    {isPaused && <Badge variant="outline" className="text-[10px] animate-pulse">⏸ In pausa</Badge>}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
+                      {isPaused ? <><Play className="w-3 h-3 mr-1" />Riprendi</> : <><Pause className="w-3 h-3 mr-1" />Pausa</>}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">{generationProgress}%</span>
+                  </div>
                 </div>
                 <Progress value={generationProgress} className="h-3" />
                 {/* Real-time elapsed vs estimated timer */}
