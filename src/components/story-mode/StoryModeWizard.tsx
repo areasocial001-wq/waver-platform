@@ -384,6 +384,7 @@ export const StoryModeWizard = () => {
             prompt: `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}`,
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
+            aspect_ratio: input.videoAspectRatio,
           },
         });
         if (error) throw error;
@@ -728,7 +729,7 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier } });
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter
@@ -782,7 +783,7 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const { data, error } = await supabase.functions.invoke("generate-video", {
-          body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1" },
+          body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1", aspect_ratio: input.videoAspectRatio },
         });
         if (error) throw error;
         scenes[i] = { ...scenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
