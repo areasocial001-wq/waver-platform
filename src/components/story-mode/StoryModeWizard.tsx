@@ -805,6 +805,101 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Re-assemble final video from existing scene assets (no re-generation)
+  const handleReassemble = async () => {
+    if (!script) return;
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    if (vids.length < 2) {
+      toast.error("Servono almeno 2 scene video completate per il montaggio.");
+      return;
+    }
+    setIsGenerating(true);
+    setFinalVideoUrl(null);
+    toast.info("Rimontaggio video finale in corso...");
+    try {
+      const transitions = vids.map((s) => ({
+        type: s.transition || "crossfade",
+        duration: s.transitionDuration || 0.5,
+      }));
+      const narrationUrls = script.scenes
+        .filter(s => s.videoStatus === "completed" && s.audioUrl)
+        .map(s => s.audioUrl)
+        .filter((u): u is string => !!u);
+      const sfxUrls = script.scenes
+        .filter(s => s.videoStatus === "completed" && s.sfxUrl)
+        .map(s => s.sfxUrl)
+        .filter((u): u is string => !!u);
+
+      const resolvedVideoUrls = await Promise.all(
+        vids.map(async (s) => {
+          const url = s.videoUrl!;
+          if (url.startsWith("storage://")) {
+            const path = url.replace("storage://", "");
+            const bucketName = path.split("/")[0];
+            const filePath = path.substring(bucketName.length + 1);
+            const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+            return urlData.publicUrl;
+          }
+          if (url.includes("/functions/v1/video-proxy")) {
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              const token = session?.access_token;
+              const res = await fetch(url, {
+                headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+              });
+              if (!res.ok) return url;
+              const blob = await res.blob();
+              const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
+              const arrayBuffer = await blob.arrayBuffer();
+              const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
+              if (upErr) return url;
+              const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
+              return urlData.publicUrl;
+            } catch { return url; }
+          }
+          return url;
+        })
+      );
+      const validVideoUrls = resolvedVideoUrls.filter((u): u is string => !!u && u.startsWith("http"));
+      if (validVideoUrls.length < 2) {
+        toast.error("Non abbastanza URL video validi per il montaggio.");
+        setIsGenerating(false);
+        return;
+      }
+      const clipDurations = vids.map(s => Math.min(s.duration, 10));
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: {
+          videoUrls: validVideoUrls,
+          clipDurations,
+          transition: transitions[0]?.type || "crossfade",
+          transitionDuration: transitions[0]?.duration || 0.5,
+          transitions,
+          resolution: input.videoQuality || "hd",
+          fps: input.videoFps || "24",
+          audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
+          backgroundMusicUrl: backgroundMusicUrl || undefined,
+          musicVolume: (script.musicVolume ?? 25) / 100,
+        },
+      });
+      if (error) throw error;
+      const finalUrl = data?.videoUrl || data?.url;
+      if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
+      if (finalUrl) {
+        setFinalVideoUrl(finalUrl);
+        setStep("complete");
+        toast.success("Video finale rimontato! 🎬");
+        setTimeout(() => saveProject(), 500);
+      } else {
+        toast.error("Nessun URL video ricevuto dal montaggio.");
+      }
+    } catch (err: any) {
+      console.error("Reassemble error:", err);
+      toast.error("Errore nel rimontaggio: " + (err.message || "sconosciuto"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleGenerateAll = async () => {
     if (!script) return;
     if (!input.imageUrl && refImageError) {
@@ -1462,6 +1557,7 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
+                onRegenerate={scene.imageUrl || scene.videoUrl || scene.audioUrl ? (type) => regenerateSceneAsset(idx, type) : undefined}
               />
             ))}
           </div>
@@ -1490,9 +1586,16 @@ export const StoryModeWizard = () => {
 
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
-            <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera</Button>
+            <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
             <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
+            {/* Show reassemble button if project has existing video assets */}
+            {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
+              <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                Rimonta Video Finale
+              </Button>
+            )}
             <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
           </div>
         </div>
@@ -1630,6 +1733,9 @@ export const StoryModeWizard = () => {
                   <Button disabled={downloadingId === "final"} onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`, "final")}>
                     {downloadingId === "final" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Scarica Video
                   </Button>
+                  <Button variant="outline" onClick={() => setStep("script")}>
+                    <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
+                  </Button>
                   <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
                 {videoSegments.length > 1 && (
@@ -1649,7 +1755,7 @@ export const StoryModeWizard = () => {
           ) : (
             <Card className="border-accent/20 bg-card/50">
               <CardContent className="pt-6 text-center space-y-3">
-                <p className="text-muted-foreground">Scarica le singole scene o rigenera quelle in errore:</p>
+                <p className="text-muted-foreground">Nessun video finale generato. Modifica le scene e rimetti in produzione:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).map((s, i) => (
                     <Button key={i} variant="outline" size="sm" disabled={downloadingId === `scene-${i}`} onClick={() => downloadFile(s.videoUrl!, `scena-${s.sceneNumber}.mp4`, `scene-${i}`)}>
@@ -1657,7 +1763,18 @@ export const StoryModeWizard = () => {
                     </Button>
                   ))}
                 </div>
-                <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                <div className="flex gap-3 justify-center flex-wrap">
+                  <Button onClick={() => setStep("script")}>
+                    <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
+                  </Button>
+                  {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
+                    <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                      {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                      Rimonta Video Finale
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                </div>
               </CardContent>
             </Card>
           )}
