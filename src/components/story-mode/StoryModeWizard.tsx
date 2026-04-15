@@ -1255,6 +1255,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="review"
+                aspectRatio={input.videoAspectRatio}
                 voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={editingSceneIndex === idx}
@@ -1405,7 +1406,7 @@ export const StoryModeWizard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
-              <SceneCard key={idx} scene={scene} index={idx} mode="generation" voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
+              <SceneCard key={idx} scene={scene} index={idx} mode="generation" aspectRatio={input.videoAspectRatio} voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
             ))}
           </div>
         </div>
@@ -1472,6 +1473,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="complete"
+                aspectRatio={input.videoAspectRatio}
                 voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={false}
