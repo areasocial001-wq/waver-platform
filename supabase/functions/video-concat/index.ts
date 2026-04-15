@@ -484,8 +484,8 @@ serve(async (req) => {
 
         console.log('Shotstack render request:', JSON.stringify(renderRequest, null, 2));
 
-        // Submit render to Shotstack (sandbox for testing, remove 'stage' for production)
-        const renderResponse = await fetch('https://api.shotstack.io/edit/stage/render', {
+        // Submit render to Shotstack (v1 production endpoint)
+        const renderResponse = await fetch('https://api.shotstack.io/edit/v1/render', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -517,7 +517,7 @@ serve(async (req) => {
           await new Promise(resolve => setTimeout(resolve, 5000));
           
           const statusResponse = await fetch(
-            `https://api.shotstack.io/edit/stage/render/${renderId}`,
+            `https://api.shotstack.io/edit/v1/render/${renderId}`,
             {
               headers: { 'x-api-key': SHOTSTACK_API_KEY },
             }
