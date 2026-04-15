@@ -386,9 +386,14 @@ export const StoryModeWizard = () => {
 
     try {
       if (type === "image") {
+        if (input.imageUrl?.startsWith("blob:")) {
+          toast.error("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+          return;
+        }
         updateScene(index, "imageStatus", "generating");
+        const referenceImageUrl = input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : undefined;
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
