@@ -1,3 +1,5 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -10,6 +12,24 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { input, style } = await req.json();
 
     if (!input || typeof input !== "string" || input.trim().length === 0) {
@@ -34,11 +54,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Determine if input is a URL
     const isUrl = /^https?:\/\//i.test(input.trim());
     let articleText = input.trim();
 
-    // If URL, try to fetch the content
     if (isUrl) {
       try {
         const fetchRes = await fetch(input.trim(), {
@@ -46,7 +64,6 @@ Deno.serve(async (req) => {
         });
         if (fetchRes.ok) {
           const html = await fetchRes.text();
-          // Simple HTML to text extraction
           articleText = html
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
@@ -57,7 +74,6 @@ Deno.serve(async (req) => {
         }
       } catch (fetchErr) {
         console.error("Failed to fetch URL:", fetchErr);
-        // Fall back to using the URL as-is in the prompt
       }
     }
 
@@ -84,10 +100,7 @@ Return ONLY the video script, formatted with scene markers like [SCENE 1], [SCEN
           model: "google/gemini-3-flash-preview",
           messages: [
             { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: `Trasforma il seguente contenuto in uno script video:\n\n${articleText}`,
-            },
+            { role: "user", content: `Trasforma il seguente contenuto in uno script video:\n\n${articleText}` },
           ],
         }),
       }

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,13 +12,30 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const { script, maxPanels = 12, action = "parse" } = await req.json();
 
     if (action === "parse") {
-      // Step 1: Parse script into shots
       if (!script || typeof script !== "string" || script.length < 10) {
         return new Response(
           JSON.stringify({ error: "Script troppo corto o mancante" }),
@@ -115,13 +133,9 @@ serve(async (req) => {
     }
 
     if (action === "generate_sketch") {
-      // Step 2: Generate a single sketch image
-      const { visualDescription, cameraAngle, lighting, mood } = await req.json().catch(() => ({}));
-      // We already parsed body above, re-read from original body
-      const body = { script, maxPanels, action, ...await Promise.resolve({}) };
-      
-      // Actually need to re-parse - let's use the already-parsed values
-      return await generateSketch(LOVABLE_API_KEY, script, corsHeaders);
+      return new Response(JSON.stringify({ error: "Use generate-sketch endpoint" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify({ error: "Invalid action" }), {
@@ -135,9 +149,3 @@ serve(async (req) => {
     );
   }
 });
-
-async function generateSketch(apiKey: string, _script: string, corsHeaders: Record<string, string>) {
-  return new Response(JSON.stringify({ error: "Use generate-sketch endpoint" }), {
-    status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-}

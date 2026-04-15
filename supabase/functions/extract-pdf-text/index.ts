@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,24 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -23,7 +42,6 @@ serve(async (req) => {
       );
     }
 
-    // Use Gemini to extract text from PDF via base64
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -36,16 +54,8 @@ serve(async (req) => {
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: "Extract ALL the text content from this PDF document. Return ONLY the raw text, preserving paragraph breaks. Do not add any commentary or formatting markers."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:application/pdf;base64,${pdfBase64}`
-                }
-              }
+              { type: "text", text: "Extract ALL the text content from this PDF document. Return ONLY the raw text, preserving paragraph breaks. Do not add any commentary or formatting markers." },
+              { type: "image_url", image_url: { url: `data:application/pdf;base64,${pdfBase64}` } }
             ]
           }
         ],
@@ -53,8 +63,7 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("PDF extraction error:", response.status, errText);
+      console.error("PDF extraction error:", response.status);
       throw new Error(`PDF extraction failed: ${response.status}`);
     }
 
