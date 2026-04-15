@@ -1582,7 +1582,7 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
-                onRegenerate={scene.imageUrl || scene.videoUrl || scene.audioUrl ? (type) => regenerateSceneAsset(idx, type) : undefined}
+                onRegenerate={(type) => regenerateSceneAsset(idx, type)}
               />
             ))}
           </div>
