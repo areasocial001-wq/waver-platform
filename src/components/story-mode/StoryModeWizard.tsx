@@ -801,7 +801,12 @@ export const StoryModeWizard = () => {
 
     await musicP;
     const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
-    if (vids.length >= 2) {
+    
+    if (vids.length === 1) {
+      // Single video: use it directly as the final video
+      setFinalVideoUrl(vids[0].videoUrl!);
+      toast.success("Video finale pronto! 🎬");
+    } else if (vids.length >= 2) {
       try {
         toast.info("Concatenazione e mix audio...");
         const transitions = vids.map((s) => ({
@@ -830,9 +835,20 @@ export const StoryModeWizard = () => {
           },
         });
         if (error) throw error;
-        setFinalVideoUrl(data.videoUrl || data.url);
-        toast.success("Video finale con audio mixato generato! 🎬");
-      } catch { toast.error("Errore concatenazione"); }
+        const finalUrl = data?.videoUrl || data?.url;
+        if (finalUrl) {
+          setFinalVideoUrl(finalUrl);
+          toast.success("Video finale con audio mixato generato! 🎬");
+        } else {
+          console.error("video-concat returned no URL:", data);
+          toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
+        }
+      } catch (err) {
+        console.error("Concat error:", err);
+        toast.error("Errore concatenazione. Puoi scaricare le singole scene.");
+      }
+    } else {
+      toast.warning("Nessun video completato con successo.");
     }
     setStep("complete");
     setIsGenerating(false);
