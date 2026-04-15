@@ -1098,7 +1098,10 @@ export const StoryModeWizard = () => {
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const sfxUrl = await generateSceneSfx(scenes[i]);
         scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
-      } catch { scenes[i] = { ...scenes[i], sfxStatus: "error" }; }
+      } catch (err: any) {
+        toast.error(`Scena ${i + 1}: errore SFX – ${err?.message || "sconosciuto"}`);
+        scenes[i] = { ...scenes[i], sfxStatus: "error" };
+      }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
