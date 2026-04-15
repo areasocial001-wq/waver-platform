@@ -1079,10 +1079,14 @@ export const StoryModeWizard = () => {
         });
         if (!r.ok) throw new Error("TTS failed");
         const blob = await r.blob();
-        // Upload to storage for Shotstack access + keep blob URL for local playback
-        const storageUrl = await uploadBlobToStorage(blob, "story-narration");
+        const sceneLabel = `Narrazione Scena ${i + 1}`;
+        const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
         scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
-      } catch (err: any) { scenes[i] = { ...scenes[i], audioStatus: "error", error: err.message }; }
+      } catch (err: any) {
+        const msg = err.message || "Errore sconosciuto";
+        toast.error(`Scena ${i + 1}: errore audio – ${msg}`);
+        scenes[i] = { ...scenes[i], audioStatus: "error", error: msg };
+      }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
