@@ -144,17 +144,6 @@ serve(async (req) => {
 
     throw lastError;
 
-    console.log("Image generation successful:", output);
-
-    return new Response(
-      JSON.stringify({ 
-        imageUrl: Array.isArray(output) ? output[0] : output,
-        success: true 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
   } catch (error: any) {
     console.error("Error in generate-image function:", error);
     return new Response(
