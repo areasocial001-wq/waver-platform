@@ -112,7 +112,7 @@ export const StoryModeWizard = () => {
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
     description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
-    videoAspectRatio: "16:9", characterFidelity: "medium",
+    videoAspectRatio: "16:9", videoQuality: "hd", characterFidelity: "medium",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
@@ -276,7 +276,7 @@ export const StoryModeWizard = () => {
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
-      videoAspectRatio: config.videoAspectRatio || "16:9", characterFidelity: config.characterFidelity || "medium",
+      videoAspectRatio: config.videoAspectRatio || "16:9", videoQuality: config.videoQuality || "hd", characterFidelity: config.characterFidelity || "medium",
     });
     if (isStale) {
       toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
@@ -1007,6 +1007,7 @@ export const StoryModeWizard = () => {
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
+            resolution: input.videoQuality || "hd",
             audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
@@ -1326,11 +1327,11 @@ export const StoryModeWizard = () => {
             </CardHeader>
           </Card>
 
-          {/* Volume Controls */}
+          {/* Volume & Quality Controls */}
           <Card className="border-secondary/20 bg-card/50">
             <CardContent className="py-3 px-4 space-y-3">
-              <p className="text-sm font-medium flex items-center gap-2"><Volume2 className="w-4 h-4 text-primary" />Controllo Volumi</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <p className="text-sm font-medium flex items-center gap-2"><Volume2 className="w-4 h-4 text-primary" />Controllo Volumi & Qualità</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs flex items-center justify-between">
                     <span>🎙️ Narrazione</span>
@@ -1352,6 +1353,30 @@ export const StoryModeWizard = () => {
                     onValueChange={([v]) => setScript({ ...script, musicVolume: v })}
                     min={0} max={100} step={5}
                   />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Qualità Video Finale</Label>
+                  <div className="flex gap-1.5 mt-1">
+                    {([
+                      { value: "sd" as const, label: "SD", desc: "480p" },
+                      { value: "hd" as const, label: "HD", desc: "720p" },
+                      { value: "fhd" as const, label: "FHD", desc: "1080p" },
+                    ]).map(q => (
+                      <button
+                        key={q.value}
+                        onClick={() => setInput(p => ({ ...p, videoQuality: q.value }))}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-0.5 py-1.5 px-2 rounded-lg border-2 transition-all text-xs font-medium",
+                          input.videoQuality === q.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:border-muted-foreground/40 text-muted-foreground"
+                        )}
+                      >
+                        <span className="font-bold text-[11px]">{q.label}</span>
+                        <span className="text-[9px] opacity-70">{q.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </CardContent>
