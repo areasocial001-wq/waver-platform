@@ -276,7 +276,7 @@ export const StoryModeWizard = () => {
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
-      videoAspectRatio: config.videoAspectRatio || "16:9", characterFidelity: config.characterFidelity || "medium",
+      videoAspectRatio: config.videoAspectRatio || "16:9", videoQuality: config.videoQuality || "hd", characterFidelity: config.characterFidelity || "medium",
     });
     if (isStale) {
       toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
