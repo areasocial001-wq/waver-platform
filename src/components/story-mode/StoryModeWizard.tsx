@@ -271,7 +271,7 @@ export const StoryModeWizard = () => {
   }, [renderStatus, renderStartTime]);
 
   // Estimate total render time: ~15s per scene + 10s base, double for HD
-  const sceneCount = script.scenes.length || 1;
+  const sceneCount = script?.scenes?.length ?? 1;
   const isHD = input.videoQuality === "hd" || input.videoQuality === "fhd";
   const estimatedRenderSeconds = (sceneCount * 15 + 10) * (isHD ? 2 : 1);
   const renderProgressPct = renderStatus === "processing"
