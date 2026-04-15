@@ -979,6 +979,7 @@ export const StoryModeWizard = () => {
         setRenderStatus("processing");
         setRenderStartTime(Date.now());
         setRenderElapsed(0);
+        if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
         setStep("complete");
         toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
         setTimeout(() => saveProject(), 500);
@@ -1226,6 +1227,7 @@ export const StoryModeWizard = () => {
           setRenderStatus("processing");
           setRenderStartTime(Date.now());
           setRenderElapsed(0);
+          if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
           toast.info("Rendering finale in corso… apparirà automaticamente.");
         } else if (finalUrl) {
           setFinalVideoUrl(finalUrl);
