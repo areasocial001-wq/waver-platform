@@ -119,6 +119,7 @@ export const StoryModeWizard = () => {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
@@ -903,7 +904,10 @@ export const StoryModeWizard = () => {
     }
     toast.info(`Rigenerazione di ${errorScenes.length} scene con problemi...`);
     setIsGenerating(true);
-    for (const { scene, index } of errorScenes) {
+    setRegenProgress({ current: 0, total: errorScenes.length });
+    for (let i = 0; i < errorScenes.length; i++) {
+      const { scene, index } = errorScenes[i];
+      setRegenProgress({ current: i, total: errorScenes.length });
       if (scene.imageStatus === "error" || (!scene.imageUrl && scene.imageStatus !== "generating")) {
         await regenerateSceneAsset(index, "image");
       }
@@ -917,6 +921,7 @@ export const StoryModeWizard = () => {
         await regenerateSceneAsset(index, "video");
       }
     }
+    setRegenProgress(null);
     setIsGenerating(false);
     toast.success("Rigenerazione completata!");
   };
@@ -1785,8 +1790,10 @@ export const StoryModeWizard = () => {
               const issues = failedOrMissingScenes(script.scenes);
               return issues.length > 0 ? (
                 <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
-                  {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  Rigenera Scene Fallite ({issues.length})
+                  {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                  {isGenerating && regenProgress
+                    ? `Rigenerando ${regenProgress.current + 1}/${regenProgress.total}…`
+                    : `Rigenera Scene Fallite (${issues.length})`}
                 </Button>
               ) : null;
             })()}
@@ -2045,8 +2052,10 @@ export const StoryModeWizard = () => {
                         {details.map((d, i) => <li key={i}>• {d}</li>)}
                       </ul>
                       <Button variant="destructive" size="sm" onClick={handleAutoRegenerateErrors} disabled={isGenerating} className="ml-7">
-                        {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                        Rigenera Solo Scene Fallite ({issues.length})
+                        {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        {isGenerating && regenProgress
+                          ? `Rigenerando ${regenProgress.current + 1}/${regenProgress.total}…`
+                          : `Rigenera Solo Scene Fallite (${issues.length})`}
                       </Button>
                     </div>
                   );
