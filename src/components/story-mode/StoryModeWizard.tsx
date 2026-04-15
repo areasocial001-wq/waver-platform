@@ -805,7 +805,7 @@ export const StoryModeWizard = () => {
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
-    const referenceImageUrl = input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : undefined;
+    const referenceImageUrl = input.imageUrl || undefined;
     const musicP = generateBackgroundMusic().then(tick);
 
     // Images
