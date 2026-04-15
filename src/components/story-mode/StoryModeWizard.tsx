@@ -215,7 +215,42 @@ export const StoryModeWizard = () => {
     return () => clearInterval(interval);
   }, [generationStartTime, isGenerating]);
 
-  // DB persistence
+  // Poll for pending Shotstack render
+  useEffect(() => {
+    if (!pendingRenderId || renderStatus !== "processing") return;
+    let cancelled = false;
+    const poll = async () => {
+      while (!cancelled) {
+        await new Promise(r => setTimeout(r, 8000));
+        if (cancelled) break;
+        try {
+          const { data, error } = await supabase.functions.invoke("video-concat", {
+            body: { pollRenderId: pendingRenderId },
+          });
+          if (error) { console.error("Poll error:", error); continue; }
+          if (data?.status === "completed" && data?.videoUrl) {
+            setFinalVideoUrl(data.videoUrl);
+            setRenderStatus("completed");
+            setPendingRenderId(null);
+            toast.success("Video finale pronto! 🎬");
+            setTimeout(() => saveProject(), 500);
+            break;
+          } else if (data?.status === "failed") {
+            setRenderStatus("failed");
+            setPendingRenderId(null);
+            toast.error("Rendering fallito: " + (data.error || "errore sconosciuto"));
+            break;
+          }
+          // still processing, continue polling
+        } catch (err) {
+          console.error("Poll exception:", err);
+        }
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [pendingRenderId, renderStatus]);
+
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
