@@ -11,7 +11,7 @@ const corsHeaders = {
 const requestSchema = z.object({
   prompt: z.string().min(1, 'Prompt obbligatorio').max(1000, 'Prompt troppo lungo'),
   category: z.enum(['music', 'sfx', 'ambient']).default('music'),
-  duration: z.number().min(1).max(30).default(10),
+  duration: z.number().min(1).default(10).transform(v => Math.min(v, 30)),
 });
 
 serve(async (req) => {
