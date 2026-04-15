@@ -352,8 +352,15 @@ export default function Landing() {
 
             <motion.h1 variants={fadeUp} custom={1} className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight mb-6 leading-[1.05] [-webkit-text-stroke:3px_black] [text-shadow:-3px_-3px_0_black,3px_-3px_0_black,-3px_3px_0_black,3px_3px_0_black,0_0_20px_black,0_0_40px_black,0_0_80px_hsl(225,25%,2%/0.95)]">
               <span className="block">All-in-one AI</span>
-              <span className="block [paint-order:stroke_fill] [-webkit-text-stroke:3px_black] [-webkit-text-fill-color:transparent] [background:linear-gradient(to_bottom,hsl(0,0%,100%),hsl(220,20%,75%),hsl(220,15%,45%))] bg-clip-text [filter:brightness(1.3)_contrast(1.1)]" style={{ textShadow: '-3px -3px 0 black, 3px -3px 0 black, -3px 3px 0 black, 3px 3px 0 black, 0 0 20px black, 0 0 40px black' }}>
-                Video &amp; Image
+              <span className="block relative">
+                {/* Stroke layer */}
+                <span className="[-webkit-text-stroke:3px_black]" style={{ textShadow: '-3px -3px 0 black, 3px -3px 0 black, -3px 3px 0 black, 3px 3px 0 black, 0 0 20px black, 0 0 40px black' }} aria-hidden="true">
+                  Video & Image
+                </span>
+                {/* Gradient fill layer */}
+                <span className="absolute inset-0 bg-gradient-to-b from-[hsl(0,0%,100%)] via-[hsl(220,20%,75%)] to-[hsl(220,15%,45%)] bg-clip-text text-transparent [filter:brightness(1.3)_contrast(1.1)]" aria-hidden="true">
+                  Video & Image
+                </span>
               </span>
               <span className="block">Generator</span>
             </motion.h1>
