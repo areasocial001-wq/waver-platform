@@ -1585,9 +1585,16 @@ export const StoryModeWizard = () => {
 
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
-            <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera</Button>
+            <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
             <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
+            {/* Show reassemble button if project has existing video assets */}
+            {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
+              <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                Rimonta Video Finale
+              </Button>
+            )}
             <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
           </div>
         </div>
