@@ -93,18 +93,28 @@ export const StoryModeWizard = () => {
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const pauseRef = useRef(false);
+  const cancelRef = useRef(false);
 
   const waitForResume = async () => {
-    while (pauseRef.current) {
+    while (pauseRef.current && !cancelRef.current) {
       await new Promise(r => setTimeout(r, 300));
     }
   };
+
+  const checkCancelled = () => cancelRef.current;
 
   const togglePause = () => {
     const next = !pauseRef.current;
     pauseRef.current = next;
     setIsPaused(next);
     toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
+  };
+
+  const cancelGeneration = () => {
+    cancelRef.current = true;
+    pauseRef.current = false;
+    setIsPaused(false);
+    toast.warning("Produzione annullata ✋");
   };
 
   const previewVoice = async (voiceId: string) => {
