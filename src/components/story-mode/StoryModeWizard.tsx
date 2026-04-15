@@ -1007,6 +1007,7 @@ export const StoryModeWizard = () => {
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
+            resolution: input.videoQuality || "hd",
             audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
