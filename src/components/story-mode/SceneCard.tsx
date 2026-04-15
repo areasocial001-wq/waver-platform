@@ -138,7 +138,12 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {isVideoReady && playableVideoUrl ? (
+          {isVideoReady && isVideoLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="ml-2 text-xs text-muted-foreground">Caricamento video...</span>
+            </div>
+          ) : isVideoReady && playableVideoUrl ? (
             <video src={playableVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
