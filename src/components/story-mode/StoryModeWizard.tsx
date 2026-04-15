@@ -676,6 +676,7 @@ export const StoryModeWizard = () => {
 
     // Images
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -688,6 +689,7 @@ export const StoryModeWizard = () => {
 
     // TTS narration
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -703,6 +705,7 @@ export const StoryModeWizard = () => {
 
     // SFX per scene (based on mood)
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       try {
         scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -714,6 +717,7 @@ export const StoryModeWizard = () => {
 
     // Video generation
     for (let i = 0; i < scenes.length; i++) {
+      await waitForResume();
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
