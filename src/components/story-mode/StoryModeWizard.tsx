@@ -1856,6 +1856,24 @@ export const StoryModeWizard = () => {
       )}
 
       {/* Step 4: Complete */}
+      {step === "complete" && !script && (
+        <Card className="border-accent/20 bg-card/50">
+          <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <div className="w-16 h-16 mx-auto rounded-full bg-muted/30 flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-1">Caricamento progetto…</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                Lo script non è ancora disponibile. Se il problema persiste, torna indietro e riprova.
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => setStep("input")}>
+              <RotateCcw className="w-4 h-4 mr-2" />Torna all'inizio
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {step === "complete" && script && (
         <div className="space-y-6">
           {/* Render status badge */}
