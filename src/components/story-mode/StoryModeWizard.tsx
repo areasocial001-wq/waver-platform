@@ -123,6 +123,8 @@ export const StoryModeWizard = () => {
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
   const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
+  const [renderStartTime, setRenderStartTime] = useState<number | null>(null);
+  const [renderElapsed, setRenderElapsed] = useState(0);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
