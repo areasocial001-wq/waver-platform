@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -110,11 +111,27 @@ export const StoryModeWizard = () => {
     toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
   };
 
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
   const cancelGeneration = () => {
     cancelRef.current = true;
     pauseRef.current = false;
     setIsPaused(false);
+    setShowCancelDialog(false);
     toast.warning("Produzione annullata ✋");
+  };
+
+  const requestCancel = () => {
+    // Pause first so nothing progresses while user decides
+    if (!pauseRef.current) { pauseRef.current = true; setIsPaused(true); }
+    setShowCancelDialog(true);
+  };
+
+  const dismissCancel = () => {
+    setShowCancelDialog(false);
+    // Resume if was auto-paused
+    pauseRef.current = false;
+    setIsPaused(false);
   };
 
   const previewVoice = async (voiceId: string) => {
@@ -1111,7 +1128,7 @@ export const StoryModeWizard = () => {
                     <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
                       {isPaused ? <><Play className="w-3 h-3 mr-1" />Riprendi</> : <><Pause className="w-3 h-3 mr-1" />Pausa</>}
                     </Button>
-                    <Button variant="destructive" size="sm" className="h-7 px-3" onClick={cancelGeneration}>
+                    <Button variant="destructive" size="sm" className="h-7 px-3" onClick={requestCancel}>
                       <Square className="w-3 h-3 mr-1" />Annulla
                     </Button>
                     <span className="text-sm text-muted-foreground">{generationProgress}%</span>
@@ -1246,6 +1263,24 @@ export const StoryModeWizard = () => {
           </div>
         </div>
       )}
+
+      {/* Cancel confirmation dialog */}
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annullare la produzione?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La generazione verrà interrotta. Gli asset già completati verranno conservati e potrai riprendere dallo script.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={dismissCancel}>Continua produzione</AlertDialogCancel>
+            <AlertDialogAction onClick={cancelGeneration} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Sì, annulla
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
