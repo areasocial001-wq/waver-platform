@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
+import { useQuotas } from "@/hooks/useQuotas";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -70,6 +71,7 @@ interface SavedProject {
 
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
+  const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>({
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
@@ -835,6 +837,14 @@ export const StoryModeWizard = () => {
           ))}
         </div>
         <div className="flex items-center gap-2">
+          {!isStoryModeUnlimited && (
+            <Badge variant="outline" className="text-xs">
+              📊 {remainingStoryMode} rimasti
+            </Badge>
+          )}
+          {isStoryModeUnlimited && (
+            <Badge variant="outline" className="text-xs">∞</Badge>
+          )}
           {script && (
             <Button variant="outline" size="sm" onClick={saveProject} disabled={isSaving}>
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -1123,6 +1133,11 @@ export const StoryModeWizard = () => {
                   <span className="text-sm font-medium flex items-center gap-2">
                     Progresso Produzione
                     {isPaused && <Badge variant="outline" className="text-[10px] animate-pulse">⏸ In pausa</Badge>}
+                    {!isStoryModeUnlimited && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        📊 {usedStoryMode}/{quota.max_story_mode_monthly} progetti usati
+                      </Badge>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
