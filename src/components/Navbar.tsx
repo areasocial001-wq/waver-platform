@@ -214,7 +214,7 @@ export const Navbar = () => {
                     <span className="hidden sm:inline ml-2">Altro</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-48 max-h-[70vh] overflow-y-auto">
                   <DropdownMenuLabel>Navigazione</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
