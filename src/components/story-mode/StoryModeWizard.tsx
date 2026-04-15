@@ -107,6 +107,7 @@ export const StoryModeWizard = () => {
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
 
