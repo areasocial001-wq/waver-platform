@@ -1630,6 +1630,9 @@ export const StoryModeWizard = () => {
                   <Button disabled={downloadingId === "final"} onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`, "final")}>
                     {downloadingId === "final" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Scarica Video
                   </Button>
+                  <Button variant="outline" onClick={() => setStep("script")}>
+                    <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
+                  </Button>
                   <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
                 {videoSegments.length > 1 && (
@@ -1649,7 +1652,7 @@ export const StoryModeWizard = () => {
           ) : (
             <Card className="border-accent/20 bg-card/50">
               <CardContent className="pt-6 text-center space-y-3">
-                <p className="text-muted-foreground">Scarica le singole scene o rigenera quelle in errore:</p>
+                <p className="text-muted-foreground">Nessun video finale generato. Modifica le scene e rimetti in produzione:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).map((s, i) => (
                     <Button key={i} variant="outline" size="sm" disabled={downloadingId === `scene-${i}`} onClick={() => downloadFile(s.videoUrl!, `scena-${s.sceneNumber}.mp4`, `scene-${i}`)}>
@@ -1657,7 +1660,18 @@ export const StoryModeWizard = () => {
                     </Button>
                   ))}
                 </div>
-                <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                <div className="flex gap-3 justify-center flex-wrap">
+                  <Button onClick={() => setStep("script")}>
+                    <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
+                  </Button>
+                  {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
+                    <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                      {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                      Rimonta Video Finale
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                </div>
               </CardContent>
             </Card>
           )}
