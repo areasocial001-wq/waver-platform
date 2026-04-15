@@ -28,6 +28,7 @@ export const useQuotas = () => {
   const { roles, loading: rolesLoading, isAdmin } = useUserRole();
   const [quota, setQuota] = useState<PlanQuota>(DEFAULT_QUOTA);
   const [usedGenerations, setUsedGenerations] = useState(0);
+  const [usedStoryMode, setUsedStoryMode] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -78,6 +79,15 @@ export const useQuotas = () => {
           .gte("created_at", startOfMonth);
 
         setUsedGenerations(count || 0);
+
+        // Count this month's story mode projects
+        const { count: storyCount } = await supabase
+          .from("story_mode_projects")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .gte("created_at", startOfMonth);
+
+        setUsedStoryMode(storyCount || 0);
       }
 
       setLoading(false);
@@ -89,12 +99,19 @@ export const useQuotas = () => {
   const canGenerate = quota.max_video_generations_monthly === -1 || usedGenerations < quota.max_video_generations_monthly;
   const remainingGenerations = quota.max_video_generations_monthly === -1 ? Infinity : Math.max(0, quota.max_video_generations_monthly - usedGenerations);
 
+  const canUseStoryMode = quota.max_story_mode_monthly === -1 || usedStoryMode < quota.max_story_mode_monthly;
+  const remainingStoryMode = quota.max_story_mode_monthly === -1 ? Infinity : Math.max(0, quota.max_story_mode_monthly - usedStoryMode);
+
   return {
     quota,
     usedGenerations,
+    usedStoryMode,
     canGenerate,
     remainingGenerations,
+    canUseStoryMode,
+    remainingStoryMode,
     loading,
     isUnlimited: quota.max_video_generations_monthly === -1,
+    isStoryModeUnlimited: quota.max_story_mode_monthly === -1,
   };
 };
