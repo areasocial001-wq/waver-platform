@@ -42,6 +42,7 @@ interface SceneCardProps {
   mode: "review" | "generation" | "complete";
   voices?: VoiceOption[];
   defaultVoiceId?: string;
+  aspectRatio?: string;
   onToggleEdit: () => void;
   onUpdate: (field: keyof StoryScene, value: any) => void;
   onPreviewAudio: () => void;
