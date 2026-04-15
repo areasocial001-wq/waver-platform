@@ -39,6 +39,8 @@ export type VideoAspectRatio = "16:9" | "4:3" | "9:16";
 
 export type VideoQuality = "sd" | "hd" | "fhd";
 
+export type VideoFps = "24" | "30" | "60";
+
 export type CharacterFidelity = "low" | "medium" | "high";
 
 export interface StoryModeInput {
@@ -53,5 +55,6 @@ export interface StoryModeInput {
   numScenes: number;
   videoAspectRatio: VideoAspectRatio;
   videoQuality: VideoQuality;
+  videoFps: VideoFps;
   characterFidelity: CharacterFidelity;
 }
