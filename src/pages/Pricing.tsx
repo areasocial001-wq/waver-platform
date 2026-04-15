@@ -150,6 +150,7 @@ const comparisonCategories = [
     name: "Strumenti di Produzione",
     features: [
       { name: "Storyboard", free: "1", premium: "10", creator: "Illimitati", business: "Illimitati" },
+      { name: "Story Mode", free: "1/mese", premium: "5/mese", creator: "15/mese", business: "Illimitato" },
       { name: "Timeline editor", free: false, premium: true, creator: true, business: true },
       { name: "Faceless video", free: false, premium: true, creator: true, business: true },
       { name: "Trailer generator", free: false, premium: true, creator: true, business: true },
