@@ -749,6 +749,10 @@ export const StoryModeWizard = () => {
 
   const handleGenerateAll = async () => {
     if (!script) return;
+    if (input.imageUrl?.startsWith("blob:")) {
+      toast.error("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+      return;
+    }
 
     // Warn if this is the last available project
     if (!isStoryModeUnlimited && remainingStoryMode <= 1 && remainingStoryMode > 0) {
@@ -767,6 +771,7 @@ export const StoryModeWizard = () => {
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
+    const referenceImageUrl = input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : undefined;
     const musicP = generateBackgroundMusic().then(tick);
 
     // Images
@@ -776,7 +781,7 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) } });
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter
