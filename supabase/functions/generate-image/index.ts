@@ -18,10 +18,11 @@ const requestSchema = z.object({
   numInferenceSteps: z.number().int().min(1).max(50).optional(),
   model: z.string().max(100).optional(),
   style: z.string().max(500).optional(),
+  referenceImageUrl: z.string().url().optional(),
 });
 
 // Lovable AI image generation fallback
-async function generateWithLovableAI(prompt: string, style?: string): Promise<string | null> {
+async function generateWithLovableAI(prompt: string, style?: string, referenceImageUrl?: string): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not set, cannot use Lovable AI fallback");
@@ -29,7 +30,24 @@ async function generateWithLovableAI(prompt: string, style?: string): Promise<st
   }
 
   const fullPrompt = style ? `${prompt}, ${style}` : prompt;
-  console.log("Falling back to Lovable AI for image generation:", fullPrompt);
+  console.log("Falling back to Lovable AI for image generation:", fullPrompt, referenceImageUrl ? "(with reference)" : "");
+
+  // Build message content — include reference image if provided
+  const content: unknown[] = [
+    {
+      type: "text",
+      text: referenceImageUrl
+        ? `Generate a high-quality image based on this reference character/subject. The generated image MUST maintain the exact same person/character appearance (face, body proportions, hair, clothing) from the reference photo. Ensure correct human anatomy with natural proportions. Prompt: ${fullPrompt}`
+        : `Generate a high-quality image with correct human anatomy and natural proportions: ${fullPrompt}`,
+    },
+  ];
+
+  if (referenceImageUrl) {
+    content.push({
+      type: "image_url",
+      image_url: { url: referenceImageUrl },
+    });
+  }
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -39,12 +57,7 @@ async function generateWithLovableAI(prompt: string, style?: string): Promise<st
     },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash-image",
-      messages: [
-        {
-          role: "user",
-          content: `Generate a high-quality image: ${fullPrompt}`,
-        },
-      ],
+      messages: [{ role: "user", content }],
       modalities: ["image", "text"],
     }),
   });
@@ -103,7 +116,7 @@ serve(async (req) => {
     }
 
     const {
-      prompt,
+      prompt: rawPrompt,
       width = 1024,
       height = 1024,
       aspectRatio = "1:1",
@@ -112,7 +125,14 @@ serve(async (req) => {
       numInferenceSteps = 4,
       model: rawModel = "black-forest-labs/flux-schnell",
       style,
+      referenceImageUrl,
     } = parseResult.data;
+
+    // Enhance prompt for anatomical correctness when generating character scenes
+    const anatomyGuard = "anatomically correct, natural human proportions, realistic body structure";
+    const prompt = referenceImageUrl
+      ? `${rawPrompt}, consistent character appearance matching reference photo, ${anatomyGuard}`
+      : `${rawPrompt}, ${anatomyGuard}`;
 
     // Map short model aliases to full Replicate model identifiers
     const MODEL_ALIASES: Record<string, string> = {
@@ -186,7 +206,7 @@ serve(async (req) => {
 
       // If Replicate failed with rate limit / server error, try Lovable AI fallback
       if (replicateFailed) {
-        const lovableImageUrl = await generateWithLovableAI(prompt, style);
+        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
         if (lovableImageUrl) {
           return new Response(
             JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -209,7 +229,7 @@ serve(async (req) => {
 
     // No Replicate key — try Lovable AI directly
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
-    const lovableImageUrl = await generateWithLovableAI(prompt, style);
+    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
     if (lovableImageUrl) {
       return new Response(
         JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
