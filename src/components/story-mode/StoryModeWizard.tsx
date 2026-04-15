@@ -295,16 +295,41 @@ export const StoryModeWizard = () => {
     loadProjectList();
   };
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Convert to base64 data URL so the edge function can use it (blob: URLs are local-only)
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Url = reader.result as string;
-      setInput(prev => ({ ...prev, imageUrl: base64Url, imageFile: file }));
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingRef(true);
+    setRefImageError(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Devi essere autenticato per caricare immagini"); return; }
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("story-references").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("story-references").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+      // Also read as base64 for the edge function (which needs inline image data)
+      const reader = new FileReader();
+      reader.onload = () => {
+        setInput(prev => ({ ...prev, imageUrl: reader.result as string, imageFile: file }));
+        // Store the storage URL so we can persist it
+        (window as any).__storyRefStorageUrl = publicUrl;
+      };
+      reader.readAsDataURL(file);
+      toast.success("Immagine di riferimento caricata!");
+    } catch (err: any) {
+      console.error("Upload reference error:", err);
+      toast.error("Errore nel caricamento dell'immagine");
+      // Fallback: use base64 directly
+      const reader = new FileReader();
+      reader.onload = () => {
+        setInput(prev => ({ ...prev, imageUrl: reader.result as string, imageFile: file }));
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingRef(false);
+    }
   }, []);
 
   const handleStyleSelect = useCallback((styleId: string) => {
