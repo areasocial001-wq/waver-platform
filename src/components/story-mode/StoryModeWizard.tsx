@@ -1016,10 +1016,10 @@ export const StoryModeWizard = () => {
           <div className="space-y-4">
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Image className="w-5 h-5 text-primary" />Immagine di Riferimento</CardTitle></CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 {input.imageUrl ? (
                   <div className="relative">
-                    <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg max-h-48 object-cover" />
+                    <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg object-contain max-h-64 bg-muted/20" />
                     <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => setInput(p => ({ ...p, imageUrl: "", imageFile: null }))}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
                   </div>
                 ) : (
@@ -1029,6 +1029,32 @@ export const StoryModeWizard = () => {
                     <span className="text-xs text-muted-foreground mt-1">(opzionale)</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </label>
+                )}
+                {input.imageUrl && (
+                  <div>
+                    <Label className="text-xs flex items-center gap-1 mb-1.5">🎯 Fedeltà al Personaggio</Label>
+                    <div className="flex gap-2">
+                      {([
+                        { value: "low" as const, label: "Bassa", desc: "Ispirazione libera" },
+                        { value: "medium" as const, label: "Media", desc: "Somiglianza bilanciata" },
+                        { value: "high" as const, label: "Alta", desc: "Massima fedeltà" },
+                      ]).map(f => (
+                        <button
+                          key={f.value}
+                          onClick={() => setInput(p => ({ ...p, characterFidelity: f.value }))}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-0.5 py-2 px-2 rounded-lg border-2 transition-all text-xs font-medium",
+                            input.characterFidelity === f.value
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-muted-foreground/40 text-muted-foreground"
+                          )}
+                        >
+                          <span className="font-bold">{f.label}</span>
+                          <span className="text-[10px] opacity-70">{f.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
