@@ -1124,19 +1124,41 @@ export const StoryModeWizard = () => {
           const pollingStart = Date.now();
           setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: 0 });
           const maxPolls = 120; // up to ~10 minutes
+          let consecutiveNetErrors = 0;
+          const maxNetErrors = 10;
           for (let poll = 0; poll < maxPolls; poll++) {
             if (checkCancelled()) break;
             await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
             setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: poll + 1 });
-            const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
-              body: { operationId: data.operationId },
-            });
-            if (pollError) { console.error("Poll error:", pollError); continue; }
-            if (pollData.status === "succeeded") {
-              videoUrl = pollData.output || pollData.videoUrl || pollData.video_url;
-              break;
-            } else if (pollData.status === "failed") {
-              throw new Error(pollData.error || "Video generation failed");
+            try {
+              const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
+                body: { operationId: data.operationId },
+              });
+              if (pollError) {
+                consecutiveNetErrors++;
+                console.error(`Poll error (${consecutiveNetErrors}/${maxNetErrors}):`, pollError);
+                if (consecutiveNetErrors >= maxNetErrors) {
+                  throw new Error(`Polling fallito dopo ${maxNetErrors} errori di rete consecutivi per scena ${i + 1}`);
+                }
+                // Backoff on network errors: wait extra time
+                await new Promise(r => setTimeout(r, 2000 * consecutiveNetErrors));
+                continue;
+              }
+              consecutiveNetErrors = 0; // reset on success
+              if (pollData.status === "succeeded") {
+                videoUrl = pollData.output || pollData.videoUrl || pollData.video_url;
+                break;
+              } else if (pollData.status === "failed") {
+                throw new Error(pollData.error || "Video generation failed");
+              }
+            } catch (pollErr: any) {
+              if (pollErr.message?.includes("Polling fallito") || pollErr.message?.includes("Video generation failed")) throw pollErr;
+              consecutiveNetErrors++;
+              console.error(`Poll network error (${consecutiveNetErrors}/${maxNetErrors}):`, pollErr);
+              if (consecutiveNetErrors >= maxNetErrors) {
+                throw new Error(`Polling fallito dopo ${maxNetErrors} errori di rete consecutivi per scena ${i + 1}`);
+              }
+              await new Promise(r => setTimeout(r, 2000 * consecutiveNetErrors));
             }
             // still processing, continue polling
           }
