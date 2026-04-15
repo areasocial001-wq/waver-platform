@@ -900,15 +900,23 @@ export const StoryModeWizard = () => {
             transitions,
             audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
-            narrationVolume: (script.narrationVolume ?? 100) / 100,
             musicVolume: (script.musicVolume ?? 25) / 100,
           },
         });
         if (error) throw error;
         const finalUrl = data?.videoUrl || data?.url;
+        // Store segments for individual download if available
+        if (data?.segments && Array.isArray(data.segments)) {
+          setVideoSegments(data.segments);
+        }
         if (finalUrl) {
           setFinalVideoUrl(finalUrl);
-          toast.success("Video finale con audio mixato generato! 🎬");
+          if (data?.method === "shotstack") {
+            toast.success("Video finale con audio mixato generato! 🎬");
+          } else {
+            // Segments mode — first segment set as preview
+            toast.success("Scene video pronte! Scarica le singole scene qui sotto. 🎬");
+          }
         } else {
           console.error("video-concat returned no URL:", data);
           toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
