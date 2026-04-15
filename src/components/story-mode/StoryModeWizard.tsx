@@ -129,6 +129,8 @@ export const StoryModeWizard = () => {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [isUploadingRef, setIsUploadingRef] = useState(false);
+  const [refImageError, setRefImageError] = useState(false);
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -233,13 +235,15 @@ export const StoryModeWizard = () => {
     if (!user || !script) return;
     setIsSaving(true);
     try {
+      const storageUrl = (window as any).__storyRefStorageUrl || "";
+      const persistedImageUrl = storageUrl || (input.imageUrl && input.imageUrl.startsWith("http") ? input.imageUrl : "");
       const projectData = {
         user_id: user.id, title: script.title, synopsis: script.synopsis,
         suggested_music: script.suggestedMusic, scenes: script.scenes as any,
         input_config: {
           ...input,
           imageFile: null,
-          imageUrl: input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : "",
+          imageUrl: persistedImageUrl,
         } as any,
         status: step === "complete" ? "completed" : step === "generation" ? "generating" : "draft",
         final_video_url: finalVideoUrl, background_music_url: backgroundMusicUrl,
@@ -264,16 +268,21 @@ export const StoryModeWizard = () => {
     if (error || !data) { toast.error("Errore nel caricamento"); return; }
     setProjectId(data.id);
     const config = data.input_config as any;
-    const hasStaleReferenceImage = typeof config.imageUrl === "string" && config.imageUrl.startsWith("blob:");
+    const imageUrl = config.imageUrl || "";
+    const isStale = imageUrl && (imageUrl.startsWith("blob:") || imageUrl.startsWith("data:"));
+    setRefImageError(isStale);
     setInput({
-      imageUrl: hasStaleReferenceImage ? "" : (config.imageUrl || ""), imageFile: null, styleId: config.styleId || "cinema",
+      imageUrl: isStale ? "" : imageUrl, imageFile: null, styleId: config.styleId || "cinema",
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
       videoAspectRatio: config.videoAspectRatio || "16:9", characterFidelity: config.characterFidelity || "medium",
     });
-    if (hasStaleReferenceImage) {
+    if (isStale) {
       toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+    }
+    if (imageUrl && imageUrl.startsWith("http")) {
+      (window as any).__storyRefStorageUrl = imageUrl;
     }
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
@@ -293,16 +302,41 @@ export const StoryModeWizard = () => {
     loadProjectList();
   };
 
-  const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Convert to base64 data URL so the edge function can use it (blob: URLs are local-only)
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Url = reader.result as string;
-      setInput(prev => ({ ...prev, imageUrl: base64Url, imageFile: file }));
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingRef(true);
+    setRefImageError(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Devi essere autenticato per caricare immagini"); return; }
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("story-references").upload(path, file, { upsert: true });
+      if (uploadError) throw uploadError;
+      const { data: urlData } = supabase.storage.from("story-references").getPublicUrl(path);
+      const publicUrl = urlData.publicUrl;
+      // Also read as base64 for the edge function (which needs inline image data)
+      const reader = new FileReader();
+      reader.onload = () => {
+        setInput(prev => ({ ...prev, imageUrl: reader.result as string, imageFile: file }));
+        // Store the storage URL so we can persist it
+        (window as any).__storyRefStorageUrl = publicUrl;
+      };
+      reader.readAsDataURL(file);
+      toast.success("Immagine di riferimento caricata!");
+    } catch (err: any) {
+      console.error("Upload reference error:", err);
+      toast.error("Errore nel caricamento dell'immagine");
+      // Fallback: use base64 directly
+      const reader = new FileReader();
+      reader.onload = () => {
+        setInput(prev => ({ ...prev, imageUrl: reader.result as string, imageFile: file }));
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingRef(false);
+    }
   }, []);
 
   const handleStyleSelect = useCallback((styleId: string) => {
@@ -386,12 +420,12 @@ export const StoryModeWizard = () => {
 
     try {
       if (type === "image") {
-        if (input.imageUrl?.startsWith("blob:")) {
-          toast.error("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+        if (!input.imageUrl && refImageError) {
+          toast.error("Ricarica l'immagine di riferimento prima di generare.");
           return;
         }
         updateScene(index, "imageStatus", "generating");
-        const referenceImageUrl = input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : undefined;
+        const referenceImageUrl = input.imageUrl || undefined;
         const { data, error } = await supabase.functions.invoke("generate-image", {
           body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
@@ -749,8 +783,8 @@ export const StoryModeWizard = () => {
 
   const handleGenerateAll = async () => {
     if (!script) return;
-    if (input.imageUrl?.startsWith("blob:")) {
-      toast.error("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+    if (!input.imageUrl && refImageError) {
+      toast.error("Ricarica l'immagine di riferimento prima di generare.");
       return;
     }
 
@@ -771,7 +805,7 @@ export const StoryModeWizard = () => {
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
-    const referenceImageUrl = input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : undefined;
+    const referenceImageUrl = input.imageUrl || undefined;
     const musicP = generateBackgroundMusic().then(tick);
 
     // Images
@@ -1050,10 +1084,21 @@ export const StoryModeWizard = () => {
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Image className="w-5 h-5 text-primary" />Immagine di Riferimento</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                {input.imageUrl ? (
+                {refImageError && !input.imageUrl && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                    <RotateCcw className="w-4 h-4 shrink-0" />
+                    <span>L'immagine di riferimento precedente non è più valida. Ricaricala prima di generare.</span>
+                  </div>
+                )}
+                {isUploadingRef ? (
+                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                    <span className="text-sm text-muted-foreground">Caricamento in corso...</span>
+                  </div>
+                ) : input.imageUrl ? (
                   <div className="relative">
                     <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg object-contain max-h-64 bg-muted/20" />
-                    <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => setInput(p => ({ ...p, imageUrl: "", imageFile: null }))}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
+                    <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setInput(p => ({ ...p, imageUrl: "", imageFile: null })); setRefImageError(false); (window as any).__storyRefStorageUrl = ""; }}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
                   </div>
                 ) : (
                   <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors">
