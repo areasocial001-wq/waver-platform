@@ -698,7 +698,9 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
-      return URL.createObjectURL(blob);
+      // Upload to storage so Shotstack can access it
+      const storageUrl = await uploadBlobToStorage(blob, "story-sfx");
+      return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
       return null;
