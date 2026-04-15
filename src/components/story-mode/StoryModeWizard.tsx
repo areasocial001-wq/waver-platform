@@ -690,6 +690,12 @@ export const StoryModeWizard = () => {
 
   const handleGenerateAll = async () => {
     if (!script) return;
+
+    // Warn if this is the last available project
+    if (!isStoryModeUnlimited && remainingStoryMode <= 1 && remainingStoryMode > 0) {
+      toast.warning("⚠️ Questo è il tuo ultimo progetto Story Mode disponibile questo mese!", { duration: 6000 });
+    }
+
     setIsGenerating(true);
     setStep("generation");
     setGenerationProgress(0);
