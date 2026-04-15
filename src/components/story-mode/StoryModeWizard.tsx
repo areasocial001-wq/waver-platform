@@ -1125,6 +1125,11 @@ export const StoryModeWizard = () => {
                   <span className="text-sm font-medium flex items-center gap-2">
                     Progresso Produzione
                     {isPaused && <Badge variant="outline" className="text-[10px] animate-pulse">⏸ In pausa</Badge>}
+                    {!isStoryModeUnlimited && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        📊 {usedStoryMode}/{quota.max_story_mode_monthly} progetti usati
+                      </Badge>
+                    )}
                   </span>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
