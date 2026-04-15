@@ -288,7 +288,13 @@ export const StoryModeWizard = () => {
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setInput(prev => ({ ...prev, imageUrl: URL.createObjectURL(file), imageFile: file }));
+    // Convert to base64 data URL so the edge function can use it (blob: URLs are local-only)
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64Url = reader.result as string;
+      setInput(prev => ({ ...prev, imageUrl: base64Url, imageFile: file }));
+    };
+    reader.readAsDataURL(file);
   }, []);
 
   const handleStyleSelect = useCallback((styleId: string) => {
