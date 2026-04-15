@@ -93,18 +93,28 @@ export const StoryModeWizard = () => {
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const pauseRef = useRef(false);
+  const cancelRef = useRef(false);
 
   const waitForResume = async () => {
-    while (pauseRef.current) {
+    while (pauseRef.current && !cancelRef.current) {
       await new Promise(r => setTimeout(r, 300));
     }
   };
+
+  const checkCancelled = () => cancelRef.current;
 
   const togglePause = () => {
     const next = !pauseRef.current;
     pauseRef.current = next;
     setIsPaused(next);
     toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
+  };
+
+  const cancelGeneration = () => {
+    cancelRef.current = true;
+    pauseRef.current = false;
+    setIsPaused(false);
+    toast.warning("Produzione annullata ✋");
   };
 
   const previewVoice = async (voiceId: string) => {
@@ -667,6 +677,7 @@ export const StoryModeWizard = () => {
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
     pauseRef.current = false;
+    cancelRef.current = false;
     setIsPaused(false);
     const totalSteps = script.scenes.length * 4 + 1;
     let completed = 0;
@@ -677,6 +688,7 @@ export const StoryModeWizard = () => {
     // Images
     for (let i = 0; i < scenes.length; i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -688,8 +700,9 @@ export const StoryModeWizard = () => {
     }
 
     // TTS narration
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -704,8 +717,9 @@ export const StoryModeWizard = () => {
     }
 
     // SFX per scene (based on mood)
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -716,8 +730,9 @@ export const StoryModeWizard = () => {
     }
 
     // Video generation
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
@@ -729,6 +744,14 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
       } catch (err: any) { scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+    }
+
+    if (checkCancelled()) {
+      setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+      setStep("script");
+      setIsGenerating(false);
+      toast.info("Produzione annullata. Puoi riprendere dallo script.");
+      return;
     }
 
     await musicP;
@@ -754,11 +777,11 @@ export const StoryModeWizard = () => {
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
             audioUrls: narrationUrls,
-            sfxUrls, // sound effects tracks
+            sfxUrls,
             backgroundMusicUrl: backgroundMusicUrl,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
             musicVolume: (script.musicVolume ?? 25) / 100,
-            sfxVolume: 0.4, // SFX at 40% volume
+            sfxVolume: 0.4,
           },
         });
         if (error) throw error;
@@ -1087,6 +1110,9 @@ export const StoryModeWizard = () => {
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
                       {isPaused ? <><Play className="w-3 h-3 mr-1" />Riprendi</> : <><Pause className="w-3 h-3 mr-1" />Pausa</>}
+                    </Button>
+                    <Button variant="destructive" size="sm" className="h-7 px-3" onClick={cancelGeneration}>
+                      <Square className="w-3 h-3 mr-1" />Annulla
                     </Button>
                     <span className="text-sm text-muted-foreground">{generationProgress}%</span>
                   </div>
