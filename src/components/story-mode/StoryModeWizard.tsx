@@ -946,8 +946,16 @@ export const StoryModeWizard = () => {
       if (error) throw error;
       const finalUrl = data?.videoUrl || data?.url;
       if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
-      if (finalUrl) {
+
+      if (data?.method === "shotstack-pending" && data?.renderId) {
+        setPendingRenderId(data.renderId);
+        setRenderStatus("processing");
+        setStep("complete");
+        toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
+        setTimeout(() => saveProject(), 500);
+      } else if (finalUrl) {
         setFinalVideoUrl(finalUrl);
+        setRenderStatus("completed");
         setStep("complete");
         toast.success("Video finale rimontato! 🎬");
         setTimeout(() => saveProject(), 500);
