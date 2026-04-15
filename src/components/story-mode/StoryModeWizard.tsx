@@ -997,9 +997,13 @@ export const StoryModeWizard = () => {
           return;
         }
 
+        // Collect clip durations for Shotstack
+        const clipDurations = vids.map(s => Math.min(s.duration, 10));
+
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: validVideoUrls,
+            clipDurations,
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
