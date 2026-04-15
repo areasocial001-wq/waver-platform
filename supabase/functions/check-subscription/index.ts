@@ -31,10 +31,12 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     let userId: string | undefined;
+    let email: string | undefined;
     try {
       const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
       if (!claimsError && claimsData?.claims) {
         userId = claimsData.claims.sub as string;
+        email = claimsData.claims.email as string;
       }
     } catch (_) {
       // getClaims not available in this SDK version
@@ -49,9 +51,9 @@ Deno.serve(async (req) => {
         );
       }
       userId = userData.user.id;
+      email = userData.user.email;
     }
-    const email = claimsData.claims.email as string;
-    if (!email) throw new Error("Email not available in token claims");
+    if (!email) throw new Error("Email not available");
 
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     const customers = await stripe.customers.list({ email, limit: 1 });
