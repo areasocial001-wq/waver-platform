@@ -1882,35 +1882,7 @@ export const StoryModeWizard = () => {
           </Card>
 
           {/* Live preview of completed scenes */}
-          {(() => {
-            const completedVideos = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
-            if (completedVideos.length > 0) {
-              return (
-                <Card className="border-accent/20 bg-card/50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Eye className="w-4 h-4 text-accent" />
-                      Anteprima Live — {completedVideos.length}/{script.scenes.length} scene completate
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <video
-                      key={completedVideos[completedVideos.length - 1].videoUrl}
-                      src={completedVideos[completedVideos.length - 1].videoUrl}
-                      controls
-                      autoPlay
-                      muted
-                      className="w-full rounded-lg max-h-[300px]"
-                    />
-                    <p className="text-xs text-muted-foreground mt-2 text-center">
-                      Ultima scena completata: Scena {completedVideos[completedVideos.length - 1].sceneNumber}
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            }
-            return null;
-          })()}
+          <LivePreviewCard scenes={script.scenes} totalScenes={script.scenes.length} />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (

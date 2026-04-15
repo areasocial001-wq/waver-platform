@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuthVideo } from "@/hooks/useAuthVideo";
 
 /**
  * Fetches a video URL with auth headers and returns a blob URL for playback.
