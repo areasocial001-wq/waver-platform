@@ -837,6 +837,14 @@ export const StoryModeWizard = () => {
           ))}
         </div>
         <div className="flex items-center gap-2">
+          {!isStoryModeUnlimited && (
+            <Badge variant="outline" className="text-xs">
+              📊 {remainingStoryMode} rimasti
+            </Badge>
+          )}
+          {isStoryModeUnlimited && (
+            <Badge variant="outline" className="text-xs">∞</Badge>
+          )}
           {script && (
             <Button variant="outline" size="sm" onClick={saveProject} disabled={isSaving}>
               {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
