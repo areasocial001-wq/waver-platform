@@ -882,29 +882,43 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Auto-regenerate all scenes that are in error state
+  // Check if a scene has any failed or missing assets
+  const sceneHasIssues = (s: StoryScene) =>
+    s.imageStatus === "error" || s.audioStatus === "error" ||
+    s.videoStatus === "error" || s.sfxStatus === "error" ||
+    (!s.imageUrl && s.imageStatus !== "generating") ||
+    (!s.audioUrl && s.audioStatus !== "generating") ||
+    (!s.videoUrl && s.videoStatus !== "generating");
+
+  const failedOrMissingScenes = (scenes: StoryScene[]) =>
+    scenes.map((s, i) => ({ scene: s, index: i })).filter(({ scene }) => sceneHasIssues(scene));
+
+  // Auto-regenerate all scenes that are in error or missing state
   const handleAutoRegenerateErrors = async () => {
     if (!script) return;
-    const errorScenes = script.scenes
-      .map((s, i) => ({ scene: s, index: i }))
-      .filter(({ scene }) =>
-        scene.imageStatus === "error" || scene.audioStatus === "error" ||
-        scene.videoStatus === "error" || scene.sfxStatus === "error"
-      );
+    const errorScenes = failedOrMissingScenes(script.scenes);
     if (errorScenes.length === 0) {
-      toast.info("Nessuna scena in errore da rigenerare.");
+      toast.info("Tutte le scene sono complete!");
       return;
     }
-    toast.info(`Rigenerazione automatica di ${errorScenes.length} scene in errore...`);
+    toast.info(`Rigenerazione di ${errorScenes.length} scene con problemi...`);
     setIsGenerating(true);
     for (const { scene, index } of errorScenes) {
-      if (scene.imageStatus === "error") await regenerateSceneAsset(index, "image");
-      if (scene.audioStatus === "error") await regenerateSceneAsset(index, "audio");
-      if (scene.sfxStatus === "error") await regenerateSceneAsset(index, "sfx");
-      if (scene.videoStatus === "error") await regenerateSceneAsset(index, "video");
+      if (scene.imageStatus === "error" || (!scene.imageUrl && scene.imageStatus !== "generating")) {
+        await regenerateSceneAsset(index, "image");
+      }
+      if (scene.audioStatus === "error" || (!scene.audioUrl && scene.audioStatus !== "generating")) {
+        await regenerateSceneAsset(index, "audio");
+      }
+      if (scene.sfxStatus === "error" || (!scene.sfxUrl && scene.sfxStatus !== "generating")) {
+        await regenerateSceneAsset(index, "sfx");
+      }
+      if (scene.videoStatus === "error" || (!scene.videoUrl && scene.videoStatus !== "generating")) {
+        await regenerateSceneAsset(index, "video");
+      }
     }
     setIsGenerating(false);
-    toast.success("Rigenerazione errori completata!");
+    toast.success("Rigenerazione completata!");
   };
 
   // Re-assemble final video from existing scene assets (no re-generation)
