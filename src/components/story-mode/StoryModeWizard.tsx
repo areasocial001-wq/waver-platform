@@ -783,8 +783,8 @@ export const StoryModeWizard = () => {
 
   const handleGenerateAll = async () => {
     if (!script) return;
-    if (input.imageUrl?.startsWith("blob:")) {
-      toast.error("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+    if (!input.imageUrl && refImageError) {
+      toast.error("Ricarica l'immagine di riferimento prima di generare.");
       return;
     }
 
