@@ -1,9 +1,10 @@
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
 import { StoryModeWizard } from "@/components/story-mode/StoryModeWizard";
-import { Film, Lock, Sparkles } from "lucide-react";
+import { Film, Lock, Sparkles, AlertTriangle } from "lucide-react";
 import { useQuotas } from "@/hooks/useQuotas";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 
@@ -71,7 +72,20 @@ const StoryMode = () => {
               </Button>
             </div>
           ) : (
-            <StoryModeWizard />
+            <>
+              {!loading && !isStoryModeUnlimited && remainingStoryMode === 1 && (
+                <Alert variant="destructive" className="mb-6 border-yellow-500/50 bg-yellow-500/10 text-yellow-200 [&>svg]:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
+                    <span>⚠️ Ti rimane <strong>1 solo progetto</strong> Story Mode questo mese. Usalo con saggezza!</span>
+                    <Button variant="outline" size="sm" className="border-yellow-500/50 text-yellow-200 hover:bg-yellow-500/20" onClick={() => navigate("/pricing")}>
+                      <Sparkles className="w-3 h-3 mr-1" />Upgrade
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <StoryModeWizard />
+            </>
           )}
         </main>
       </div>
