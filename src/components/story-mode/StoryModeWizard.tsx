@@ -698,7 +698,9 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
-      return URL.createObjectURL(blob);
+      // Upload to storage so Shotstack can access it
+      const storageUrl = await uploadBlobToStorage(blob, "story-sfx");
+      return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
       return null;
@@ -724,6 +726,20 @@ export const StoryModeWizard = () => {
     finally { setIsGeneratingScript(false); }
   };
 
+  // Upload a blob to Supabase storage and return the public URL
+  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3"): Promise<string> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const fileName = `${folder}/${user?.id || "anon"}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const arrayBuffer = await blob.arrayBuffer();
+    const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
+      contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
+      upsert: true,
+    });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
+    return urlData.publicUrl;
+  };
+
   const generateBackgroundMusic = async (): Promise<string | null> => {
     if (!script?.suggestedMusic) return null;
     try {
@@ -736,10 +752,11 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setBackgroundMusicUrl(url);
+      // Upload to storage so Shotstack can access it
+      const storageUrl = await uploadBlobToStorage(blob, "story-music");
+      setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
-      return url;
+      return storageUrl;
     } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
   };
 
@@ -842,7 +859,10 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
         });
         if (!r.ok) throw new Error("TTS failed");
-        scenes[i] = { ...scenes[i], audioUrl: URL.createObjectURL(await r.blob()), audioStatus: "completed" };
+        const blob = await r.blob();
+        // Upload to storage for Shotstack access + keep blob URL for local playback
+        const storageUrl = await uploadBlobToStorage(blob, "story-narration");
+        scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
       } catch (err: any) { scenes[i] = { ...scenes[i], audioStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
@@ -936,7 +956,7 @@ export const StoryModeWizard = () => {
           .map(s => s.sfxUrl)
           .filter((u): u is string => !!u);
 
-        // Resolve storage:// URLs to public URLs for Shotstack compatibility
+        // Resolve storage:// and video-proxy URLs to public URLs for Shotstack compatibility
         const resolvedVideoUrls = await Promise.all(
           vids.map(async (s) => {
             const url = s.videoUrl!;
@@ -946,6 +966,24 @@ export const StoryModeWizard = () => {
               const filePath = path.substring(bucketName.length + 1);
               const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
               return urlData.publicUrl;
+            }
+            // Video-proxy URLs need to be fetched with auth and re-uploaded
+            if (url.includes("/functions/v1/video-proxy")) {
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+                const res = await fetch(url, {
+                  headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+                });
+                if (!res.ok) return url;
+                const blob = await res.blob();
+                const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
+                const arrayBuffer = await blob.arrayBuffer();
+                const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
+                if (upErr) return url;
+                const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
+                return urlData.publicUrl;
+              } catch { return url; }
             }
             return url;
           })
@@ -959,9 +997,13 @@ export const StoryModeWizard = () => {
           return;
         }
 
+        // Collect clip durations for Shotstack
+        const clipDurations = vids.map(s => Math.min(s.duration, 10));
+
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: validVideoUrls,
+            clipDurations,
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
