@@ -254,7 +254,25 @@ export const StoryModeWizard = () => {
     return () => { cancelled = true; };
   }, [pendingRenderId, renderStatus]);
 
-  const [projectId, setProjectId] = useState<string | null>(null);
+  // Render elapsed timer
+  useEffect(() => {
+    if (renderStatus !== "processing" || !renderStartTime) return;
+    const iv = setInterval(() => {
+      setRenderElapsed(Math.floor((Date.now() - renderStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [renderStatus, renderStartTime]);
+
+  // Estimate total render time: ~15s per scene + 10s base, double for HD
+  const sceneCount = script.scenes.length || 1;
+  const isHD = input.quality === "hd" || input.quality === "1080p";
+  const estimatedRenderSeconds = (sceneCount * 15 + 10) * (isHD ? 2 : 1);
+  const renderProgressPct = renderStatus === "processing"
+    ? Math.min(95, (renderElapsed / estimatedRenderSeconds) * 100)
+    : renderStatus === "completed" ? 100 : 0;
+  const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
+
+
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
