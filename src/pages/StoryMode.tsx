@@ -34,7 +34,8 @@ const StoryMode = () => {
               Crea un Video Completo con l'AI
             </h1>
             <p className="text-muted-foreground mt-2 max-w-2xl mx-auto">
-              Da una semplice descrizione a un video professionale di ~60-80 secondi con narrazione, scene generate e montaggio automatico
+              Da una semplice descrizione a un video professionale di ~60-80 secondi con narrazione,<br />
+              scene generate e montaggio automatico
             </p>
           </div>
 
