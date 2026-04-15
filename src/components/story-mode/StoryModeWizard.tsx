@@ -878,6 +878,8 @@ export const StoryModeWizard = () => {
     }
     setIsGenerating(true);
     setFinalVideoUrl(null);
+    setRenderStatus("idle");
+    setPendingRenderId(null);
     toast.info("Rimontaggio video finale in corso...");
     try {
       const transitions = vids.map((s) => ({
