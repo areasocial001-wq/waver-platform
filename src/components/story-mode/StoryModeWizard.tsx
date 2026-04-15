@@ -956,7 +956,7 @@ export const StoryModeWizard = () => {
           .map(s => s.sfxUrl)
           .filter((u): u is string => !!u);
 
-        // Resolve storage:// URLs to public URLs for Shotstack compatibility
+        // Resolve storage:// and video-proxy URLs to public URLs for Shotstack compatibility
         const resolvedVideoUrls = await Promise.all(
           vids.map(async (s) => {
             const url = s.videoUrl!;
@@ -966,6 +966,24 @@ export const StoryModeWizard = () => {
               const filePath = path.substring(bucketName.length + 1);
               const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
               return urlData.publicUrl;
+            }
+            // Video-proxy URLs need to be fetched with auth and re-uploaded
+            if (url.includes("/functions/v1/video-proxy")) {
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+                const res = await fetch(url, {
+                  headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+                });
+                if (!res.ok) return url;
+                const blob = await res.blob();
+                const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
+                const arrayBuffer = await blob.arrayBuffer();
+                const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
+                if (upErr) return url;
+                const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
+                return urlData.publicUrl;
+              } catch { return url; }
             }
             return url;
           })
