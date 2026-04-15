@@ -107,6 +107,7 @@ export const StoryModeWizard = () => {
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
 
@@ -791,10 +792,13 @@ export const StoryModeWizard = () => {
         let videoUrl = data.videoUrl || data.video_url || data.output;
         if (!videoUrl && data.operationId && (data.status === "starting" || data.status === "processing")) {
           console.log(`Scene ${i + 1}: polling operationId ${data.operationId}`);
+          const pollingStart = Date.now();
+          setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: 0 });
           const maxPolls = 120; // up to ~10 minutes
           for (let poll = 0; poll < maxPolls; poll++) {
             if (checkCancelled()) break;
             await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
+            setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: poll + 1 });
             const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
               body: { operationId: data.operationId },
             });
@@ -807,6 +811,7 @@ export const StoryModeWizard = () => {
             }
             // still processing, continue polling
           }
+          setVideoPollingInfo(null);
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
@@ -1267,6 +1272,20 @@ export const StoryModeWizard = () => {
                   </div>
                 )}
                 {backgroundMusicUrl && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Music className="w-3 h-3 text-primary" />Colonna sonora generata</div>}
+                {/* Video polling indicator */}
+                {videoPollingInfo && script.scenes[videoPollingInfo.sceneIndex] && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 animate-pulse">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        ⏳ Scena {videoPollingInfo.sceneIndex + 1}: rendering in corso...
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        In attesa da {videoPollingInfo.pollCount * 5}s — controllo #{videoPollingInfo.pollCount}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
