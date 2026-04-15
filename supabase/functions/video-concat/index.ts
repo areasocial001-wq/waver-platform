@@ -321,6 +321,69 @@ serve(async (req) => {
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Handle render status polling
+    if (body.pollRenderId) {
+      const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
+      if (!SHOTSTACK_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: 'Shotstack not configured' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const statusResponse = await fetch(
+        `https://api.shotstack.io/edit/v1/render/${body.pollRenderId}`,
+        { headers: { 'x-api-key': SHOTSTACK_API_KEY } }
+      );
+
+      if (!statusResponse.ok) {
+        return new Response(
+          JSON.stringify({ status: 'unknown', error: `Status check failed: ${statusResponse.status}` }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const statusData = await statusResponse.json();
+      const renderStatus = statusData.response?.status;
+      const renderUrl = statusData.response?.url;
+
+      if (renderStatus === 'done' && renderUrl) {
+        // Download and upload to storage
+        let finalUrl = renderUrl;
+        try {
+          const videoResponse = await fetch(renderUrl);
+          const videoBlob = await videoResponse.arrayBuffer();
+          const fileName = `concatenated/${Date.now()}.mp4`;
+          const { error: uploadError } = await supabase.storage
+            .from('generated-videos')
+            .upload(fileName, new Uint8Array(videoBlob), { contentType: 'video/mp4', upsert: true });
+          if (!uploadError) {
+            finalUrl = await normalizeAssetUrl(`storage://generated-videos/${fileName}`, supabase, supabaseUrl);
+          }
+        } catch (e) {
+          console.error('Poll: upload error', e);
+        }
+        return new Response(
+          JSON.stringify({ status: 'completed', videoUrl: finalUrl }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else if (renderStatus === 'failed') {
+        return new Response(
+          JSON.stringify({ status: 'failed', error: statusData.response?.error || 'Render failed' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } else {
+        return new Response(
+          JSON.stringify({ status: 'processing', renderStatus }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     
     // Validate input
     const parseResult = requestSchema.safeParse(body);

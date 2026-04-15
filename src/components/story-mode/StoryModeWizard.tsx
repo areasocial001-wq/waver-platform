@@ -15,6 +15,7 @@ import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
   Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square, Pause,
+  AlertTriangle,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
@@ -120,6 +121,8 @@ export const StoryModeWizard = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
+  const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
+  const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
@@ -213,7 +216,42 @@ export const StoryModeWizard = () => {
     return () => clearInterval(interval);
   }, [generationStartTime, isGenerating]);
 
-  // DB persistence
+  // Poll for pending Shotstack render
+  useEffect(() => {
+    if (!pendingRenderId || renderStatus !== "processing") return;
+    let cancelled = false;
+    const poll = async () => {
+      while (!cancelled) {
+        await new Promise(r => setTimeout(r, 8000));
+        if (cancelled) break;
+        try {
+          const { data, error } = await supabase.functions.invoke("video-concat", {
+            body: { pollRenderId: pendingRenderId },
+          });
+          if (error) { console.error("Poll error:", error); continue; }
+          if (data?.status === "completed" && data?.videoUrl) {
+            setFinalVideoUrl(data.videoUrl);
+            setRenderStatus("completed");
+            setPendingRenderId(null);
+            toast.success("Video finale pronto! 🎬");
+            setTimeout(() => saveProject(), 500);
+            break;
+          } else if (data?.status === "failed") {
+            setRenderStatus("failed");
+            setPendingRenderId(null);
+            toast.error("Rendering fallito: " + (data.error || "errore sconosciuto"));
+            break;
+          }
+          // still processing, continue polling
+        } catch (err) {
+          console.error("Poll exception:", err);
+        }
+      }
+    };
+    poll();
+    return () => { cancelled = true; };
+  }, [pendingRenderId, renderStatus]);
+
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -840,6 +878,8 @@ export const StoryModeWizard = () => {
     }
     setIsGenerating(true);
     setFinalVideoUrl(null);
+    setRenderStatus("idle");
+    setPendingRenderId(null);
     toast.info("Rimontaggio video finale in corso...");
     try {
       const transitions = vids.map((s) => ({
@@ -909,8 +949,16 @@ export const StoryModeWizard = () => {
       if (error) throw error;
       const finalUrl = data?.videoUrl || data?.url;
       if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
-      if (finalUrl) {
+
+      if (data?.method === "shotstack-pending" && data?.renderId) {
+        setPendingRenderId(data.renderId);
+        setRenderStatus("processing");
+        setStep("complete");
+        toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
+        setTimeout(() => saveProject(), 500);
+      } else if (finalUrl) {
         setFinalVideoUrl(finalUrl);
+        setRenderStatus("completed");
         setStep("complete");
         toast.success("Video finale rimontato! 🎬");
         setTimeout(() => saveProject(), 500);
@@ -1143,16 +1191,20 @@ export const StoryModeWizard = () => {
         });
         if (error) throw error;
         const finalUrl = data?.videoUrl || data?.url;
-        // Store segments for individual download if available
         if (data?.segments && Array.isArray(data.segments)) {
           setVideoSegments(data.segments);
         }
-        if (finalUrl) {
+
+        if (data?.method === "shotstack-pending" && data?.renderId) {
+          setPendingRenderId(data.renderId);
+          setRenderStatus("processing");
+          toast.info("Rendering finale in corso… apparirà automaticamente.");
+        } else if (finalUrl) {
           setFinalVideoUrl(finalUrl);
+          setRenderStatus("completed");
           if (data?.method === "shotstack") {
             toast.success("Video finale con audio mixato generato! 🎬");
           } else {
-            // Segments mode — first segment set as preview
             toast.success("Scene video pronte! Scarica le singole scene qui sotto. 🎬");
           }
         } else {
@@ -1773,6 +1825,33 @@ export const StoryModeWizard = () => {
       {/* Step 4: Complete */}
       {step === "complete" && script && (
         <div className="space-y-6">
+          {/* Render status badge */}
+          {renderStatus === "processing" && (
+            <div className="flex items-center gap-3 p-4 rounded-lg border border-primary/30 bg-primary/5">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Rendering in lavorazione…</p>
+                <p className="text-xs text-muted-foreground">Il video finale apparirà automaticamente. Puoi restare su questa pagina.</p>
+              </div>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">In lavorazione</Badge>
+            </div>
+          )}
+          {renderStatus === "failed" && !finalVideoUrl && (
+            <div className="flex items-center gap-3 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Rendering fallito</p>
+                <p className="text-xs text-muted-foreground">Puoi riprovare con il bottone "Rimonta Video Finale".</p>
+              </div>
+              <Badge variant="destructive">Fallito</Badge>
+            </div>
+          )}
+          {renderStatus === "completed" && finalVideoUrl && (
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className="bg-green-500/10 text-green-400 border-green-500/20"><Check className="w-3 h-3 mr-1" />Completato</Badge>
+            </div>
+          )}
+
           {finalVideoUrl ? (
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-xl flex items-center gap-2"><Film className="w-6 h-6 text-primary" />{script.title}</CardTitle></CardHeader>
@@ -1794,7 +1873,7 @@ export const StoryModeWizard = () => {
                   <Button variant="outline" onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
                 {videoSegments.length > 1 && (
                   <div className="pt-3 border-t border-border/50">
@@ -1837,7 +1916,7 @@ export const StoryModeWizard = () => {
                       Rimonta Video Finale
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
               </CardContent>
             </Card>
