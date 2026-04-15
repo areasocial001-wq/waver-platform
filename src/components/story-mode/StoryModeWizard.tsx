@@ -69,6 +69,17 @@ interface SavedProject {
   updated_at: string;
 }
 
+// Helper to get auth headers with user's JWT token
+const getAuthHeaders = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return {
+    "Content-Type": "application/json",
+    apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    Authorization: `Bearer ${token}`,
+  };
+};
+
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
