@@ -182,11 +182,39 @@ export const SceneCard = ({
   }
 
   if (mode === "complete") {
+    const assetChecks = [
+      { label: "Img", ok: !!scene.imageUrl, status: scene.imageStatus },
+      { label: "Audio", ok: !!scene.audioUrl, status: scene.audioStatus },
+      { label: "Video", ok: !!scene.videoUrl, status: scene.videoStatus },
+      { label: "SFX", ok: !!scene.sfxUrl, status: scene.sfxStatus },
+    ];
+    const allReady = assetChecks.filter(a => a.label !== "SFX").every(a => a.ok);
+    const hasError = assetChecks.some(a => a.status === "error");
+
     return (
-      <Card className="bg-card/50 overflow-hidden">
-        {scene.imageUrl && (
-          <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className={cn("w-full object-cover", aspectClass)} />
-        )}
+      <Card className={cn("bg-card/50 overflow-hidden", hasError && "border-destructive/50", allReady && !hasError && "border-green-500/30")}>
+        <div className="relative">
+          {scene.imageUrl ? (
+            <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className={cn("w-full object-cover", aspectClass)} />
+          ) : (
+            <div className={cn("w-full flex items-center justify-center bg-muted/30", aspectClass)}>
+              <Image className="w-6 h-6 text-muted-foreground" />
+            </div>
+          )}
+          {/* Asset status overlay */}
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent p-1.5 flex items-center gap-1">
+            {assetChecks.map(a => (
+              <Badge key={a.label} variant="outline" className={cn(
+                "text-[9px] h-4 px-1 border-none",
+                a.status === "error" ? "bg-destructive/80 text-white" :
+                a.ok ? "bg-green-500/80 text-white" :
+                "bg-muted-foreground/40 text-white/70"
+              )}>
+                {a.status === "error" ? "✗" : a.ok ? "✓" : "—"} {a.label}
+              </Badge>
+            ))}
+          </div>
+        </div>
         <CardContent className="p-2 space-y-1">
           <p className="text-xs text-muted-foreground line-clamp-1">{scene.narration}</p>
           {/* Per-scene voice selector in complete mode */}

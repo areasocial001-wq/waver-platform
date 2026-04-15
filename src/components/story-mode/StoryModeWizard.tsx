@@ -805,6 +805,31 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Auto-regenerate all scenes that are in error state
+  const handleAutoRegenerateErrors = async () => {
+    if (!script) return;
+    const errorScenes = script.scenes
+      .map((s, i) => ({ scene: s, index: i }))
+      .filter(({ scene }) =>
+        scene.imageStatus === "error" || scene.audioStatus === "error" ||
+        scene.videoStatus === "error" || scene.sfxStatus === "error"
+      );
+    if (errorScenes.length === 0) {
+      toast.info("Nessuna scena in errore da rigenerare.");
+      return;
+    }
+    toast.info(`Rigenerazione automatica di ${errorScenes.length} scene in errore...`);
+    setIsGenerating(true);
+    for (const { scene, index } of errorScenes) {
+      if (scene.imageStatus === "error") await regenerateSceneAsset(index, "image");
+      if (scene.audioStatus === "error") await regenerateSceneAsset(index, "audio");
+      if (scene.sfxStatus === "error") await regenerateSceneAsset(index, "sfx");
+      if (scene.videoStatus === "error") await regenerateSceneAsset(index, "video");
+    }
+    setIsGenerating(false);
+    toast.success("Rigenerazione errori completata!");
+  };
+
   // Re-assemble final video from existing scene assets (no re-generation)
   const handleReassemble = async () => {
     if (!script) return;
