@@ -123,7 +123,7 @@ export const SceneCard = ({
 }: SceneCardProps) => {
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
-  const authBlobUrl = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
 
   const voiceName = useMemo(() => {
