@@ -31,24 +31,29 @@ async function generateWithLovableAI(prompt: string, style?: string, referenceIm
   }
 
   const fullPrompt = style ? `${prompt}, ${style}` : prompt;
-  console.log("Falling back to Lovable AI for image generation:", fullPrompt, referenceImageUrl ? "(with reference)" : "");
+  console.log("Using Lovable AI for image generation:", fullPrompt.substring(0, 200), referenceImageUrl ? "(with reference)" : "");
 
   // Build message content — include reference image if provided
-  const content: unknown[] = [
-    {
-      type: "text",
-      text: referenceImageUrl
-        ? `Generate a high-quality image based on this reference character/subject. The generated image MUST maintain the exact same person/character appearance (face, body proportions, hair, clothing) from the reference photo. Ensure correct human anatomy with natural proportions. Prompt: ${fullPrompt}`
-        : `Generate a high-quality image with correct human anatomy and natural proportions: ${fullPrompt}`,
-    },
-  ];
+  const content: unknown[] = [];
 
   if (referenceImageUrl) {
+    content.push({
+      type: "text",
+      text: `You are a character-consistent image generator. Study the reference photo carefully. The generated image MUST depict the EXACT SAME person/character from the reference: same face shape, same eyes, same nose, same mouth, same skin tone, same hair color/style/length, same body build. Do NOT change their appearance. Do NOT switch art styles unless explicitly asked. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural joint positions, proper limb proportions. NEVER generate deformed, extra, or missing body parts.\n\nScene to generate: ${fullPrompt}`,
+    });
     content.push({
       type: "image_url",
       image_url: { url: referenceImageUrl },
     });
+  } else {
+    content.push({
+      type: "text",
+      text: `Generate a high-quality image. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural proportions, no deformities.\n\n${fullPrompt}`,
+    });
   }
+
+  // Use the pro image model for better quality with reference images
+  const imageModel = referenceImageUrl ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
 
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -57,7 +62,7 @@ async function generateWithLovableAI(prompt: string, style?: string, referenceIm
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image",
+      model: imageModel,
       messages: [{ role: "user", content }],
       modalities: ["image", "text"],
     }),
