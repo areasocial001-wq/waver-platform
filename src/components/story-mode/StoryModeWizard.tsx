@@ -1356,7 +1356,18 @@ export const StoryModeWizard = () => {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Qualità</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs flex items-center gap-1 cursor-help"><Film className="w-3 h-3" />Qualità ℹ️</Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        <p><b>SD 480p</b> — Leggero, rendering veloce. Ideale per bozze e anteprime.</p>
+                        <p className="mt-1"><b>HD 720p</b> — Buon equilibrio tra qualità e velocità. Consigliato.</p>
+                        <p className="mt-1"><b>FHD 1080p</b> — Massima qualità, rendering più lento. Per il prodotto finale.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <div className="flex gap-1.5 mt-1">
                     {([
                       { value: "sd" as const, label: "SD", desc: "480p" },
@@ -1380,7 +1391,18 @@ export const StoryModeWizard = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs flex items-center gap-1"><Film className="w-3 h-3" />Framerate</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Label className="text-xs flex items-center gap-1 cursor-help"><Film className="w-3 h-3" />Framerate ℹ️</Label>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[220px] text-xs">
+                        <p><b>24fps</b> — Look cinematografico classico. Il più usato per film e cortometraggi.</p>
+                        <p className="mt-1"><b>30fps</b> — Standard per web e social media. Buona fluidità.</p>
+                        <p className="mt-1"><b>60fps</b> — Ultra fluido, ideale per azioni rapide. File più pesanti.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   <div className="flex gap-1.5 mt-1">
                     {([
                       { value: "24" as const, label: "24", desc: "Cinema" },
