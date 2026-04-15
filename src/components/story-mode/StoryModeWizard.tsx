@@ -805,6 +805,31 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Auto-regenerate all scenes that are in error state
+  const handleAutoRegenerateErrors = async () => {
+    if (!script) return;
+    const errorScenes = script.scenes
+      .map((s, i) => ({ scene: s, index: i }))
+      .filter(({ scene }) =>
+        scene.imageStatus === "error" || scene.audioStatus === "error" ||
+        scene.videoStatus === "error" || scene.sfxStatus === "error"
+      );
+    if (errorScenes.length === 0) {
+      toast.info("Nessuna scena in errore da rigenerare.");
+      return;
+    }
+    toast.info(`Rigenerazione automatica di ${errorScenes.length} scene in errore...`);
+    setIsGenerating(true);
+    for (const { scene, index } of errorScenes) {
+      if (scene.imageStatus === "error") await regenerateSceneAsset(index, "image");
+      if (scene.audioStatus === "error") await regenerateSceneAsset(index, "audio");
+      if (scene.sfxStatus === "error") await regenerateSceneAsset(index, "sfx");
+      if (scene.videoStatus === "error") await regenerateSceneAsset(index, "video");
+    }
+    setIsGenerating(false);
+    toast.success("Rigenerazione errori completata!");
+  };
+
   // Re-assemble final video from existing scene assets (no re-generation)
   const handleReassemble = async () => {
     if (!script) return;
@@ -1589,6 +1614,13 @@ export const StoryModeWizard = () => {
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
             <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
+            {/* Auto-regenerate error scenes */}
+            {script.scenes.some(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error") && (
+              <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
+                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                Rigenera Errori ({script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length})
+              </Button>
+            )}
             {/* Show reassemble button if project has existing video assets */}
             {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
               <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
@@ -1767,6 +1799,12 @@ export const StoryModeWizard = () => {
                   <Button onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
+                  {script.scenes.some(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error") && (
+                    <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
+                      {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                      Rigenera Errori ({script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length})
+                    </Button>
+                  )}
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
                     <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
