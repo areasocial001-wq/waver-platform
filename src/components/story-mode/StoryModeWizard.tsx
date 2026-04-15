@@ -1084,10 +1084,21 @@ export const StoryModeWizard = () => {
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Image className="w-5 h-5 text-primary" />Immagine di Riferimento</CardTitle></CardHeader>
               <CardContent className="space-y-3">
-                {input.imageUrl ? (
+                {refImageError && !input.imageUrl && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
+                    <RotateCcw className="w-4 h-4 shrink-0" />
+                    <span>L'immagine di riferimento precedente non è più valida. Ricaricala prima di generare.</span>
+                  </div>
+                )}
+                {isUploadingRef ? (
+                  <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                    <span className="text-sm text-muted-foreground">Caricamento in corso...</span>
+                  </div>
+                ) : input.imageUrl ? (
                   <div className="relative">
                     <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg object-contain max-h-64 bg-muted/20" />
-                    <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => setInput(p => ({ ...p, imageUrl: "", imageFile: null }))}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
+                    <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setInput(p => ({ ...p, imageUrl: "", imageFile: null })); setRefImageError(false); (window as any).__storyRefStorageUrl = ""; }}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
                   </div>
                 ) : (
                   <label className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-primary/30 rounded-lg cursor-pointer hover:bg-primary/5 transition-colors">
