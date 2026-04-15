@@ -331,10 +331,10 @@ serve(async (req) => {
       );
     }
     
-    const { 
+    const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
       resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
-      intro, outro 
+      intro, outro
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
@@ -379,11 +379,12 @@ serve(async (req) => {
           // Use custom duration or default to 5 seconds
           const clipLength = clipDurations?.[i] || 5;
           const effects = clipEffects?.[i];
-          
+          const normalizedVideoUrl = await normalizeAssetUrl(videoUrls[i], supabase, supabaseUrl);
+
           const clip: any = {
             asset: {
               type: 'video',
-              src: videoUrls[i],
+              src: normalizedVideoUrl,
             },
             start: currentStart,
             length: clipLength,
@@ -441,25 +442,23 @@ serve(async (req) => {
           const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
           const totalDuration = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
           let audioSrc = audioUrl;
-          
+
           // If audio is base64, we need to upload it first
           if (audioUrl.startsWith('data:')) {
             const base64Data = audioUrl.split(',')[1];
             const audioBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
             const audioFileName = `audio/${Date.now()}.mp3`;
-            
+
             await supabase.storage
               .from('generated-videos')
               .upload(audioFileName, audioBytes, {
                 contentType: 'audio/mpeg',
                 upsert: true,
               });
-            
-            const { data: audioUrlData } = supabase.storage
-              .from('generated-videos')
-              .getPublicUrl(audioFileName);
-            
-            audioSrc = audioUrlData.publicUrl;
+
+            audioSrc = await normalizeAssetUrl(`storage://generated-videos/${audioFileName}`, supabase, supabaseUrl);
+          } else {
+            audioSrc = await normalizeAssetUrl(audioUrl, supabase, supabaseUrl);
           }
           
           timeline.tracks.push({
