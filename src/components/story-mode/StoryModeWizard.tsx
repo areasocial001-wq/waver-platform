@@ -1272,6 +1272,20 @@ export const StoryModeWizard = () => {
                   </div>
                 )}
                 {backgroundMusicUrl && <div className="flex items-center gap-2 text-xs text-muted-foreground"><Music className="w-3 h-3 text-primary" />Colonna sonora generata</div>}
+                {/* Video polling indicator */}
+                {videoPollingInfo && script.scenes[videoPollingInfo.sceneIndex] && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20 animate-pulse">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        ⏳ Scena {videoPollingInfo.sceneIndex + 1}: rendering in corso...
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        In attesa da {Math.floor((Date.now() - videoPollingInfo.startedAt) / 1000)}s — controllo #{videoPollingInfo.pollCount}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
