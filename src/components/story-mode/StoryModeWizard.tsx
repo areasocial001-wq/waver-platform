@@ -1281,7 +1281,7 @@ export const StoryModeWizard = () => {
                         ⏳ Scena {videoPollingInfo.sceneIndex + 1}: rendering in corso...
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        In attesa da {Math.floor((Date.now() - videoPollingInfo.startedAt) / 1000)}s — controllo #{videoPollingInfo.pollCount}
+                        In attesa da {videoPollingInfo.pollCount * 5}s — controllo #{videoPollingInfo.pollCount}
                       </p>
                     </div>
                   </div>
