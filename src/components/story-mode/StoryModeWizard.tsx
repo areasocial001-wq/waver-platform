@@ -1822,6 +1822,33 @@ export const StoryModeWizard = () => {
       {/* Step 4: Complete */}
       {step === "complete" && script && (
         <div className="space-y-6">
+          {/* Render status badge */}
+          {renderStatus === "processing" && (
+            <div className="flex items-center gap-3 p-4 rounded-lg border border-primary/30 bg-primary/5">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Rendering in lavorazione…</p>
+                <p className="text-xs text-muted-foreground">Il video finale apparirà automaticamente. Puoi restare su questa pagina.</p>
+              </div>
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">In lavorazione</Badge>
+            </div>
+          )}
+          {renderStatus === "failed" && !finalVideoUrl && (
+            <div className="flex items-center gap-3 p-4 rounded-lg border border-destructive/30 bg-destructive/5">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Rendering fallito</p>
+                <p className="text-xs text-muted-foreground">Puoi riprovare con il bottone "Rimonta Video Finale".</p>
+              </div>
+              <Badge variant="destructive">Fallito</Badge>
+            </div>
+          )}
+          {renderStatus === "completed" && finalVideoUrl && (
+            <div className="flex items-center gap-2 mb-2">
+              <Badge className="bg-green-500/10 text-green-400 border-green-500/20"><Check className="w-3 h-3 mr-1" />Completato</Badge>
+            </div>
+          )}
+
           {finalVideoUrl ? (
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-xl flex items-center gap-2"><Film className="w-6 h-6 text-primary" />{script.title}</CardTitle></CardHeader>
