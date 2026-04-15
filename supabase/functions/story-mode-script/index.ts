@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,24 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { description, style, stylePromptModifier, numScenes, language } = await req.json();
 
     if (!description || !style) {
@@ -72,67 +91,29 @@ Generate a complete script with title, scenes, and metadata.`;
               parameters: {
                 type: "object",
                 properties: {
-                  title: {
-                    type: "string",
-                    description: "Creative title for the video",
-                  },
-                  synopsis: {
-                    type: "string",
-                    description: "One-paragraph synopsis of the story",
-                  },
+                  title: { type: "string", description: "Creative title for the video" },
+                  synopsis: { type: "string", description: "One-paragraph synopsis of the story" },
                   scenes: {
                     type: "array",
                     items: {
                       type: "object",
                       properties: {
                         sceneNumber: { type: "number" },
-                        duration: {
-                          type: "number",
-                          description: "Duration in seconds (6-10)",
-                        },
-                        narration: {
-                          type: "string",
-                          description: "Voiceover narration text for this scene",
-                        },
-                        imagePrompt: {
-                          type: "string",
-                          description:
-                            "Detailed English prompt for AI image generation, including style modifiers",
-                        },
+                        duration: { type: "number", description: "Duration in seconds (6-10)" },
+                        narration: { type: "string", description: "Voiceover narration text for this scene" },
+                        imagePrompt: { type: "string", description: "Detailed English prompt for AI image generation, including style modifiers" },
                         cameraMovement: {
                           type: "string",
-                          enum: [
-                            "static",
-                            "slow_zoom_in",
-                            "slow_zoom_out",
-                            "pan_left",
-                            "pan_right",
-                            "tilt_up",
-                            "tilt_down",
-                            "dolly_forward",
-                          ],
+                          enum: ["static", "slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "tilt_up", "tilt_down", "dolly_forward"],
                           description: "Camera movement for video generation",
                         },
-                        mood: {
-                          type: "string",
-                          description: "Emotional tone of this scene",
-                        },
+                        mood: { type: "string", description: "Emotional tone of this scene" },
                       },
-                      required: [
-                        "sceneNumber",
-                        "duration",
-                        "narration",
-                        "imagePrompt",
-                        "cameraMovement",
-                        "mood",
-                      ],
+                      required: ["sceneNumber", "duration", "narration", "imagePrompt", "cameraMovement", "mood"],
                       additionalProperties: false,
                     },
                   },
-                  suggestedMusic: {
-                    type: "string",
-                    description: "Description of background music mood/style",
-                  },
+                  suggestedMusic: { type: "string", description: "Description of background music mood/style" },
                 },
                 required: ["title", "synopsis", "scenes", "suggestedMusic"],
                 additionalProperties: false,
@@ -140,30 +121,23 @@ Generate a complete script with title, scenes, and metadata.`;
             },
           },
         ],
-        tool_choice: {
-          type: "function",
-          function: { name: "generate_story_script" },
-        },
+        tool_choice: { type: "function", function: { name: "generate_story_script" } },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI Gateway error:", response.status, errorText);
-
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again later." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Credits exhausted. Please add funds." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: "Credits exhausted. Please add funds." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 

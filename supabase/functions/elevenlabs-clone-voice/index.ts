@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,12 +7,29 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
       throw new Error("ELEVENLABS_API_KEY not configured");
@@ -36,7 +54,6 @@ serve(async (req) => {
       );
     }
 
-    // Prepare FormData for ElevenLabs API
     const elevenLabsFormData = new FormData();
     elevenLabsFormData.append("name", name);
     elevenLabsFormData.append("description", description);
@@ -46,27 +63,21 @@ serve(async (req) => {
 
     const response = await fetch("https://api.elevenlabs.io/v1/voices/add", {
       method: "POST",
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-      },
+      headers: { "xi-api-key": ELEVENLABS_API_KEY },
       body: elevenLabsFormData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("ElevenLabs clone error:", errorText);
-      throw new Error(`Voice cloning failed: ${response.status} - ${errorText}`);
+      throw new Error(`Voice cloning failed: ${response.status}`);
     }
 
     const data = await response.json();
     console.log("Voice cloned successfully:", data);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        voiceId: data.voice_id,
-        message: "Voice cloned successfully" 
-      }),
+      JSON.stringify({ success: true, voiceId: data.voice_id, message: "Voice cloned successfully" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
