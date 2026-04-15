@@ -95,6 +95,7 @@ export const StoryModeWizard = () => {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
