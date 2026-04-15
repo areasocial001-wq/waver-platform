@@ -1127,7 +1127,7 @@ export const StoryModeWizard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
-              <SceneCard key={idx} scene={scene} index={idx} mode="generation" isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
+              <SceneCard key={idx} scene={scene} index={idx} mode="generation" voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
             ))}
           </div>
         </div>

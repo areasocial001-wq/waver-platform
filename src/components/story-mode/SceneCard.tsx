@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download,
+  Image, Eye, Download, Mic,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
@@ -60,6 +60,12 @@ export const SceneCard = ({
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
+  const voiceName = useMemo(() => {
+    const vid = scene.voiceId || defaultVoiceId;
+    if (!vid || !voices?.length) return null;
+    const found = voices.find(v => v.id === vid);
+    return found?.name || null;
+  }, [scene.voiceId, defaultVoiceId, voices]);
 
   if (mode === "generation") {
     return (
@@ -86,11 +92,16 @@ export const SceneCard = ({
           )}
         </div>
         <CardContent className="p-3 space-y-2">
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs flex-wrap">
             <StatusDot status={scene.imageStatus} /><span>Img</span>
             <StatusDot status={scene.audioStatus} /><span>Audio</span>
             <StatusDot status={scene.sfxStatus} /><span>SFX</span>
             <StatusDot status={scene.videoStatus} /><span>Video</span>
+            {voiceName && (
+              <Badge variant="outline" className="ml-auto text-[10px] h-5 gap-1">
+                <Mic className="w-2.5 h-2.5" />{voiceName}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
         </CardContent>
