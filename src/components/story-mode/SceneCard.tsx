@@ -57,7 +57,7 @@ interface SceneCardProps {
 
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
-  mode, voices, defaultVoiceId, onToggleEdit, onUpdate, onPreviewAudio,
+  mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
