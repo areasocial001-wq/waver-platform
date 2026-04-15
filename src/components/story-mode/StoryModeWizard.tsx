@@ -236,6 +236,10 @@ export const StoryModeWizard = () => {
             setRenderStatus("completed");
             setPendingRenderId(null);
             toast.success("Video finale pronto! 🎬");
+            // Browser push notification
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("Video pronto! 🎬", { body: "Il tuo video finale è stato renderizzato con successo.", icon: "/favicon.ico" });
+            }
             setTimeout(() => saveProject(), 500);
             break;
           } else if (data?.status === "failed") {
