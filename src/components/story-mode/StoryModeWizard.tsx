@@ -1208,6 +1208,10 @@ export const StoryModeWizard = () => {
           console.error("video-concat returned no URL:", data);
           toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
         }
+      } catch (err) {
+        console.error("Concat error:", err);
+        toast.error("Errore concatenazione. Puoi scaricare le singole scene.");
+      }
     } else {
       toast.warning("Nessun video completato con successo.");
     }
