@@ -70,8 +70,18 @@ serve(async (req) => {
       outputFormat = "webp",
       outputQuality = 90,
       numInferenceSteps = 4,
-      model = "black-forest-labs/flux-schnell"
+      model: rawModel = "black-forest-labs/flux-schnell"
     } = parseResult.data;
+
+    // Map short model aliases to full Replicate model identifiers
+    const MODEL_ALIASES: Record<string, string> = {
+      "flux": "black-forest-labs/flux-schnell",
+      "flux-schnell": "black-forest-labs/flux-schnell",
+      "flux-dev": "black-forest-labs/flux-dev",
+      "flux-pro": "black-forest-labs/flux-pro",
+      "sdxl": "stability-ai/sdxl",
+    };
+    const model = MODEL_ALIASES[rawModel] || rawModel;
 
     console.log("Generating image with Replicate Flux:", { 
       prompt, 
