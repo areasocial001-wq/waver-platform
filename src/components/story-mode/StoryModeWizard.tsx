@@ -132,6 +132,7 @@ export const StoryModeWizard = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
 
