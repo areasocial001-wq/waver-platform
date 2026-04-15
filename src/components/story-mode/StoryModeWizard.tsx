@@ -770,8 +770,7 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
-      // Upload to storage so Shotstack can access it
-      const storageUrl = await uploadBlobToStorage(blob, "story-sfx");
+      const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena`);
       return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
@@ -798,19 +797,32 @@ export const StoryModeWizard = () => {
     finally { setIsGeneratingScript(false); }
   };
 
-  // Upload a blob to Supabase storage and return the public URL
-  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3"): Promise<string> => {
+  // Upload a blob to Supabase storage with retry (max 3 attempts, exponential backoff)
+  const uploadBlobToStorage = async (blob: Blob, folder: string, ext: string = "mp3", sceneLabel?: string): Promise<string> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Utente non autenticato");
     const fileName = `${user.id}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const arrayBuffer = await blob.arrayBuffer();
-    const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
-      contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
-      upsert: true,
-    });
-    if (error) throw error;
-    const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
-    return urlData.publicUrl;
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const { error } = await supabase.storage.from("audio-uploads").upload(fileName, new Uint8Array(arrayBuffer), {
+        contentType: ext === "mp3" ? "audio/mpeg" : "audio/wav",
+        upsert: true,
+      });
+      if (!error) {
+        const { data: urlData } = supabase.storage.from("audio-uploads").getPublicUrl(fileName);
+        return urlData.publicUrl;
+      }
+      lastError = error;
+      const label = sceneLabel || folder;
+      console.warn(`Upload ${label} tentativo ${attempt}/${maxAttempts} fallito:`, error.message);
+      if (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+      }
+    }
+    const label = sceneLabel || folder;
+    throw new Error(`Upload fallito per "${label}" dopo ${maxAttempts} tentativi: ${lastError?.message}`);
   };
 
   const generateBackgroundMusic = async (): Promise<string | null> => {
@@ -825,8 +837,7 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
       const blob = await response.blob();
-      // Upload to storage so Shotstack can access it
-      const storageUrl = await uploadBlobToStorage(blob, "story-music");
+      const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
@@ -1066,10 +1077,14 @@ export const StoryModeWizard = () => {
         });
         if (!r.ok) throw new Error("TTS failed");
         const blob = await r.blob();
-        // Upload to storage for Shotstack access + keep blob URL for local playback
-        const storageUrl = await uploadBlobToStorage(blob, "story-narration");
+        const sceneLabel = `Narrazione Scena ${i + 1}`;
+        const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
         scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
-      } catch (err: any) { scenes[i] = { ...scenes[i], audioStatus: "error", error: err.message }; }
+      } catch (err: any) {
+        const msg = err.message || "Errore sconosciuto";
+        toast.error(`Scena ${i + 1}: errore audio – ${msg}`);
+        scenes[i] = { ...scenes[i], audioStatus: "error", error: msg };
+      }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
@@ -1082,7 +1097,10 @@ export const StoryModeWizard = () => {
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const sfxUrl = await generateSceneSfx(scenes[i]);
         scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
-      } catch { scenes[i] = { ...scenes[i], sfxStatus: "error" }; }
+      } catch (err: any) {
+        toast.error(`Scena ${i + 1}: errore SFX – ${err?.message || "sconosciuto"}`);
+        scenes[i] = { ...scenes[i], sfxStatus: "error" };
+      }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
