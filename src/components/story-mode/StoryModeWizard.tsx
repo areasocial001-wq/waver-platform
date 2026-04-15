@@ -80,21 +80,26 @@ const getAuthHeaders = async () => {
   };
 };
 
-// Cross-origin safe download via fetch + blob
-const downloadFile = async (url: string, filename: string) => {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
-  } catch {
-    window.open(url, "_blank");
-  }
+// Cross-origin safe download via fetch + blob (returns a function that manages loading state)
+const useDownloadFile = (setLoadingId: (id: string | null) => void) => {
+  return async (url: string, filename: string, id?: string) => {
+    setLoadingId(id || filename);
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
+    } catch {
+      window.open(url, "_blank");
+    } finally {
+      setLoadingId(null);
+    }
+  };
 };
 
 export const StoryModeWizard = () => {
@@ -105,7 +110,7 @@ export const StoryModeWizard = () => {
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
     description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
-    videoAspectRatio: "16:9",
+    videoAspectRatio: "16:9", characterFidelity: "medium",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
@@ -126,6 +131,8 @@ export const StoryModeWizard = () => {
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
 
@@ -256,7 +263,7 @@ export const StoryModeWizard = () => {
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
-      videoAspectRatio: config.videoAspectRatio || "16:9",
+      videoAspectRatio: config.videoAspectRatio || "16:9", characterFidelity: config.characterFidelity || "medium",
     });
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
@@ -365,7 +372,7 @@ export const StoryModeWizard = () => {
       if (type === "image") {
         updateScene(index, "imageStatus", "generating");
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl } : {}) },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -748,7 +755,7 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl } : {}) } });
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(input.imageUrl ? { referenceImageUrl: input.imageUrl, characterFidelity: input.characterFidelity } : {}) } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter
@@ -1016,10 +1023,10 @@ export const StoryModeWizard = () => {
           <div className="space-y-4">
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Image className="w-5 h-5 text-primary" />Immagine di Riferimento</CardTitle></CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 {input.imageUrl ? (
                   <div className="relative">
-                    <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg max-h-48 object-cover" />
+                    <img src={input.imageUrl} alt="Reference" className="w-full rounded-lg object-contain max-h-64 bg-muted/20" />
                     <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => setInput(p => ({ ...p, imageUrl: "", imageFile: null }))}><RotateCcw className="w-3 h-3 mr-1" />Cambia</Button>
                   </div>
                 ) : (
@@ -1029,6 +1036,32 @@ export const StoryModeWizard = () => {
                     <span className="text-xs text-muted-foreground mt-1">(opzionale)</span>
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                   </label>
+                )}
+                {input.imageUrl && (
+                  <div>
+                    <Label className="text-xs flex items-center gap-1 mb-1.5">🎯 Fedeltà al Personaggio</Label>
+                    <div className="flex gap-2">
+                      {([
+                        { value: "low" as const, label: "Bassa", desc: "Ispirazione libera" },
+                        { value: "medium" as const, label: "Media", desc: "Somiglianza bilanciata" },
+                        { value: "high" as const, label: "Alta", desc: "Massima fedeltà" },
+                      ]).map(f => (
+                        <button
+                          key={f.value}
+                          onClick={() => setInput(p => ({ ...p, characterFidelity: f.value }))}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-0.5 py-2 px-2 rounded-lg border-2 transition-all text-xs font-medium",
+                            input.characterFidelity === f.value
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border hover:border-muted-foreground/40 text-muted-foreground"
+                          )}
+                        >
+                          <span className="font-bold">{f.label}</span>
+                          <span className="text-[10px] opacity-70">{f.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1222,6 +1255,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="review"
+                aspectRatio={input.videoAspectRatio}
                 voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={editingSceneIndex === idx}
@@ -1372,7 +1406,7 @@ export const StoryModeWizard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
-              <SceneCard key={idx} scene={scene} index={idx} mode="generation" voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
+              <SceneCard key={idx} scene={scene} index={idx} mode="generation" aspectRatio={input.videoAspectRatio} voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} />
             ))}
           </div>
         </div>
@@ -1390,21 +1424,24 @@ export const StoryModeWizard = () => {
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                     <Music className="w-5 h-5 text-primary shrink-0" />
                     <div className="flex-1"><p className="text-sm font-medium">Colonna Sonora</p><audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" /></div>
-                    <Button variant="outline" size="sm" onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3")}><Download className="w-3 h-3" /></Button>
+                    <Button variant="outline" size="sm" disabled={downloadingId === "music"} onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3", "music")}>
+                      {downloadingId === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                    </Button>
                   </div>
                 )}
                 <div className="flex gap-3 flex-wrap">
-                  <Button onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`)}><Download className="w-4 h-4 mr-2" />Scarica Video</Button>
+                  <Button disabled={downloadingId === "final"} onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`, "final")}>
+                    {downloadingId === "final" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}Scarica Video
+                  </Button>
                   <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
-                {/* Show individual scene downloads */}
                 {videoSegments.length > 1 && (
                   <div className="pt-3 border-t border-border/50">
                     <p className="text-sm text-muted-foreground mb-2">Scarica scene singole:</p>
                     <div className="flex flex-wrap gap-2">
                       {videoSegments.map((segUrl, i) => (
-                        <Button key={i} variant="outline" size="sm" onClick={() => downloadFile(segUrl, `scena-${i + 1}.mp4`)}>
-                          <Download className="w-3 h-3 mr-1" />Scena {i + 1}
+                        <Button key={i} variant="outline" size="sm" disabled={downloadingId === `seg-${i}`} onClick={() => downloadFile(segUrl, `scena-${i + 1}.mp4`, `seg-${i}`)}>
+                          {downloadingId === `seg-${i}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}Scena {i + 1}
                         </Button>
                       ))}
                     </div>
@@ -1418,8 +1455,8 @@ export const StoryModeWizard = () => {
                 <p className="text-muted-foreground">Scarica le singole scene o rigenera quelle in errore:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).map((s, i) => (
-                    <Button key={i} variant="outline" size="sm" onClick={() => downloadFile(s.videoUrl!, `scena-${s.sceneNumber}.mp4`)}>
-                      <Download className="w-3 h-3 mr-1" />Scena {s.sceneNumber}
+                    <Button key={i} variant="outline" size="sm" disabled={downloadingId === `scene-${i}`} onClick={() => downloadFile(s.videoUrl!, `scena-${s.sceneNumber}.mp4`, `scene-${i}`)}>
+                      {downloadingId === `scene-${i}` ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}Scena {s.sceneNumber}
                     </Button>
                   ))}
                 </div>
@@ -1436,6 +1473,7 @@ export const StoryModeWizard = () => {
                 scene={scene}
                 index={idx}
                 mode="complete"
+                aspectRatio={input.videoAspectRatio}
                 voices={voiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={false}

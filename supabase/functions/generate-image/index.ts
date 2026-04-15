@@ -19,6 +19,7 @@ const requestSchema = z.object({
   model: z.string().max(100).optional(),
   style: z.string().max(500).optional(),
   referenceImageUrl: z.string().url().optional(),
+  characterFidelity: z.enum(['low', 'medium', 'high']).optional(),
 });
 
 // Lovable AI image generation fallback
@@ -126,12 +127,18 @@ serve(async (req) => {
       model: rawModel = "black-forest-labs/flux-schnell",
       style,
       referenceImageUrl,
+      characterFidelity = 'medium',
     } = parseResult.data;
 
-    // Enhance prompt for anatomical correctness when generating character scenes
+    // Build fidelity-aware prompt enhancement
+    const fidelityInstructions: Record<string, string> = {
+      low: "loosely inspired by the reference subject",
+      medium: "consistent character appearance matching reference photo, same face and body type",
+      high: "exact same person as the reference photo, identical face features, hair, body proportions, and clothing style",
+    };
     const anatomyGuard = "anatomically correct, natural human proportions, realistic body structure";
     const prompt = referenceImageUrl
-      ? `${rawPrompt}, consistent character appearance matching reference photo, ${anatomyGuard}`
+      ? `${rawPrompt}, ${fidelityInstructions[characterFidelity]}, ${anatomyGuard}`
       : `${rawPrompt}, ${anatomyGuard}`;
 
     // Map short model aliases to full Replicate model identifiers

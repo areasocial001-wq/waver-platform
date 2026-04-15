@@ -42,6 +42,7 @@ interface SceneCardProps {
   mode: "review" | "generation" | "complete";
   voices?: VoiceOption[];
   defaultVoiceId?: string;
+  aspectRatio?: string;
   onToggleEdit: () => void;
   onUpdate: (field: keyof StoryScene, value: any) => void;
   onPreviewAudio: () => void;
@@ -56,7 +57,7 @@ interface SceneCardProps {
 
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
-  mode, voices, defaultVoiceId, onToggleEdit, onUpdate, onPreviewAudio,
+  mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
@@ -66,11 +67,12 @@ export const SceneCard = ({
     const found = voices.find(v => v.id === vid);
     return found?.name || null;
   }, [scene.voiceId, defaultVoiceId, voices]);
+  const aspectClass = aspectRatio === "9:16" ? "aspect-[9/16]" : aspectRatio === "4:3" ? "aspect-[4/3]" : "aspect-video";
 
   if (mode === "generation") {
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
-        <div className="aspect-video bg-muted/30 relative">
+        <div className={cn(aspectClass, "bg-muted/30 relative")}>
           {scene.videoStatus === "completed" && scene.videoUrl ? (
             <video src={scene.videoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
           ) : scene.imageUrl ? (
@@ -113,7 +115,7 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 overflow-hidden">
         {scene.imageUrl && (
-          <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full aspect-video object-cover" />
+          <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className={cn("w-full object-cover", aspectClass)} />
         )}
         <CardContent className="p-2 space-y-1">
           <p className="text-xs text-muted-foreground line-clamp-1">{scene.narration}</p>
