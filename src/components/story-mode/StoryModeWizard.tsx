@@ -88,6 +88,7 @@ export const StoryModeWizard = () => {
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
     description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
+    videoAspectRatio: "16:9",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
@@ -236,6 +237,7 @@ export const StoryModeWizard = () => {
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
+      videoAspectRatio: config.videoAspectRatio || "16:9",
     });
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
