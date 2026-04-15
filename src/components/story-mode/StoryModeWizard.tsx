@@ -80,6 +80,23 @@ const getAuthHeaders = async () => {
   };
 };
 
+// Cross-origin safe download via fetch + blob
+const downloadFile = async (url: string, filename: string) => {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(blobUrl); a.remove(); }, 1000);
+  } catch {
+    window.open(url, "_blank");
+  }
+};
+
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
@@ -95,6 +112,7 @@ export const StoryModeWizard = () => {
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
@@ -882,15 +900,23 @@ export const StoryModeWizard = () => {
             transitions,
             audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
-            narrationVolume: (script.narrationVolume ?? 100) / 100,
             musicVolume: (script.musicVolume ?? 25) / 100,
           },
         });
         if (error) throw error;
         const finalUrl = data?.videoUrl || data?.url;
+        // Store segments for individual download if available
+        if (data?.segments && Array.isArray(data.segments)) {
+          setVideoSegments(data.segments);
+        }
         if (finalUrl) {
           setFinalVideoUrl(finalUrl);
-          toast.success("Video finale con audio mixato generato! 🎬");
+          if (data?.method === "shotstack") {
+            toast.success("Video finale con audio mixato generato! 🎬");
+          } else {
+            // Segments mode — first segment set as preview
+            toast.success("Scene video pronte! Scarica le singole scene qui sotto. 🎬");
+          }
         } else {
           console.error("video-concat returned no URL:", data);
           toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
@@ -1364,13 +1390,26 @@ export const StoryModeWizard = () => {
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                     <Music className="w-5 h-5 text-primary shrink-0" />
                     <div className="flex-1"><p className="text-sm font-medium">Colonna Sonora</p><audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" /></div>
-                    <Button variant="outline" size="sm" asChild><a href={backgroundMusicUrl} download="soundtrack.mp3"><Download className="w-3 h-3" /></a></Button>
+                    <Button variant="outline" size="sm" onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3")}><Download className="w-3 h-3" /></Button>
                   </div>
                 )}
                 <div className="flex gap-3 flex-wrap">
-                  <Button asChild><a href={finalVideoUrl} download={`${script.title}.mp4`}><Download className="w-4 h-4 mr-2" />Scarica Video</a></Button>
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`)}><Download className="w-4 h-4 mr-2" />Scarica Video</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
+                {/* Show individual scene downloads */}
+                {videoSegments.length > 1 && (
+                  <div className="pt-3 border-t border-border/50">
+                    <p className="text-sm text-muted-foreground mb-2">Scarica scene singole:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {videoSegments.map((segUrl, i) => (
+                        <Button key={i} variant="outline" size="sm" onClick={() => downloadFile(segUrl, `scena-${i + 1}.mp4`)}>
+                          <Download className="w-3 h-3 mr-1" />Scena {i + 1}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -1379,10 +1418,12 @@ export const StoryModeWizard = () => {
                 <p className="text-muted-foreground">Scarica le singole scene o rigenera quelle in errore:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).map((s, i) => (
-                    <Button key={i} variant="outline" size="sm" asChild><a href={s.videoUrl} download><Download className="w-3 h-3 mr-1" />Scena {s.sceneNumber}</a></Button>
+                    <Button key={i} variant="outline" size="sm" onClick={() => downloadFile(s.videoUrl!, `scena-${s.sceneNumber}.mp4`)}>
+                      <Download className="w-3 h-3 mr-1" />Scena {s.sceneNumber}
+                    </Button>
                   ))}
                 </div>
-                <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
               </CardContent>
             </Card>
           )}
