@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
@@ -6,14 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Input validation schemas
 const generateSchema = z.object({
   action: z.literal('generate').optional(),
   prompt: z.string().min(1, 'Prompt richiesto').max(2000, 'Prompt troppo lungo'),
   imageUrl: z.string().url().or(z.string().startsWith('data:')),
   audioUrl: z.string().url().or(z.string().startsWith('data:')).optional(),
   sampleSteps: z.number().int().min(10).max(50).optional(),
-  // External audio for lip sync
   externalAudioUrl: z.string().url().or(z.string().startsWith('data:')).optional(),
   useLipSync: z.boolean().optional(),
 });
@@ -29,6 +28,23 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const HF_TOKEN = Deno.env.get("HUGGING_FACE_ACCESS_TOKEN");
     if (!HF_TOKEN) {
       throw new Error("HUGGING_FACE_ACCESS_TOKEN is not configured");
