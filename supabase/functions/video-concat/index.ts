@@ -253,6 +253,59 @@ const createTitleClip = (
   return clips;
 };
 
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+const getStoragePathFromUrl = (url: string, supabaseUrl: string): { bucket: string; path: string } | null => {
+  try {
+    if (url.startsWith('storage://')) {
+      const storagePath = url.replace('storage://', '');
+      const [bucket, ...pathParts] = storagePath.split('/');
+      if (!bucket || pathParts.length === 0) return null;
+      return { bucket, path: pathParts.join('/') };
+    }
+
+    const parsed = new URL(url);
+    if (!parsed.origin.startsWith(supabaseUrl)) return null;
+    const marker = '/storage/v1/object/';
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const objectPath = parsed.pathname.slice(markerIndex + marker.length);
+    const normalized = objectPath.startsWith('public/')
+      ? objectPath.slice('public/'.length)
+      : objectPath.startsWith('sign/')
+        ? objectPath.slice('sign/'.length)
+        : objectPath;
+
+    const [bucket, ...pathParts] = normalized.split('/');
+    if (!bucket || pathParts.length === 0) return null;
+    return { bucket, path: decodeURIComponent(pathParts.join('/')) };
+  } catch {
+    return null;
+  }
+};
+
+const normalizeAssetUrl = async (
+  url: string,
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string
+): Promise<string> => {
+  if (!url) return url;
+
+  const storageTarget = getStoragePathFromUrl(url, supabaseUrl);
+  if (storageTarget) {
+    const { data, error } = await supabase.storage
+      .from(storageTarget.bucket)
+      .createSignedUrl(storageTarget.path, SIGNED_URL_TTL_SECONDS);
+
+    if (!error && data?.signedUrl) {
+      return data.signedUrl;
+    }
+  }
+
+  return url;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
