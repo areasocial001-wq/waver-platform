@@ -857,7 +857,10 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
         });
         if (!r.ok) throw new Error("TTS failed");
-        scenes[i] = { ...scenes[i], audioUrl: URL.createObjectURL(await r.blob()), audioStatus: "completed" };
+        const blob = await r.blob();
+        // Upload to storage for Shotstack access + keep blob URL for local playback
+        const storageUrl = await uploadBlobToStorage(blob, "story-narration");
+        scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
       } catch (err: any) { scenes[i] = { ...scenes[i], audioStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
