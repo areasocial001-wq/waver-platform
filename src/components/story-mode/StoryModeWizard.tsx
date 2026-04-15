@@ -346,7 +346,7 @@ export const StoryModeWizard = () => {
       if (type === "image") {
         updateScene(index, "imageStatus", "generating");
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
