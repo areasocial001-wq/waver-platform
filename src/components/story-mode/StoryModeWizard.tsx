@@ -1188,26 +1188,26 @@ export const StoryModeWizard = () => {
         });
         if (error) throw error;
         const finalUrl = data?.videoUrl || data?.url;
-        // Store segments for individual download if available
         if (data?.segments && Array.isArray(data.segments)) {
           setVideoSegments(data.segments);
         }
-        if (finalUrl) {
+
+        if (data?.method === "shotstack-pending" && data?.renderId) {
+          setPendingRenderId(data.renderId);
+          setRenderStatus("processing");
+          toast.info("Rendering finale in corso… apparirà automaticamente.");
+        } else if (finalUrl) {
           setFinalVideoUrl(finalUrl);
+          setRenderStatus("completed");
           if (data?.method === "shotstack") {
             toast.success("Video finale con audio mixato generato! 🎬");
           } else {
-            // Segments mode — first segment set as preview
             toast.success("Scene video pronte! Scarica le singole scene qui sotto. 🎬");
           }
         } else {
           console.error("video-concat returned no URL:", data);
           toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
         }
-      } catch (err) {
-        console.error("Concat error:", err);
-        toast.error("Errore concatenazione. Puoi scaricare le singole scene.");
-      }
     } else {
       toast.warning("Nessun video completato con successo.");
     }
