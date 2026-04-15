@@ -236,7 +236,11 @@ export const StoryModeWizard = () => {
       const projectData = {
         user_id: user.id, title: script.title, synopsis: script.synopsis,
         suggested_music: script.suggestedMusic, scenes: script.scenes as any,
-        input_config: input as any,
+        input_config: {
+          ...input,
+          imageFile: null,
+          imageUrl: input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : "",
+        } as any,
         status: step === "complete" ? "completed" : step === "generation" ? "generating" : "draft",
         final_video_url: finalVideoUrl, background_music_url: backgroundMusicUrl,
       };
