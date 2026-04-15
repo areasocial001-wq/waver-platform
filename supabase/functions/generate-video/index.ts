@@ -2602,7 +2602,12 @@ serve(async (req) => {
           const imageBlob = await imageResponse.blob();
           const arrayBuffer = await imageBlob.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
-          base64Data = btoa(String.fromCharCode(...uint8Array));
+          // Convert in chunks to avoid stack overflow with large images
+          let binaryStr = '';
+          for (let i = 0; i < uint8Array.length; i += 8192) {
+            binaryStr += String.fromCharCode(...uint8Array.subarray(i, Math.min(i + 8192, uint8Array.length)));
+          }
+          base64Data = btoa(binaryStr);
           
           const contentType = imageResponse.headers.get('content-type');
           if (contentType && contentType.startsWith('image/')) {
