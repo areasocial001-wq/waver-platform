@@ -235,13 +235,15 @@ export const StoryModeWizard = () => {
     if (!user || !script) return;
     setIsSaving(true);
     try {
+      const storageUrl = (window as any).__storyRefStorageUrl || "";
+      const persistedImageUrl = storageUrl || (input.imageUrl && input.imageUrl.startsWith("http") ? input.imageUrl : "");
       const projectData = {
         user_id: user.id, title: script.title, synopsis: script.synopsis,
         suggested_music: script.suggestedMusic, scenes: script.scenes as any,
         input_config: {
           ...input,
           imageFile: null,
-          imageUrl: input.imageUrl && !input.imageUrl.startsWith("blob:") ? input.imageUrl : "",
+          imageUrl: persistedImageUrl,
         } as any,
         status: step === "complete" ? "completed" : step === "generation" ? "generating" : "draft",
         final_video_url: finalVideoUrl, background_music_url: backgroundMusicUrl,
