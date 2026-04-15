@@ -119,6 +119,7 @@ export const StoryModeWizard = () => {
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
   const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
