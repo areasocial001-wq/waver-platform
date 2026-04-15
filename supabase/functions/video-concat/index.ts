@@ -253,6 +253,59 @@ const createTitleClip = (
   return clips;
 };
 
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+const getStoragePathFromUrl = (url: string, supabaseUrl: string): { bucket: string; path: string } | null => {
+  try {
+    if (url.startsWith('storage://')) {
+      const storagePath = url.replace('storage://', '');
+      const [bucket, ...pathParts] = storagePath.split('/');
+      if (!bucket || pathParts.length === 0) return null;
+      return { bucket, path: pathParts.join('/') };
+    }
+
+    const parsed = new URL(url);
+    if (!parsed.origin.startsWith(supabaseUrl)) return null;
+    const marker = '/storage/v1/object/';
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+
+    const objectPath = parsed.pathname.slice(markerIndex + marker.length);
+    const normalized = objectPath.startsWith('public/')
+      ? objectPath.slice('public/'.length)
+      : objectPath.startsWith('sign/')
+        ? objectPath.slice('sign/'.length)
+        : objectPath;
+
+    const [bucket, ...pathParts] = normalized.split('/');
+    if (!bucket || pathParts.length === 0) return null;
+    return { bucket, path: decodeURIComponent(pathParts.join('/')) };
+  } catch {
+    return null;
+  }
+};
+
+const normalizeAssetUrl = async (
+  url: string,
+  supabase: ReturnType<typeof createClient>,
+  supabaseUrl: string
+): Promise<string> => {
+  if (!url) return url;
+
+  const storageTarget = getStoragePathFromUrl(url, supabaseUrl);
+  if (storageTarget) {
+    const { data, error } = await supabase.storage
+      .from(storageTarget.bucket)
+      .createSignedUrl(storageTarget.path, SIGNED_URL_TTL_SECONDS);
+
+    if (!error && data?.signedUrl) {
+      return data.signedUrl;
+    }
+  }
+
+  return url;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -278,10 +331,10 @@ serve(async (req) => {
       );
     }
     
-    const { 
+    const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
       resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
-      intro, outro 
+      intro, outro
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
@@ -326,11 +379,12 @@ serve(async (req) => {
           // Use custom duration or default to 5 seconds
           const clipLength = clipDurations?.[i] || 5;
           const effects = clipEffects?.[i];
-          
+          const normalizedVideoUrl = await normalizeAssetUrl(videoUrls[i], supabase, supabaseUrl);
+
           const clip: any = {
             asset: {
               type: 'video',
-              src: videoUrls[i],
+              src: normalizedVideoUrl,
             },
             start: currentStart,
             length: clipLength,
@@ -388,25 +442,23 @@ serve(async (req) => {
           const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
           const totalDuration = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
           let audioSrc = audioUrl;
-          
+
           // If audio is base64, we need to upload it first
           if (audioUrl.startsWith('data:')) {
             const base64Data = audioUrl.split(',')[1];
             const audioBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
             const audioFileName = `audio/${Date.now()}.mp3`;
-            
+
             await supabase.storage
               .from('generated-videos')
               .upload(audioFileName, audioBytes, {
                 contentType: 'audio/mpeg',
                 upsert: true,
               });
-            
-            const { data: audioUrlData } = supabase.storage
-              .from('generated-videos')
-              .getPublicUrl(audioFileName);
-            
-            audioSrc = audioUrlData.publicUrl;
+
+            audioSrc = await normalizeAssetUrl(`storage://generated-videos/${audioFileName}`, supabase, supabaseUrl);
+          } else {
+            audioSrc = await normalizeAssetUrl(audioUrl, supabase, supabaseUrl);
           }
           
           timeline.tracks.push({
@@ -429,8 +481,8 @@ serve(async (req) => {
           for (let i = 0; i < audioUrls.length; i++) {
             if (!audioUrls[i]) continue;
             let narrationSrc = audioUrls[i];
-            // Upload blob URLs won't work with Shotstack - skip blob: URLs
             if (narrationSrc.startsWith('blob:')) continue;
+            narrationSrc = await normalizeAssetUrl(narrationSrc, supabase, supabaseUrl);
             const clipLen = clipDurations?.[i] || 5;
             narrationClips.push({
               asset: {
@@ -452,11 +504,12 @@ serve(async (req) => {
         if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
           const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
           const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
+          const normalizedMusicUrl = await normalizeAssetUrl(backgroundMusicUrl, supabase, supabaseUrl);
           timeline.tracks.push({
             clips: [{
               asset: {
                 type: 'audio',
-                src: backgroundMusicUrl,
+                src: normalizedMusicUrl,
                 volume: musicVolume,
               },
               start: 0,
@@ -556,14 +609,12 @@ serve(async (req) => {
               });
 
             if (!uploadError) {
-              const { data: urlData } = supabase.storage
-                .from('generated-videos')
-                .getPublicUrl(fileName);
+              const signedFinalUrl = await normalizeAssetUrl(`storage://generated-videos/${fileName}`, supabase, supabaseUrl);
 
               return new Response(
                 JSON.stringify({
                   success: true,
-                  videoUrl: urlData.publicUrl,
+                  videoUrl: signedFinalUrl,
                   segments: videoUrls,
                   audioUrl: audioUrl,
                   message: 'Video concatenato con Shotstack!',
@@ -642,10 +693,8 @@ serve(async (req) => {
           // Use original URL if upload fails
           outputFiles.push(videoUrls[i]);
         } else {
-          const { data: urlData } = supabase.storage
-            .from('generated-videos')
-            .getPublicUrl(fileName);
-          outputFiles.push(urlData.publicUrl);
+          const signedSegmentUrl = await normalizeAssetUrl(`storage://generated-videos/${fileName}`, supabase, supabaseUrl);
+          outputFiles.push(signedSegmentUrl);
         }
       } catch (err) {
         console.error(`Error processing video ${i + 1}:`, err);
@@ -661,7 +710,7 @@ serve(async (req) => {
           const base64Data = audioUrl.split(',')[1];
           const audioBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
           const audioFileName = `concat/${timestamp}/audio.mp3`;
-          
+
           const { error: audioUploadError } = await supabase.storage
             .from('generated-videos')
             .upload(audioFileName, audioBytes, {
@@ -670,17 +719,14 @@ serve(async (req) => {
             });
 
           if (!audioUploadError) {
-            const { data: audioUrlData } = supabase.storage
-              .from('generated-videos')
-              .getPublicUrl(audioFileName);
-            outputAudioUrl = audioUrlData.publicUrl;
+            outputAudioUrl = await normalizeAssetUrl(`storage://generated-videos/${audioFileName}`, supabase, supabaseUrl);
           }
         } catch (err) {
           console.error('Audio processing error:', err);
           outputAudioUrl = audioUrl;
         }
       } else {
-        outputAudioUrl = audioUrl;
+        outputAudioUrl = await normalizeAssetUrl(audioUrl, supabase, supabaseUrl);
       }
     }
 
