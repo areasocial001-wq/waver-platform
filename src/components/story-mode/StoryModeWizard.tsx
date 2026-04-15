@@ -837,8 +837,7 @@ export const StoryModeWizard = () => {
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
       const blob = await response.blob();
-      // Upload to storage so Shotstack can access it
-      const storageUrl = await uploadBlobToStorage(blob, "story-music");
+      const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
