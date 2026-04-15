@@ -116,7 +116,7 @@ serve(async (req) => {
     }
 
     const {
-      prompt,
+      prompt: rawPrompt,
       width = 1024,
       height = 1024,
       aspectRatio = "1:1",
@@ -125,7 +125,14 @@ serve(async (req) => {
       numInferenceSteps = 4,
       model: rawModel = "black-forest-labs/flux-schnell",
       style,
+      referenceImageUrl,
     } = parseResult.data;
+
+    // Enhance prompt for anatomical correctness when generating character scenes
+    const anatomyGuard = "anatomically correct, natural human proportions, realistic body structure";
+    const prompt = referenceImageUrl
+      ? `${rawPrompt}, consistent character appearance matching reference photo, ${anatomyGuard}`
+      : `${rawPrompt}, ${anatomyGuard}`;
 
     // Map short model aliases to full Replicate model identifiers
     const MODEL_ALIASES: Record<string, string> = {
