@@ -1475,6 +1475,11 @@ export const StoryModeWizard = () => {
                 <p className="text-xs text-muted-foreground">
                   {script.scenes.length} scene × (immagine ~15s + audio ~8s + video ~45s + SFX ~5s) + musica + montaggio
                 </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  🎬 Rendering: <span className="font-medium text-foreground">{input.videoQuality.toUpperCase()}</span> • <span className="font-medium text-foreground">{input.videoFps}fps</span>
+                  {renderingMultiplier > 1.2 && <span className="text-amber-500 ml-1">⚠️ rendering più lento ({Math.round(renderingMultiplier * 100 - 100)}% in più)</span>}
+                  {renderingMultiplier < 0.8 && <span className="text-green-500 ml-1">⚡ rendering veloce</span>}
+                </p>
               </div>
               <Badge variant="secondary" className="text-base font-bold px-3 py-1">
                 <Clock className="w-4 h-4 mr-1" />
