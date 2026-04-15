@@ -1080,8 +1080,16 @@ export const StoryModeWizard = () => {
             <CardContent className="pt-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Progresso Produzione</span>
-                  <span className="text-sm text-muted-foreground">{generationProgress}%</span>
+                  <span className="text-sm font-medium flex items-center gap-2">
+                    Progresso Produzione
+                    {isPaused && <Badge variant="outline" className="text-[10px] animate-pulse">⏸ In pausa</Badge>}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" className="h-7 px-3" onClick={togglePause}>
+                      {isPaused ? <><Play className="w-3 h-3 mr-1" />Riprendi</> : <><Pause className="w-3 h-3 mr-1" />Pausa</>}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">{generationProgress}%</span>
+                  </div>
                 </div>
                 <Progress value={generationProgress} className="h-3" />
                 {/* Real-time elapsed vs estimated timer */}
