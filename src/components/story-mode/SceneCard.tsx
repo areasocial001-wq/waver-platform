@@ -21,17 +21,20 @@ import { supabase } from "@/integrations/supabase/client";
  */
 function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const prevUrl = useRef<string | undefined>();
 
   useEffect(() => {
     if (!isActive || !videoUrl) {
       setBlobUrl(null);
+      setIsLoading(false);
       return;
     }
     if (videoUrl === prevUrl.current) return;
     prevUrl.current = videoUrl;
 
     let cancelled = false;
+    setIsLoading(true);
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -52,6 +55,8 @@ function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
         }
       } catch (err) {
         console.error("useAuthVideo error:", err);
+      } finally {
+        if (!cancelled) setIsLoading(false);
       }
     })();
 
@@ -60,14 +65,13 @@ function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
     };
   }, [videoUrl, isActive]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
   }, [blobUrl]);
 
-  return blobUrl;
+  return { blobUrl, isLoading };
 }
 
 const TRANSITIONS: { value: TransitionType; label: string; icon: string }[] = [
