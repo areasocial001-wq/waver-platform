@@ -246,6 +246,9 @@ export const StoryModeWizard = () => {
             setRenderStatus("failed");
             setPendingRenderId(null);
             toast.error("Rendering fallito: " + (data.error || "errore sconosciuto"));
+            if ("Notification" in window && Notification.permission === "granted") {
+              new Notification("Rendering fallito ❌", { body: "Si è verificato un errore durante il rendering del video.", icon: "/favicon.ico" });
+            }
             break;
           }
           // still processing, continue polling
