@@ -227,6 +227,8 @@ export function TalkingAvatarGenerator() {
     }
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -234,7 +236,7 @@ export function TalkingAvatarGenerator() {
           headers: {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
             text: dialogueText,
@@ -580,6 +582,8 @@ export function TalkingAvatarGenerator() {
     setBackgroundMusicEmotion(emotion);
     
     try {
+      const { data: { session: musicSession } } = await supabase.auth.getSession();
+      const musicToken = musicSession?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
         {
@@ -587,7 +591,7 @@ export function TalkingAvatarGenerator() {
           headers: {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Authorization': `Bearer ${musicToken}`,
           },
           body: JSON.stringify({
             prompt: musicPrompt,
