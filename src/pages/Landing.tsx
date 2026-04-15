@@ -354,7 +354,7 @@ export default function Landing() {
               <span className="block">All-in-one AI</span>
               <span className="block relative [-webkit-text-stroke:0px_transparent]">
                 {/* Stroke layer */}
-                <span className="[-webkit-text-stroke:3px_black]" style={{ textShadow: '-3px -3px 0 black, 3px -3px 0 black, -3px 3px 0 black, 3px 3px 0 black, 0 0 20px black, 0 0 40px black' }} aria-hidden="true">
+                <span className="[-webkit-text-stroke:3px_black] text-black" style={{ textShadow: '-3px -3px 0 black, 3px -3px 0 black, -3px 3px 0 black, 3px 3px 0 black, 0 0 20px black, 0 0 40px black' }} aria-hidden="true">
                   Video & Image
                 </span>
                 {/* Gradient fill layer */}
