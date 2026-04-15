@@ -792,10 +792,13 @@ export const StoryModeWizard = () => {
         let videoUrl = data.videoUrl || data.video_url || data.output;
         if (!videoUrl && data.operationId && (data.status === "starting" || data.status === "processing")) {
           console.log(`Scene ${i + 1}: polling operationId ${data.operationId}`);
+          const pollingStart = Date.now();
+          setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: 0 });
           const maxPolls = 120; // up to ~10 minutes
           for (let poll = 0; poll < maxPolls; poll++) {
             if (checkCancelled()) break;
             await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
+            setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: poll + 1 });
             const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
               body: { operationId: data.operationId },
             });
@@ -808,6 +811,7 @@ export const StoryModeWizard = () => {
             }
             // still processing, continue polling
           }
+          setVideoPollingInfo(null);
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
