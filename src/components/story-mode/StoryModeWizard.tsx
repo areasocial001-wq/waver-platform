@@ -264,13 +264,17 @@ export const StoryModeWizard = () => {
     if (error || !data) { toast.error("Errore nel caricamento"); return; }
     setProjectId(data.id);
     const config = data.input_config as any;
+    const hasStaleReferenceImage = typeof config.imageUrl === "string" && config.imageUrl.startsWith("blob:");
     setInput({
-      imageUrl: config.imageUrl || "", imageFile: null, styleId: config.styleId || "cinema",
+      imageUrl: hasStaleReferenceImage ? "" : (config.imageUrl || ""), imageFile: null, styleId: config.styleId || "cinema",
       styleName: config.styleName || "Cinema", stylePromptModifier: config.stylePromptModifier || "",
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
       videoAspectRatio: config.videoAspectRatio || "16:9", characterFidelity: config.characterFidelity || "medium",
     });
+    if (hasStaleReferenceImage) {
+      toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
+    }
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
     setBackgroundMusicUrl(data.background_music_url);
