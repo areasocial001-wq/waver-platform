@@ -677,6 +677,7 @@ export const StoryModeWizard = () => {
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
     pauseRef.current = false;
+    cancelRef.current = false;
     setIsPaused(false);
     const totalSteps = script.scenes.length * 4 + 1;
     let completed = 0;
