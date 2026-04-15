@@ -666,7 +666,9 @@ export const StoryModeWizard = () => {
     setGenerationProgress(0);
     setGenerationStartTime(Date.now());
     setElapsedSeconds(0);
-    const totalSteps = script.scenes.length * 4 + 1; // img + tts + sfx + video + music
+    pauseRef.current = false;
+    setIsPaused(false);
+    const totalSteps = script.scenes.length * 4 + 1;
     let completed = 0;
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
