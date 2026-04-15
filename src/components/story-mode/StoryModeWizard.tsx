@@ -112,7 +112,7 @@ export const StoryModeWizard = () => {
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
     description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
-    videoAspectRatio: "16:9", characterFidelity: "medium",
+    videoAspectRatio: "16:9", videoQuality: "hd", characterFidelity: "medium",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
