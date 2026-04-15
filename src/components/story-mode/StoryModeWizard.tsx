@@ -110,11 +110,27 @@ export const StoryModeWizard = () => {
     toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
   };
 
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+
   const cancelGeneration = () => {
     cancelRef.current = true;
     pauseRef.current = false;
     setIsPaused(false);
+    setShowCancelDialog(false);
     toast.warning("Produzione annullata ✋");
+  };
+
+  const requestCancel = () => {
+    // Pause first so nothing progresses while user decides
+    if (!pauseRef.current) { pauseRef.current = true; setIsPaused(true); }
+    setShowCancelDialog(true);
+  };
+
+  const dismissCancel = () => {
+    setShowCancelDialog(false);
+    // Resume if was auto-paused
+    pauseRef.current = false;
+    setIsPaused(false);
   };
 
   const previewVoice = async (voiceId: string) => {
