@@ -844,23 +844,46 @@ export const StoryModeWizard = () => {
         }));
         const narrationUrls = scenes
           .filter(s => s.videoStatus === "completed" && s.audioUrl)
-          .map(s => s.audioUrl);
+          .map(s => s.audioUrl)
+          .filter((u): u is string => !!u);
         const sfxUrls = scenes
           .filter(s => s.videoStatus === "completed" && s.sfxUrl)
-          .map(s => s.sfxUrl);
+          .map(s => s.sfxUrl)
+          .filter((u): u is string => !!u);
+
+        // Resolve storage:// URLs to public URLs for Shotstack compatibility
+        const resolvedVideoUrls = await Promise.all(
+          vids.map(async (s) => {
+            const url = s.videoUrl!;
+            if (url.startsWith("storage://")) {
+              const path = url.replace("storage://", "");
+              const bucketName = path.split("/")[0];
+              const filePath = path.substring(bucketName.length + 1);
+              const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+              return urlData.publicUrl;
+            }
+            return url;
+          })
+        );
+
+        // Filter out any null/empty URLs
+        const validVideoUrls = resolvedVideoUrls.filter((u): u is string => !!u && u.startsWith("http"));
+        if (validVideoUrls.length < 2) {
+          setFinalVideoUrl(vids[0].videoUrl!);
+          toast.success("Video finale pronto! 🎬");
+          return;
+        }
 
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
-            videoUrls: vids.map(s => s.videoUrl),
+            videoUrls: validVideoUrls,
             transition: transitions[0]?.type || "crossfade",
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
-            audioUrls: narrationUrls,
-            sfxUrls,
-            backgroundMusicUrl: backgroundMusicUrl,
+            audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
+            backgroundMusicUrl: backgroundMusicUrl || undefined,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
             musicVolume: (script.musicVolume ?? 25) / 100,
-            sfxVolume: 0.4,
           },
         });
         if (error) throw error;
