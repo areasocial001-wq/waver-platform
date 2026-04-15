@@ -206,7 +206,7 @@ serve(async (req) => {
 
       // If Replicate failed with rate limit / server error, try Lovable AI fallback
       if (replicateFailed) {
-        const lovableImageUrl = await generateWithLovableAI(prompt, style);
+        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
         if (lovableImageUrl) {
           return new Response(
             JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -229,7 +229,7 @@ serve(async (req) => {
 
     // No Replicate key — try Lovable AI directly
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
-    const lovableImageUrl = await generateWithLovableAI(prompt, style);
+    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
     if (lovableImageUrl) {
       return new Response(
         JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
