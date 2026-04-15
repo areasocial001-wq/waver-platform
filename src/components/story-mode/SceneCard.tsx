@@ -60,6 +60,12 @@ export const SceneCard = ({
   onDuplicate, onDelete, onRegenerate,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
+  const voiceName = useMemo(() => {
+    const vid = scene.voiceId || defaultVoiceId;
+    if (!vid || !voices?.length) return null;
+    const found = voices.find(v => v.id === vid);
+    return found?.name || null;
+  }, [scene.voiceId, defaultVoiceId, voices]);
 
   if (mode === "generation") {
     return (
