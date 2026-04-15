@@ -358,7 +358,7 @@ export default function Landing() {
                   Video & Image
                 </span>
                 {/* Gradient fill layer */}
-                <span className="absolute inset-0 bg-gradient-to-b from-[hsl(0,0%,100%)] via-[hsl(220,20%,75%)] to-[hsl(220,15%,45%)] bg-clip-text text-transparent [-webkit-text-stroke:0px_transparent] [filter:brightness(1.3)_contrast(1.1)]" aria-hidden="true">
+                <span className="absolute inset-0 bg-gradient-to-b from-[hsl(0,0%,100%)] via-[hsl(220,15%,80%)] to-[hsl(220,20%,65%)] bg-clip-text text-transparent [-webkit-text-stroke:0px_transparent] [filter:brightness(1.2)_contrast(1.05)]" aria-hidden="true">
                   Video & Image
                 </span>
               </span>
