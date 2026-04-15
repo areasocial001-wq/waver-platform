@@ -37,8 +37,10 @@ import penInkImg from "@/assets/styles/pen-ink.jpg";
 import plasticBlocksImg from "@/assets/styles/plastic-blocks.jpg";
 import halftoneImg from "@/assets/styles/halftone.jpg";
 import motionGraphicsImg from "@/assets/styles/motion-graphics.jpg";
+import realisticImg from "@/assets/styles/realistic.jpg";
 
 const VIDEO_STYLES = [
+  { id: "realistic", name: "Realistico", preview: realisticImg, description: "Fotorealistico, come una foto o un film dal vero", promptModifier: "photorealistic style, real photography, natural lighting, lifelike textures, shallow depth of field, 35mm film look, no illustration, no cartoon, no anime" },
   { id: "animation", name: "Animation", preview: animationImg, description: "Stile animazione 3D fluida e colorata", promptModifier: "3D animated style, Pixar-like, vibrant colors, smooth animation" },
   { id: "claymation", name: "Claymation", preview: claymationImg, description: "Stop-motion in plastilina artigianale", promptModifier: "claymation style, stop motion, handcrafted clay figures, warm lighting" },
   { id: "comic-noir", name: "Comic Noir", preview: comicNoirImg, description: "Fumetto dark con contrasti forti", promptModifier: "comic book noir style, high contrast black and white, dramatic shadows, ink strokes" },
