@@ -688,6 +688,7 @@ export const StoryModeWizard = () => {
     // Images
     for (let i = 0; i < scenes.length; i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -699,8 +700,9 @@ export const StoryModeWizard = () => {
     }
 
     // TTS narration
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -715,8 +717,9 @@ export const StoryModeWizard = () => {
     }
 
     // SFX per scene (based on mood)
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       try {
         scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
@@ -727,8 +730,9 @@ export const StoryModeWizard = () => {
     }
 
     // Video generation
-    for (let i = 0; i < scenes.length; i++) {
+    for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
+      if (checkCancelled()) break;
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
         scenes[i] = { ...scenes[i], videoStatus: "generating" };
@@ -740,6 +744,14 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
       } catch (err: any) { scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+    }
+
+    if (checkCancelled()) {
+      setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+      setStep("script");
+      setIsGenerating(false);
+      toast.info("Produzione annullata. Puoi riprendere dallo script.");
+      return;
     }
 
     await musicP;
@@ -765,11 +777,11 @@ export const StoryModeWizard = () => {
             transitionDuration: transitions[0]?.duration || 0.5,
             transitions,
             audioUrls: narrationUrls,
-            sfxUrls, // sound effects tracks
+            sfxUrls,
             backgroundMusicUrl: backgroundMusicUrl,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
             musicVolume: (script.musicVolume ?? 25) / 100,
-            sfxVolume: 0.4, // SFX at 40% volume
+            sfxVolume: 0.4,
           },
         });
         if (error) throw error;
