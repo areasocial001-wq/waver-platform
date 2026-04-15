@@ -91,65 +91,104 @@ serve(async (req) => {
       model 
     });
 
-    // Retry with backoff on 429 rate limits
     const MAX_RETRIES = 3;
     let lastError: any = null;
 
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
-        const output = await replicate.run(
-          model,
-          {
-            input: {
-              prompt,
-              go_fast: true,
-              megapixels: "1",
-              num_outputs: 1,
-              aspect_ratio: aspectRatio,
-              output_format: outputFormat,
-              output_quality: outputQuality,
-              num_inference_steps: numInferenceSteps,
-              ...(width && height ? { width, height } : {})
-            }
-          }
-        );
+        const output = await replicate.run(model, {
+          input: {
+            prompt,
+            go_fast: true,
+            megapixels: "1",
+            num_outputs: 1,
+            aspect_ratio: aspectRatio,
+            output_format: outputFormat,
+            output_quality: outputQuality,
+            num_inference_steps: numInferenceSteps,
+            ...(width && height ? { width, height } : {}),
+          },
+        });
 
         console.log("Image generation successful:", output);
 
         return new Response(
-          JSON.stringify({ 
+          JSON.stringify({
             imageUrl: Array.isArray(output) ? output[0] : output,
-            success: true 
-          }), {
+            success: true,
+          }),
+          {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           }
         );
       } catch (err: any) {
         lastError = err;
-        const msg = err.message || '';
-        // Extract retry_after from error message if present
-        const retryMatch = msg.match(/retry_after["\s:]+(\d+)/);
-        const isRateLimit = msg.includes('429') || msg.includes('Too Many Requests');
+        const message = err?.message || '';
+        const retryMatch = message.match(/retry_after["\s:]+(\d+)/);
+        const retryAfter = retryMatch ? parseInt(retryMatch[1], 10) : null;
+        const isRateLimit = message.includes('429') || message.includes('Too Many Requests');
+        const isUpstreamServiceError = isRateLimit || message.includes('status 500') || message.includes('status 502') || message.includes('status 503') || message.includes('status 504');
 
         if (isRateLimit && attempt < MAX_RETRIES - 1) {
-          const waitSec = retryMatch ? parseInt(retryMatch[1], 10) + 1 : (attempt + 1) * 10;
+          const waitSec = retryAfter ? retryAfter + 1 : (attempt + 1) * 10;
           console.log(`Rate limited, waiting ${waitSec}s before retry ${attempt + 2}/${MAX_RETRIES}`);
-          await new Promise(r => setTimeout(r, waitSec * 1000));
+          await new Promise((resolve) => setTimeout(resolve, waitSec * 1000));
           continue;
         }
+
+        if (isUpstreamServiceError) {
+          console.error('Replicate unavailable, returning fallback response:', err);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'SERVICE_UNAVAILABLE',
+              fallback: true,
+              provider: 'replicate',
+              message,
+              retryAfter,
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200,
+            }
+          );
+        }
+
         throw err;
       }
     }
 
     throw lastError;
-
   } catch (error: any) {
     console.error("Error in generate-image function:", error);
+    const message = error?.message || "Failed to generate image";
+    const retryMatch = message.match(/retry_after["\s:]+(\d+)/);
+    const retryAfter = retryMatch ? parseInt(retryMatch[1], 10) : null;
+    const isFallbackable = message.includes('429') || message.includes('Too Many Requests') || message.includes('status 500') || message.includes('status 502') || message.includes('status 503') || message.includes('status 504');
+
+    if (isFallbackable) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'SERVICE_UNAVAILABLE',
+          fallback: true,
+          provider: 'replicate',
+          message,
+          retryAfter,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ 
-        error: error.message || "Failed to generate image" 
-      }), {
+      JSON.stringify({
+        error: message,
+      }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       }
