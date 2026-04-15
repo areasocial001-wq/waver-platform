@@ -786,7 +786,31 @@ export const StoryModeWizard = () => {
           body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1", aspect_ratio: input.videoAspectRatio },
         });
         if (error) throw error;
-        scenes[i] = { ...scenes[i], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
+
+        // Handle async video generation (polling for operationId)
+        let videoUrl = data.videoUrl || data.video_url || data.output;
+        if (!videoUrl && data.operationId && (data.status === "starting" || data.status === "processing")) {
+          console.log(`Scene ${i + 1}: polling operationId ${data.operationId}`);
+          const maxPolls = 120; // up to ~10 minutes
+          for (let poll = 0; poll < maxPolls; poll++) {
+            if (checkCancelled()) break;
+            await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
+            const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
+              body: { operationId: data.operationId },
+            });
+            if (pollError) { console.error("Poll error:", pollError); continue; }
+            if (pollData.status === "succeeded") {
+              videoUrl = pollData.output || pollData.videoUrl || pollData.video_url;
+              break;
+            } else if (pollData.status === "failed") {
+              throw new Error(pollData.error || "Video generation failed");
+            }
+            // still processing, continue polling
+          }
+        }
+
+        if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
+        scenes[i] = { ...scenes[i], videoUrl, videoStatus: "completed" };
       } catch (err: any) { scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
