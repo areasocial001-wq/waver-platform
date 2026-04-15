@@ -91,6 +91,21 @@ export const StoryModeWizard = () => {
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [voicePreviewAudio, setVoicePreviewAudio] = useState<HTMLAudioElement | null>(null);
   const [isPreviewingVoice, setIsPreviewingVoice] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const pauseRef = useRef(false);
+
+  const waitForResume = async () => {
+    while (pauseRef.current) {
+      await new Promise(r => setTimeout(r, 300));
+    }
+  };
+
+  const togglePause = () => {
+    const next = !pauseRef.current;
+    pauseRef.current = next;
+    setIsPaused(next);
+    toast.info(next ? "Produzione in pausa ⏸️" : "Produzione ripresa ▶️");
+  };
 
   const previewVoice = async (voiceId: string) => {
     if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
