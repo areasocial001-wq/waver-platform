@@ -1799,6 +1799,12 @@ export const StoryModeWizard = () => {
                   <Button onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
+                  {script.scenes.some(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error") && (
+                    <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
+                      {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                      Rigenera Errori ({script.scenes.filter(s => s.imageStatus === "error" || s.audioStatus === "error" || s.videoStatus === "error" || s.sfxStatus === "error").length})
+                    </Button>
+                  )}
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
                     <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
