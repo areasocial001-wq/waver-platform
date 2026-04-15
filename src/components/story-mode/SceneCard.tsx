@@ -106,6 +106,18 @@ export const SceneCard = ({
         )}
         <CardContent className="p-2 space-y-1">
           <p className="text-xs text-muted-foreground line-clamp-1">{scene.narration}</p>
+          {/* Per-scene voice selector in complete mode */}
+          {voices && voices.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Label className="text-[10px] text-muted-foreground shrink-0">🎙️</Label>
+              <Select value={scene.voiceId || defaultVoiceId || ""} onValueChange={val => onUpdate("voiceId", val)}>
+                <SelectTrigger className="h-6 text-[10px] flex-1"><SelectValue placeholder="Voce..." /></SelectTrigger>
+                <SelectContent>
+                  {voices.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="flex gap-1 flex-wrap">
             {scene.audioUrl && (
               <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => new Audio(scene.audioUrl!).play()}>
