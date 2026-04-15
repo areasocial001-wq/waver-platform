@@ -265,14 +265,14 @@ export const StoryModeWizard = () => {
 
   // Estimate total render time: ~15s per scene + 10s base, double for HD
   const sceneCount = script.scenes.length || 1;
-  const isHD = input.quality === "hd" || input.quality === "1080p";
+  const isHD = input.videoQuality === "1080p";
   const estimatedRenderSeconds = (sceneCount * 15 + 10) * (isHD ? 2 : 1);
   const renderProgressPct = renderStatus === "processing"
     ? Math.min(95, (renderElapsed / estimatedRenderSeconds) * 100)
     : renderStatus === "completed" ? 100 : 0;
   const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
 
-
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
