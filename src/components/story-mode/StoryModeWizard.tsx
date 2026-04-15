@@ -347,6 +347,14 @@ export const StoryModeWizard = () => {
           body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier },
         });
         if (error) throw error;
+        if (data?.fallback || !data?.imageUrl) {
+          const message = data?.retryAfter
+            ? `Generazione immagini temporaneamente limitata. Riprova tra ${data.retryAfter}s.`
+            : (data?.message || "Generazione immagini temporaneamente non disponibile.");
+          updateScene(index, "imageStatus", "error");
+          toast.error(message);
+          return;
+        }
         const scenes = [...script.scenes];
         scenes[index] = { ...scenes[index], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
         setScript({ ...script, scenes });
@@ -720,7 +728,14 @@ export const StoryModeWizard = () => {
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier } });
         if (error) throw error;
-        scenes[i] = { ...scenes[i], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
+        if (data?.fallback || !data?.imageUrl) {
+          const message = data?.retryAfter
+            ? `Generazione immagini temporaneamente limitata. Riprova tra ${data.retryAfter}s.`
+            : (data?.message || "Generazione immagini temporaneamente non disponibile.");
+          scenes[i] = { ...scenes[i], imageStatus: "error", error: message };
+        } else {
+          scenes[i] = { ...scenes[i], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
+        }
       } catch (err: any) { scenes[i] = { ...scenes[i], imageStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
