@@ -104,6 +104,22 @@ serve(async (req) => {
       }
     }
 
+    // Add AIML API key for aiml-hosted URIs
+    if (videoUrl.includes("api.aimlapi.com") || videoUrl.includes("aimlapi")) {
+      const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+      if (AIML_API_KEY) {
+        fetchHeaders["Authorization"] = `Bearer ${AIML_API_KEY}`;
+      }
+    }
+
+    // Forward caller's auth for Supabase proxy URLs
+    const authHeader = req.headers.get("Authorization");
+    if (videoUrl.includes("/functions/v1/") && authHeader) {
+      fetchHeaders["Authorization"] = authHeader;
+      const apikey = req.headers.get("apikey");
+      if (apikey) fetchHeaders["apikey"] = apikey;
+    }
+
     // Download the video with retries for transient provider failures (e.g. 502)
     const videoResponse = await fetchVideoWithRetry(videoUrl, fetchHeaders);
 
@@ -195,10 +211,12 @@ serve(async (req) => {
 
     // 404/410 = source video gone permanently, stop retrying
     const isSourceGone = upstreamStatus !== null && (upstreamStatus === 404 || upstreamStatus === 410);
-    if (isSourceGone) {
-      console.warn("Source video no longer available (permanent):", message);
+    const isAuthError = upstreamStatus !== null && (upstreamStatus === 401 || upstreamStatus === 403);
+
+    if (isSourceGone || isAuthError) {
+      console.warn("Source video not accessible (permanent):", message);
       return new Response(
-        JSON.stringify({ status: "source_not_found", retryable: false, error: message }),
+        JSON.stringify({ status: isAuthError ? "auth_failed" : "source_not_found", retryable: false, error: message }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
