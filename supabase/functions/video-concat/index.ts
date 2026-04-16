@@ -599,7 +599,8 @@ serve(async (req) => {
         const output: any = {
           format: 'mp4',
           resolution: mapResolution(resolution),
-          fps: parseInt(fps), // Use user-selected framerate
+          fps: parseInt(fps),
+          aspectRatio: aspectRatio, // Tell Shotstack the target aspect ratio
         };
         
         if (aspectSize) {
