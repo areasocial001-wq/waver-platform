@@ -997,8 +997,11 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio || "16:9",
           fps: input.videoFps || "24",
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
+          sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+          sfxVolume: 0.7,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (script.musicVolume ?? 25) / 100,
+          narrationVolume: (script.narrationVolume ?? 100) / 100,
         },
       });
       if (error) throw error;
@@ -1268,8 +1271,11 @@ export const StoryModeWizard = () => {
             aspectRatio: input.videoAspectRatio || "16:9",
             fps: input.videoFps || "24",
             audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
+            sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+            sfxVolume: 0.7,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
+            narrationVolume: (script.narrationVolume ?? 100) / 100,
           },
         });
         if (error) throw error;
