@@ -647,6 +647,42 @@ serve(async (req) => {
 
         console.log('Shotstack render request:', JSON.stringify(renderRequest, null, 2));
 
+        // Dry-run mode: return timeline summary without actually rendering
+        if (dryRun) {
+          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
+          const narrationCount = audioUrls?.filter(u => !!u).length || 0;
+          const sfxCount = sfxUrls?.filter(u => !!u).length || 0;
+          const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
+            track: idx + 1,
+            clips: t.clips.length,
+            type: t.clips[0]?.asset?.type || 'unknown',
+          }));
+          return new Response(
+            JSON.stringify({
+              dryRun: true,
+              summary: {
+                totalScenes: videoUrls.length,
+                totalDuration: Math.round(totalDur * 10) / 10,
+                aspectRatio,
+                resolution,
+                fps,
+                narrationScenes: narrationCount,
+                sfxScenes: sfxCount,
+                hasBackgroundMusic: !!backgroundMusicUrl,
+                hasIntro: intro?.enabled || false,
+                hasOutro: outro?.enabled || false,
+                transitionType: transitions?.[0]?.type || transition,
+                tracks: tracksSummary,
+                narrationVolume,
+                sfxVolume,
+                musicVolume,
+              },
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         // Submit render to Shotstack (v1 production endpoint)
         const renderResponse = await fetch('https://api.shotstack.io/edit/v1/render', {
           method: 'POST',
