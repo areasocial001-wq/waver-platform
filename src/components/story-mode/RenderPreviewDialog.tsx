@@ -173,9 +173,32 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
             {/* Volume controls */}
             <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
-              <p className="text-sm font-medium flex items-center gap-1.5">
-                <Volume2 className="w-4 h-4" /> Regola Volumi
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium flex items-center gap-1.5">
+                  <Volume2 className="w-4 h-4" /> Regola Volumi
+                </p>
+              </div>
+
+              {/* Presets */}
+              <div className="flex gap-1.5 flex-wrap">
+                {[
+                  { label: "🎙️ Voce forte", narration: 100, sfx: 30, music: 15 },
+                  { label: "🎵 Solo musica", narration: 0, sfx: 0, music: 100 },
+                  { label: "⚖️ Bilanciato", narration: 80, sfx: 50, music: 35 },
+                  { label: "🎬 Cinematico", narration: 70, sfx: 80, music: 50 },
+                ].map(p => (
+                  <Button
+                    key={p.label}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => { setNarrationVol(p.narration); setSfxVol(p.sfx); setMusicVol(p.music); }}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+
 
               {/* Narration volume */}
               <div className="space-y-1.5">
