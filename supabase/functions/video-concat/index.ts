@@ -46,17 +46,21 @@ const requestSchema = z.object({
   clipEffects: z.array(clipEffectsSchema).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
-  transitions: z.array(perSceneTransitionSchema).optional(), // per-scene transitions
+  transitions: z.array(perSceneTransitionSchema).optional(),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   fps: z.enum(['24', '30', '60']).default('24'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
   audioUrls: z.array(z.string()).optional(), // per-scene narration audio
-  backgroundMusicUrl: z.string().optional(), // background music track
-  musicVolume: z.number().min(0).max(1).default(0.25), // music volume (0-1)
+  sfxUrls: z.array(z.string()).optional(), // per-scene sound effects
+  sfxVolume: z.number().min(0).max(1).default(0.7), // sfx volume (0-1)
+  backgroundMusicUrl: z.string().optional(),
+  musicVolume: z.number().min(0).max(1).default(0.25),
+  narrationVolume: z.number().min(0).max(1).default(1),
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
+  dryRun: z.boolean().optional(), // preview mode: returns timeline summary without rendering
 });
 
 // Map resolution to Shotstack format
