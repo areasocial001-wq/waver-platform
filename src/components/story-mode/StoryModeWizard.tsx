@@ -25,7 +25,7 @@ import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
-import { RenderPreviewDialog } from "./RenderPreviewDialog";
+import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -931,7 +931,7 @@ export const StoryModeWizard = () => {
   };
 
   // Re-assemble final video from existing scene assets (no re-generation)
-  const handleReassemble = async () => {
+  const handleReassemble = async (volumeOverrides?: RenderVolumes) => {
     if (!script) return;
     const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
     if (vids.length < 2) {
@@ -1001,10 +1001,10 @@ export const StoryModeWizard = () => {
           fps: input.videoFps || "24",
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
           sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
-          sfxVolume: 0.7,
+          sfxVolume: (volumeOverrides?.sfxVolume ?? 70) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
-          musicVolume: (script.musicVolume ?? 25) / 100,
-          narrationVolume: (script.narrationVolume ?? 100) / 100,
+          musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
+          narrationVolume: (volumeOverrides?.narrationVolume ?? script.narrationVolume ?? 100) / 100,
         },
       });
       if (error) throw error;
@@ -1801,7 +1801,7 @@ export const StoryModeWizard = () => {
             })()}
             {/* Show reassemble button if project has existing video assets */}
             {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
-              <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+              <Button variant="secondary" onClick={() => handleReassemble()} disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                 Rimonta Video Finale
               </Button>
@@ -2102,9 +2102,9 @@ export const StoryModeWizard = () => {
           script={script}
           input={input}
           backgroundMusicUrl={backgroundMusicUrl}
-          onConfirmRender={() => {
+          onConfirmRender={(volumes) => {
             if (pendingRenderAction === "reassemble") {
-              handleReassemble();
+              handleReassemble(volumes);
             }
             setPendingRenderAction(null);
           }}

@@ -2,9 +2,17 @@ import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
+
+export interface RenderVolumes {
+  narrationVolume: number; // 0-100
+  sfxVolume: number;       // 0-100
+  musicVolume: number;     // 0-100
+}
 
 interface RenderPreviewDialogProps {
   open: boolean;
@@ -13,7 +21,7 @@ interface RenderPreviewDialogProps {
   script: StoryScript;
   input: StoryModeInput;
   backgroundMusicUrl: string | null;
-  onConfirmRender: () => void;
+  onConfirmRender: (volumes: RenderVolumes) => void;
 }
 
 interface PreviewSummary {
@@ -40,6 +48,11 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Editable volumes
+  const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
+  const [sfxVol, setSfxVol] = useState(70);
+  const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
 
   const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
 
@@ -69,10 +82,10 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           fps: input.videoFps || "24",
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
           sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
-          sfxVolume: 0.7,
+          sfxVolume: sfxVol / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
-          musicVolume: (script.musicVolume ?? 25) / 100,
-          narrationVolume: (script.narrationVolume ?? 100) / 100,
+          musicVolume: musicVol / 100,
+          narrationVolume: narrationVol / 100,
           dryRun: true,
         },
       });
@@ -92,6 +105,9 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   React.useEffect(() => {
     if (open && !summary && !loading) {
+      setNarrationVol(script.narrationVolume ?? 100);
+      setMusicVol(script.musicVolume ?? 25);
+      setSfxVol(70);
       fetchPreview();
     }
     if (!open) {
@@ -99,15 +115,6 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
       setError(null);
     }
   }, [open]);
-
-  const trackTypeLabel = (type: string) => {
-    switch (type) {
-      case "video": return "🎬 Video";
-      case "audio": return "🔊 Audio";
-      case "html": return "📝 Titolo";
-      default: return type;
-    }
-  };
 
   const issues: string[] = [];
   if (summary) {
@@ -121,14 +128,14 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Film className="w-5 h-5 text-primary" />
             Anteprima Montaggio
           </DialogTitle>
           <DialogDescription>
-            Verifica la composizione del video finale prima di inviarlo al rendering.
+            Verifica la composizione e regola i volumi prima del rendering.
           </DialogDescription>
         </DialogHeader>
 
@@ -164,37 +171,58 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             </div>
 
-            {/* Audio tracks */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium flex items-center gap-1.5"><Layers className="w-4 h-4" />Tracce audio</p>
+            {/* Volume controls */}
+            <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <Volume2 className="w-4 h-4" /> Regola Volumi
+              </p>
+
+              {/* Narration volume */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/20">
-                  <span className="flex items-center gap-2"><Mic className="w-3.5 h-3.5" />Narrazione</span>
-                  <span className="flex items-center gap-1.5">
-                    {summary.narrationScenes > 0 ? (
-                      <><Badge variant="outline" className="text-xs">{summary.narrationScenes} scene</Badge>
-                      <Volume2 className="w-3 h-3" /><span className="text-xs">{Math.round(summary.narrationVolume * 100)}%</span></>
-                    ) : <Badge variant="destructive" className="text-xs">Assente</Badge>}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Mic className="w-3 h-3 text-primary" /> Narrazione
+                  </Label>
+                  <span className="text-xs font-medium tabular-nums">{narrationVol}%</span>
                 </div>
-                <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/20">
-                  <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" />Effetti sonori</span>
-                  <span className="flex items-center gap-1.5">
-                    {summary.sfxScenes > 0 ? (
-                      <><Badge variant="outline" className="text-xs">{summary.sfxScenes} scene</Badge>
-                      <Volume2 className="w-3 h-3" /><span className="text-xs">{Math.round(summary.sfxVolume * 100)}%</span></>
-                    ) : <Badge variant="secondary" className="text-xs">Assente</Badge>}
-                  </span>
+                <Slider
+                  value={[narrationVol]}
+                  min={0} max={100} step={5}
+                  onValueChange={v => setNarrationVol(v[0])}
+                  disabled={summary.narrationScenes === 0}
+                />
+              </div>
+
+              {/* SFX volume */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-yellow-400" /> Effetti Sonori
+                  </Label>
+                  <span className="text-xs font-medium tabular-nums">{sfxVol}%</span>
                 </div>
-                <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/20">
-                  <span className="flex items-center gap-2"><Music className="w-3.5 h-3.5" />Musica</span>
-                  <span className="flex items-center gap-1.5">
-                    {summary.hasBackgroundMusic ? (
-                      <><Check className="w-3.5 h-3.5 text-green-400" />
-                      <Volume2 className="w-3 h-3" /><span className="text-xs">{Math.round(summary.musicVolume * 100)}%</span></>
-                    ) : <Badge variant="secondary" className="text-xs">Assente</Badge>}
-                  </span>
+                <Slider
+                  value={[sfxVol]}
+                  min={0} max={100} step={5}
+                  onValueChange={v => setSfxVol(v[0])}
+                  disabled={summary.sfxScenes === 0}
+                />
+              </div>
+
+              {/* Music volume */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Music className="w-3 h-3 text-green-400" /> Musica
+                  </Label>
+                  <span className="text-xs font-medium tabular-nums">{musicVol}%</span>
                 </div>
+                <Slider
+                  value={[musicVol]}
+                  min={0} max={100} step={5}
+                  onValueChange={v => setMusicVol(v[0])}
+                  disabled={!summary.hasBackgroundMusic}
+                />
               </div>
             </div>
 
@@ -228,7 +256,10 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
           <Button
-            onClick={() => { onOpenChange(false); onConfirmRender(); }}
+            onClick={() => {
+              onOpenChange(false);
+              onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, musicVolume: musicVol });
+            }}
             disabled={loading || !!error}
           >
             <Film className="w-4 h-4 mr-2" />Avvia Rendering
