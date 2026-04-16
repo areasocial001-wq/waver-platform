@@ -542,20 +542,20 @@ serve(async (req) => {
           const narrationClips: any[] = [];
           let narrationStart = introDuration;
           for (let i = 0; i < audioUrls.length; i++) {
-            if (!audioUrls[i]) continue;
-            let narrationSrc = audioUrls[i];
-            if (narrationSrc.startsWith('blob:')) continue;
-            narrationSrc = await normalizeAssetUrl(narrationSrc, supabase, supabaseUrl);
             const clipLen = clipDurations?.[i] || 5;
-            narrationClips.push({
-              asset: {
-                type: 'audio',
-                src: narrationSrc,
-                volume: 1,
-              },
-              start: narrationStart,
-              length: clipLen,
-            });
+            const rawUrl = audioUrls[i];
+            if (rawUrl && !rawUrl.startsWith('blob:')) {
+              let narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              narrationClips.push({
+                asset: {
+                  type: 'audio',
+                  src: narrationSrc,
+                  volume: 1,
+                },
+                start: narrationStart,
+                length: clipLen,
+              });
+            }
             narrationStart += clipLen;
           }
           if (narrationClips.length > 0) {
