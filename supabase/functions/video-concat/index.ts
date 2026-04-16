@@ -400,23 +400,26 @@ serve(async (req) => {
     
     const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
-      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
-      intro, outro
+      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, sfxUrls, sfxVolume,
+      backgroundMusicUrl, musicVolume, narrationVolume, intro, outro, dryRun
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
       clipDurations,
-      clipEffects: clipEffects?.length,
       transition, 
       transitionDuration,
       resolution,
       aspectRatio,
       hasAudio: !!audioUrl,
+      hasNarration: audioUrls?.filter(u => !!u).length || 0,
+      hasSfx: sfxUrls?.filter(u => !!u).length || 0,
+      hasMusic: !!backgroundMusicUrl,
       hasIntro: intro?.enabled,
       hasOutro: outro?.enabled,
-      useShotstack: !!SHOTSTACK_API_KEY
+      useShotstack: !!SHOTSTACK_API_KEY,
+      dryRun: !!dryRun,
     });
 
     // Initialize Supabase client
