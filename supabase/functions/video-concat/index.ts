@@ -565,12 +565,12 @@ serve(async (req) => {
             const clipLen = clipDurations?.[i] || 5;
             const rawUrl = audioUrls[i];
             if (rawUrl && !rawUrl.startsWith('blob:')) {
-              let narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              const narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               narrationClips.push({
                 asset: {
                   type: 'audio',
                   src: narrationSrc,
-                  volume: 1,
+                  volume: narrationVolume,
                 },
                 start: narrationStart,
                 length: clipLen,
@@ -580,6 +580,32 @@ serve(async (req) => {
           }
           if (narrationClips.length > 0) {
             timeline.tracks.push({ clips: narrationClips });
+          }
+        }
+
+        // Add per-scene SFX audio tracks
+        if (sfxUrls && sfxUrls.length > 0) {
+          const sfxClips: any[] = [];
+          let sfxStart = introDuration;
+          for (let i = 0; i < sfxUrls.length; i++) {
+            const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = sfxUrls[i];
+            if (rawUrl && !rawUrl.startsWith('blob:')) {
+              const sfxSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              sfxClips.push({
+                asset: {
+                  type: 'audio',
+                  src: sfxSrc,
+                  volume: sfxVolume,
+                },
+                start: sfxStart,
+                length: clipLen,
+              });
+            }
+            sfxStart += clipLen;
+          }
+          if (sfxClips.length > 0) {
+            timeline.tracks.push({ clips: sfxClips });
           }
         }
 
