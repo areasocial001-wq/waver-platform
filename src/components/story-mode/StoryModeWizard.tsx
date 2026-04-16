@@ -2039,7 +2039,7 @@ export const StoryModeWizard = () => {
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
-                    <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                    <Button variant="secondary" onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                       Rimonta Video Finale
                     </Button>
