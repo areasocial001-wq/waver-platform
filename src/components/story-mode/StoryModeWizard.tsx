@@ -25,6 +25,7 @@ import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
+import { RenderPreviewDialog } from "./RenderPreviewDialog";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -143,6 +144,8 @@ export const StoryModeWizard = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showRenderPreview, setShowRenderPreview] = useState(false);
+  const [pendingRenderAction, setPendingRenderAction] = useState<"reassemble" | "generateAll" | null>(null);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
@@ -997,8 +1000,11 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio || "16:9",
           fps: input.videoFps || "24",
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
+          sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+          sfxVolume: 0.7,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (script.musicVolume ?? 25) / 100,
+          narrationVolume: (script.narrationVolume ?? 100) / 100,
         },
       });
       if (error) throw error;
@@ -1268,8 +1274,11 @@ export const StoryModeWizard = () => {
             aspectRatio: input.videoAspectRatio || "16:9",
             fps: input.videoFps || "24",
             audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
+            sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+            sfxVolume: 0.7,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
+            narrationVolume: (script.narrationVolume ?? 100) / 100,
           },
         });
         if (error) throw error;
@@ -2030,7 +2039,7 @@ export const StoryModeWizard = () => {
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
-                    <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+                    <Button variant="secondary" onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                       Rimonta Video Finale
                     </Button>
@@ -2083,6 +2092,24 @@ export const StoryModeWizard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Render preview dialog */}
+      {script && (
+        <RenderPreviewDialog
+          open={showRenderPreview}
+          onOpenChange={setShowRenderPreview}
+          scenes={script.scenes}
+          script={script}
+          input={input}
+          backgroundMusicUrl={backgroundMusicUrl}
+          onConfirmRender={() => {
+            if (pendingRenderAction === "reassemble") {
+              handleReassemble();
+            }
+            setPendingRenderAction(null);
+          }}
+        />
+      )}
     </div>
   );
 };

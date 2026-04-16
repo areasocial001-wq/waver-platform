@@ -46,17 +46,21 @@ const requestSchema = z.object({
   clipEffects: z.array(clipEffectsSchema).optional(),
   transition: z.enum(['none', 'fade', 'crossfade', 'wipe']).default('none'),
   transitionDuration: z.number().min(0).max(5).default(0.5),
-  transitions: z.array(perSceneTransitionSchema).optional(), // per-scene transitions
+  transitions: z.array(perSceneTransitionSchema).optional(),
   resolution: z.enum(['sd', 'hd', 'fhd']).default('hd'),
   aspectRatio: z.enum(['16:9', '9:16', '1:1']).default('16:9'),
   fps: z.enum(['24', '30', '60']).default('24'),
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
   audioUrls: z.array(z.string()).optional(), // per-scene narration audio
-  backgroundMusicUrl: z.string().optional(), // background music track
-  musicVolume: z.number().min(0).max(1).default(0.25), // music volume (0-1)
+  sfxUrls: z.array(z.string()).optional(), // per-scene sound effects
+  sfxVolume: z.number().min(0).max(1).default(0.7), // sfx volume (0-1)
+  backgroundMusicUrl: z.string().optional(),
+  musicVolume: z.number().min(0).max(1).default(0.25),
+  narrationVolume: z.number().min(0).max(1).default(1),
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
+  dryRun: z.boolean().optional(), // preview mode: returns timeline summary without rendering
 });
 
 // Map resolution to Shotstack format
@@ -396,23 +400,26 @@ serve(async (req) => {
     
     const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
-      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, backgroundMusicUrl, musicVolume,
-      intro, outro
+      resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, sfxUrls, sfxVolume,
+      backgroundMusicUrl, musicVolume, narrationVolume, intro, outro, dryRun
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
       clipDurations,
-      clipEffects: clipEffects?.length,
       transition, 
       transitionDuration,
       resolution,
       aspectRatio,
       hasAudio: !!audioUrl,
+      hasNarration: audioUrls?.filter(u => !!u).length || 0,
+      hasSfx: sfxUrls?.filter(u => !!u).length || 0,
+      hasMusic: !!backgroundMusicUrl,
       hasIntro: intro?.enabled,
       hasOutro: outro?.enabled,
-      useShotstack: !!SHOTSTACK_API_KEY
+      useShotstack: !!SHOTSTACK_API_KEY,
+      dryRun: !!dryRun,
     });
 
     // Initialize Supabase client
@@ -558,12 +565,12 @@ serve(async (req) => {
             const clipLen = clipDurations?.[i] || 5;
             const rawUrl = audioUrls[i];
             if (rawUrl && !rawUrl.startsWith('blob:')) {
-              let narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              const narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               narrationClips.push({
                 asset: {
                   type: 'audio',
                   src: narrationSrc,
-                  volume: 1,
+                  volume: narrationVolume,
                 },
                 start: narrationStart,
                 length: clipLen,
@@ -573,6 +580,32 @@ serve(async (req) => {
           }
           if (narrationClips.length > 0) {
             timeline.tracks.push({ clips: narrationClips });
+          }
+        }
+
+        // Add per-scene SFX audio tracks
+        if (sfxUrls && sfxUrls.length > 0) {
+          const sfxClips: any[] = [];
+          let sfxStart = introDuration;
+          for (let i = 0; i < sfxUrls.length; i++) {
+            const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = sfxUrls[i];
+            if (rawUrl && !rawUrl.startsWith('blob:')) {
+              const sfxSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              sfxClips.push({
+                asset: {
+                  type: 'audio',
+                  src: sfxSrc,
+                  volume: sfxVolume,
+                },
+                start: sfxStart,
+                length: clipLen,
+              });
+            }
+            sfxStart += clipLen;
+          }
+          if (sfxClips.length > 0) {
+            timeline.tracks.push({ clips: sfxClips });
           }
         }
 
@@ -613,6 +646,42 @@ serve(async (req) => {
         };
 
         console.log('Shotstack render request:', JSON.stringify(renderRequest, null, 2));
+
+        // Dry-run mode: return timeline summary without actually rendering
+        if (dryRun) {
+          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
+          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
+          const narrationCount = audioUrls?.filter(u => !!u).length || 0;
+          const sfxCount = sfxUrls?.filter(u => !!u).length || 0;
+          const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
+            track: idx + 1,
+            clips: t.clips.length,
+            type: t.clips[0]?.asset?.type || 'unknown',
+          }));
+          return new Response(
+            JSON.stringify({
+              dryRun: true,
+              summary: {
+                totalScenes: videoUrls.length,
+                totalDuration: Math.round(totalDur * 10) / 10,
+                aspectRatio,
+                resolution,
+                fps,
+                narrationScenes: narrationCount,
+                sfxScenes: sfxCount,
+                hasBackgroundMusic: !!backgroundMusicUrl,
+                hasIntro: intro?.enabled || false,
+                hasOutro: outro?.enabled || false,
+                transitionType: transitions?.[0]?.type || transition,
+                tracks: tracksSummary,
+                narrationVolume,
+                sfxVolume,
+                musicVolume,
+              },
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
         // Submit render to Shotstack (v1 production endpoint)
         const renderResponse = await fetch('https://api.shotstack.io/edit/v1/render', {
