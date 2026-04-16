@@ -945,14 +945,9 @@ export const StoryModeWizard = () => {
         type: s.transition || "crossfade",
         duration: s.transitionDuration || 0.5,
       }));
-      const narrationUrls = script.scenes
-        .filter(s => s.videoStatus === "completed" && s.audioUrl)
-        .map(s => s.audioUrl)
-        .filter((u): u is string => !!u);
-      const sfxUrls = script.scenes
-        .filter(s => s.videoStatus === "completed" && s.sfxUrl)
-        .map(s => s.sfxUrl)
-        .filter((u): u is string => !!u);
+      // Build positional narration array aligned with video clips
+      const narrationUrls = vids.map(s => s.audioUrl || "");
+      const sfxUrls = vids.map(s => s.sfxUrl || "");
 
       const resolvedVideoUrls = await Promise.all(
         vids.map(async (s) => {
@@ -999,8 +994,9 @@ export const StoryModeWizard = () => {
           transitionDuration: transitions[0]?.duration || 0.5,
           transitions,
           resolution: input.videoQuality || "hd",
+          aspectRatio: input.videoAspectRatio || "16:9",
           fps: input.videoFps || "24",
-          audioUrls: narrationUrls.length > 0 ? narrationUrls : undefined,
+          audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (script.musicVolume ?? 25) / 100,
         },
