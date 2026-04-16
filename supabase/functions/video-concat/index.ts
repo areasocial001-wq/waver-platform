@@ -437,6 +437,9 @@ serve(async (req) => {
           currentStart = introDuration;
         }
 
+        // Determine if we have dedicated audio tracks (narration/music)
+        const hasDedicatedAudio = (audioUrls && audioUrls.some(u => !!u)) || !!backgroundMusicUrl || !!audioUrl;
+
         // Add video clips
         for (let i = 0; i < videoUrls.length; i++) {
           // Use custom duration or default to 5 seconds
@@ -448,9 +451,12 @@ serve(async (req) => {
             asset: {
               type: 'video',
               src: normalizedVideoUrl,
+              // Mute embedded video audio when we have dedicated audio tracks
+              ...(hasDedicatedAudio ? { volume: 0 } : {}),
             },
             start: currentStart,
             length: clipLength,
+            fit: 'crop', // Scale to fill the output frame maintaining aspect ratio
           };
           
           // Add filters, transform, and transitions for effects
@@ -463,24 +469,31 @@ serve(async (req) => {
           if (effectsResult.transform) {
             clip.transform = effectsResult.transform;
           }
-          
-          // Add animation transition from effects
-          if (effectsResult.transition) {
-            clip.transition = effectsResult.transition;
-          }
 
           // Add transition effect between clips (per-scene or global)
           const sceneTransition = transitions?.[i];
           const transType = sceneTransition?.type || transition;
           const transDur = sceneTransition?.duration || transitionDuration;
           const shotstackTransition = mapTransition(transType);
+          
           if (shotstackTransition && i > 0) {
+            // Add fade-out to previous clip for smooth transition
+            const prevClip = videoClips[videoClips.length - 1];
+            if (prevClip && !prevClip.transition?.out) {
+              prevClip.transition = {
+                ...prevClip.transition,
+                out: shotstackTransition,
+              };
+            }
+            // Add fade-in to current clip
             clip.transition = {
-              ...clip.transition,
+              ...effectsResult.transition,
               in: shotstackTransition,
             };
             // Overlap clips for smooth transition
             clip.start = Math.max(0, currentStart - transDur);
+          } else if (effectsResult.transition) {
+            clip.transition = effectsResult.transition;
           }
 
           videoClips.push(clip);
