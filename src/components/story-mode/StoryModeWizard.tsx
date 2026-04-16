@@ -1801,7 +1801,7 @@ export const StoryModeWizard = () => {
             })()}
             {/* Show reassemble button if project has existing video assets */}
             {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
-              <Button variant="secondary" onClick={handleReassemble} disabled={isGenerating}>
+              <Button variant="secondary" onClick={() => handleReassemble()} disabled={isGenerating}>
                 {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                 Rimonta Video Finale
               </Button>
