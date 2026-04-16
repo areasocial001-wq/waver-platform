@@ -25,6 +25,7 @@ import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
+import { RenderPreviewDialog } from "./RenderPreviewDialog";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -143,6 +144,8 @@ export const StoryModeWizard = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [videoPollingInfo, setVideoPollingInfo] = useState<{ sceneIndex: number; startedAt: number; pollCount: number } | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showRenderPreview, setShowRenderPreview] = useState(false);
+  const [pendingRenderAction, setPendingRenderAction] = useState<"reassemble" | "generateAll" | null>(null);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
