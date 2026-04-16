@@ -2092,6 +2092,24 @@ export const StoryModeWizard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Render preview dialog */}
+      {script && (
+        <RenderPreviewDialog
+          open={showRenderPreview}
+          onOpenChange={setShowRenderPreview}
+          scenes={script.scenes}
+          script={script}
+          input={input}
+          backgroundMusicUrl={backgroundMusicUrl}
+          onConfirmRender={() => {
+            if (pendingRenderAction === "reassemble") {
+              handleReassemble();
+            }
+            setPendingRenderAction(null);
+          }}
+        />
+      )}
     </div>
   );
 };
