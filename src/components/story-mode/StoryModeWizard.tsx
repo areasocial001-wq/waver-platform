@@ -334,7 +334,12 @@ export const StoryModeWizard = () => {
   };
 
   const loadProject = async (id: string) => {
-    const { data, error } = await supabase.from("story_mode_projects").select("*").eq("id", id).single();
+    // Select only needed columns - avoid fetching the entire row (scenes JSONB can be huge)
+    const { data, error } = await supabase
+      .from("story_mode_projects")
+      .select("id, title, synopsis, suggested_music, scenes, input_config, status, final_video_url, background_music_url")
+      .eq("id", id)
+      .single();
     if (error || !data) { toast.error("Errore nel caricamento"); return; }
     setProjectId(data.id);
     const config = data.input_config as any;

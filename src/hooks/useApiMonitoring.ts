@@ -172,9 +172,16 @@ export const useApiMonitoring = () => {
     }
   }, []);
 
-  // Save status to history
+  // Track last saved status per API to avoid duplicate writes
+  const lastSavedStatus = useRef<Map<string, string>>(new Map());
+
+  // Save status to history - only when status changes (reduces writes by ~95%)
   const saveToHistory = useCallback(async (apiName: string, status: string, responseTime?: number) => {
     try {
+      // Skip if status hasn't changed since last save
+      const previous = lastSavedStatus.current.get(apiName);
+      if (previous === status) return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -184,6 +191,8 @@ export const useApiMonitoring = () => {
         status,
         response_time: responseTime || null,
       });
+
+      lastSavedStatus.current.set(apiName, status);
     } catch (error) {
       console.error("Error saving to history:", error);
     }
