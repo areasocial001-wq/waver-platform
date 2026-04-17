@@ -90,8 +90,9 @@ export const DbHealthDashboard = () => {
         supabase
           .from("maintenance_log" as any)
           .select("id, operation, status, triggered_by, tables_processed, total_freed_bytes, duration_ms, created_at")
+          .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
           .order("created_at", { ascending: false })
-          .limit(20),
+          .limit(500),
       ]);
 
       if (statsRes.error) throw statsRes.error;
