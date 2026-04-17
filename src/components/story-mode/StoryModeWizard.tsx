@@ -2241,6 +2241,9 @@ export const StoryModeWizard = () => {
             </div>
           )}
 
+          {/* Diagnostic card also available in complete step for post-mortem checks */}
+          <SceneDiagnosticsCard scenes={script.scenes} expectedAspectRatio={input.videoAspectRatio} />
+
           {finalVideoUrl ? (
             <Card className="border-primary/20 bg-card/50">
               <CardHeader><CardTitle className="text-xl flex items-center gap-2"><Film className="w-6 h-6 text-primary" />{script.title}</CardTitle></CardHeader>
