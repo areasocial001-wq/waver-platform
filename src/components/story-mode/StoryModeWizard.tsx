@@ -2181,6 +2181,21 @@ export const StoryModeWizard = () => {
                 </Button>
               ) : null;
             })()}
+            {/* Regenerate non-compliant aspect-ratio images */}
+            {(() => {
+              const nonCompliant = script.scenes.filter(s => !!s.imageAspectWarning);
+              return nonCompliant.length > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateNonCompliantImages}
+                  disabled={isGenerating}
+                  className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                >
+                  {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+                  Rigenera Immagini Non Conformi ({nonCompliant.length})
+                </Button>
+              ) : null;
+            })()}
             {/* Show reassemble button if project has existing video assets */}
             {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
               <Button variant="secondary" onClick={() => handleReassemble()} disabled={isGenerating}>
