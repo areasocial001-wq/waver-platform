@@ -555,7 +555,10 @@ export const StoryModeWizard = () => {
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
-        updateScene(index, "videoStatus", "generating");
+        const startedAt = Date.now();
+        const scenes0 = [...script.scenes];
+        scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
+        setScript({ ...script, scenes: scenes0 });
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
             prompt: `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}`,
@@ -572,11 +575,15 @@ export const StoryModeWizard = () => {
           console.log(`[Regen] Scene ${index + 1}: polling operationId ${data.operationId}`);
           const pollingStart = Date.now();
           setVideoPollingInfo({ sceneIndex: index, startedAt: pollingStart, pollCount: 0 });
-          const maxPolls = 120; // up to ~10 minutes
+          const MAX_POLL_WALL_MS = 12 * 60 * 1000;
+          const maxPolls = 144; // 144 * 5s = 12 minutes
           let consecutiveNetErrors = 0;
           const maxNetErrors = 10;
           try {
             for (let poll = 0; poll < maxPolls; poll++) {
+              if (Date.now() - pollingStart > MAX_POLL_WALL_MS) {
+                throw new Error("Generazione video troppo lenta, riprova");
+              }
               await new Promise(r => setTimeout(r, 5000));
               setVideoPollingInfo({ sceneIndex: index, startedAt: pollingStart, pollCount: poll + 1 });
               try {
@@ -599,7 +606,11 @@ export const StoryModeWizard = () => {
                   throw new Error(pollData.error || "Video generation failed");
                 }
               } catch (pollErr: any) {
-                if (pollErr.message?.includes("Polling fallito") || pollErr.message?.includes("Video generation failed")) throw pollErr;
+                if (
+                  pollErr.message?.includes("Polling fallito") ||
+                  pollErr.message?.includes("Video generation failed") ||
+                  pollErr.message?.includes("Generazione video troppo lenta")
+                ) throw pollErr;
                 consecutiveNetErrors++;
                 if (consecutiveNetErrors >= maxNetErrors) {
                   throw new Error(`Polling fallito dopo ${maxNetErrors} errori di rete`);
@@ -610,11 +621,14 @@ export const StoryModeWizard = () => {
           } finally {
             setVideoPollingInfo(null);
           }
+          if (!videoUrl) {
+            throw new Error("Generazione video troppo lenta, riprova");
+          }
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], videoUrl, videoStatus: "completed" };
+        scenes[index] = { ...scenes[index], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
         setScript({ ...script, scenes });
         toast.success(`Video scena ${index + 1} rigenerato`);
       } else if (type === "sfx") {
@@ -1206,7 +1220,7 @@ export const StoryModeWizard = () => {
       if (checkCancelled()) break;
       if (scenes[i].imageStatus !== "completed" || !scenes[i].imageUrl) { tick(); continue; }
       try {
-        scenes[i] = { ...scenes[i], videoStatus: "generating" };
+        scenes[i] = { ...scenes[i], videoStatus: "generating", videoGeneratingStartedAt: Date.now() };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1", aspect_ratio: input.videoAspectRatio },
@@ -1219,11 +1233,17 @@ export const StoryModeWizard = () => {
           console.log(`Scene ${i + 1}: polling operationId ${data.operationId}`);
           const pollingStart = Date.now();
           setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: 0 });
-          const maxPolls = 120; // up to ~10 minutes
+          // Hard safety timeout: 12 minutes max wall-clock from polling start
+          const MAX_POLL_WALL_MS = 12 * 60 * 1000;
+          const maxPolls = 144; // 144 * 5s = 12 minutes (matches wall-clock guard)
           let consecutiveNetErrors = 0;
           const maxNetErrors = 10;
           for (let poll = 0; poll < maxPolls; poll++) {
             if (checkCancelled()) break;
+            // Wall-clock guard: covers cases where backoff sleeps inflate per-poll time
+            if (Date.now() - pollingStart > MAX_POLL_WALL_MS) {
+              throw new Error("Generazione video troppo lenta, riprova");
+            }
             await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
             setVideoPollingInfo({ sceneIndex: i, startedAt: pollingStart, pollCount: poll + 1 });
             try {
@@ -1248,7 +1268,11 @@ export const StoryModeWizard = () => {
                 throw new Error(pollData.error || "Video generation failed");
               }
             } catch (pollErr: any) {
-              if (pollErr.message?.includes("Polling fallito") || pollErr.message?.includes("Video generation failed")) throw pollErr;
+              if (
+                pollErr.message?.includes("Polling fallito") ||
+                pollErr.message?.includes("Video generation failed") ||
+                pollErr.message?.includes("Generazione video troppo lenta")
+              ) throw pollErr;
               consecutiveNetErrors++;
               console.error(`Poll network error (${consecutiveNetErrors}/${maxNetErrors}):`, pollErr);
               if (consecutiveNetErrors >= maxNetErrors) {
@@ -1259,11 +1283,20 @@ export const StoryModeWizard = () => {
             // still processing, continue polling
           }
           setVideoPollingInfo(null);
+          // Loop ended without success and no exception → polls exhausted
+          if (!videoUrl) {
+            throw new Error("Generazione video troppo lenta, riprova");
+          }
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
-        scenes[i] = { ...scenes[i], videoUrl, videoStatus: "completed" };
-      } catch (err: any) { scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message }; }
+        scenes[i] = { ...scenes[i], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
+      } catch (err: any) {
+        scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message, videoGeneratingStartedAt: undefined };
+        if (err.message?.includes("Generazione video troppo lenta")) {
+          toast.error(`Scena ${i + 1}: Generazione video troppo lenta, riprova`);
+        }
+      }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
