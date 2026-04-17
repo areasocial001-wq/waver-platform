@@ -142,6 +142,26 @@ export const SceneCard = ({
           {scene.videoStatus === "completed" && (
             <Badge className="absolute top-2 right-2 bg-green-500/90 text-white text-xs">▶ Video</Badge>
           )}
+          {(scene.imageAspectWarning || scene.videoAspectWarning) && (
+            <div className="absolute bottom-2 inset-x-2 flex items-start gap-1.5 px-2 py-1 rounded-md bg-amber-500/95 text-white text-[10px] leading-tight shadow-lg">
+              <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+              <span className="line-clamp-2">
+                {scene.imageAspectWarning
+                  ? `Img ${scene.imageWidth}×${scene.imageHeight} non conforme`
+                  : `Video ${scene.videoWidth}×${scene.videoHeight} non conforme`}
+              </span>
+              {onRegenerate && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-5 px-1.5 ml-auto text-[10px] text-white hover:bg-white/20"
+                  onClick={() => onRegenerate(scene.imageAspectWarning ? "image" : "video")}
+                >
+                  <RefreshCw className="w-2.5 h-2.5" />
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <CardContent className="p-3 space-y-2">
           <div className="flex items-center gap-2 text-xs flex-wrap">

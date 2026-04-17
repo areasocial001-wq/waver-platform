@@ -28,7 +28,7 @@ import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
-import { measureAndValidateAspect } from "@/lib/aspectRatioCheck";
+import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -809,10 +809,23 @@ export const StoryModeWizard = () => {
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
+        const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
+        scenes[index] = {
+          ...scenes[index],
+          videoUrl,
+          videoStatus: "completed",
+          videoGeneratingStartedAt: undefined,
+          videoWidth: videoCheck?.width,
+          videoHeight: videoCheck?.height,
+          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+        };
         setScript({ ...script, scenes });
-        toast.success(`Video scena ${index + 1} rigenerato`);
+        if (videoCheck?.mismatch) {
+          toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
+        } else {
+          toast.success(`Video scena ${index + 1} rigenerato`);
+        }
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
         updateScene(index, "sfxStatus", "generating");
@@ -1205,6 +1218,28 @@ export const StoryModeWizard = () => {
     toast.success("Rigenerazione completata!");
   };
 
+  // Regenerate every scene whose image has an aspect-ratio warning (e.g. Flux returned 1024x1024 for 9:16)
+  const handleRegenerateNonCompliantImages = async () => {
+    if (!script) return;
+    const nonCompliant = script.scenes
+      .map((s, i) => ({ scene: s, index: i }))
+      .filter(({ scene }) => !!scene.imageAspectWarning);
+    if (nonCompliant.length === 0) {
+      toast.info("Tutte le immagini rispettano il formato richiesto.");
+      return;
+    }
+    toast.info(`Rigenerazione di ${nonCompliant.length} ${nonCompliant.length === 1 ? "immagine non conforme" : "immagini non conformi"}...`);
+    setIsGenerating(true);
+    setRegenProgress({ current: 0, total: nonCompliant.length });
+    for (let i = 0; i < nonCompliant.length; i++) {
+      setRegenProgress({ current: i, total: nonCompliant.length });
+      await regenerateSceneAsset(nonCompliant[i].index, "image");
+    }
+    setRegenProgress(null);
+    setIsGenerating(false);
+    toast.success("Rigenerazione immagini non conformi completata!");
+  };
+
   // Re-assemble final video from existing scene assets (no re-generation)
   const handleReassemble = async (volumeOverrides?: RenderVolumes) => {
     if (!script) return;
@@ -1506,7 +1541,19 @@ export const StoryModeWizard = () => {
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
-        scenes[i] = { ...scenes[i], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
+        const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
+        scenes[i] = {
+          ...scenes[i],
+          videoUrl,
+          videoStatus: "completed",
+          videoGeneratingStartedAt: undefined,
+          videoWidth: videoCheck?.width,
+          videoHeight: videoCheck?.height,
+          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+        };
+        if (videoCheck?.mismatch) {
+          console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
+        }
       } catch (err: any) {
         scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message, videoGeneratingStartedAt: undefined };
         if (err.message?.includes("Generazione video troppo lenta")) {
@@ -2131,6 +2178,21 @@ export const StoryModeWizard = () => {
                   {isGenerating && regenProgress
                     ? `Rigenerando ${regenProgress.current + 1}/${regenProgress.total}…`
                     : `Rigenera Scene Fallite (${issues.length})`}
+                </Button>
+              ) : null;
+            })()}
+            {/* Regenerate non-compliant aspect-ratio images */}
+            {(() => {
+              const nonCompliant = script.scenes.filter(s => !!s.imageAspectWarning);
+              return nonCompliant.length > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateNonCompliantImages}
+                  disabled={isGenerating}
+                  className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                >
+                  {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+                  Rigenera Immagini Non Conformi ({nonCompliant.length})
                 </Button>
               ) : null;
             })()}
