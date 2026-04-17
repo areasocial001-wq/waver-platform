@@ -532,6 +532,26 @@ export const StoryModeWizard = () => {
     setShowProjectList(false);
     toast.success(`Progetto "${data.title}" caricato`);
 
+    // Resume polling if a render was in progress and is still within 10 min window
+    const pendingRid = (data as any).pending_render_id;
+    const renderStartedAt = (data as any).render_started_at;
+    if (pendingRid && renderStartedAt && !data.final_video_url) {
+      const startedMs = new Date(renderStartedAt).getTime();
+      const elapsed = Date.now() - startedMs;
+      if (elapsed < 10 * 60 * 1000) {
+        setPendingRenderId(pendingRid);
+        setRenderStartTime(startedMs);
+        setRenderElapsed(Math.floor(elapsed / 1000));
+        setRenderStatus("processing");
+        setStep("complete");
+        toast.info(`Ripristino polling rendering (${Math.floor(elapsed / 1000)}s trascorsi)…`);
+      } else {
+        // Timeout exceeded — clear stale render id
+        supabase.from("story_mode_projects").update({ pending_render_id: null, render_started_at: null } as any).eq("id", data.id).then(() => {});
+        toast.warning("Il rendering precedente è scaduto. Usa 'Solo concat finale' per riprovare.");
+      }
+    }
+
     if (autoResetCount > 0) {
       toast.info(`${autoResetCount} ${autoResetCount === 1 ? "scena bloccata da oltre 20 minuti è stata sbloccata" : "scene bloccate da oltre 20 minuti sono state sbloccate"} automaticamente. Puoi rigenerarle.`);
       // Persist the reset so reloading doesn't show them stuck again
