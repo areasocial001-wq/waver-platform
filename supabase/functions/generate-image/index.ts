@@ -178,8 +178,8 @@ serve(async (req) => {
 
     const {
       prompt: rawPrompt,
-      width = 1024,
-      height = 1024,
+      width,
+      height,
       aspectRatio = "1:1",
       outputFormat = "webp",
       outputQuality = 90,
