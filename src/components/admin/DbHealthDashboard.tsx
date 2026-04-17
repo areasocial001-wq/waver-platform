@@ -74,7 +74,9 @@ export const DbHealthDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vacuuming, setVacuuming] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
+  const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
