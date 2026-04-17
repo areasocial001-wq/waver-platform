@@ -83,8 +83,57 @@ Visual style to apply: ${style} (${stylePromptModifier || ""})
 
 Generate a complete script with title, scenes, and metadata.`;
 
-    // Retry helper for transient AI Gateway errors (503, 502, 504)
-    const callAIGateway = async (): Promise<Response> => {
+    // Build the AI Gateway request payload (reused for primary + fallback model)
+    const buildPayload = (model: string) => ({
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "generate_story_script",
+            description: "Generate a structured story script for video production",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Creative title for the video" },
+                synopsis: { type: "string", description: "One-paragraph synopsis of the story" },
+                scenes: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      sceneNumber: { type: "number" },
+                      duration: { type: "number", description: "Duration in seconds (6-10)" },
+                      narration: { type: "string", description: "Voiceover narration text for this scene" },
+                      imagePrompt: { type: "string", description: "Detailed English prompt for AI image generation, including style modifiers" },
+                      cameraMovement: {
+                        type: "string",
+                        enum: ["static", "slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "tilt_up", "tilt_down", "dolly_forward"],
+                        description: "Camera movement for video generation",
+                      },
+                      mood: { type: "string", description: "Emotional tone of this scene" },
+                    },
+                    required: ["sceneNumber", "duration", "narration", "imagePrompt", "cameraMovement", "mood"],
+                    additionalProperties: false,
+                  },
+                },
+                suggestedMusic: { type: "string", description: "Description of background music mood/style" },
+              },
+              required: ["title", "synopsis", "scenes", "suggestedMusic"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "generate_story_script" } },
+    });
+
+    // Retry a single model on transient 5xx with backoff
+    const callModel = async (model: string): Promise<Response> => {
       const MAX_ATTEMPTS = 3;
       let lastResponse: Response | null = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -94,63 +143,24 @@ Generate a complete script with title, scenes, and metadata.`;
             Authorization: `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            tools: [
-              {
-                type: "function",
-                function: {
-                  name: "generate_story_script",
-                  description: "Generate a structured story script for video production",
-                  parameters: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string", description: "Creative title for the video" },
-                      synopsis: { type: "string", description: "One-paragraph synopsis of the story" },
-                      scenes: {
-                        type: "array",
-                        items: {
-                          type: "object",
-                          properties: {
-                            sceneNumber: { type: "number" },
-                            duration: { type: "number", description: "Duration in seconds (6-10)" },
-                            narration: { type: "string", description: "Voiceover narration text for this scene" },
-                            imagePrompt: { type: "string", description: "Detailed English prompt for AI image generation, including style modifiers" },
-                            cameraMovement: {
-                              type: "string",
-                              enum: ["static", "slow_zoom_in", "slow_zoom_out", "pan_left", "pan_right", "tilt_up", "tilt_down", "dolly_forward"],
-                              description: "Camera movement for video generation",
-                            },
-                            mood: { type: "string", description: "Emotional tone of this scene" },
-                          },
-                          required: ["sceneNumber", "duration", "narration", "imagePrompt", "cameraMovement", "mood"],
-                          additionalProperties: false,
-                        },
-                      },
-                      suggestedMusic: { type: "string", description: "Description of background music mood/style" },
-                    },
-                    required: ["title", "synopsis", "scenes", "suggestedMusic"],
-                    additionalProperties: false,
-                  },
-                },
-              },
-            ],
-            tool_choice: { type: "function", function: { name: "generate_story_script" } },
-          }),
+          body: JSON.stringify(buildPayload(model)),
         });
         lastResponse = r;
-        if (r.ok || ![502, 503, 504].includes(r.status)) {
-          return r;
-        }
+        if (r.ok || ![502, 503, 504].includes(r.status)) return r;
         const waitMs = attempt * 2000;
-        console.warn(`[story-mode-script] AI Gateway ${r.status} attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${waitMs}ms`);
+        console.warn(`[story-mode-script] ${model} ${r.status} attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${waitMs}ms`);
         await new Promise((res) => setTimeout(res, waitMs));
       }
       return lastResponse!;
+    };
+
+    // Try primary (Gemini), fallback to OpenAI on persistent 5xx
+    const callAIGateway = async (): Promise<Response> => {
+      const primary = await callModel("google/gemini-3-flash-preview");
+      if (primary.ok || ![502, 503, 504].includes(primary.status)) return primary;
+      console.warn("[story-mode-script] Gemini unavailable, falling back to openai/gpt-5-mini");
+      const fallback = await callModel("openai/gpt-5-mini");
+      return fallback.ok ? fallback : primary;
     };
 
     const response = await callAIGateway();
