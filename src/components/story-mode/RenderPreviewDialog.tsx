@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers } from "lucide-react";
+import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
@@ -23,6 +23,8 @@ interface RenderPreviewDialogProps {
   input: StoryModeInput;
   backgroundMusicUrl: string | null;
   onConfirmRender: (volumes: RenderVolumes) => void;
+  /** Inline regeneration handler — called when user clicks "Rigenera ora" on a non-compliant scene */
+  onRegenerateScene?: (sceneIndex: number, type: "image" | "video") => Promise<void> | void;
 }
 
 interface PreviewSummary {
@@ -44,12 +46,13 @@ interface PreviewSummary {
 }
 
 export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
-  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender,
+  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender, onRegenerateScene,
 }) => {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
   // Editable volumes
   const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
@@ -335,17 +338,41 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                   <AlertTriangle className="w-4 h-4" />
                   {nonCompliantScenes.length} {nonCompliantScenes.length === 1 ? "scena non conforme" : "scene non conformi"} al formato richiesto ({input.videoAspectRatio})
                 </p>
-                <ul className="text-xs space-y-1 max-h-32 overflow-y-auto pl-1">
+                <ul className="text-xs space-y-1 max-h-40 overflow-y-auto pl-1">
                   {nonCompliantScenes.map(({ scene, index }) => {
                     const isVideoIssue = !!scene.videoAspectWarning;
                     const w = isVideoIssue ? scene.videoWidth : scene.imageWidth;
                     const h = isVideoIssue ? scene.videoHeight : scene.imageHeight;
+                    const isRegenThis = regeneratingIndex === index;
                     return (
-                      <li key={index} className="flex items-center gap-1.5 text-muted-foreground">
-                        <span className="font-mono text-foreground">#{scene.sceneNumber}</span>
-                        <Badge variant="outline" className="h-4 px-1 text-[9px]">{isVideoIssue ? "VIDEO" : "IMG"}</Badge>
-                        <span className="tabular-nums">{w}×{h}</span>
-                        <span className="text-muted-foreground/70 truncate">— {scene.narration?.slice(0, 40)}…</span>
+                      <li key={index} className="flex items-center gap-1.5 text-muted-foreground py-0.5">
+                        <span className="font-mono text-foreground shrink-0">#{scene.sceneNumber}</span>
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] shrink-0">{isVideoIssue ? "VIDEO" : "IMG"}</Badge>
+                        <span className="tabular-nums shrink-0">{w}×{h}</span>
+                        <span className="text-muted-foreground/70 truncate flex-1">— {scene.narration?.slice(0, 30)}…</span>
+                        {onRegenerateScene && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 px-2 text-[10px] shrink-0"
+                            disabled={regeneratingIndex !== null}
+                            onClick={async () => {
+                              setRegeneratingIndex(index);
+                              try {
+                                await onRegenerateScene(index, isVideoIssue ? "video" : "image");
+                              } finally {
+                                setRegeneratingIndex(null);
+                              }
+                            }}
+                            title={`Rigenera ${isVideoIssue ? "video" : "immagine"} scena #${scene.sceneNumber}`}
+                          >
+                            {isRegenThis ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <><RefreshCw className="w-3 h-3 mr-1" />Rigenera</>
+                            )}
+                          </Button>
+                        )}
                       </li>
                     );
                   })}
