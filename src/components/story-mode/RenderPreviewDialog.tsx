@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers } from "lucide-react";
+import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
@@ -23,6 +23,8 @@ interface RenderPreviewDialogProps {
   input: StoryModeInput;
   backgroundMusicUrl: string | null;
   onConfirmRender: (volumes: RenderVolumes) => void;
+  /** Inline regeneration handler — called when user clicks "Rigenera ora" on a non-compliant scene */
+  onRegenerateScene?: (sceneIndex: number, type: "image" | "video") => Promise<void> | void;
 }
 
 interface PreviewSummary {
@@ -44,12 +46,13 @@ interface PreviewSummary {
 }
 
 export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
-  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender,
+  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender, onRegenerateScene,
 }) => {
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
+  const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
   // Editable volumes
   const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
