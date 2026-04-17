@@ -548,9 +548,9 @@ export const StoryModeWizard = () => {
         });
         if (!response.ok) throw new Error("TTS failed");
         const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], audioUrl: url, audioStatus: "completed" };
+        scenes[index] = { ...scenes[index], audioUrl: storageUrl, audioStatus: "completed" };
         setScript({ ...script, scenes });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
@@ -565,8 +565,56 @@ export const StoryModeWizard = () => {
           },
         });
         if (error) throw error;
+
+        // Handle async video generation (polling for operationId) — same as handleGenerateAll
+        let videoUrl: string | undefined = data?.videoUrl || data?.video_url || data?.output;
+        if (!videoUrl && data?.operationId && (data.status === "starting" || data.status === "processing")) {
+          console.log(`[Regen] Scene ${index + 1}: polling operationId ${data.operationId}`);
+          const pollingStart = Date.now();
+          setVideoPollingInfo({ sceneIndex: index, startedAt: pollingStart, pollCount: 0 });
+          const maxPolls = 120; // up to ~10 minutes
+          let consecutiveNetErrors = 0;
+          const maxNetErrors = 10;
+          try {
+            for (let poll = 0; poll < maxPolls; poll++) {
+              await new Promise(r => setTimeout(r, 5000));
+              setVideoPollingInfo({ sceneIndex: index, startedAt: pollingStart, pollCount: poll + 1 });
+              try {
+                const { data: pollData, error: pollError } = await supabase.functions.invoke("generate-video", {
+                  body: { operationId: data.operationId },
+                });
+                if (pollError) {
+                  consecutiveNetErrors++;
+                  if (consecutiveNetErrors >= maxNetErrors) {
+                    throw new Error(`Polling fallito dopo ${maxNetErrors} errori di rete`);
+                  }
+                  await new Promise(r => setTimeout(r, 2000 * consecutiveNetErrors));
+                  continue;
+                }
+                consecutiveNetErrors = 0;
+                if (pollData?.status === "succeeded") {
+                  videoUrl = pollData.output || pollData.videoUrl || pollData.video_url;
+                  break;
+                } else if (pollData?.status === "failed") {
+                  throw new Error(pollData.error || "Video generation failed");
+                }
+              } catch (pollErr: any) {
+                if (pollErr.message?.includes("Polling fallito") || pollErr.message?.includes("Video generation failed")) throw pollErr;
+                consecutiveNetErrors++;
+                if (consecutiveNetErrors >= maxNetErrors) {
+                  throw new Error(`Polling fallito dopo ${maxNetErrors} errori di rete`);
+                }
+                await new Promise(r => setTimeout(r, 2000 * consecutiveNetErrors));
+              }
+            }
+          } finally {
+            setVideoPollingInfo(null);
+          }
+        }
+
+        if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], videoUrl: data.videoUrl || data.video_url, videoStatus: "completed" };
+        scenes[index] = { ...scenes[index], videoUrl, videoStatus: "completed" };
         setScript({ ...script, scenes });
         toast.success(`Video scena ${index + 1} rigenerato`);
       } else if (type === "sfx") {
@@ -580,9 +628,9 @@ export const StoryModeWizard = () => {
         });
         if (!response.ok) throw new Error("SFX generation failed");
         const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], sfxUrl: url, sfxStatus: "completed" };
+        scenes[index] = { ...scenes[index], sfxUrl: storageUrl, sfxStatus: "completed" };
         setScript({ ...script, scenes });
         toast.success(`SFX scena ${index + 1} rigenerato`);
       }
