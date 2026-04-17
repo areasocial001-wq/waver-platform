@@ -671,8 +671,15 @@ export const StoryModeWizard = () => {
         }
         updateScene(index, "imageStatus", "generating");
         const referenceImageUrl = input.imageUrl || undefined;
+        // Force explicit width/height matching the requested aspect ratio so Flux generates true vertical/horizontal frames
+        // instead of letterboxed outputs that Kling/Veo would later have to "fit" into the target canvas.
+        const fluxDims = input.videoAspectRatio === "9:16"
+          ? { width: 720, height: 1280 }
+          : input.videoAspectRatio === "4:3"
+          ? { width: 1024, height: 768 }
+          : { width: 1280, height: 720 };
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
+          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -1325,7 +1332,12 @@ export const StoryModeWizard = () => {
       try {
         scenes[i] = { ...scenes[i], imageStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) } });
+        const fluxDims = input.videoAspectRatio === "9:16"
+          ? { width: 720, height: 1280 }
+          : input.videoAspectRatio === "4:3"
+          ? { width: 1024, height: 768 }
+          : { width: 1280, height: 720 };
+        const { data, error } = await supabase.functions.invoke("generate-image", { body: { prompt: scenes[i].imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) } });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
           const message = data?.retryAfter

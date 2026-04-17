@@ -153,8 +153,34 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           </div>
         )}
 
-        {summary && (
+        {summary && (() => {
+          // Compute output pixel dimensions matching video-concat (full-frame, no letterbox)
+          const ar = summary.aspectRatio;
+          const tier = summary.resolution === "fhd" ? "fhd" : summary.resolution === "hd" ? "hd" : "sd";
+          const sizeMap: Record<string, Record<string, [number, number]>> = {
+            "16:9": { fhd: [1920, 1080], hd: [1280, 720], sd: [854, 480] },
+            "9:16": { fhd: [1080, 1920], hd: [720, 1280], sd: [480, 854] },
+            "1:1":  { fhd: [1080, 1080], hd: [720, 720],  sd: [480, 480] },
+          };
+          const [outW, outH] = sizeMap[ar]?.[tier] || [1280, 720];
+          const orientation = outW > outH ? "orizzontale" : outW < outH ? "verticale" : "quadrato";
+          const platformHint = ar === "9:16" ? "Instagram Reels / TikTok / Shorts" : ar === "1:1" ? "Instagram Feed" : "YouTube / TV";
+          return (
           <div className="space-y-4">
+            {/* Output dimensions badge — explicit pixel size + platform hint */}
+            <div className="flex items-center justify-between gap-2 p-3 rounded-lg border border-primary/30 bg-primary/5">
+              <div className="flex items-center gap-2 min-w-0">
+                <Film className="w-4 h-4 text-primary shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold tabular-nums">
+                    {outW} × {outH} px <span className="text-muted-foreground font-normal">({orientation})</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">Ottimizzato per {platformHint}</p>
+                </div>
+              </div>
+              <Badge variant="default" className="shrink-0">{ar}</Badge>
+            </div>
+
             {/* Main stats */}
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-3 rounded-lg bg-muted/30">
@@ -274,7 +300,8 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
