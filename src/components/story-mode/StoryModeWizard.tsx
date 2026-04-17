@@ -508,6 +508,19 @@ export const StoryModeWizard = () => {
     }
   };
 
+  // Reset a scene that has been stuck in videoStatus="generating" so the user can retry
+  const unstuckScene = (index: number) => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    scenes[index] = {
+      ...scenes[index],
+      videoStatus: "idle",
+      videoGeneratingStartedAt: undefined,
+      error: undefined,
+    };
+    setScript({ ...script, scenes });
+  };
+
   // Regenerate single scene asset
   const regenerateSceneAsset = async (index: number, type: "image" | "audio" | "video" | "sfx") => {
     if (!script) return;
