@@ -154,6 +154,17 @@ export const SceneCard = ({
             )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
+          {showCountdown && timeoutRemainingMs !== null && (
+            <div className={cn(
+              "flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-md border",
+              timeoutRemainingMs < 2 * 60 * 1000
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                : "bg-muted/40 border-border/50 text-muted-foreground"
+            )}>
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span>Timeout in {formatCountdown(timeoutRemainingMs)}</span>
+            </div>
+          )}
           {isStuck && onUnstuck && (
             <div className="flex items-center justify-between gap-2 mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/30">
               <span className="text-[11px] text-destructive font-medium">
