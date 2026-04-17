@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,17 +74,24 @@ export const DbHealthDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [vacuuming, setVacuuming] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
+  const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
     try {
-      const [statsRes, historyRes] = await Promise.all([
+      const [statsRes, historyRes, logRes] = await Promise.all([
         supabase.rpc("get_db_health_stats" as any),
         supabase
           .from("db_health_snapshots" as any)
           .select("recorded_at, db_size_bytes, total_rows")
           .order("recorded_at", { ascending: true })
           .limit(90),
+        supabase
+          .from("maintenance_log" as any)
+          .select("id, operation, status, triggered_by, tables_processed, total_freed_bytes, duration_ms, created_at")
+          .order("created_at", { ascending: false })
+          .limit(20),
       ]);
 
       if (statsRes.error) throw statsRes.error;
@@ -92,6 +99,7 @@ export const DbHealthDashboard = () => {
 
       setStats(statsRes.data as unknown as DbHealthStats);
       setHistory((historyRes.data as unknown as SnapshotRow[]) || []);
+      setMaintenanceLog((logRes.data as any[]) || []);
     } catch (err: any) {
       console.error("DB health load error:", err);
       toast.error(err.message || "Errore nel caricamento delle statistiche");
@@ -135,6 +143,25 @@ export const DbHealthDashboard = () => {
       toast.error(err.message || "Errore durante la manutenzione");
     } finally {
       setVacuuming(false);
+    }
+  };
+
+  const handleReindex = async () => {
+    setReindexing(true);
+    setMaintenanceResult(null);
+    try {
+      const { data, error } = await supabase.rpc("run_db_reindex" as any);
+      if (error) throw error;
+      const result = data as any;
+      setMaintenanceResult({ ...result, operation: "reindex" });
+      toast.success(
+        `REINDEX completato: ${result.tables_processed} tabelle, liberati ${result.total_freed_pretty}`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante il REINDEX");
+    } finally {
+      setReindexing(false);
     }
   };
 
@@ -189,6 +216,26 @@ export const DbHealthDashboard = () => {
               <AlertDialogFooter>
                 <AlertDialogCancel>Annulla</AlertDialogCancel>
                 <AlertDialogAction onClick={handleVacuum}>Esegui</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={reindexing}>
+                {reindexing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Hammer className="h-4 w-4 mr-1" />}
+                {reindexing ? "Reindex..." : "REINDEX"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Ricostruire gli indici?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Verrà eseguito <code>REINDEX TABLE</code> sulle 10 tabelle pubbliche più usate per ricostruire indici frammentati. L'operazione può bloccare le scritture per alcuni secondi per tabella.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReindex}>Esegui</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
@@ -432,6 +479,69 @@ export const DbHealthDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Maintenance log */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HistoryIcon className="h-5 w-5" />
+            Storico manutenzioni
+          </CardTitle>
+          <CardDescription>
+            Operazioni VACUUM/REINDEX (manuali e automatiche). Job settimanale: domenica 05:00 UTC.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {maintenanceLog.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nessuna operazione registrata. Esegui un VACUUM o REINDEX per iniziare.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Operazione</TableHead>
+                  <TableHead>Origine</TableHead>
+                  <TableHead className="text-right">Tabelle</TableHead>
+                  <TableHead className="text-right">Liberati</TableHead>
+                  <TableHead className="text-right">Durata</TableHead>
+                  <TableHead>Stato</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {maintenanceLog.map(l => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(l.created_at).toLocaleString("it-IT")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">{l.operation}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={l.triggered_by?.startsWith("cron") ? "secondary" : "default"} className="text-xs">
+                        {l.triggered_by?.startsWith("cron") ? "Auto" : "Manuale"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{l.tables_processed}</TableCell>
+                    <TableCell className="text-right text-xs">{formatBytes(l.total_freed_bytes || 0)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {(l.duration_ms / 1000).toFixed(1)}s
+                    </TableCell>
+                    <TableCell>
+                      {l.status === "success" ? (
+                        <Badge variant="outline" className="text-green-500 border-green-500/30 text-xs">OK</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">{l.status}</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
