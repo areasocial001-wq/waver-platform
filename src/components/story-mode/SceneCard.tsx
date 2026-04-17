@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download, Mic,
+  Image, Eye, Download, Mic, Unlock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
@@ -52,6 +52,7 @@ interface SceneCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onRegenerate?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -61,13 +62,27 @@ interface SceneCardProps {
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
-  onDuplicate, onDelete, onRegenerate,
+  onDuplicate, onDelete, onRegenerate, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
   const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
+
+  // Detect "stuck" scenes: videoStatus generating for > 15 minutes.
+  // Re-check every 30s so the unlock button appears without needing a manual refresh.
+  const STUCK_THRESHOLD_MS = 15 * 60 * 1000;
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (scene.videoStatus !== "generating") return;
+    const id = setInterval(() => forceTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [scene.videoStatus]);
+  const isStuck =
+    scene.videoStatus === "generating" &&
+    !!scene.videoGeneratingStartedAt &&
+    Date.now() - scene.videoGeneratingStartedAt > STUCK_THRESHOLD_MS;
 
   const voiceName = useMemo(() => {
     const vid = scene.voiceId || defaultVoiceId;
