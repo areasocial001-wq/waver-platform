@@ -49,6 +49,7 @@ interface UserStat {
   userId: string;
   email: string | null;
   fullName: string | null;
+  plan: string | null;
   count: number;
   avgDurationMs: number;
   lastSeen: string;
@@ -57,7 +58,9 @@ interface UserStat {
 export const KlingTimeoutsCard = () => {
   const [logs, setLogs] = useState<TimeoutLog[]>([]);
   const [profiles, setProfiles] = useState<Record<string, { email: string | null; full_name: string | null }>>({});
+  const [userPlans, setUserPlans] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
+  const [minTimeouts, setMinTimeouts] = useState(1);
 
   const load = async () => {
     setLoading(true);
