@@ -171,7 +171,27 @@ export const DbHealthDashboard = () => {
           </h2>
           <p className="text-sm text-muted-foreground">Monitoraggio in tempo reale</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={vacuuming}>
+                {vacuuming ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Wrench className="h-4 w-4 mr-1" />}
+                {vacuuming ? "Manutenzione..." : "VACUUM/ANALYZE"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Eseguire manutenzione database?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Verrà eseguito <code>VACUUM ANALYZE</code> sulle tabelle pubbliche più pesanti per liberare dead tuples e aggiornare le statistiche del query planner. L'operazione può richiedere alcuni secondi e blocca temporaneamente le scritture sulle tabelle interessate.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                <AlertDialogAction onClick={handleVacuum}>Esegui</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button variant="outline" size="sm" onClick={handleSnapshot}>
             <Activity className="h-4 w-4 mr-1" /> Snapshot
           </Button>
