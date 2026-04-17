@@ -165,20 +165,40 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           const [outW, outH] = sizeMap[ar]?.[tier] || [1280, 720];
           const orientation = outW > outH ? "orizzontale" : outW < outH ? "verticale" : "quadrato";
           const platformHint = ar === "9:16" ? "Instagram Reels / TikTok / Shorts" : ar === "1:1" ? "Instagram Feed" : "YouTube / TV";
+          // First scene's image (if available) for the live thumbnail preview
+          const firstThumbUrl = vids[0]?.imageUrl || scenes[0]?.imageUrl;
+          // Tailwind aspect class — fall back to inline style for unusual ratios
+          const aspectClass = ar === "9:16" ? "aspect-[9/16]" : ar === "1:1" ? "aspect-square" : "aspect-video";
+
           return (
           <div className="space-y-4">
-            {/* Output dimensions badge — explicit pixel size + platform hint */}
-            <div className="flex items-center justify-between gap-2 p-3 rounded-lg border border-primary/30 bg-primary/5">
-              <div className="flex items-center gap-2 min-w-0">
-                <Film className="w-4 h-4 text-primary shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold tabular-nums">
-                    {outW} × {outH} px <span className="text-muted-foreground font-normal">({orientation})</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">Ottimizzato per {platformHint}</p>
-                </div>
+            {/* Output dimensions badge — explicit pixel size + platform hint + thumbnail */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
+              {/* Thumbnail scaled to the EXACT requested aspect ratio so user sees orientation immediately */}
+              <div className={cn("shrink-0 rounded-md overflow-hidden bg-muted/40 border border-border/60", aspectClass, ar === "9:16" ? "h-24 w-auto" : "w-32 h-auto")}>
+                {firstThumbUrl ? (
+                  <img
+                    src={firstThumbUrl}
+                    alt="Anteprima primo frame"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Film className="w-5 h-5" />
+                  </div>
+                )}
               </div>
-              <Badge variant="default" className="shrink-0">{ar}</Badge>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className="text-sm font-semibold tabular-nums truncate">
+                    {outW} × {outH} px
+                  </p>
+                  <Badge variant="default" className="shrink-0">{ar}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground capitalize">{orientation}</p>
+                <p className="text-xs text-muted-foreground truncate">Per {platformHint}</p>
+              </div>
             </div>
 
             {/* Main stats */}
