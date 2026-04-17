@@ -235,6 +235,18 @@ export const SceneCard = ({
                 </Button>
               </>
             )}
+            {isStuck && onUnstuck && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-xs gap-1"
+                onClick={() => { onUnstuck(); toast.success(`Scena ${scene.sceneNumber} sbloccata`); }}
+                title={`Scena bloccata da ${Math.floor((Date.now() - (scene.videoGeneratingStartedAt || 0)) / 60000)} min — sblocca per rigenerare`}
+              >
+                <Unlock className="w-3 h-3" />
+                Sblocca
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
