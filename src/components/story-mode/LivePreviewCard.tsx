@@ -42,14 +42,15 @@ export function LivePreviewCard({ scenes, totalScenes, aspectRatio = "16:9" }: L
     }
   };
 
-  if (completedVideos.length === 0) return null;
-
-  const safeIndex = Math.max(0, Math.min(selectedIndex, completedVideos.length - 1));
-  const currentScene = completedVideos[safeIndex];
-  const rawUrl = currentScene.videoUrl!;
-  const needsAuth = rawUrl.includes("/functions/v1/video-proxy");
+  const hasVideos = completedVideos.length > 0;
+  const safeIndex = hasVideos ? Math.max(0, Math.min(selectedIndex, completedVideos.length - 1)) : 0;
+  const currentScene = hasVideos ? completedVideos[safeIndex] : undefined;
+  const rawUrl = currentScene?.videoUrl;
+  const needsAuth = !!rawUrl && rawUrl.includes("/functions/v1/video-proxy");
   const { blobUrl, isLoading } = useAuthVideo(needsAuth ? rawUrl : undefined, true);
   const playableUrl = needsAuth ? blobUrl : rawUrl;
+
+  if (!hasVideos || !currentScene) return null;
 
   const canPrev = safeIndex > 0;
   const canNext = safeIndex < completedVideos.length - 1;
