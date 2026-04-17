@@ -78,18 +78,32 @@ export const KlingTimeoutsCard = () => {
       const list = (data as TimeoutLog[]) || [];
       setLogs(list);
 
-      // Fetch profiles for all user_ids in the timeout logs (admins can read all profiles)
+      // Fetch profiles + roles for all user_ids in the timeout logs (admins can read all)
       const uniqueUserIds = Array.from(new Set(list.map(l => l.user_id).filter(Boolean)));
       if (uniqueUserIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .in("id", uniqueUserIds);
+        const [{ data: profs }, { data: roles }] = await Promise.all([
+          supabase.from("profiles").select("id, email, full_name").in("id", uniqueUserIds),
+          supabase.from("user_roles").select("user_id, role").in("user_id", uniqueUserIds),
+        ]);
         const map: Record<string, { email: string | null; full_name: string | null }> = {};
         (profs || []).forEach(p => { map[p.id] = { email: p.email, full_name: p.full_name }; });
         setProfiles(map);
+
+        // Aggregate roles per user → keep highest-priority plan
+        const rolesByUser = new Map<string, string[]>();
+        (roles || []).forEach(r => {
+          const arr = rolesByUser.get(r.user_id) || [];
+          arr.push(r.role as string);
+          rolesByUser.set(r.user_id, arr);
+        });
+        const planMap: Record<string, string | null> = {};
+        uniqueUserIds.forEach(uid => {
+          planMap[uid] = pickTopPlan(rolesByUser.get(uid) || []);
+        });
+        setUserPlans(planMap);
       } else {
         setProfiles({});
+        setUserPlans({});
       }
     } catch (err: any) {
       toast.error(`Errore caricamento timeout: ${err.message}`);
