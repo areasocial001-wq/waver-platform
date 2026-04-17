@@ -301,23 +301,50 @@ export const StoryModeWizard = () => {
     if (data) setSavedProjects(data);
   };
 
-  const saveProject = async () => {
+  const persistProject = async (overrides?: {
+    script?: StoryScript | null;
+    step?: StoryStep;
+    finalVideoUrl?: string | null;
+    backgroundMusicUrl?: string | null;
+  }) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !script) return;
+    const scriptToSave = overrides?.script ?? script;
+    const stepToSave = overrides?.step ?? step;
+    const finalVideoUrlToSave = overrides?.finalVideoUrl ?? finalVideoUrl;
+    const backgroundMusicUrlToSave = overrides?.backgroundMusicUrl ?? backgroundMusicUrl;
+    if (!user || !scriptToSave) return;
     setIsSaving(true);
     try {
       const storageUrl = (window as any).__storyRefStorageUrl || "";
       const persistedImageUrl = storageUrl || (input.imageUrl && input.imageUrl.startsWith("http") ? input.imageUrl : "");
+      const normalizedScenes = scriptToSave.scenes.map((scene) => {
+        if (scene.videoUrl && scene.videoStatus !== "completed") {
+          return {
+            ...scene,
+            videoStatus: "completed" as const,
+            videoGeneratingStartedAt: undefined,
+            error: scene.error === "Generazione video troppo lenta, riprova" ? scene.error : undefined,
+          };
+        }
+        return scene;
+      });
+      const derivedStatus = finalVideoUrlToSave
+        ? "completed"
+        : stepToSave === "generation"
+          ? "generating"
+          : stepToSave === "complete"
+            ? "completed"
+            : "draft";
       const projectData = {
-        user_id: user.id, title: script.title, synopsis: script.synopsis,
-        suggested_music: script.suggestedMusic, scenes: script.scenes as any,
+        user_id: user.id, title: scriptToSave.title, synopsis: scriptToSave.synopsis,
+        suggested_music: scriptToSave.suggestedMusic, scenes: normalizedScenes as any,
         input_config: {
           ...input,
           imageFile: null,
           imageUrl: persistedImageUrl,
         } as any,
-        status: step === "complete" ? "completed" : step === "generation" ? "generating" : "draft",
-        final_video_url: finalVideoUrl, background_music_url: backgroundMusicUrl,
+        status: derivedStatus,
+        final_video_url: finalVideoUrlToSave, background_music_url: backgroundMusicUrlToSave,
       };
       if (projectId) {
         const { error } = await supabase.from("story_mode_projects").update(projectData).eq("id", projectId);
@@ -332,6 +359,10 @@ export const StoryModeWizard = () => {
       loadProjectList();
     } catch (err: any) { toast.error(err.message || "Errore nel salvataggio"); }
     finally { setIsSaving(false); }
+  };
+
+  const saveProject = async () => {
+    await persistProject();
   };
 
   const loadProject = async (id: string) => {
@@ -2041,7 +2072,7 @@ export const StoryModeWizard = () => {
           </Card>
 
           {/* Live preview of completed scenes */}
-          <LivePreviewCard scenes={script.scenes} totalScenes={script.scenes.length} />
+          <LivePreviewCard scenes={script.scenes} totalScenes={script.scenes.length} aspectRatio={input.videoAspectRatio} />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (

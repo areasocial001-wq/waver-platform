@@ -122,7 +122,9 @@ export const SceneCard = ({
               <span className="ml-2 text-xs text-muted-foreground">Caricamento video...</span>
             </div>
           ) : isVideoReady && playableVideoUrl ? (
-            <video src={playableVideoUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+            <div className="w-full h-full bg-black">
+              <video src={playableVideoUrl} className="w-full h-full object-contain" autoPlay muted loop playsInline />
+            </div>
           ) : scene.imageUrl ? (
             <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
           ) : (
