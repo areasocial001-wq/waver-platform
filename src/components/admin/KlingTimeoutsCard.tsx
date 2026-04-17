@@ -306,16 +306,32 @@ export const KlingTimeoutsCard = () => {
             </div>
 
             {/* Top users impacted */}
-            {topUsers.length > 0 && (
+            {allUsers.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  <User className="h-4 w-4" /> Top utenti impattati
-                </h4>
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                  <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                    <User className="h-4 w-4" /> Top utenti impattati
+                  </h4>
+                  <div className="flex items-center gap-3 flex-1 max-w-xs min-w-[200px]">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      Min timeout: <span className="font-mono font-semibold text-foreground">{minTimeouts}</span>
+                    </span>
+                    <Slider
+                      value={[minTimeouts]}
+                      onValueChange={(v) => setMinTimeouts(v[0])}
+                      min={1}
+                      max={Math.min(sliderMax, 10)}
+                      step={1}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
                 <div className="rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Utente</TableHead>
+                        <TableHead>Piano</TableHead>
                         <TableHead className="text-right">Timeout</TableHead>
                         <TableHead className="text-right">Durata media</TableHead>
                         <TableHead>Ultimo</TableHead>
@@ -337,6 +353,18 @@ export const KlingTimeoutsCard = () => {
                                 {u.userId.slice(0, 8)}…
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {u.plan ? (
+                              <Badge variant={planBadgeVariant(u.plan)} className="capitalize gap-1">
+                                {(u.plan === "premium" || u.plan === "creator" || u.plan === "business") && (
+                                  <Crown className="h-3 w-3" />
+                                )}
+                                {u.plan}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant={u.count > 2 ? "destructive" : u.count > 1 ? "default" : "secondary"}>
