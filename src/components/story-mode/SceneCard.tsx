@@ -134,6 +134,22 @@ export const SceneCard = ({
             )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
+          {isStuck && onUnstuck && (
+            <div className="flex items-center justify-between gap-2 mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <span className="text-[11px] text-destructive font-medium">
+                ⚠️ Bloccata da {Math.floor((Date.now() - (scene.videoGeneratingStartedAt || 0)) / 60000)} min
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-[11px] gap-1"
+                onClick={() => { onUnstuck(); toast.success(`Scena ${scene.sceneNumber} sbloccata`); }}
+              >
+                <Unlock className="w-3 h-3" />
+                Sblocca
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
