@@ -146,7 +146,24 @@ export const DbHealthDashboard = () => {
     }
   };
 
-  if (loading) {
+  const handleReindex = async () => {
+    setReindexing(true);
+    setMaintenanceResult(null);
+    try {
+      const { data, error } = await supabase.rpc("run_db_reindex" as any);
+      if (error) throw error;
+      const result = data as any;
+      setMaintenanceResult({ ...result, operation: "reindex" });
+      toast.success(
+        `REINDEX completato: ${result.tables_processed} tabelle, liberati ${result.total_freed_pretty}`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante il REINDEX");
+    } finally {
+      setReindexing(false);
+    }
+  };
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
