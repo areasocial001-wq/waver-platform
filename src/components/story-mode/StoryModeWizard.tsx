@@ -226,15 +226,6 @@ export const StoryModeWizard = () => {
     return () => clearInterval(interval);
   }, [generationStartTime, isGenerating]);
 
-  // Persist pendingRenderId to DB so polling can resume after page reload
-  useEffect(() => {
-    if (!projectId) return;
-    supabase.from("story_mode_projects").update({
-      pending_render_id: pendingRenderId,
-      render_started_at: pendingRenderId && renderStartTime ? new Date(renderStartTime).toISOString() : null,
-    } as any).eq("id", projectId).then(() => {});
-  }, [pendingRenderId, renderStartTime, projectId]);
-
   // Poll for pending Shotstack render — extended to 10 min, with adaptive backoff
   useEffect(() => {
     if (!pendingRenderId || renderStatus !== "processing") return;
