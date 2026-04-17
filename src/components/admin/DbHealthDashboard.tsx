@@ -219,6 +219,26 @@ export const DbHealthDashboard = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={reindexing}>
+                {reindexing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Hammer className="h-4 w-4 mr-1" />}
+                {reindexing ? "Reindex..." : "REINDEX"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Ricostruire gli indici?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Verrà eseguito <code>REINDEX TABLE</code> sulle 10 tabelle pubbliche più usate per ricostruire indici frammentati. L'operazione può bloccare le scritture per alcuni secondi per tabella.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                <AlertDialogAction onClick={handleReindex}>Esegui</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button variant="outline" size="sm" onClick={handleSnapshot}>
             <Activity className="h-4 w-4 mr-1" /> Snapshot
           </Button>
