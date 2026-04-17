@@ -28,7 +28,7 @@ import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
-import { measureAndValidateAspect } from "@/lib/aspectRatioCheck";
+import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -809,10 +809,23 @@ export const StoryModeWizard = () => {
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
+        const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
+        scenes[index] = {
+          ...scenes[index],
+          videoUrl,
+          videoStatus: "completed",
+          videoGeneratingStartedAt: undefined,
+          videoWidth: videoCheck?.width,
+          videoHeight: videoCheck?.height,
+          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+        };
         setScript({ ...script, scenes });
-        toast.success(`Video scena ${index + 1} rigenerato`);
+        if (videoCheck?.mismatch) {
+          toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
+        } else {
+          toast.success(`Video scena ${index + 1} rigenerato`);
+        }
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
         updateScene(index, "sfxStatus", "generating");
@@ -1506,7 +1519,19 @@ export const StoryModeWizard = () => {
         }
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
-        scenes[i] = { ...scenes[i], videoUrl, videoStatus: "completed", videoGeneratingStartedAt: undefined };
+        const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
+        scenes[i] = {
+          ...scenes[i],
+          videoUrl,
+          videoStatus: "completed",
+          videoGeneratingStartedAt: undefined,
+          videoWidth: videoCheck?.width,
+          videoHeight: videoCheck?.height,
+          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+        };
+        if (videoCheck?.mismatch) {
+          console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
+        }
       } catch (err: any) {
         scenes[i] = { ...scenes[i], videoStatus: "error", error: err.message, videoGeneratingStartedAt: undefined };
         if (err.message?.includes("Generazione video troppo lenta")) {
