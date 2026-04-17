@@ -119,6 +119,25 @@ export const DbHealthDashboard = () => {
     }
   };
 
+  const handleVacuum = async () => {
+    setVacuuming(true);
+    setMaintenanceResult(null);
+    try {
+      const { data, error } = await supabase.rpc("run_db_maintenance" as any);
+      if (error) throw error;
+      const result = data as any;
+      setMaintenanceResult(result);
+      toast.success(
+        `Manutenzione completata: ${result.tables_processed} tabelle, liberati ${result.total_freed_pretty}`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante la manutenzione");
+    } finally {
+      setVacuuming(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
