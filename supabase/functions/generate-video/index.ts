@@ -2580,11 +2580,17 @@ serve(async (req) => {
     
     console.log("Using validDuration:", validDuration);
     
+    // Veo 3.1 supports 16:9 and 9:16 (and 1:1 in some preview variants).
+    // Pass through the requested aspect ratio so vertical generations don't get letterboxed inside a 16:9 canvas.
+    const veoSupportedRatios = ["16:9", "9:16", "1:1"];
+    const veoAspectRatio = aspect_ratio && veoSupportedRatios.includes(aspect_ratio) ? aspect_ratio : "16:9";
+    console.log(`[Google Veo 3.1] Using aspectRatio=${veoAspectRatio} (requested: ${aspect_ratio || 'none'})`);
+
     const requestBody: any = {
       instances: [{}],
       parameters: {
         durationSeconds: validDuration,
-        aspectRatio: "16:9"
+        aspectRatio: veoAspectRatio,
       }
     };
 
