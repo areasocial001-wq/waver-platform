@@ -1002,6 +1002,7 @@ export type Database = {
         Returns: boolean
       }
       record_db_health_snapshot: { Args: never; Returns: undefined }
+      run_db_maintenance: { Args: never; Returns: Json }
     }
     Enums: {
       app_role:
