@@ -24,6 +24,11 @@ export interface StoryScene {
   error?: string;
   /** Epoch ms when videoStatus was last set to "generating" — used to detect stuck scenes */
   videoGeneratingStartedAt?: number;
+  /** Real measured dimensions of the generated image (after load) — used to validate aspect ratio */
+  imageWidth?: number;
+  imageHeight?: number;
+  /** Set when measured aspect ratio deviates >5% from requested — shows warning + offers regeneration */
+  imageAspectWarning?: string;
 }
 
 export interface StoryScript {
