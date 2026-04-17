@@ -71,18 +71,38 @@ export const SceneCard = ({
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
 
   // Detect "stuck" scenes: videoStatus generating for > 15 minutes.
-  // Re-check every 30s so the unlock button appears without needing a manual refresh.
+  // Also drives a live countdown to the 12-min hard timeout (MAX_POLL_WALL_MS).
+  // Re-tick every second while generating so the countdown stays fresh.
   const STUCK_THRESHOLD_MS = 15 * 60 * 1000;
+  const MAX_POLL_WALL_MS = 12 * 60 * 1000;
   const [, forceTick] = useState(0);
   useEffect(() => {
     if (scene.videoStatus !== "generating") return;
-    const id = setInterval(() => forceTick(t => t + 1), 30_000);
+    const id = setInterval(() => forceTick(t => t + 1), 1000);
     return () => clearInterval(id);
   }, [scene.videoStatus]);
   const isStuck =
     scene.videoStatus === "generating" &&
     !!scene.videoGeneratingStartedAt &&
     Date.now() - scene.videoGeneratingStartedAt > STUCK_THRESHOLD_MS;
+
+  // Countdown to system auto-fail (12 min). Hidden once stuck banner appears.
+  const timeoutRemainingMs =
+    scene.videoStatus === "generating" && scene.videoGeneratingStartedAt
+      ? MAX_POLL_WALL_MS - (Date.now() - scene.videoGeneratingStartedAt)
+      : null;
+  const formatCountdown = (ms: number) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  };
+  const showCountdown =
+    scene.videoStatus === "generating" &&
+    !!scene.videoGeneratingStartedAt &&
+    timeoutRemainingMs !== null &&
+    timeoutRemainingMs > 0 &&
+    !isStuck;
 
   const voiceName = useMemo(() => {
     const vid = scene.voiceId || defaultVoiceId;
@@ -134,6 +154,17 @@ export const SceneCard = ({
             )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
+          {showCountdown && timeoutRemainingMs !== null && (
+            <div className={cn(
+              "flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-md border",
+              timeoutRemainingMs < 2 * 60 * 1000
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                : "bg-muted/40 border-border/50 text-muted-foreground"
+            )}>
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span>Timeout in {formatCountdown(timeoutRemainingMs)}</span>
+            </div>
+          )}
           {isStuck && onUnstuck && (
             <div className="flex items-center justify-between gap-2 mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/30">
               <span className="text-[11px] text-destructive font-medium">
