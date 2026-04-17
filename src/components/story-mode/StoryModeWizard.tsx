@@ -315,6 +315,15 @@ export const StoryModeWizard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
 
+  // Persist pendingRenderId to DB so polling can resume after page reload
+  useEffect(() => {
+    if (!projectId) return;
+    supabase.from("story_mode_projects").update({
+      pending_render_id: pendingRenderId,
+      render_started_at: pendingRenderId && renderStartTime ? new Date(renderStartTime).toISOString() : null,
+    } as any).eq("id", projectId).then(() => {});
+  }, [pendingRenderId, renderStartTime, projectId]);
+
   useEffect(() => { loadProjectList(); }, []);
 
   const loadProjectList = async () => {
