@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
