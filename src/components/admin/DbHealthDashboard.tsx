@@ -75,6 +75,7 @@ export const DbHealthDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [vacuuming, setVacuuming] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [runningCron, setRunningCron] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
   const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
