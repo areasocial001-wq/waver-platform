@@ -479,6 +479,69 @@ export const DbHealthDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Maintenance log */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HistoryIcon className="h-5 w-5" />
+            Storico manutenzioni
+          </CardTitle>
+          <CardDescription>
+            Operazioni VACUUM/REINDEX (manuali e automatiche). Job settimanale: domenica 05:00 UTC.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {maintenanceLog.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nessuna operazione registrata. Esegui un VACUUM o REINDEX per iniziare.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Operazione</TableHead>
+                  <TableHead>Origine</TableHead>
+                  <TableHead className="text-right">Tabelle</TableHead>
+                  <TableHead className="text-right">Liberati</TableHead>
+                  <TableHead className="text-right">Durata</TableHead>
+                  <TableHead>Stato</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {maintenanceLog.map(l => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(l.created_at).toLocaleString("it-IT")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="font-mono text-xs">{l.operation}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={l.triggered_by?.startsWith("cron") ? "secondary" : "default"} className="text-xs">
+                        {l.triggered_by?.startsWith("cron") ? "Auto" : "Manuale"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{l.tables_processed}</TableCell>
+                    <TableCell className="text-right text-xs">{formatBytes(l.total_freed_bytes || 0)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {(l.duration_ms / 1000).toFixed(1)}s
+                    </TableCell>
+                    <TableCell>
+                      {l.status === "success" ? (
+                        <Badge variant="outline" className="text-green-500 border-green-500/30 text-xs">OK</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">{l.status}</Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
