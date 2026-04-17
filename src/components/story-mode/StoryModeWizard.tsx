@@ -566,12 +566,47 @@ export const StoryModeWizard = () => {
         if (!user) return;
         const { migrateSceneAssets } = await import("@/lib/sceneAssetMigration");
         const { scenes: migrated, migratedCount } = await migrateSceneAssets(loadedScenes, data.id, user.id);
-        if (migratedCount > 0) {
+
+        // Detect scenes whose audioUrl was a dead blob: (now empty after migration)
+        // and the original had a blob url → re-generate narration via TTS so the audio track survives.
+        const scenesNeedingAudio: number[] = [];
+        migrated.forEach((s, i) => {
+          const original = loadedScenes[i];
+          const hadBlobAudio = typeof original?.audioUrl === "string" && original.audioUrl.startsWith("blob:");
+          if (hadBlobAudio && !s.audioUrl && s.narration) {
+            scenesNeedingAudio.push(i);
+          }
+        });
+
+        let reuploadedAudio = 0;
+        if (scenesNeedingAudio.length > 0) {
+          toast.info(`Rigenerazione audio scaduto per ${scenesNeedingAudio.length} ${scenesNeedingAudio.length === 1 ? "scena" : "scene"}…`);
+          const authHeaders = await getAuthHeaders();
+          for (const i of scenesNeedingAudio) {
+            try {
+              const sc = migrated[i];
+              const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+                method: "POST", headers: authHeaders,
+                body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
+              });
+              if (!r.ok) continue;
+              const blob = await r.blob();
+              const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
+              migrated[i] = { ...migrated[i], audioUrl: storageUrl, audioStatus: "completed" };
+              reuploadedAudio++;
+            } catch (e) {
+              console.warn(`Audio re-upload failed for scene ${i + 1}:`, e);
+            }
+          }
+        }
+
+        if (migratedCount > 0 || reuploadedAudio > 0) {
           await supabase.from("story_mode_projects")
             .update({ scenes: migrated as any })
             .eq("id", data.id);
           setScript(prev => prev ? { ...prev, scenes: migrated } : prev);
-          toast.success(`${migratedCount} asset spostati nello storage per liberare spazio`);
+          if (migratedCount > 0) toast.success(`${migratedCount} asset spostati nello storage per liberare spazio`);
+          if (reuploadedAudio > 0) toast.success(`${reuploadedAudio} ${reuploadedAudio === 1 ? "audio rigenerato" : "audio rigenerati"} dopo URL blob scaduto`);
         }
       } catch (err) {
         console.warn("Background asset migration failed:", err);
