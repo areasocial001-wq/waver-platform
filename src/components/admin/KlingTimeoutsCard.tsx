@@ -397,6 +397,11 @@ export const KlingTimeoutsCard = () => {
                     </TableBody>
                   </Table>
                 </div>
+                {topUsers.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Nessun utente con almeno {minTimeouts} timeout. Riduci il filtro per vedere più risultati.
+                  </p>
+                )}
               </div>
             )}
 
