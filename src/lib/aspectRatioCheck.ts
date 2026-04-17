@@ -75,3 +75,55 @@ export async function measureAndValidateAspect(
     img.src = url;
   });
 }
+
+/**
+ * Same as measureAndValidateAspect but for video URLs. Loads metadata only
+ * (no playback) via a hidden `<video>` element and reads videoWidth/videoHeight.
+ * Falls back to null if the browser cannot load the metadata (e.g. CORS, bad URL).
+ */
+export async function measureAndValidateVideoAspect(
+  url: string,
+  requestedAspect: string,
+  tolerance = 0.05,
+): Promise<AspectCheckResult | null> {
+  const expectedRatio = RATIO_MAP[requestedAspect];
+  if (!expectedRatio) return null;
+
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    let settled = false;
+    const finish = (r: AspectCheckResult | null) => {
+      if (settled) return;
+      settled = true;
+      try { video.src = ""; video.remove(); } catch { /* noop */ }
+      resolve(r);
+    };
+    video.onloadedmetadata = () => {
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height) {
+        finish(null);
+        return;
+      }
+      const measuredRatio = width / height;
+      const deviation = Math.abs(measuredRatio - expectedRatio) / expectedRatio;
+      const mismatch = deviation > tolerance;
+      const result: AspectCheckResult = {
+        width, height, measuredRatio, expectedRatio, deviation, mismatch,
+      };
+      if (mismatch) {
+        const got = measuredRatio > 1 ? "orizzontale" : measuredRatio < 1 ? "verticale" : "quadrata";
+        const want = expectedRatio > 1 ? "orizzontale" : expectedRatio < 1 ? "verticale" : "quadrata";
+        result.warning = `Video non conforme: richiesto ${requestedAspect} (${want}) ma ricevuto ${width}×${height} (${got}, scarto ${Math.round(deviation * 100)}%). Rigenera per ottenere il formato corretto.`;
+      }
+      finish(result);
+    };
+    video.onerror = () => finish(null);
+    // Safety timeout — some videos never fire loadedmetadata (CORS/blocked)
+    setTimeout(() => finish(null), 15000);
+    video.src = url;
+  });
+}

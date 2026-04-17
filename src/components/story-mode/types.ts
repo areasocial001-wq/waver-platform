@@ -29,6 +29,11 @@ export interface StoryScene {
   imageHeight?: number;
   /** Set when measured aspect ratio deviates >5% from requested — shows warning + offers regeneration */
   imageAspectWarning?: string;
+  /** Real measured dimensions of the generated video (after metadata load) */
+  videoWidth?: number;
+  videoHeight?: number;
+  /** Set when measured video aspect ratio deviates >5% from requested */
+  videoAspectWarning?: string;
 }
 
 export interface StoryScript {
