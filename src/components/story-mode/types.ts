@@ -22,6 +22,8 @@ export interface StoryScene {
   videoStatus?: "idle" | "generating" | "completed" | "error";
   audioStatus?: "idle" | "generating" | "completed" | "error";
   error?: string;
+  /** Epoch ms when videoStatus was last set to "generating" — used to detect stuck scenes */
+  videoGeneratingStartedAt?: number;
 }
 
 export interface StoryScript {

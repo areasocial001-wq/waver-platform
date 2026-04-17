@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download, Mic,
+  Image, Eye, Download, Mic, Unlock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
@@ -52,6 +52,7 @@ interface SceneCardProps {
   onDuplicate: () => void;
   onDelete: () => void;
   onRegenerate?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
   onDragEnd?: () => void;
@@ -61,13 +62,27 @@ interface SceneCardProps {
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
-  onDuplicate, onDelete, onRegenerate,
+  onDuplicate, onDelete, onRegenerate, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
   const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
+
+  // Detect "stuck" scenes: videoStatus generating for > 15 minutes.
+  // Re-check every 30s so the unlock button appears without needing a manual refresh.
+  const STUCK_THRESHOLD_MS = 15 * 60 * 1000;
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (scene.videoStatus !== "generating") return;
+    const id = setInterval(() => forceTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [scene.videoStatus]);
+  const isStuck =
+    scene.videoStatus === "generating" &&
+    !!scene.videoGeneratingStartedAt &&
+    Date.now() - scene.videoGeneratingStartedAt > STUCK_THRESHOLD_MS;
 
   const voiceName = useMemo(() => {
     const vid = scene.voiceId || defaultVoiceId;
@@ -119,6 +134,22 @@ export const SceneCard = ({
             )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
+          {isStuck && onUnstuck && (
+            <div className="flex items-center justify-between gap-2 mt-2 p-2 rounded-md bg-destructive/10 border border-destructive/30">
+              <span className="text-[11px] text-destructive font-medium">
+                ⚠️ Bloccata da {Math.floor((Date.now() - (scene.videoGeneratingStartedAt || 0)) / 60000)} min
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-[11px] gap-1"
+                onClick={() => { onUnstuck(); toast.success(`Scena ${scene.sceneNumber} sbloccata`); }}
+              >
+                <Unlock className="w-3 h-3" />
+                Sblocca
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     );
@@ -203,6 +234,18 @@ export const SceneCard = ({
                   <RefreshCw className="w-3 h-3 mr-1" />🔊
                 </Button>
               </>
+            )}
+            {isStuck && onUnstuck && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-6 px-2 text-xs gap-1"
+                onClick={() => { onUnstuck(); toast.success(`Scena ${scene.sceneNumber} sbloccata`); }}
+                title={`Scena bloccata da ${Math.floor((Date.now() - (scene.videoGeneratingStartedAt || 0)) / 60000)} min — sblocca per rigenerare`}
+              >
+                <Unlock className="w-3 h-3" />
+                Sblocca
+              </Button>
             )}
           </div>
         </CardContent>
