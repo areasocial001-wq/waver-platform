@@ -203,6 +203,33 @@ export const DbHealthDashboard = () => {
     .sort((a, b) => b.seq_tup_read - a.seq_tup_read)
     .slice(0, 5);
 
+  // Maintenance chart data: aggregate freed bytes per day, split VACUUM vs REINDEX
+  const maintenanceChartData = (() => {
+    const byDay = new Map<string, { date: string; vacuumMB: number; reindexMB: number }>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      byDay.set(key, {
+        date: d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+        vacuumMB: 0,
+        reindexMB: 0,
+      });
+    }
+    for (const log of maintenanceLog) {
+      const key = new Date(log.created_at).toISOString().slice(0, 10);
+      const entry = byDay.get(key);
+      if (!entry) continue;
+      const mb = (log.total_freed_bytes || 0) / 1024 / 1024;
+      if (log.operation === "reindex") entry.reindexMB += mb;
+      else entry.vacuumMB += mb;
+    }
+    return Array.from(byDay.values()).map(e => ({
+      ...e,
+      vacuumMB: +e.vacuumMB.toFixed(2),
+      reindexMB: +e.reindexMB.toFixed(2),
+    }));
+  })();
+
   return (
     <div className="space-y-6">
       {/* Header actions */}
