@@ -261,7 +261,73 @@ export const KlingTimeoutsCard = () => {
               )}
             </div>
 
-            {/* Recommendation */}
+            {/* Top users impacted */}
+            {topUsers.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <User className="h-4 w-4" /> Top utenti impattati
+                </h4>
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Utente</TableHead>
+                        <TableHead className="text-right">Timeout</TableHead>
+                        <TableHead className="text-right">Durata media</TableHead>
+                        <TableHead>Ultimo</TableHead>
+                        <TableHead className="text-right">Azione</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topUsers.map(u => (
+                        <TableRow key={u.userId}>
+                          <TableCell className="text-xs max-w-[260px]">
+                            <div className="flex flex-col">
+                              <span className="font-medium truncate" title={u.email || u.userId}>
+                                {u.email || <span className="text-muted-foreground italic">email non disponibile</span>}
+                              </span>
+                              {u.fullName && (
+                                <span className="text-muted-foreground truncate">{u.fullName}</span>
+                              )}
+                              <span className="font-mono text-[10px] text-muted-foreground/70 truncate">
+                                {u.userId.slice(0, 8)}…
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={u.count > 2 ? "destructive" : u.count > 1 ? "default" : "secondary"}>
+                              {u.count}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-xs">{formatMs(u.avgDurationMs)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(u.lastSeen).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {u.email ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="h-7 px-2"
+                                title={`Contatta ${u.email}`}
+                              >
+                                <a href={`mailto:${u.email}?subject=${encodeURIComponent("Problema generazione video Story Mode")}&body=${encodeURIComponent(`Ciao,\n\nabbiamo notato che hai riscontrato ${u.count} timeout durante la generazione video negli ultimi 7 giorni.\n\n`)}`}>
+                                  <Mail className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
             {totalCount >= 5 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
                 <p className="font-medium text-amber-700 dark:text-amber-400">
