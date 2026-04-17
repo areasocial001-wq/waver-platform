@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { AlertTriangle, RefreshCw, Clock, Mail, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -117,6 +117,32 @@ export const KlingTimeoutsCard = () => {
   }
   const dailyEntries = Array.from(dailyMap.entries()).sort((a, b) => b[0].localeCompare(a[0]));
 
+  // Top users impacted
+  const userMap = new Map<string, UserStat>();
+  for (const l of logs) {
+    if (!l.user_id) continue;
+    const dur = Number(l.details?.totalDurationMs) || 0;
+    const existing = userMap.get(l.user_id);
+    if (existing) {
+      existing.count += 1;
+      existing.avgDurationMs = Math.round(
+        (existing.avgDurationMs * (existing.count - 1) + dur) / existing.count
+      );
+      if (l.created_at > existing.lastSeen) existing.lastSeen = l.created_at;
+    } else {
+      const p = profiles[l.user_id];
+      userMap.set(l.user_id, {
+        userId: l.user_id,
+        email: p?.email ?? null,
+        fullName: p?.full_name ?? null,
+        count: 1,
+        avgDurationMs: dur,
+        lastSeen: l.created_at,
+      });
+    }
+  }
+  const topUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+
   const formatMs = (ms: number) => {
     const total = Math.floor(ms / 1000);
     const m = Math.floor(total / 60);
@@ -156,8 +182,8 @@ export const KlingTimeoutsCard = () => {
             <p className="text-2xl font-bold">{avgDurationMs ? formatMs(avgDurationMs) : "—"}</p>
           </div>
           <div className="rounded-lg border bg-card p-3">
-            <p className="text-xs text-muted-foreground">Op. uniche</p>
-            <p className="text-2xl font-bold">{opMap.size}</p>
+            <p className="text-xs text-muted-foreground">Utenti impattati</p>
+            <p className="text-2xl font-bold">{userMap.size}</p>
           </div>
         </div>
 
