@@ -6,6 +6,7 @@ import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
 
 export interface RenderVolumes {
