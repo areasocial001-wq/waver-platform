@@ -28,6 +28,7 @@ import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
+import { measureAndValidateAspect } from "@/lib/aspectRatioCheck";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -690,10 +691,23 @@ export const StoryModeWizard = () => {
           toast.error(message);
           return;
         }
+        const newImageUrl = data.imageUrl || data.url;
+        const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
+        scenes[index] = {
+          ...scenes[index],
+          imageUrl: newImageUrl,
+          imageStatus: "completed",
+          imageWidth: aspectCheck?.width,
+          imageHeight: aspectCheck?.height,
+          imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+        };
         setScript({ ...script, scenes });
-        toast.success(`Immagine scena ${index + 1} rigenerata`);
+        if (aspectCheck?.mismatch) {
+          toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
+        } else {
+          toast.success(`Immagine scena ${index + 1} rigenerata`);
+        }
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
         const authHeaders = await getAuthHeaders();
@@ -1345,7 +1359,19 @@ export const StoryModeWizard = () => {
             : (data?.message || "Generazione immagini temporaneamente non disponibile.");
           scenes[i] = { ...scenes[i], imageStatus: "error", error: message };
         } else {
-          scenes[i] = { ...scenes[i], imageUrl: data.imageUrl || data.url, imageStatus: "completed" };
+          const newImageUrl = data.imageUrl || data.url;
+          const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
+          scenes[i] = {
+            ...scenes[i],
+            imageUrl: newImageUrl,
+            imageStatus: "completed",
+            imageWidth: aspectCheck?.width,
+            imageHeight: aspectCheck?.height,
+            imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+          };
+          if (aspectCheck?.mismatch) {
+            console.warn(`[Story Mode] Scene ${i + 1} aspect mismatch:`, aspectCheck.warning);
+          }
         }
       } catch (err: any) { scenes[i] = { ...scenes[i], imageStatus: "error", error: err.message }; }
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
