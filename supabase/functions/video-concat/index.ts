@@ -73,23 +73,25 @@ const mapResolution = (resolution: string): string => {
   }
 };
 
-// Map aspect ratio to Shotstack size
+// Map aspect ratio to Shotstack size (full-frame, no letterbox)
 const getAspectRatioSize = (aspectRatio: string, resolution: string): { width: number; height: number } | null => {
-  const resMultiplier = resolution === 'fhd' ? 1 : resolution === 'hd' ? 0.67 : 0.45;
-  
+  // Use full pixel dimensions per resolution tier — Shotstack will render at exactly this size
+  // This avoids the "postage stamp" effect caused by passing resolution:'hd' (which forces 1280x720 canvas) together with aspectRatio:'9:16'
+  const tier = resolution === 'fhd' ? 'fhd' : resolution === 'hd' ? 'hd' : 'sd';
+
   switch (aspectRatio) {
     case '16:9':
-      return null; // Use default
+      if (tier === 'fhd') return { width: 1920, height: 1080 };
+      if (tier === 'hd')  return { width: 1280, height: 720 };
+      return { width: 854, height: 480 };
     case '9:16':
-      return { 
-        width: Math.round(1080 * resMultiplier), 
-        height: Math.round(1920 * resMultiplier) 
-      };
+      if (tier === 'fhd') return { width: 1080, height: 1920 };
+      if (tier === 'hd')  return { width: 720,  height: 1280 };
+      return { width: 480, height: 854 };
     case '1:1':
-      return { 
-        width: Math.round(1080 * resMultiplier), 
-        height: Math.round(1080 * resMultiplier) 
-      };
+      if (tier === 'fhd') return { width: 1080, height: 1080 };
+      if (tier === 'hd')  return { width: 720,  height: 720 };
+      return { width: 480, height: 480 };
     default:
       return null;
   }
@@ -627,17 +629,21 @@ serve(async (req) => {
           });
         }
 
-        // Build render request with aspect ratio
+        // Build render request — use explicit size for vertical/square to avoid Shotstack
+        // letterboxing (the "francobollo" effect) caused by mixing resolution:'hd' with aspectRatio:'9:16'.
         const aspectSize = getAspectRatioSize(aspectRatio, resolution);
         const output: any = {
           format: 'mp4',
-          resolution: mapResolution(resolution),
           fps: parseInt(fps),
-          aspectRatio: aspectRatio, // Tell Shotstack the target aspect ratio
         };
-        
+
         if (aspectSize) {
+          // Explicit size = exact pixel canvas, no letterbox
           output.size = aspectSize;
+        } else {
+          // Fallback (shouldn't happen — all 3 ratios return a size now)
+          output.resolution = mapResolution(resolution);
+          output.aspectRatio = aspectRatio;
         }
 
         const renderRequest = {
