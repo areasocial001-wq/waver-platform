@@ -15,7 +15,7 @@ import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
   Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square, Pause,
-  AlertTriangle,
+  AlertTriangle, ShieldCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
+import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
@@ -363,6 +364,87 @@ export const StoryModeWizard = () => {
 
   const saveProject = async () => {
     await persistProject();
+  };
+
+  const [isReconciling, setIsReconciling] = useState(false);
+
+  const reconcileProject = async () => {
+    if (!script) {
+      toast.error("Nessun progetto da riconciliare");
+      return;
+    }
+    setIsReconciling(true);
+    try {
+      const scenes = [...script.scenes];
+      let fixedScenes = 0;
+      let clearedErrors = 0;
+
+      const STUCK_MS = 15 * 60 * 1000;
+      const next = scenes.map((s) => {
+        const updated = { ...s };
+        // 1) videoUrl present but status not "completed" → fix
+        if (updated.videoUrl && updated.videoStatus !== "completed") {
+          updated.videoStatus = "completed";
+          updated.videoGeneratingStartedAt = undefined;
+          fixedScenes++;
+        }
+        // 2) "generating" without start timestamp or stuck → reset to idle
+        if (
+          updated.videoStatus === "generating" &&
+          (!updated.videoGeneratingStartedAt ||
+            Date.now() - updated.videoGeneratingStartedAt > STUCK_MS) &&
+          !updated.videoUrl
+        ) {
+          updated.videoStatus = "idle";
+          updated.videoGeneratingStartedAt = undefined;
+          fixedScenes++;
+        }
+        // 3) clear stale RLS / generic errors when the asset is actually present
+        if (
+          updated.error &&
+          updated.videoUrl &&
+          updated.videoStatus === "completed"
+        ) {
+          updated.error = undefined;
+          clearedErrors++;
+        }
+        // 4) align audio/sfx status with presence of url
+        if (updated.audioUrl && updated.audioStatus !== "completed") {
+          updated.audioStatus = "completed";
+        }
+        if (updated.sfxUrl && updated.sfxStatus !== "completed") {
+          updated.sfxStatus = "completed";
+        }
+        return updated;
+      });
+
+      const newScript = { ...script, scenes: next };
+      setScript(newScript);
+
+      // Final video already present? → push step to "complete"
+      const hasFinal = !!finalVideoUrl;
+      const allDone = next.every((s) => !!s.videoUrl && s.videoStatus === "completed");
+      let nextStep: StoryStep = step;
+      if (hasFinal) {
+        nextStep = "complete";
+        setStep("complete");
+      } else if (allDone && step === "generation") {
+        nextStep = "complete";
+        setStep("complete");
+      }
+
+      await persistProject({ script: newScript, step: nextStep });
+
+      const parts: string[] = [];
+      if (fixedScenes) parts.push(`${fixedScenes} scene riallineate`);
+      if (clearedErrors) parts.push(`${clearedErrors} errori obsoleti rimossi`);
+      if (hasFinal) parts.push("status → completed");
+      toast.success(parts.length ? `Riconciliato: ${parts.join(", ")}` : "Tutto già coerente ✅");
+    } catch (err: any) {
+      toast.error(`Errore riconciliazione: ${err?.message || "sconosciuto"}`);
+    } finally {
+      setIsReconciling(false);
+    }
   };
 
   const loadProject = async (id: string) => {
@@ -1544,6 +1626,18 @@ export const StoryModeWizard = () => {
               <span className="hidden sm:inline ml-1">Salva</span>
             </Button>
           )}
+          {script && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reconcileProject}
+              disabled={isReconciling || isSaving}
+              title="Ricontrolla scene con video presente, corregge stati incoerenti e completa il progetto"
+            >
+              {isReconciling ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              <span className="hidden sm:inline ml-1">Riconcilia</span>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setShowProjectList(!showProjectList)}>
             <FolderOpen className="w-4 h-4" />
             <span className="hidden sm:inline ml-1">Progetti</span>
@@ -2074,6 +2168,9 @@ export const StoryModeWizard = () => {
           {/* Live preview of completed scenes */}
           <LivePreviewCard scenes={script.scenes} totalScenes={script.scenes.length} aspectRatio={input.videoAspectRatio} />
 
+          {/* Diagnostic card: video/audio/sfx health + detected aspect ratio */}
+          <SceneDiagnosticsCard scenes={script.scenes} expectedAspectRatio={input.videoAspectRatio} />
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
               <SceneCard key={idx} scene={scene} index={idx} mode="generation" aspectRatio={input.videoAspectRatio} voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} onUnstuck={() => unstuckScene(idx)} />
@@ -2143,6 +2240,9 @@ export const StoryModeWizard = () => {
               <Badge className="bg-green-500/10 text-green-400 border-green-500/20"><Check className="w-3 h-3 mr-1" />Completato</Badge>
             </div>
           )}
+
+          {/* Diagnostic card also available in complete step for post-mortem checks */}
+          <SceneDiagnosticsCard scenes={script.scenes} expectedAspectRatio={input.videoAspectRatio} />
 
           {finalVideoUrl ? (
             <Card className="border-primary/20 bg-card/50">
