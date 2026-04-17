@@ -484,7 +484,7 @@ export const StoryModeWizard = () => {
     // Select only needed columns - avoid fetching the entire row (scenes JSONB can be huge)
     const { data, error } = await supabase
       .from("story_mode_projects")
-      .select("id, title, synopsis, suggested_music, scenes, input_config, status, final_video_url, background_music_url")
+      .select("id, title, synopsis, suggested_music, scenes, input_config, status, final_video_url, background_music_url, pending_render_id, render_started_at")
       .eq("id", id)
       .single();
     if (error || !data) { toast.error("Errore nel caricamento"); return; }
