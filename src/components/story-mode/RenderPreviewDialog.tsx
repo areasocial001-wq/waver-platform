@@ -300,7 +300,8 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             )}
           </div>
-        )}
+          );
+        })()}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
