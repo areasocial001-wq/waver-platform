@@ -1218,6 +1218,28 @@ export const StoryModeWizard = () => {
     toast.success("Rigenerazione completata!");
   };
 
+  // Regenerate every scene whose image has an aspect-ratio warning (e.g. Flux returned 1024x1024 for 9:16)
+  const handleRegenerateNonCompliantImages = async () => {
+    if (!script) return;
+    const nonCompliant = script.scenes
+      .map((s, i) => ({ scene: s, index: i }))
+      .filter(({ scene }) => !!scene.imageAspectWarning);
+    if (nonCompliant.length === 0) {
+      toast.info("Tutte le immagini rispettano il formato richiesto.");
+      return;
+    }
+    toast.info(`Rigenerazione di ${nonCompliant.length} ${nonCompliant.length === 1 ? "immagine non conforme" : "immagini non conformi"}...`);
+    setIsGenerating(true);
+    setRegenProgress({ current: 0, total: nonCompliant.length });
+    for (let i = 0; i < nonCompliant.length; i++) {
+      setRegenProgress({ current: i, total: nonCompliant.length });
+      await regenerateSceneAsset(nonCompliant[i].index, "image");
+    }
+    setRegenProgress(null);
+    setIsGenerating(false);
+    toast.success("Rigenerazione immagini non conformi completata!");
+  };
+
   // Re-assemble final video from existing scene assets (no re-generation)
   const handleReassemble = async (volumeOverrides?: RenderVolumes) => {
     if (!script) return;
