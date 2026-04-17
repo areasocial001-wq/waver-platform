@@ -68,17 +68,30 @@ async function generateWithLovableAI(prompt: string, style?: string, referenceIm
     }),
   });
 
+  const rawText = await response.text();
+
   if (!response.ok) {
-    const errText = await response.text();
-    console.error("Lovable AI image generation failed:", response.status, errText);
+    console.error("Lovable AI image generation failed:", response.status, rawText);
     return null;
   }
 
-  const data = await response.json();
+  if (!rawText || rawText.trim().length === 0) {
+    console.error("Lovable AI returned empty response body (status:", response.status, ")");
+    return null;
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(rawText);
+  } catch (_parseErr) {
+    console.error("Lovable AI returned non-JSON response:", rawText.slice(0, 500));
+    return null;
+  }
+
   const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
   if (!imageUrl) {
-    console.error("No image returned from Lovable AI");
+    console.error("No image returned from Lovable AI. Response:", JSON.stringify(data).slice(0, 500));
     return null;
   }
 
@@ -123,7 +136,14 @@ serve(async (req) => {
       }
       userId = userData.user.id;
     }
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (_e) {
+      return new Response(JSON.stringify({ error: 'Invalid or empty JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Validate input
     const parseResult = requestSchema.safeParse(body);
