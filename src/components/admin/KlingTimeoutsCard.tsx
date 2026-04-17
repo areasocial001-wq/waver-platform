@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, RefreshCw, Clock } from "lucide-react";
+import { AlertTriangle, RefreshCw, Clock, Mail, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -22,8 +22,18 @@ interface OperationStat {
   lastSeen: string;
 }
 
+interface UserStat {
+  userId: string;
+  email: string | null;
+  fullName: string | null;
+  count: number;
+  avgDurationMs: number;
+  lastSeen: string;
+}
+
 export const KlingTimeoutsCard = () => {
   const [logs, setLogs] = useState<TimeoutLog[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, { email: string | null; full_name: string | null }>>({});
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -39,7 +49,22 @@ export const KlingTimeoutsCard = () => {
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      setLogs((data as TimeoutLog[]) || []);
+      const list = (data as TimeoutLog[]) || [];
+      setLogs(list);
+
+      // Fetch profiles for all user_ids in the timeout logs (admins can read all profiles)
+      const uniqueUserIds = Array.from(new Set(list.map(l => l.user_id).filter(Boolean)));
+      if (uniqueUserIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", uniqueUserIds);
+        const map: Record<string, { email: string | null; full_name: string | null }> = {};
+        (profs || []).forEach(p => { map[p.id] = { email: p.email, full_name: p.full_name }; });
+        setProfiles(map);
+      } else {
+        setProfiles({});
+      }
     } catch (err: any) {
       toast.error(`Errore caricamento timeout: ${err.message}`);
     } finally {
@@ -92,6 +117,32 @@ export const KlingTimeoutsCard = () => {
   }
   const dailyEntries = Array.from(dailyMap.entries()).sort((a, b) => b[0].localeCompare(a[0]));
 
+  // Top users impacted
+  const userMap = new Map<string, UserStat>();
+  for (const l of logs) {
+    if (!l.user_id) continue;
+    const dur = Number(l.details?.totalDurationMs) || 0;
+    const existing = userMap.get(l.user_id);
+    if (existing) {
+      existing.count += 1;
+      existing.avgDurationMs = Math.round(
+        (existing.avgDurationMs * (existing.count - 1) + dur) / existing.count
+      );
+      if (l.created_at > existing.lastSeen) existing.lastSeen = l.created_at;
+    } else {
+      const p = profiles[l.user_id];
+      userMap.set(l.user_id, {
+        userId: l.user_id,
+        email: p?.email ?? null,
+        fullName: p?.full_name ?? null,
+        count: 1,
+        avgDurationMs: dur,
+        lastSeen: l.created_at,
+      });
+    }
+  }
+  const topUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+
   const formatMs = (ms: number) => {
     const total = Math.floor(ms / 1000);
     const m = Math.floor(total / 60);
@@ -119,7 +170,7 @@ export const KlingTimeoutsCard = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Summary metrics */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-lg border bg-card p-3">
             <p className="text-xs text-muted-foreground">Timeout totali</p>
             <p className="text-2xl font-bold">{totalCount}</p>
@@ -133,6 +184,12 @@ export const KlingTimeoutsCard = () => {
           <div className="rounded-lg border bg-card p-3">
             <p className="text-xs text-muted-foreground">Op. uniche</p>
             <p className="text-2xl font-bold">{opMap.size}</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <User className="h-3 w-3" /> Utenti impattati
+            </p>
+            <p className="text-2xl font-bold">{userMap.size}</p>
           </div>
         </div>
 
@@ -204,7 +261,73 @@ export const KlingTimeoutsCard = () => {
               )}
             </div>
 
-            {/* Recommendation */}
+            {/* Top users impacted */}
+            {topUsers.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <User className="h-4 w-4" /> Top utenti impattati
+                </h4>
+                <div className="rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Utente</TableHead>
+                        <TableHead className="text-right">Timeout</TableHead>
+                        <TableHead className="text-right">Durata media</TableHead>
+                        <TableHead>Ultimo</TableHead>
+                        <TableHead className="text-right">Azione</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topUsers.map(u => (
+                        <TableRow key={u.userId}>
+                          <TableCell className="text-xs max-w-[260px]">
+                            <div className="flex flex-col">
+                              <span className="font-medium truncate" title={u.email || u.userId}>
+                                {u.email || <span className="text-muted-foreground italic">email non disponibile</span>}
+                              </span>
+                              {u.fullName && (
+                                <span className="text-muted-foreground truncate">{u.fullName}</span>
+                              )}
+                              <span className="font-mono text-[10px] text-muted-foreground/70 truncate">
+                                {u.userId.slice(0, 8)}…
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={u.count > 2 ? "destructive" : u.count > 1 ? "default" : "secondary"}>
+                              {u.count}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-xs">{formatMs(u.avgDurationMs)}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(u.lastSeen).toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" })}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {u.email ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="h-7 px-2"
+                                title={`Contatta ${u.email}`}
+                              >
+                                <a href={`mailto:${u.email}?subject=${encodeURIComponent("Problema generazione video Story Mode")}&body=${encodeURIComponent(`Ciao,\n\nabbiamo notato che hai riscontrato ${u.count} timeout durante la generazione video negli ultimi 7 giorni.\n\n`)}`}>
+                                  <Mail className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
             {totalCount >= 5 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
                 <p className="font-medium text-amber-700 dark:text-amber-400">
