@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +75,7 @@ export const DbHealthDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [vacuuming, setVacuuming] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [runningCron, setRunningCron] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
   const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
@@ -90,8 +91,9 @@ export const DbHealthDashboard = () => {
         supabase
           .from("maintenance_log" as any)
           .select("id, operation, status, triggered_by, tables_processed, total_freed_bytes, duration_ms, created_at")
+          .gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
           .order("created_at", { ascending: false })
-          .limit(20),
+          .limit(500),
       ]);
 
       if (statsRes.error) throw statsRes.error;
@@ -165,6 +167,20 @@ export const DbHealthDashboard = () => {
     }
   };
 
+  const handleRunCron = async (jobname: string) => {
+    setRunningCron(true);
+    try {
+      const { error } = await supabase.rpc("run_scheduled_maintenance" as any);
+      if (error) throw error;
+      toast.success(`Job "${jobname}" eseguito manualmente`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante l'esecuzione del job");
+    } finally {
+      setRunningCron(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -186,6 +202,33 @@ export const DbHealthDashboard = () => {
     .filter(t => t.seq_tup_read > 10000)
     .sort((a, b) => b.seq_tup_read - a.seq_tup_read)
     .slice(0, 5);
+
+  // Maintenance chart data: aggregate freed bytes per day, split VACUUM vs REINDEX
+  const maintenanceChartData = (() => {
+    const byDay = new Map<string, { date: string; vacuumMB: number; reindexMB: number }>();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      byDay.set(key, {
+        date: d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+        vacuumMB: 0,
+        reindexMB: 0,
+      });
+    }
+    for (const log of maintenanceLog) {
+      const key = new Date(log.created_at).toISOString().slice(0, 10);
+      const entry = byDay.get(key);
+      if (!entry) continue;
+      const mb = (log.total_freed_bytes || 0) / 1024 / 1024;
+      if (log.operation === "reindex") entry.reindexMB += mb;
+      else entry.vacuumMB += mb;
+    }
+    return Array.from(byDay.values()).map(e => ({
+      ...e,
+      vacuumMB: +e.vacuumMB.toFixed(2),
+      reindexMB: +e.reindexMB.toFixed(2),
+    }));
+  })();
 
   return (
     <div className="space-y-6">
@@ -421,6 +464,7 @@ export const DbHealthDashboard = () => {
                   <TableHead>Stato</TableHead>
                   <TableHead>Ultima esecuzione</TableHead>
                   <TableHead>Esito</TableHead>
+                  <TableHead className="text-right">Azioni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -445,6 +489,25 @@ export const DbHealthDashboard = () => {
                         <Badge variant="outline" className="text-green-500 border-green-500/30">OK</Badge>
                       ) : j.last_status ? (
                         <Badge variant="destructive">{j.last_status}</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {j.jobname === "weekly-vacuum-analyze" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRunCron(j.jobname)}
+                          disabled={runningCron}
+                          className="h-7"
+                        >
+                          {runningCron ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <><Play className="h-3 w-3 mr-1" /> Esegui ora</>
+                          )}
+                        </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
@@ -491,7 +554,29 @@ export const DbHealthDashboard = () => {
             Operazioni VACUUM/REINDEX (manuali e automatiche). Job settimanale: domenica 05:00 UTC.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* 30-day chart */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Spazio liberato per giorno (ultimi 30 giorni, MB)</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={maintenanceChartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="date" className="text-xs" interval={4} />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "0.5rem",
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="vacuumMB" stroke="hsl(var(--primary))" name="VACUUM (MB)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="reindexMB" stroke="hsl(var(--accent))" name="REINDEX (MB)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
           {maintenanceLog.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               Nessuna operazione registrata. Esegui un VACUUM o REINDEX per iniziare.
