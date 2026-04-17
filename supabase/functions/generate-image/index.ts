@@ -22,16 +22,38 @@ const requestSchema = z.object({
   characterFidelity: z.enum(['low', 'medium', 'high']).optional(),
 });
 
+// Map aspect ratio string to a textual orientation hint for models that don't accept aspect_ratio natively
+function aspectRatioInstruction(aspectRatio?: string): string {
+  switch (aspectRatio) {
+    case "9:16":
+      return "CRITICAL OUTPUT FORMAT: vertical portrait orientation, aspect ratio exactly 9:16 (1080x1920), full vertical frame composition, NEVER horizontal, NEVER landscape, NEVER 16:9. Frame the subject vertically.";
+    case "16:9":
+      return "CRITICAL OUTPUT FORMAT: horizontal landscape orientation, aspect ratio exactly 16:9 (1920x1080), wide cinematic frame.";
+    case "4:3":
+      return "CRITICAL OUTPUT FORMAT: classic 4:3 aspect ratio, slightly horizontal frame.";
+    case "1:1":
+      return "CRITICAL OUTPUT FORMAT: square 1:1 aspect ratio.";
+    default:
+      return "";
+  }
+}
+
 // Lovable AI image generation fallback
-async function generateWithLovableAI(prompt: string, style?: string, referenceImageUrl?: string): Promise<string | null> {
+async function generateWithLovableAI(
+  prompt: string,
+  style?: string,
+  referenceImageUrl?: string,
+  aspectRatio?: string,
+): Promise<string | null> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     console.warn("LOVABLE_API_KEY not set, cannot use Lovable AI fallback");
     return null;
   }
 
+  const aspectHint = aspectRatioInstruction(aspectRatio);
   const fullPrompt = style ? `${prompt}, ${style}` : prompt;
-  console.log("Using Lovable AI for image generation:", fullPrompt.substring(0, 200), referenceImageUrl ? "(with reference)" : "");
+  console.log("Using Lovable AI for image generation:", fullPrompt.substring(0, 200), referenceImageUrl ? "(with reference)" : "", "aspectRatio:", aspectRatio);
 
   // Build message content — include reference image if provided
   const content: unknown[] = [];
@@ -39,7 +61,7 @@ async function generateWithLovableAI(prompt: string, style?: string, referenceIm
   if (referenceImageUrl) {
     content.push({
       type: "text",
-      text: `You are a character-consistent image generator. Study the reference photo carefully. The generated image MUST depict the EXACT SAME person/character from the reference: same face shape, same eyes, same nose, same mouth, same skin tone, same hair color/style/length, same body build. Do NOT change their appearance. Do NOT switch art styles unless explicitly asked. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural joint positions, proper limb proportions. NEVER generate deformed, extra, or missing body parts.\n\nScene to generate: ${fullPrompt}`,
+      text: `${aspectHint}\n\nYou are a character-consistent image generator. Study the reference photo carefully. The generated image MUST depict the EXACT SAME person/character from the reference: same face shape, same eyes, same nose, same mouth, same skin tone, same hair color/style/length, same body build. Do NOT change their appearance. Do NOT switch art styles unless explicitly asked. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural joint positions, proper limb proportions. NEVER generate deformed, extra, or missing body parts. ${aspectHint}\n\nScene to generate: ${fullPrompt}`,
     });
     content.push({
       type: "image_url",
@@ -48,7 +70,7 @@ async function generateWithLovableAI(prompt: string, style?: string, referenceIm
   } else {
     content.push({
       type: "text",
-      text: `Generate a high-quality image. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural proportions, no deformities.\n\n${fullPrompt}`,
+      text: `${aspectHint}\n\nGenerate a high-quality image. Ensure anatomically correct human body: correct hands with 5 fingers, correct feet with 5 toes, natural proportions, no deformities. ${aspectHint}\n\n${fullPrompt}`,
     });
   }
 
@@ -156,8 +178,8 @@ serve(async (req) => {
 
     const {
       prompt: rawPrompt,
-      width = 1024,
-      height = 1024,
+      width,
+      height,
       aspectRatio = "1:1",
       outputFormat = "webp",
       outputQuality = 90,
@@ -196,7 +218,7 @@ serve(async (req) => {
     // and go directly to Lovable AI which supports multimodal input
     if (referenceImageUrl) {
       console.log("Reference image provided — using Lovable AI for character-consistent generation");
-      const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+      const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
       if (lovableImageUrl) {
         return new Response(
           JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -269,7 +291,7 @@ serve(async (req) => {
 
       // If Replicate failed with rate limit / server error, try Lovable AI fallback
       if (replicateFailed) {
-        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
         if (lovableImageUrl) {
           return new Response(
             JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -292,7 +314,7 @@ serve(async (req) => {
 
     // No Replicate key — try Lovable AI directly
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
-    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
     if (lovableImageUrl) {
       return new Response(
         JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
