@@ -80,13 +80,18 @@ export const DbHealthDashboard = () => {
 
   const loadData = useCallback(async () => {
     try {
-      const [statsRes, historyRes] = await Promise.all([
+      const [statsRes, historyRes, logRes] = await Promise.all([
         supabase.rpc("get_db_health_stats" as any),
         supabase
           .from("db_health_snapshots" as any)
           .select("recorded_at, db_size_bytes, total_rows")
           .order("recorded_at", { ascending: true })
           .limit(90),
+        supabase
+          .from("maintenance_log" as any)
+          .select("id, operation, status, triggered_by, tables_processed, total_freed_bytes, duration_ms, created_at")
+          .order("created_at", { ascending: false })
+          .limit(20),
       ]);
 
       if (statsRes.error) throw statsRes.error;
@@ -94,6 +99,7 @@ export const DbHealthDashboard = () => {
 
       setStats(statsRes.data as unknown as DbHealthStats);
       setHistory((historyRes.data as unknown as SnapshotRow[]) || []);
+      setMaintenanceLog((logRes.data as any[]) || []);
     } catch (err: any) {
       console.error("DB health load error:", err);
       toast.error(err.message || "Errore nel caricamento delle statistiche");
