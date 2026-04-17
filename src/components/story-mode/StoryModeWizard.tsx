@@ -1040,7 +1040,12 @@ export const StoryModeWizard = () => {
         body: { description: input.description, style: input.styleName, stylePromptModifier: input.stylePromptModifier, numScenes: input.numScenes, language: input.language },
       });
       if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (data?.fallback || data?.error === "AI_SERVICE_UNAVAILABLE") {
+        toast.error(data.message || "Servizio AI temporaneamente non disponibile. Riprova tra qualche istante.");
+        return;
+      }
+      if (data?.error) throw new Error(data.error);
+      if (!data?.scenes) throw new Error("Risposta AI non valida");
       const enrichedScenes = data.scenes.map((s: StoryScene) => ({
         ...s, imageStatus: "idle" as const, videoStatus: "idle" as const, audioStatus: "idle" as const,
       }));
