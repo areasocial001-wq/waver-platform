@@ -22,8 +22,18 @@ interface OperationStat {
   lastSeen: string;
 }
 
+interface UserStat {
+  userId: string;
+  email: string | null;
+  fullName: string | null;
+  count: number;
+  avgDurationMs: number;
+  lastSeen: string;
+}
+
 export const KlingTimeoutsCard = () => {
   const [logs, setLogs] = useState<TimeoutLog[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, { email: string | null; full_name: string | null }>>({});
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -39,7 +49,22 @@ export const KlingTimeoutsCard = () => {
         .order("created_at", { ascending: false })
         .limit(500);
       if (error) throw error;
-      setLogs((data as TimeoutLog[]) || []);
+      const list = (data as TimeoutLog[]) || [];
+      setLogs(list);
+
+      // Fetch profiles for all user_ids in the timeout logs (admins can read all profiles)
+      const uniqueUserIds = Array.from(new Set(list.map(l => l.user_id).filter(Boolean)));
+      if (uniqueUserIds.length > 0) {
+        const { data: profs } = await supabase
+          .from("profiles")
+          .select("id, email, full_name")
+          .in("id", uniqueUserIds);
+        const map: Record<string, { email: string | null; full_name: string | null }> = {};
+        (profs || []).forEach(p => { map[p.id] = { email: p.email, full_name: p.full_name }; });
+        setProfiles(map);
+      } else {
+        setProfiles({});
+      }
     } catch (err: any) {
       toast.error(`Errore caricamento timeout: ${err.message}`);
     } finally {
