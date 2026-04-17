@@ -226,25 +226,56 @@ export const StoryModeWizard = () => {
     return () => clearInterval(interval);
   }, [generationStartTime, isGenerating]);
 
-  // Poll for pending Shotstack render
+  // Persist pendingRenderId to DB so polling can resume after page reload
+  useEffect(() => {
+    if (!projectId) return;
+    supabase.from("story_mode_projects").update({
+      pending_render_id: pendingRenderId,
+      render_started_at: pendingRenderId && renderStartTime ? new Date(renderStartTime).toISOString() : null,
+    } as any).eq("id", projectId).then(() => {});
+  }, [pendingRenderId, renderStartTime, projectId]);
+
+  // Poll for pending Shotstack render — extended to 10 min, with adaptive backoff
   useEffect(() => {
     if (!pendingRenderId || renderStatus !== "processing") return;
     let cancelled = false;
+    const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    const startedAt = renderStartTime || Date.now();
     const poll = async () => {
+      let consecutiveErrors = 0;
       while (!cancelled) {
-        await new Promise(r => setTimeout(r, 8000));
+        // Adaptive interval: 8s for first 2 min, then 15s
+        const elapsed = Date.now() - startedAt;
+        if (elapsed > POLL_TIMEOUT_MS) {
+          setRenderStatus("failed");
+          setPendingRenderId(null);
+          toast.error("Rendering scaduto dopo 10 minuti. Riprova con 'Rimonta Video Finale'.");
+          break;
+        }
+        const interval = elapsed > 120_000 ? 15000 : 8000;
+        await new Promise(r => setTimeout(r, interval));
         if (cancelled) break;
         try {
           const { data, error } = await supabase.functions.invoke("video-concat", {
             body: { pollRenderId: pendingRenderId },
           });
-          if (error) { console.error("Poll error:", error); continue; }
+          if (error) {
+            consecutiveErrors++;
+            console.error(`Poll error (${consecutiveErrors}):`, error);
+            if (consecutiveErrors >= 5) {
+              setRenderStatus("failed");
+              setPendingRenderId(null);
+              toast.error("Errori ripetuti durante il polling. Riprova manualmente.");
+              break;
+            }
+            continue;
+          }
+          consecutiveErrors = 0;
           if (data?.status === "completed" && data?.videoUrl) {
             setFinalVideoUrl(data.videoUrl);
             setRenderStatus("completed");
             setPendingRenderId(null);
             toast.success("Video finale pronto! 🎬");
-            // Browser push notification
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("Video pronto! 🎬", { body: "Il tuo video finale è stato renderizzato con successo.", icon: "/favicon.ico" });
             }
@@ -261,13 +292,14 @@ export const StoryModeWizard = () => {
           }
           // still processing, continue polling
         } catch (err) {
+          consecutiveErrors++;
           console.error("Poll exception:", err);
         }
       }
     };
     poll();
     return () => { cancelled = true; };
-  }, [pendingRenderId, renderStatus]);
+  }, [pendingRenderId, renderStatus, renderStartTime]);
 
   // Render elapsed timer
   useEffect(() => {
