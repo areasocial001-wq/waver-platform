@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
+import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
