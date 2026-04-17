@@ -359,7 +359,8 @@ export const StoryModeWizard = () => {
     if (imageUrl && imageUrl.startsWith("http")) {
       (window as any).__storyRefStorageUrl = imageUrl;
     }
-    setScript({ title: data.title, synopsis: data.synopsis || "", scenes: (data.scenes as any) || [], suggestedMusic: data.suggested_music || "" });
+    const loadedScenes = (data.scenes as any) || [];
+    setScript({ title: data.title, synopsis: data.synopsis || "", scenes: loadedScenes, suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
     setBackgroundMusicUrl(data.background_music_url);
     if (data.status === "completed") setStep("complete");
@@ -367,6 +368,26 @@ export const StoryModeWizard = () => {
     else setStep("script");
     setShowProjectList(false);
     toast.success(`Progetto "${data.title}" caricato`);
+
+    // Background migration: move heavy inline assets (data:/blob:) into storage
+    // so the JSONB row stays small and assets persist across sessions.
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { migrateSceneAssets } = await import("@/lib/sceneAssetMigration");
+        const { scenes: migrated, migratedCount } = await migrateSceneAssets(loadedScenes, data.id, user.id);
+        if (migratedCount > 0) {
+          await supabase.from("story_mode_projects")
+            .update({ scenes: migrated as any })
+            .eq("id", data.id);
+          setScript(prev => prev ? { ...prev, scenes: migrated } : prev);
+          toast.success(`${migratedCount} asset spostati nello storage per liberare spazio`);
+        }
+      } catch (err) {
+        console.warn("Background asset migration failed:", err);
+      }
+    })();
   };
 
   const deleteProject = async (id: string) => {
