@@ -1626,6 +1626,18 @@ export const StoryModeWizard = () => {
               <span className="hidden sm:inline ml-1">Salva</span>
             </Button>
           )}
+          {script && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={reconcileProject}
+              disabled={isReconciling || isSaving}
+              title="Ricontrolla scene con video presente, corregge stati incoerenti e completa il progetto"
+            >
+              {isReconciling ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              <span className="hidden sm:inline ml-1">Riconcilia</span>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => setShowProjectList(!showProjectList)}>
             <FolderOpen className="w-4 h-4" />
             <span className="hidden sm:inline ml-1">Progetti</span>
