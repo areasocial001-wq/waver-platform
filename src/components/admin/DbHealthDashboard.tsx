@@ -554,7 +554,29 @@ export const DbHealthDashboard = () => {
             Operazioni VACUUM/REINDEX (manuali e automatiche). Job settimanale: domenica 05:00 UTC.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* 30-day chart */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Spazio liberato per giorno (ultimi 30 giorni, MB)</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={maintenanceChartData}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="date" className="text-xs" interval={4} />
+                <YAxis className="text-xs" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "0.5rem",
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="vacuumMB" stroke="hsl(var(--primary))" name="VACUUM (MB)" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="reindexMB" stroke="hsl(var(--accent))" name="REINDEX (MB)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
           {maintenanceLog.length === 0 ? (
             <p className="text-sm text-muted-foreground py-4 text-center">
               Nessuna operazione registrata. Esegui un VACUUM o REINDEX per iniziare.
