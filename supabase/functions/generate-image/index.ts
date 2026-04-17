@@ -77,23 +77,35 @@ async function generateWithLovableAI(
   // Use the pro image model for better quality with reference images
   const imageModel = referenceImageUrl ? "google/gemini-3-pro-image-preview" : "google/gemini-2.5-flash-image";
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: imageModel,
-      messages: [{ role: "user", content }],
-      modalities: ["image", "text"],
-    }),
-  });
+  // Retry helper for transient AI Gateway errors (502/503/504)
+  const MAX_ATTEMPTS = 3;
+  let response: Response | null = null;
+  let rawText = "";
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: imageModel,
+        messages: [{ role: "user", content }],
+        modalities: ["image", "text"],
+      }),
+    });
+    rawText = await response.text();
 
-  const rawText = await response.text();
+    if (response.ok) break;
+    if (![502, 503, 504].includes(response.status) || attempt === MAX_ATTEMPTS) break;
 
-  if (!response.ok) {
-    console.error("Lovable AI image generation failed:", response.status, rawText);
+    const waitMs = attempt * 2000;
+    console.warn(`[generate-image] Lovable AI ${response.status} attempt ${attempt}/${MAX_ATTEMPTS}, retrying in ${waitMs}ms`);
+    await new Promise((res) => setTimeout(res, waitMs));
+  }
+
+  if (!response || !response.ok) {
+    console.error("Lovable AI image generation failed after retries:", response?.status, rawText.slice(0, 500));
     return null;
   }
 
