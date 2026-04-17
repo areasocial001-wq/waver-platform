@@ -49,11 +49,21 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
 
   // Editable volumes
   const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
   const [sfxVol, setSfxVol] = useState(70);
   const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
+
+  // Identify scenes whose generated assets don't match the requested aspect ratio
+  const nonCompliantScenes = scenes
+    .map((s, i) => ({ scene: s, index: i }))
+    .filter(({ scene }) =>
+      (scene.videoStatus === "completed" && !!scene.videoAspectWarning) ||
+      (!!scene.imageAspectWarning && (!scene.videoStatus || scene.videoStatus !== "completed")),
+    );
+  const hasNonCompliantBlocking = nonCompliantScenes.length > 0 && !ignoreAspectWarnings;
 
   const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
 
@@ -114,6 +124,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
     if (!open) {
       setSummary(null);
       setError(null);
+      setIgnoreAspectWarnings(false);
     }
   }, [open]);
 
@@ -309,6 +320,52 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               <Badge variant="secondary">{summary.tracks.length} tracce</Badge>
             </div>
 
+            {/* Aspect-ratio non-compliance — BLOCKING unless explicitly ignored */}
+            {nonCompliantScenes.length > 0 && (
+              <div className={cn(
+                "p-3 rounded-lg border space-y-2",
+                ignoreAspectWarnings
+                  ? "border-muted bg-muted/20"
+                  : "border-destructive/50 bg-destructive/5",
+              )}>
+                <p className={cn(
+                  "text-sm font-medium flex items-center gap-1.5",
+                  ignoreAspectWarnings ? "text-muted-foreground" : "text-destructive",
+                )}>
+                  <AlertTriangle className="w-4 h-4" />
+                  {nonCompliantScenes.length} {nonCompliantScenes.length === 1 ? "scena non conforme" : "scene non conformi"} al formato richiesto ({input.videoAspectRatio})
+                </p>
+                <ul className="text-xs space-y-1 max-h-32 overflow-y-auto pl-1">
+                  {nonCompliantScenes.map(({ scene, index }) => {
+                    const isVideoIssue = !!scene.videoAspectWarning;
+                    const w = isVideoIssue ? scene.videoWidth : scene.imageWidth;
+                    const h = isVideoIssue ? scene.videoHeight : scene.imageHeight;
+                    return (
+                      <li key={index} className="flex items-center gap-1.5 text-muted-foreground">
+                        <span className="font-mono text-foreground">#{scene.sceneNumber}</span>
+                        <Badge variant="outline" className="h-4 px-1 text-[9px]">{isVideoIssue ? "VIDEO" : "IMG"}</Badge>
+                        <span className="tabular-nums">{w}×{h}</span>
+                        <span className="text-muted-foreground/70 truncate">— {scene.narration?.slice(0, 40)}…</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-xs text-muted-foreground">
+                  {ignoreAspectWarnings
+                    ? "Procedendo, le scene non conformi verranno scalate/ritagliate dal renderer."
+                    : "Risolvi rigenerando le scene problematiche dal toolbar, oppure ignora per procedere comunque."}
+                </p>
+                <Button
+                  variant={ignoreAspectWarnings ? "outline" : "secondary"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setIgnoreAspectWarnings(v => !v)}
+                >
+                  {ignoreAspectWarnings ? "Riattiva controllo formato" : "Ignora e procedi comunque"}
+                </Button>
+              </div>
+            )}
+
             {/* Warnings */}
             {issues.length > 0 && (
               <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 space-y-1">
@@ -331,9 +388,11 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               onOpenChange(false);
               onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, musicVolume: musicVol });
             }}
-            disabled={loading || !!error}
+            disabled={loading || !!error || hasNonCompliantBlocking}
+            title={hasNonCompliantBlocking ? "Risolvi le scene non conformi o premi 'Ignora e procedi'" : undefined}
           >
-            <Film className="w-4 h-4 mr-2" />Avvia Rendering
+            <Film className="w-4 h-4 mr-2" />
+            {hasNonCompliantBlocking ? `Bloccato (${nonCompliantScenes.length} non conformi)` : "Avvia Rendering"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1240,6 +1240,28 @@ export const StoryModeWizard = () => {
     toast.success("Rigenerazione immagini non conformi completata!");
   };
 
+  // Regenerate every scene whose video has an aspect-ratio warning (e.g. Kling returned 16:9 for a 9:16 request)
+  const handleRegenerateNonCompliantVideos = async () => {
+    if (!script) return;
+    const nonCompliant = script.scenes
+      .map((s, i) => ({ scene: s, index: i }))
+      .filter(({ scene }) => !!scene.videoAspectWarning);
+    if (nonCompliant.length === 0) {
+      toast.info("Tutti i video rispettano il formato richiesto.");
+      return;
+    }
+    toast.info(`Rigenerazione di ${nonCompliant.length} ${nonCompliant.length === 1 ? "video non conforme" : "video non conformi"}...`);
+    setIsGenerating(true);
+    setRegenProgress({ current: 0, total: nonCompliant.length });
+    for (let i = 0; i < nonCompliant.length; i++) {
+      setRegenProgress({ current: i, total: nonCompliant.length });
+      await regenerateSceneAsset(nonCompliant[i].index, "video");
+    }
+    setRegenProgress(null);
+    setIsGenerating(false);
+    toast.success("Rigenerazione video non conformi completata!");
+  };
+
   // Re-assemble final video from existing scene assets (no re-generation)
   const handleReassemble = async (volumeOverrides?: RenderVolumes) => {
     if (!script) return;
@@ -2193,6 +2215,21 @@ export const StoryModeWizard = () => {
                 >
                   {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
                   Rigenera Immagini Non Conformi ({nonCompliant.length})
+                </Button>
+              ) : null;
+            })()}
+            {/* Regenerate non-compliant aspect-ratio videos */}
+            {(() => {
+              const nonCompliantVids = script.scenes.filter(s => !!s.videoAspectWarning);
+              return nonCompliantVids.length > 0 ? (
+                <Button
+                  variant="outline"
+                  onClick={handleRegenerateNonCompliantVideos}
+                  disabled={isGenerating}
+                  className="border-amber-500/50 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                >
+                  {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}
+                  Rigenera Video Non Conformi ({nonCompliantVids.length})
                 </Button>
               ) : null;
             })()}
