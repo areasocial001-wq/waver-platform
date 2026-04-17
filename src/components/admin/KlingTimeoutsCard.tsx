@@ -175,13 +175,17 @@ export const KlingTimeoutsCard = () => {
         userId: l.user_id,
         email: p?.email ?? null,
         fullName: p?.full_name ?? null,
+        plan: userPlans[l.user_id] ?? null,
         count: 1,
         avgDurationMs: dur,
         lastSeen: l.created_at,
       });
     }
   }
-  const topUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+  const allUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count);
+  const maxUserCount = allUsers.length ? Math.max(...allUsers.map(u => u.count)) : 1;
+  const sliderMax = Math.max(10, maxUserCount);
+  const topUsers = allUsers.filter(u => u.count >= minTimeouts).slice(0, 10);
 
   const formatMs = (ms: number) => {
     const total = Math.floor(ms / 1000);
