@@ -170,7 +170,7 @@ export const KlingTimeoutsCard = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Summary metrics */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-lg border bg-card p-3">
             <p className="text-xs text-muted-foreground">Timeout totali</p>
             <p className="text-2xl font-bold">{totalCount}</p>
@@ -182,7 +182,13 @@ export const KlingTimeoutsCard = () => {
             <p className="text-2xl font-bold">{avgDurationMs ? formatMs(avgDurationMs) : "—"}</p>
           </div>
           <div className="rounded-lg border bg-card p-3">
-            <p className="text-xs text-muted-foreground">Utenti impattati</p>
+            <p className="text-xs text-muted-foreground">Op. uniche</p>
+            <p className="text-2xl font-bold">{opMap.size}</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <User className="h-3 w-3" /> Utenti impattati
+            </p>
             <p className="text-2xl font-bold">{userMap.size}</p>
           </div>
         </div>
