@@ -136,7 +136,14 @@ serve(async (req) => {
       }
       userId = userData.user.id;
     }
-    const body = await req.json();
+    let body: any;
+    try {
+      body = await req.json();
+    } catch (_e) {
+      return new Response(JSON.stringify({ error: 'Invalid or empty JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Validate input
     const parseResult = requestSchema.safeParse(body);
