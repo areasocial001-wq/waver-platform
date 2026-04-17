@@ -49,11 +49,21 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
 
   // Editable volumes
   const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
   const [sfxVol, setSfxVol] = useState(70);
   const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
+
+  // Identify scenes whose generated assets don't match the requested aspect ratio
+  const nonCompliantScenes = scenes
+    .map((s, i) => ({ scene: s, index: i }))
+    .filter(({ scene }) =>
+      (scene.videoStatus === "completed" && !!scene.videoAspectWarning) ||
+      (!!scene.imageAspectWarning && (!scene.videoStatus || scene.videoStatus !== "completed")),
+    );
+  const hasNonCompliantBlocking = nonCompliantScenes.length > 0 && !ignoreAspectWarnings;
 
   const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
 
@@ -114,6 +124,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
     if (!open) {
       setSummary(null);
       setError(null);
+      setIgnoreAspectWarnings(false);
     }
   }, [open]);
 
