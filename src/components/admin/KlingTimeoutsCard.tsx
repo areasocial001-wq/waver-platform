@@ -1,11 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, RefreshCw, Clock, Mail, User } from "lucide-react";
+import { AlertTriangle, RefreshCw, Clock, Mail, User, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+// Plan priority for sorting/badge styling — higher = more important customer
+const PLAN_PRIORITY: Record<string, number> = {
+  business: 5,
+  creator: 4,
+  premium: 3,
+  moderator: 2,
+  admin: 1,
+  user: 0,
+};
+
+const planBadgeVariant = (plan: string | null): "default" | "secondary" | "destructive" | "outline" => {
+  if (!plan) return "outline";
+  if (plan === "business" || plan === "creator" || plan === "premium") return "default";
+  if (plan === "admin" || plan === "moderator") return "secondary";
+  return "outline";
+};
+
+const pickTopPlan = (roles: string[]): string | null => {
+  if (!roles.length) return null;
+  return [...roles].sort((a, b) => (PLAN_PRIORITY[b] ?? 0) - (PLAN_PRIORITY[a] ?? 0))[0];
+};
 
 interface TimeoutLog {
   id: string;
