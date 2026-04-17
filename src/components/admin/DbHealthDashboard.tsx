@@ -4,7 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2 } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -62,6 +73,8 @@ export const DbHealthDashboard = () => {
   const [history, setHistory] = useState<SnapshotRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [vacuuming, setVacuuming] = useState(false);
+  const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -106,6 +119,25 @@ export const DbHealthDashboard = () => {
     }
   };
 
+  const handleVacuum = async () => {
+    setVacuuming(true);
+    setMaintenanceResult(null);
+    try {
+      const { data, error } = await supabase.rpc("run_db_maintenance" as any);
+      if (error) throw error;
+      const result = data as any;
+      setMaintenanceResult(result);
+      toast.success(
+        `Manutenzione completata: ${result.tables_processed} tabelle, liberati ${result.total_freed_pretty}`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante la manutenzione");
+    } finally {
+      setVacuuming(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -139,7 +171,27 @@ export const DbHealthDashboard = () => {
           </h2>
           <p className="text-sm text-muted-foreground">Monitoraggio in tempo reale</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={vacuuming}>
+                {vacuuming ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Wrench className="h-4 w-4 mr-1" />}
+                {vacuuming ? "Manutenzione..." : "VACUUM/ANALYZE"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Eseguire manutenzione database?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Verrà eseguito <code>VACUUM ANALYZE</code> sulle tabelle pubbliche più pesanti per liberare dead tuples e aggiornare le statistiche del query planner. L'operazione può richiedere alcuni secondi e blocca temporaneamente le scritture sulle tabelle interessate.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annulla</AlertDialogCancel>
+                <AlertDialogAction onClick={handleVacuum}>Esegui</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button variant="outline" size="sm" onClick={handleSnapshot}>
             <Activity className="h-4 w-4 mr-1" /> Snapshot
           </Button>
@@ -148,6 +200,34 @@ export const DbHealthDashboard = () => {
           </Button>
         </div>
       </div>
+
+      {/* Maintenance result */}
+      {maintenanceResult && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Manutenzione completata
+            </CardTitle>
+            <CardDescription>
+              {maintenanceResult.tables_processed} tabelle processate · spazio liberato: <strong>{maintenanceResult.total_freed_pretty}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-1 max-h-48 overflow-y-auto text-sm">
+              {(maintenanceResult.results || []).map((r: any) => (
+                <div key={r.table} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/30">
+                  <span className="font-mono text-xs">{r.table}</span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{r.size_before} → {r.size_after}</span>
+                    <Badge variant="outline" className="text-xs">{r.duration_ms}ms</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPI cards */}
       <div className="grid gap-4 md:grid-cols-3">
