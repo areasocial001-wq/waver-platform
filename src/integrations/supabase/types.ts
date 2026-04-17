@@ -374,6 +374,45 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_log: {
+        Row: {
+          created_at: string
+          details: Json
+          duration_ms: number
+          error_message: string | null
+          id: string
+          operation: string
+          status: string
+          tables_processed: number
+          total_freed_bytes: number
+          triggered_by: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          duration_ms?: number
+          error_message?: string | null
+          id?: string
+          operation: string
+          status?: string
+          tables_processed?: number
+          total_freed_bytes?: number
+          triggered_by?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          duration_ms?: number
+          error_message?: string | null
+          id?: string
+          operation?: string
+          status?: string
+          tables_processed?: number
+          total_freed_bytes?: number
+          triggered_by?: string
+        }
+        Relationships: []
+      }
       motion_presets: {
         Row: {
           category: string
@@ -1003,6 +1042,8 @@ export type Database = {
       }
       record_db_health_snapshot: { Args: never; Returns: undefined }
       run_db_maintenance: { Args: never; Returns: Json }
+      run_db_reindex: { Args: never; Returns: Json }
+      run_scheduled_maintenance: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:
