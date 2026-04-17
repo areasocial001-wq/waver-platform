@@ -1,11 +1,34 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertTriangle, RefreshCw, Clock, Mail, User } from "lucide-react";
+import { AlertTriangle, RefreshCw, Clock, Mail, User, Crown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+// Plan priority for sorting/badge styling — higher = more important customer
+const PLAN_PRIORITY: Record<string, number> = {
+  business: 5,
+  creator: 4,
+  premium: 3,
+  moderator: 2,
+  admin: 1,
+  user: 0,
+};
+
+const planBadgeVariant = (plan: string | null): "default" | "secondary" | "destructive" | "outline" => {
+  if (!plan) return "outline";
+  if (plan === "business" || plan === "creator" || plan === "premium") return "default";
+  if (plan === "admin" || plan === "moderator") return "secondary";
+  return "outline";
+};
+
+const pickTopPlan = (roles: string[]): string | null => {
+  if (!roles.length) return null;
+  return [...roles].sort((a, b) => (PLAN_PRIORITY[b] ?? 0) - (PLAN_PRIORITY[a] ?? 0))[0];
+};
 
 interface TimeoutLog {
   id: string;
@@ -26,6 +49,7 @@ interface UserStat {
   userId: string;
   email: string | null;
   fullName: string | null;
+  plan: string | null;
   count: number;
   avgDurationMs: number;
   lastSeen: string;
@@ -34,7 +58,9 @@ interface UserStat {
 export const KlingTimeoutsCard = () => {
   const [logs, setLogs] = useState<TimeoutLog[]>([]);
   const [profiles, setProfiles] = useState<Record<string, { email: string | null; full_name: string | null }>>({});
+  const [userPlans, setUserPlans] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
+  const [minTimeouts, setMinTimeouts] = useState(1);
 
   const load = async () => {
     setLoading(true);
@@ -52,18 +78,32 @@ export const KlingTimeoutsCard = () => {
       const list = (data as TimeoutLog[]) || [];
       setLogs(list);
 
-      // Fetch profiles for all user_ids in the timeout logs (admins can read all profiles)
+      // Fetch profiles + roles for all user_ids in the timeout logs (admins can read all)
       const uniqueUserIds = Array.from(new Set(list.map(l => l.user_id).filter(Boolean)));
       if (uniqueUserIds.length > 0) {
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("id, email, full_name")
-          .in("id", uniqueUserIds);
+        const [{ data: profs }, { data: roles }] = await Promise.all([
+          supabase.from("profiles").select("id, email, full_name").in("id", uniqueUserIds),
+          supabase.from("user_roles").select("user_id, role").in("user_id", uniqueUserIds),
+        ]);
         const map: Record<string, { email: string | null; full_name: string | null }> = {};
         (profs || []).forEach(p => { map[p.id] = { email: p.email, full_name: p.full_name }; });
         setProfiles(map);
+
+        // Aggregate roles per user → keep highest-priority plan
+        const rolesByUser = new Map<string, string[]>();
+        (roles || []).forEach(r => {
+          const arr = rolesByUser.get(r.user_id) || [];
+          arr.push(r.role as string);
+          rolesByUser.set(r.user_id, arr);
+        });
+        const planMap: Record<string, string | null> = {};
+        uniqueUserIds.forEach(uid => {
+          planMap[uid] = pickTopPlan(rolesByUser.get(uid) || []);
+        });
+        setUserPlans(planMap);
       } else {
         setProfiles({});
+        setUserPlans({});
       }
     } catch (err: any) {
       toast.error(`Errore caricamento timeout: ${err.message}`);
@@ -135,13 +175,17 @@ export const KlingTimeoutsCard = () => {
         userId: l.user_id,
         email: p?.email ?? null,
         fullName: p?.full_name ?? null,
+        plan: userPlans[l.user_id] ?? null,
         count: 1,
         avgDurationMs: dur,
         lastSeen: l.created_at,
       });
     }
   }
-  const topUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
+  const allUsers = Array.from(userMap.values()).sort((a, b) => b.count - a.count);
+  const maxUserCount = allUsers.length ? Math.max(...allUsers.map(u => u.count)) : 1;
+  const sliderMax = Math.max(10, maxUserCount);
+  const topUsers = allUsers.filter(u => u.count >= minTimeouts).slice(0, 10);
 
   const formatMs = (ms: number) => {
     const total = Math.floor(ms / 1000);
@@ -262,16 +306,32 @@ export const KlingTimeoutsCard = () => {
             </div>
 
             {/* Top users impacted */}
-            {topUsers.length > 0 && (
+            {allUsers.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  <User className="h-4 w-4" /> Top utenti impattati
-                </h4>
+                <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                  <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                    <User className="h-4 w-4" /> Top utenti impattati
+                  </h4>
+                  <div className="flex items-center gap-3 flex-1 max-w-xs min-w-[200px]">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      Min timeout: <span className="font-mono font-semibold text-foreground">{minTimeouts}</span>
+                    </span>
+                    <Slider
+                      value={[minTimeouts]}
+                      onValueChange={(v) => setMinTimeouts(v[0])}
+                      min={1}
+                      max={Math.min(sliderMax, 10)}
+                      step={1}
+                      className="flex-1"
+                    />
+                  </div>
+                </div>
                 <div className="rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Utente</TableHead>
+                        <TableHead>Piano</TableHead>
                         <TableHead className="text-right">Timeout</TableHead>
                         <TableHead className="text-right">Durata media</TableHead>
                         <TableHead>Ultimo</TableHead>
@@ -293,6 +353,18 @@ export const KlingTimeoutsCard = () => {
                                 {u.userId.slice(0, 8)}…
                               </span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {u.plan ? (
+                              <Badge variant={planBadgeVariant(u.plan)} className="capitalize gap-1">
+                                {(u.plan === "premium" || u.plan === "creator" || u.plan === "business") && (
+                                  <Crown className="h-3 w-3" />
+                                )}
+                                {u.plan}
+                              </Badge>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <Badge variant={u.count > 2 ? "destructive" : u.count > 1 ? "default" : "secondary"}>
@@ -325,6 +397,11 @@ export const KlingTimeoutsCard = () => {
                     </TableBody>
                   </Table>
                 </div>
+                {topUsers.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Nessun utente con almeno {minTimeouts} timeout. Riduci il filtro per vedere più risultati.
+                  </p>
+                )}
               </div>
             )}
 
