@@ -2320,13 +2320,23 @@ export const StoryModeWizard = () => {
                 </Button>
               ) : null;
             })()}
-            {/* Show reassemble button if project has existing video assets */}
-            {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
-              <Button variant="secondary" onClick={() => handleReassemble()} disabled={isGenerating}>
-                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
-                Rimonta Video Finale
-              </Button>
-            )}
+            {/* "Solo concat finale" — skip scene generation, montaggio diretto da scene già completate */}
+            {(() => {
+              const completedVids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+              if (completedVids.length < 2) return null;
+              return (
+                <Button
+                  variant="default"
+                  onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }}
+                  disabled={isGenerating || renderStatus === "processing"}
+                  className="bg-primary/90 hover:bg-primary"
+                  title={`Salta la generazione delle scene e monta direttamente il video finale dalle ${completedVids.length} scene già pronte`}
+                >
+                  {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                  🎬 Solo concat finale ({completedVids.length} scene pronte)
+                </Button>
+              );
+            })()}
             <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
           </div>
         </div>
