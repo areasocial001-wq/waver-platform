@@ -437,6 +437,7 @@ export const DbHealthDashboard = () => {
                   <TableHead>Stato</TableHead>
                   <TableHead>Ultima esecuzione</TableHead>
                   <TableHead>Esito</TableHead>
+                  <TableHead className="text-right">Azioni</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
