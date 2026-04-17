@@ -218,7 +218,7 @@ serve(async (req) => {
     // and go directly to Lovable AI which supports multimodal input
     if (referenceImageUrl) {
       console.log("Reference image provided — using Lovable AI for character-consistent generation");
-      const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+      const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
       if (lovableImageUrl) {
         return new Response(
           JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -291,7 +291,7 @@ serve(async (req) => {
 
       // If Replicate failed with rate limit / server error, try Lovable AI fallback
       if (replicateFailed) {
-        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+        const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
         if (lovableImageUrl) {
           return new Response(
             JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
@@ -314,7 +314,7 @@ serve(async (req) => {
 
     // No Replicate key — try Lovable AI directly
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
-    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl);
+    const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
     if (lovableImageUrl) {
       return new Response(
         JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
