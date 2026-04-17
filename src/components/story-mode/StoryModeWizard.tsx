@@ -226,25 +226,47 @@ export const StoryModeWizard = () => {
     return () => clearInterval(interval);
   }, [generationStartTime, isGenerating]);
 
-  // Poll for pending Shotstack render
+  // Poll for pending Shotstack render — extended to 10 min, with adaptive backoff
   useEffect(() => {
     if (!pendingRenderId || renderStatus !== "processing") return;
     let cancelled = false;
+    const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+    const startedAt = renderStartTime || Date.now();
     const poll = async () => {
+      let consecutiveErrors = 0;
       while (!cancelled) {
-        await new Promise(r => setTimeout(r, 8000));
+        // Adaptive interval: 8s for first 2 min, then 15s
+        const elapsed = Date.now() - startedAt;
+        if (elapsed > POLL_TIMEOUT_MS) {
+          setRenderStatus("failed");
+          setPendingRenderId(null);
+          toast.error("Rendering scaduto dopo 10 minuti. Riprova con 'Rimonta Video Finale'.");
+          break;
+        }
+        const interval = elapsed > 120_000 ? 15000 : 8000;
+        await new Promise(r => setTimeout(r, interval));
         if (cancelled) break;
         try {
           const { data, error } = await supabase.functions.invoke("video-concat", {
             body: { pollRenderId: pendingRenderId },
           });
-          if (error) { console.error("Poll error:", error); continue; }
+          if (error) {
+            consecutiveErrors++;
+            console.error(`Poll error (${consecutiveErrors}):`, error);
+            if (consecutiveErrors >= 5) {
+              setRenderStatus("failed");
+              setPendingRenderId(null);
+              toast.error("Errori ripetuti durante il polling. Riprova manualmente.");
+              break;
+            }
+            continue;
+          }
+          consecutiveErrors = 0;
           if (data?.status === "completed" && data?.videoUrl) {
             setFinalVideoUrl(data.videoUrl);
             setRenderStatus("completed");
             setPendingRenderId(null);
             toast.success("Video finale pronto! 🎬");
-            // Browser push notification
             if ("Notification" in window && Notification.permission === "granted") {
               new Notification("Video pronto! 🎬", { body: "Il tuo video finale è stato renderizzato con successo.", icon: "/favicon.ico" });
             }
@@ -261,13 +283,14 @@ export const StoryModeWizard = () => {
           }
           // still processing, continue polling
         } catch (err) {
+          consecutiveErrors++;
           console.error("Poll exception:", err);
         }
       }
     };
     poll();
     return () => { cancelled = true; };
-  }, [pendingRenderId, renderStatus]);
+  }, [pendingRenderId, renderStatus, renderStartTime]);
 
   // Render elapsed timer
   useEffect(() => {
@@ -291,6 +314,15 @@ export const StoryModeWizard = () => {
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
+
+  // Persist pendingRenderId to DB so polling can resume after page reload
+  useEffect(() => {
+    if (!projectId) return;
+    supabase.from("story_mode_projects").update({
+      pending_render_id: pendingRenderId,
+      render_started_at: pendingRenderId && renderStartTime ? new Date(renderStartTime).toISOString() : null,
+    } as any).eq("id", projectId).then(() => {});
+  }, [pendingRenderId, renderStartTime, projectId]);
 
   useEffect(() => { loadProjectList(); }, []);
 
@@ -452,7 +484,7 @@ export const StoryModeWizard = () => {
     // Select only needed columns - avoid fetching the entire row (scenes JSONB can be huge)
     const { data, error } = await supabase
       .from("story_mode_projects")
-      .select("id, title, synopsis, suggested_music, scenes, input_config, status, final_video_url, background_music_url")
+      .select("id, title, synopsis, suggested_music, scenes, input_config, status, final_video_url, background_music_url, pending_render_id, render_started_at")
       .eq("id", id)
       .single();
     if (error || !data) { toast.error("Errore nel caricamento"); return; }
@@ -500,6 +532,26 @@ export const StoryModeWizard = () => {
     setShowProjectList(false);
     toast.success(`Progetto "${data.title}" caricato`);
 
+    // Resume polling if a render was in progress and is still within 10 min window
+    const pendingRid = (data as any).pending_render_id;
+    const renderStartedAt = (data as any).render_started_at;
+    if (pendingRid && renderStartedAt && !data.final_video_url) {
+      const startedMs = new Date(renderStartedAt).getTime();
+      const elapsed = Date.now() - startedMs;
+      if (elapsed < 10 * 60 * 1000) {
+        setPendingRenderId(pendingRid);
+        setRenderStartTime(startedMs);
+        setRenderElapsed(Math.floor(elapsed / 1000));
+        setRenderStatus("processing");
+        setStep("complete");
+        toast.info(`Ripristino polling rendering (${Math.floor(elapsed / 1000)}s trascorsi)…`);
+      } else {
+        // Timeout exceeded — clear stale render id
+        supabase.from("story_mode_projects").update({ pending_render_id: null, render_started_at: null } as any).eq("id", data.id).then(() => {});
+        toast.warning("Il rendering precedente è scaduto. Usa 'Solo concat finale' per riprovare.");
+      }
+    }
+
     if (autoResetCount > 0) {
       toast.info(`${autoResetCount} ${autoResetCount === 1 ? "scena bloccata da oltre 20 minuti è stata sbloccata" : "scene bloccate da oltre 20 minuti sono state sbloccate"} automaticamente. Puoi rigenerarle.`);
       // Persist the reset so reloading doesn't show them stuck again
@@ -514,12 +566,47 @@ export const StoryModeWizard = () => {
         if (!user) return;
         const { migrateSceneAssets } = await import("@/lib/sceneAssetMigration");
         const { scenes: migrated, migratedCount } = await migrateSceneAssets(loadedScenes, data.id, user.id);
-        if (migratedCount > 0) {
+
+        // Detect scenes whose audioUrl was a dead blob: (now empty after migration)
+        // and the original had a blob url → re-generate narration via TTS so the audio track survives.
+        const scenesNeedingAudio: number[] = [];
+        migrated.forEach((s, i) => {
+          const original = loadedScenes[i];
+          const hadBlobAudio = typeof original?.audioUrl === "string" && original.audioUrl.startsWith("blob:");
+          if (hadBlobAudio && !s.audioUrl && s.narration) {
+            scenesNeedingAudio.push(i);
+          }
+        });
+
+        let reuploadedAudio = 0;
+        if (scenesNeedingAudio.length > 0) {
+          toast.info(`Rigenerazione audio scaduto per ${scenesNeedingAudio.length} ${scenesNeedingAudio.length === 1 ? "scena" : "scene"}…`);
+          const authHeaders = await getAuthHeaders();
+          for (const i of scenesNeedingAudio) {
+            try {
+              const sc = migrated[i];
+              const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+                method: "POST", headers: authHeaders,
+                body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
+              });
+              if (!r.ok) continue;
+              const blob = await r.blob();
+              const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
+              migrated[i] = { ...migrated[i], audioUrl: storageUrl, audioStatus: "completed" };
+              reuploadedAudio++;
+            } catch (e) {
+              console.warn(`Audio re-upload failed for scene ${i + 1}:`, e);
+            }
+          }
+        }
+
+        if (migratedCount > 0 || reuploadedAudio > 0) {
           await supabase.from("story_mode_projects")
             .update({ scenes: migrated as any })
             .eq("id", data.id);
           setScript(prev => prev ? { ...prev, scenes: migrated } : prev);
-          toast.success(`${migratedCount} asset spostati nello storage per liberare spazio`);
+          if (migratedCount > 0) toast.success(`${migratedCount} asset spostati nello storage per liberare spazio`);
+          if (reuploadedAudio > 0) toast.success(`${reuploadedAudio} ${reuploadedAudio === 1 ? "audio rigenerato" : "audio rigenerati"} dopo URL blob scaduto`);
         }
       } catch (err) {
         console.warn("Background asset migration failed:", err);
@@ -2233,13 +2320,23 @@ export const StoryModeWizard = () => {
                 </Button>
               ) : null;
             })()}
-            {/* Show reassemble button if project has existing video assets */}
-            {script.scenes.some(s => s.videoStatus === "completed" && s.videoUrl) && (
-              <Button variant="secondary" onClick={() => handleReassemble()} disabled={isGenerating}>
-                {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
-                Rimonta Video Finale
-              </Button>
-            )}
+            {/* "Solo concat finale" — skip scene generation, montaggio diretto da scene già completate */}
+            {(() => {
+              const completedVids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+              if (completedVids.length < 2) return null;
+              return (
+                <Button
+                  variant="default"
+                  onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }}
+                  disabled={isGenerating || renderStatus === "processing"}
+                  className="bg-primary/90 hover:bg-primary"
+                  title={`Salta la generazione delle scene e monta direttamente il video finale dalle ${completedVids.length} scene già pronte`}
+                >
+                  {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
+                  🎬 Solo concat finale ({completedVids.length} scene pronte)
+                </Button>
+              );
+            })()}
             <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
           </div>
         </div>

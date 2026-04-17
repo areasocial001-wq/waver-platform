@@ -582,6 +582,8 @@ export type Database = {
           final_video_url: string | null
           id: string
           input_config: Json
+          pending_render_id: string | null
+          render_started_at: string | null
           scenes: Json
           status: string
           suggested_music: string | null
@@ -596,6 +598,8 @@ export type Database = {
           final_video_url?: string | null
           id?: string
           input_config?: Json
+          pending_render_id?: string | null
+          render_started_at?: string | null
           scenes?: Json
           status?: string
           suggested_music?: string | null
@@ -610,6 +614,8 @@ export type Database = {
           final_video_url?: string | null
           id?: string
           input_config?: Json
+          pending_render_id?: string | null
+          render_started_at?: string | null
           scenes?: Json
           status?: string
           suggested_music?: string | null
