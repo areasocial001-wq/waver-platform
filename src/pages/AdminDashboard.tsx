@@ -15,9 +15,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign, Database } from "lucide-react";
 import { WaitlistManager } from "@/components/admin/WaitlistManager";
 import { CostMarginDashboard } from "@/components/admin/CostMarginDashboard";
+import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
 
 interface AdminUser {
   id: string;
@@ -152,6 +153,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="costs" className="flex items-center gap-2">
                 <DollarSign className="h-4 w-4" />
                 Costi & Margini
+              </TabsTrigger>
+              <TabsTrigger value="db" className="flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Database
               </TabsTrigger>
             </TabsList>
 
@@ -352,6 +357,10 @@ export default function AdminDashboard() {
 
             <TabsContent value="costs">
               <CostMarginDashboard />
+            </TabsContent>
+
+            <TabsContent value="db">
+              <DbHealthDashboard />
             </TabsContent>
           </Tabs>
         </div>
