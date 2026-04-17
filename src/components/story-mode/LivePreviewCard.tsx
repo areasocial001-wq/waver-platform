@@ -9,15 +9,16 @@ import { cn } from "@/lib/utils";
 interface LivePreviewCardProps {
   scenes: StoryScene[];
   totalScenes: number;
+  aspectRatio?: string;
 }
 
-export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
-  const completedVideos = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+export function LivePreviewCard({ scenes, totalScenes, aspectRatio = "16:9" }: LivePreviewCardProps) {
+  const completedVideos = scenes.filter(s => !!s.videoUrl && (s.videoStatus === "completed" || s.videoStatus === "generating"));
   const [selectedIndex, setSelectedIndex] = useState(completedVideos.length - 1);
   const [playAll, setPlayAll] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const aspectClass = aspectRatio === "9:16" ? "aspect-[9/16]" : aspectRatio === "4:3" ? "aspect-[4/3]" : "aspect-video";
 
-  // Auto-advance to latest when new scenes complete (only if not in play-all mode)
   useEffect(() => {
     if (!playAll) setSelectedIndex(completedVideos.length - 1);
   }, [completedVideos.length, playAll]);
@@ -28,7 +29,7 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
     if (nextIndex < completedVideos.length) {
       setSelectedIndex(nextIndex);
     } else {
-      setPlayAll(false); // finished all
+      setPlayAll(false);
     }
   }, [playAll, selectedIndex, completedVideos.length]);
 
@@ -89,27 +90,29 @@ export function LivePreviewCard({ scenes, totalScenes }: LivePreviewCardProps) {
       </CardHeader>
       <CardContent className="space-y-2">
         {isLoading ? (
-          <div className="flex items-center justify-center h-[200px] bg-muted rounded-lg">
+          <div className={cn("flex items-center justify-center bg-muted rounded-lg", aspectClass)}>
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : playableUrl ? (
-          <video
-            ref={videoRef}
-            key={playableUrl}
-            src={playableUrl}
-            controls
-            autoPlay
-            muted
-            className="w-full rounded-lg max-h-[300px]"
-            onEnded={handleVideoEnded}
-          />
+          <div className={cn("w-full rounded-lg overflow-hidden bg-black", aspectClass)}>
+            <video
+              ref={videoRef}
+              key={playableUrl}
+              src={playableUrl}
+              controls
+              autoPlay
+              muted
+              playsInline
+              className="w-full h-full object-contain"
+              onEnded={handleVideoEnded}
+            />
+          </div>
         ) : (
-          <div className="flex items-center justify-center h-[200px] bg-muted rounded-lg text-muted-foreground text-sm">
+          <div className={cn("flex items-center justify-center bg-muted rounded-lg text-muted-foreground text-sm", aspectClass)}>
             Caricamento video...
           </div>
         )}
 
-        {/* Thumbnail strip */}
         {completedVideos.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {completedVideos.map((scene, i) => (
