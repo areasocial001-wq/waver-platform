@@ -2549,6 +2549,9 @@ export const StoryModeWizard = () => {
             }
             setPendingRenderAction(null);
           }}
+          onRegenerateScene={async (sceneIndex, type) => {
+            await regenerateSceneAsset(sceneIndex, type);
+          }}
         />
       )}
     </div>
