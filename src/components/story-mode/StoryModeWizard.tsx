@@ -15,7 +15,7 @@ import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
   Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square, Pause,
-  AlertTriangle,
+  AlertTriangle, ShieldCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
 import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
+import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
