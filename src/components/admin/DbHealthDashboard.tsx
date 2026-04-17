@@ -201,6 +201,34 @@ export const DbHealthDashboard = () => {
         </div>
       </div>
 
+      {/* Maintenance result */}
+      {maintenanceResult && (
+        <Card className="border-primary/30 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+              Manutenzione completata
+            </CardTitle>
+            <CardDescription>
+              {maintenanceResult.tables_processed} tabelle processate · spazio liberato: <strong>{maintenanceResult.total_freed_pretty}</strong>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-1 max-h-48 overflow-y-auto text-sm">
+              {(maintenanceResult.results || []).map((r: any) => (
+                <div key={r.table} className="flex items-center justify-between py-1 px-2 rounded hover:bg-muted/30">
+                  <span className="font-mono text-xs">{r.table}</span>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{r.size_before} → {r.size_after}</span>
+                    <Badge variant="outline" className="text-xs">{r.duration_ms}ms</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
