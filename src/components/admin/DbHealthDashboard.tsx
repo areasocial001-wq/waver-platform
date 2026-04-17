@@ -167,6 +167,20 @@ export const DbHealthDashboard = () => {
     }
   };
 
+  const handleRunCron = async (jobname: string) => {
+    setRunningCron(true);
+    try {
+      const { error } = await supabase.rpc("run_scheduled_maintenance" as any);
+      if (error) throw error;
+      toast.success(`Job "${jobname}" eseguito manualmente`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante l'esecuzione del job");
+    } finally {
+      setRunningCron(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
