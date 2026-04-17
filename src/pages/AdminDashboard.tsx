@@ -19,6 +19,7 @@ import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail
 import { WaitlistManager } from "@/components/admin/WaitlistManager";
 import { CostMarginDashboard } from "@/components/admin/CostMarginDashboard";
 import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
+import { KlingTimeoutsCard } from "@/components/admin/KlingTimeoutsCard";
 
 interface AdminUser {
   id: string;
