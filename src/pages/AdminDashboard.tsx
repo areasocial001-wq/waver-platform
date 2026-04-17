@@ -350,6 +350,9 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
               </div>
+              <div className="mt-4">
+                <KlingTimeoutsCard />
+              </div>
             </TabsContent>
 
             <TabsContent value="waitlist">
