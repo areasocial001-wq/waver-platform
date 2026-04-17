@@ -366,6 +366,87 @@ export const StoryModeWizard = () => {
     await persistProject();
   };
 
+  const [isReconciling, setIsReconciling] = useState(false);
+
+  const reconcileProject = async () => {
+    if (!script) {
+      toast.error("Nessun progetto da riconciliare");
+      return;
+    }
+    setIsReconciling(true);
+    try {
+      const scenes = [...script.scenes];
+      let fixedScenes = 0;
+      let clearedErrors = 0;
+
+      const STUCK_MS = 15 * 60 * 1000;
+      const next = scenes.map((s) => {
+        const updated = { ...s };
+        // 1) videoUrl present but status not "completed" → fix
+        if (updated.videoUrl && updated.videoStatus !== "completed") {
+          updated.videoStatus = "completed";
+          updated.videoGeneratingStartedAt = undefined;
+          fixedScenes++;
+        }
+        // 2) "generating" without start timestamp or stuck → reset to idle
+        if (
+          updated.videoStatus === "generating" &&
+          (!updated.videoGeneratingStartedAt ||
+            Date.now() - updated.videoGeneratingStartedAt > STUCK_MS) &&
+          !updated.videoUrl
+        ) {
+          updated.videoStatus = "idle";
+          updated.videoGeneratingStartedAt = undefined;
+          fixedScenes++;
+        }
+        // 3) clear stale RLS / generic errors when the asset is actually present
+        if (
+          updated.error &&
+          updated.videoUrl &&
+          updated.videoStatus === "completed"
+        ) {
+          updated.error = undefined;
+          clearedErrors++;
+        }
+        // 4) align audio/sfx status with presence of url
+        if (updated.audioUrl && updated.audioStatus !== "completed") {
+          updated.audioStatus = "completed";
+        }
+        if (updated.sfxUrl && updated.sfxStatus !== "completed") {
+          updated.sfxStatus = "completed";
+        }
+        return updated;
+      });
+
+      const newScript = { ...script, scenes: next };
+      setScript(newScript);
+
+      // Final video already present? → push step to "complete"
+      const hasFinal = !!finalVideoUrl;
+      const allDone = next.every((s) => !!s.videoUrl && s.videoStatus === "completed");
+      let nextStep: StoryStep = step;
+      if (hasFinal) {
+        nextStep = "complete";
+        setStep("complete");
+      } else if (allDone && step === "generation") {
+        nextStep = "complete";
+        setStep("complete");
+      }
+
+      await persistProject({ script: newScript, step: nextStep });
+
+      const parts: string[] = [];
+      if (fixedScenes) parts.push(`${fixedScenes} scene riallineate`);
+      if (clearedErrors) parts.push(`${clearedErrors} errori obsoleti rimossi`);
+      if (hasFinal) parts.push("status → completed");
+      toast.success(parts.length ? `Riconciliato: ${parts.join(", ")}` : "Tutto già coerente ✅");
+    } catch (err: any) {
+      toast.error(`Errore riconciliazione: ${err?.message || "sconosciuto"}`);
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
   const loadProject = async (id: string) => {
     // Select only needed columns - avoid fetching the entire row (scenes JSONB can be huge)
     const { data, error } = await supabase
