@@ -301,7 +301,7 @@ export const StoryModeWizard = () => {
     if (data) setSavedProjects(data);
   };
 
-  const saveProject = async (overrides?: {
+  const persistProject = async (overrides?: {
     script?: StoryScript | null;
     step?: StoryStep;
     finalVideoUrl?: string | null;
@@ -359,6 +359,10 @@ export const StoryModeWizard = () => {
       loadProjectList();
     } catch (err: any) { toast.error(err.message || "Errore nel salvataggio"); }
     finally { setIsSaving(false); }
+  };
+
+  const saveProject = async () => {
+    await persistProject();
   };
 
   const loadProject = async (id: string) => {
