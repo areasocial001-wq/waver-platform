@@ -360,7 +360,23 @@ export const StoryModeWizard = () => {
     if (imageUrl && imageUrl.startsWith("http")) {
       (window as any).__storyRefStorageUrl = imageUrl;
     }
-    const loadedScenes = (data.scenes as any) || [];
+    const loadedScenesRaw = (data.scenes as any) || [];
+
+    // Auto-cleanup: reset scenes stuck in "generating" for > 20 minutes
+    const STUCK_AUTO_RESET_MS = 20 * 60 * 1000;
+    let autoResetCount = 0;
+    const loadedScenes = loadedScenesRaw.map((s: any) => {
+      if (
+        s?.videoStatus === "generating" &&
+        s?.videoGeneratingStartedAt &&
+        Date.now() - s.videoGeneratingStartedAt > STUCK_AUTO_RESET_MS
+      ) {
+        autoResetCount++;
+        return { ...s, videoStatus: "idle", videoGeneratingStartedAt: undefined, error: undefined };
+      }
+      return s;
+    });
+
     setScript({ title: data.title, synopsis: data.synopsis || "", scenes: loadedScenes, suggestedMusic: data.suggested_music || "" });
     setFinalVideoUrl(data.final_video_url);
     setBackgroundMusicUrl(data.background_music_url);
@@ -369,6 +385,12 @@ export const StoryModeWizard = () => {
     else setStep("script");
     setShowProjectList(false);
     toast.success(`Progetto "${data.title}" caricato`);
+
+    if (autoResetCount > 0) {
+      toast.info(`${autoResetCount} ${autoResetCount === 1 ? "scena bloccata da oltre 20 minuti è stata sbloccata" : "scene bloccate da oltre 20 minuti sono state sbloccate"} automaticamente. Puoi rigenerarle.`);
+      // Persist the reset so reloading doesn't show them stuck again
+      supabase.from("story_mode_projects").update({ scenes: loadedScenes as any }).eq("id", data.id).then(() => {});
+    }
 
     // Background migration: move heavy inline assets (data:/blob:) into storage
     // so the JSONB row stays small and assets persist across sessions.
@@ -596,6 +618,13 @@ export const StoryModeWizard = () => {
           try {
             for (let poll = 0; poll < maxPolls; poll++) {
               if (Date.now() - pollingStart > MAX_POLL_WALL_MS) {
+                apiLogger.error("Kling", "video_timeout", "Timeout 12min su rigenerazione scena", {
+                  operationId: data.operationId,
+                  sceneNumber: index + 1,
+                  totalDurationMs: Date.now() - pollingStart,
+                  pollCount: poll,
+                  context: "regenerateSceneAsset",
+                }).catch(() => {});
                 throw new Error("Generazione video troppo lenta, riprova");
               }
               await new Promise(r => setTimeout(r, 5000));
@@ -1256,6 +1285,13 @@ export const StoryModeWizard = () => {
             if (checkCancelled()) break;
             // Wall-clock guard: covers cases where backoff sleeps inflate per-poll time
             if (Date.now() - pollingStart > MAX_POLL_WALL_MS) {
+              apiLogger.error("Kling", "video_timeout", "Timeout 12min su generazione batch", {
+                operationId: data.operationId,
+                sceneNumber: i + 1,
+                totalDurationMs: Date.now() - pollingStart,
+                pollCount: poll,
+                context: "handleGenerateAll",
+              }).catch(() => {});
               throw new Error("Generazione video troppo lenta, riprova");
             }
             await new Promise(r => setTimeout(r, 5000)); // wait 5s between polls
