@@ -466,6 +466,25 @@ export const DbHealthDashboard = () => {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {j.jobname === "weekly-vacuum-analyze" ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRunCron(j.jobname)}
+                          disabled={runningCron}
+                          className="h-7"
+                        >
+                          {runningCron ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <><Play className="h-3 w-3 mr-1" /> Esegui ora</>
+                          )}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
