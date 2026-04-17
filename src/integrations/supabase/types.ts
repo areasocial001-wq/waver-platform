@@ -200,6 +200,30 @@ export type Database = {
         }
         Relationships: []
       }
+      db_health_snapshots: {
+        Row: {
+          db_size_bytes: number
+          id: string
+          recorded_at: string
+          table_stats: Json
+          total_rows: number
+        }
+        Insert: {
+          db_size_bytes: number
+          id?: string
+          recorded_at?: string
+          table_stats?: Json
+          total_rows?: number
+        }
+        Update: {
+          db_size_bytes?: number
+          id?: string
+          recorded_at?: string
+          table_stats?: Json
+          total_rows?: number
+        }
+        Relationships: []
+      }
       json2video_projects: {
         Row: {
           audio_track: Json | null
@@ -969,6 +993,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_db_health_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -976,6 +1001,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      record_db_health_snapshot: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role:
