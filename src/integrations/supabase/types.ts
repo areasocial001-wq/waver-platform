@@ -583,6 +583,7 @@ export type Database = {
           id: string
           input_config: Json
           pending_render_id: string | null
+          recovery_history: Json
           render_started_at: string | null
           scenes: Json
           status: string
@@ -599,6 +600,7 @@ export type Database = {
           id?: string
           input_config?: Json
           pending_render_id?: string | null
+          recovery_history?: Json
           render_started_at?: string | null
           scenes?: Json
           status?: string
@@ -615,6 +617,7 @@ export type Database = {
           id?: string
           input_config?: Json
           pending_render_id?: string | null
+          recovery_history?: Json
           render_started_at?: string | null
           scenes?: Json
           status?: string

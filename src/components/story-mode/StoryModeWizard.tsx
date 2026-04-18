@@ -1301,6 +1301,41 @@ export const StoryModeWizard = () => {
   };
 
   /**
+   * Append a failed recovery event to story_mode_projects.recovery_history (analytics).
+   * Read current array, append new entry, write back. Best-effort — no-op if no projectId.
+   */
+  const logRecoveryFailure = async (
+    context: "reassemble" | "generateAll",
+    assets: Array<{ type: string; index?: number; sceneNumber?: number; url?: string }>,
+    attempts: number,
+  ) => {
+    if (!projectId) return;
+    try {
+      const { data: row } = await supabase
+        .from("story_mode_projects")
+        .select("recovery_history")
+        .eq("id", projectId)
+        .single();
+      const prev = Array.isArray((row as any)?.recovery_history) ? (row as any).recovery_history : [];
+      const entry = {
+        timestamp: new Date().toISOString(),
+        context,
+        attempts,
+        assets: assets.map(a => ({
+          type: a.type,
+          sceneNumber: a.sceneNumber ?? null,
+          urlKind: a.url?.startsWith("blob:") ? "blob" : a.url ? "remote" : "unknown",
+        })),
+      };
+      // Cap history at 50 entries to avoid unbounded growth
+      const next = [...prev, entry].slice(-50);
+      await supabase.from("story_mode_projects").update({ recovery_history: next } as any).eq("id", projectId);
+    } catch (err) {
+      console.warn("Failed to log recovery history:", err);
+    }
+  };
+
+  /**
    * Pre-render check: scan all completed video scenes for blob: audio URLs.
    * If >50% are blob, open a confirm dialog to batch-regenerate them all
    * instead of forcing the user to click "Rigenera" one-by-one in the dialog.
@@ -1611,6 +1646,8 @@ export const StoryModeWizard = () => {
           setRecoveryFailureAssets(enriched);
           setRecoveryFailureContext("reassemble");
           setShowRecoveryFailureDialog(true);
+          // Persist failure to recovery_history for analytics
+          logRecoveryFailure("reassemble", enriched, MAX_RECOVERY_ATTEMPTS);
         } else {
           const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
           if (recovered) {
@@ -1981,6 +2018,7 @@ export const StoryModeWizard = () => {
             setRecoveryFailureAssets(enriched);
             setRecoveryFailureContext("generateAll");
             setShowRecoveryFailureDialog(true);
+            logRecoveryFailure("generateAll", enriched, MAX_RECOVERY_ATTEMPTS);
           } else {
             const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
             if (recovered) {
@@ -3041,15 +3079,42 @@ export const StoryModeWizard = () => {
           </AlertDialogHeader>
 
           {recoveryFailureAssets.length > 0 && (
-            <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+            <ScrollArea className="h-64 rounded-md border bg-muted/30 p-2">
               <div className="space-y-1">
                 {recoveryFailureAssets.map((a, i) => {
                   const typeLabel = a.type === "narration" ? "🎙️ Voce narrante" : a.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : a.type === "music" ? "🎵 Musica di sottofondo" : `❓ ${a.type}`;
                   const sceneLabel = a.type === "music" ? "Globale" : a.sceneNumber ? `Scena ${a.sceneNumber}` : "Sconosciuto";
+                  // Resolve the freshest URL we have for this asset (script state > backend skipped url)
+                  let playUrl: string | null = null;
+                  if (a.type === "music") {
+                    playUrl = backgroundMusicUrl ?? null;
+                  } else if (a.sceneNumber && script) {
+                    const scene = script.scenes.find(s => s.sceneNumber === a.sceneNumber);
+                    if (scene) {
+                      playUrl = a.type === "narration" ? (scene.audioUrl ?? null) : (scene.sfxUrl ?? null);
+                    }
+                  }
+                  if (!playUrl) playUrl = (a as any).url ?? null;
+                  const isBlob = !!playUrl && playUrl.startsWith("blob:");
                   return (
-                    <div key={`${a.type}-${a.index ?? i}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm bg-destructive/5">
-                      <span className="flex-1">{typeLabel}</span>
-                      <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                    <div key={`${a.type}-${a.index ?? i}`} className="flex flex-col gap-2 rounded-md px-2 py-2 text-sm bg-destructive/5">
+                      <div className="flex items-center gap-3">
+                        <span className="flex-1">{typeLabel}</span>
+                        <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                        {isBlob && <Badge variant="secondary" className="text-xs">blob</Badge>}
+                      </div>
+                      {playUrl ? (
+                        <audio
+                          controls
+                          preload="none"
+                          src={playUrl}
+                          className="w-full h-8"
+                          onError={(e) => { (e.currentTarget.parentElement?.querySelector(".audio-fallback") as HTMLElement | null)?.classList.remove("hidden"); }}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Nessuna URL disponibile per la preview</span>
+                      )}
+                      <span className="audio-fallback hidden text-xs text-muted-foreground italic">⚠️ Audio non riproducibile (URL scaduto o non raggiungibile)</span>
                     </div>
                   );
                 })}
