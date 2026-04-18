@@ -2727,6 +2727,20 @@ export const StoryModeWizard = () => {
           onRegenerateScene={async (sceneIndex, type) => {
             await regenerateSceneAsset(sceneIndex, type);
           }}
+          onRegenerateAudio={async ({ type, sceneIndex }) => {
+            if (type === "music") {
+              await generateBackgroundMusic();
+              return;
+            }
+            if (typeof sceneIndex !== "number" || !script) return;
+            // sceneIndex from dialog is the index inside `vids` (completed videos), map to real scene index
+            const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+            const targetVid = vids[sceneIndex];
+            if (!targetVid) return;
+            const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+            if (realIdx < 0) return;
+            await regenerateSceneAsset(realIdx, type === "narration" ? "audio" : "sfx");
+          }}
         />
       )}
     </div>
