@@ -2047,12 +2047,23 @@ export const StoryModeWizard = () => {
               <p className="text-sm text-muted-foreground text-center py-4">Nessun progetto salvato</p>
             ) : (
               <div className="grid gap-2 max-h-60 overflow-y-auto">
-                {savedProjects.map(p => (
+                {savedProjects.map(p => {
+                  // Active render badge: pending_render_id set + render_started_at < 15min ago (else stale)
+                  const renderStartMs = p.render_started_at ? new Date(p.render_started_at).getTime() : 0;
+                  const elapsedMin = renderStartMs ? Math.floor((Date.now() + savedProjectsTick * 0 - renderStartMs) / 60000) : 0;
+                  const isActiveRender = !!p.pending_render_id && renderStartMs > 0 && elapsedMin < 15;
+                  return (
                   <div key={p.id} className={cn("flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors", projectId === p.id ? "border-primary bg-primary/5" : "border-border")} onClick={() => loadProject(p.id)}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant="outline" className="text-xs">{p.status}</Badge>
+                        {isActiveRender && (
+                          <Badge variant="default" className="text-xs bg-primary/20 text-primary border-primary/40 animate-pulse flex items-center gap-1">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            Rendering ({elapsedMin}m)
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(p.updated_at).toLocaleDateString("it-IT")}</span>
                       </div>
                     </div>
@@ -2060,7 +2071,8 @@ export const StoryModeWizard = () => {
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
