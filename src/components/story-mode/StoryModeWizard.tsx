@@ -1312,15 +1312,37 @@ export const StoryModeWizard = () => {
     const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
     let blobCount = 0;
     let totalCount = 0;
+    const details: Array<{ key: string; realIdx: number; sceneNumber: number; type: "audio" | "sfx" | "music" }> = [];
     vids.forEach(s => {
-      if (s.audioUrl) { totalCount++; if (isBlob(s.audioUrl)) blobCount++; }
-      if (s.sfxUrl) { totalCount++; if (isBlob(s.sfxUrl)) blobCount++; }
+      const realIdx = script.scenes.findIndex(x => x.sceneNumber === s.sceneNumber);
+      if (s.audioUrl) {
+        totalCount++;
+        if (isBlob(s.audioUrl)) {
+          blobCount++;
+          details.push({ key: `audio-${s.sceneNumber}`, realIdx, sceneNumber: s.sceneNumber, type: "audio" });
+        }
+      }
+      if (s.sfxUrl) {
+        totalCount++;
+        if (isBlob(s.sfxUrl)) {
+          blobCount++;
+          details.push({ key: `sfx-${s.sceneNumber}`, realIdx, sceneNumber: s.sceneNumber, type: "sfx" });
+        }
+      }
     });
-    if (backgroundMusicUrl) { totalCount++; if (isBlob(backgroundMusicUrl)) blobCount++; }
+    if (backgroundMusicUrl) {
+      totalCount++;
+      if (isBlob(backgroundMusicUrl)) {
+        blobCount++;
+        details.push({ key: "music-global", realIdx: -1, sceneNumber: 0, type: "music" });
+      }
+    }
     if (totalCount === 0 || blobCount === 0) return true;
     const pct = Math.round((blobCount / totalCount) * 100);
     if (pct > 50) {
       setBatchAudioStats({ blob: blobCount, total: totalCount, pct });
+      setBatchAudioDetails(details);
+      setBatchSelectedKeys(new Set(details.map(d => d.key)));
       setShowBatchAudioRegenDialog(true);
       return false;
     }
@@ -1335,32 +1357,35 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Batch-regenerate all blob: audio assets across the project
+  // Batch-regenerate selected blob: audio assets across the project
   const handleBatchRegenAudio = async () => {
     if (!script) return;
+    const selected = batchAudioDetails.filter(d => batchSelectedKeys.has(d.key));
+    if (selected.length === 0) {
+      toast.warning("Nessun asset selezionato");
+      return;
+    }
     setIsBatchRegenAudio(true);
-    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
-    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
-    const tasks: Array<{ realIdx: number; type: "audio" | "sfx" }> = [];
-    vids.forEach((vid) => {
-      const realIdx = script.scenes.findIndex(s => s.sceneNumber === vid.sceneNumber);
-      if (realIdx < 0) return;
-      if (isBlob(vid.audioUrl)) tasks.push({ realIdx, type: "audio" });
-      if (isBlob(vid.sfxUrl)) tasks.push({ realIdx, type: "sfx" });
-    });
-    const needsMusic = isBlob(backgroundMusicUrl);
-    const total = tasks.length + (needsMusic ? 1 : 0);
+    const total = selected.length;
     toast.info(`Rigenerazione batch di ${total} audio scaduti…`);
     let done = 0;
-    for (const t of tasks) {
-      try { await regenerateSceneAsset(t.realIdx, t.type); done++; } catch (e) { console.warn("Batch regen failed:", e); }
-    }
-    if (needsMusic) {
-      try { await generateBackgroundMusic(); done++; } catch (e) { console.warn("Batch music regen failed:", e); }
+    for (const t of selected) {
+      try {
+        if (t.type === "music") {
+          await generateBackgroundMusic();
+        } else {
+          await regenerateSceneAsset(t.realIdx, t.type);
+        }
+        done++;
+      } catch (e) {
+        console.warn("Batch regen failed:", e);
+      }
     }
     setIsBatchRegenAudio(false);
     setShowBatchAudioRegenDialog(false);
     setBatchAudioStats(null);
+    setBatchAudioDetails([]);
+    setBatchSelectedKeys(new Set());
     toast.success(`${done}/${total} audio rigenerati`);
     setTimeout(() => saveProject(), 300);
     setShowRenderPreview(true);
