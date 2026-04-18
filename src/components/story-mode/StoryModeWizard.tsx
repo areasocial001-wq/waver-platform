@@ -158,6 +158,18 @@ export const StoryModeWizard = () => {
   const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
   const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
   const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  // Detailed list of expired audio assets (per-scene), used by the batch dialog for selective regeneration
+  const [batchAudioDetails, setBatchAudioDetails] = useState<Array<{
+    key: string;
+    realIdx: number;
+    sceneNumber: number;
+    type: "audio" | "sfx" | "music";
+  }>>([]);
+  const [batchSelectedKeys, setBatchSelectedKeys] = useState<Set<string>>(new Set());
+  // Final failure dialog: shown when auto-recovery exhausts MAX_RECOVERY_ATTEMPTS
+  const [showRecoveryFailureDialog, setShowRecoveryFailureDialog] = useState(false);
+  const [recoveryFailureAssets, setRecoveryFailureAssets] = useState<Array<{ type: string; index?: number; sceneNumber?: number }>>([]);
+  const [recoveryFailureContext, setRecoveryFailureContext] = useState<"reassemble" | "generateAll" | null>(null);
   const [savedProjectsTick, setSavedProjectsTick] = useState(0);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
