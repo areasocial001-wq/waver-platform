@@ -1826,11 +1826,19 @@ export const StoryModeWizard = () => {
           setVideoSegments(data.segments);
         }
 
-        // Warn user about skipped audio assets (blob URLs unreachable from server)
+        // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble
         if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
+          const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
+          if (recovered) {
+            toast.info("Ri-tentativo concat con audio rigenerati…");
+            setStep("complete");
+            setIsGenerating(false);
+            setTimeout(() => handleReassemble(), 500);
+            return;
+          }
           const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
           toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
-          console.warn("Skipped assets:", data.skippedAssets);
+          console.warn("Skipped assets (recovery failed):", data.skippedAssets);
         }
 
         if (data?.method === "shotstack-pending" && data?.renderId) {
