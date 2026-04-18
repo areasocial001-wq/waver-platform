@@ -2508,7 +2508,7 @@ export const StoryModeWizard = () => {
               return (
                 <Button
                   variant="default"
-                  onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }}
+                  onClick={() => openRenderPreview("reassemble")}
                   disabled={isGenerating || renderStatus === "processing"}
                   className="bg-primary/90 hover:bg-primary"
                   title={`Salta la generazione delle scene e monta direttamente il video finale dalle ${completedVids.length} scene già pronte`}
@@ -2757,7 +2757,7 @@ export const StoryModeWizard = () => {
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
-                    <Button variant="secondary" onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }} disabled={isGenerating}>
+                    <Button variant="secondary" onClick={() => openRenderPreview("reassemble")} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                       Rimonta Video Finale
                     </Button>
