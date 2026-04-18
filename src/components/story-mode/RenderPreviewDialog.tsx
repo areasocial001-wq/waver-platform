@@ -411,6 +411,108 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             )}
 
+            {/* Blob audio assets banner — assets unreachable from Shotstack server */}
+            {totalBlobAssets > 0 && (
+              <div className={cn(
+                "p-3 rounded-lg border space-y-2",
+                ignoreBlobAssets
+                  ? "border-muted bg-muted/20"
+                  : "border-orange-500/40 bg-orange-500/5",
+              )}>
+                <p className={cn(
+                  "text-sm font-medium flex items-center gap-1.5",
+                  ignoreBlobAssets ? "text-muted-foreground" : "text-orange-400",
+                )}>
+                  <AlertTriangle className="w-4 h-4" />
+                  {totalBlobAssets} {totalBlobAssets === 1 ? "asset audio scaduto" : "asset audio scaduti"} (URL temporaneo del browser)
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Questi asset NON saranno inclusi nel video finale perché Shotstack non può raggiungerli.
+                  Rigenerali ora oppure procedi comunque (il video finale sarà incompleto).
+                </p>
+                <ul className="text-xs space-y-1 max-h-40 overflow-y-auto pl-1">
+                  {blobNarrations.map(({ scene, index }) => {
+                    const key = `narration-${index}`;
+                    const isThis = regeneratingAudio === key;
+                    return (
+                      <li key={key} className="flex items-center gap-1.5 text-muted-foreground py-0.5">
+                        <Mic className="w-3 h-3 text-primary shrink-0" />
+                        <span className="font-mono text-foreground shrink-0">#{scene.sceneNumber}</span>
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] shrink-0">VOCE</Badge>
+                        <span className="text-muted-foreground/70 truncate flex-1">— {scene.narration?.slice(0, 30)}…</span>
+                        {onRegenerateAudio && (
+                          <Button
+                            variant="outline" size="sm" className="h-6 px-2 text-[10px] shrink-0"
+                            disabled={regeneratingAudio !== null}
+                            onClick={async () => {
+                              setRegeneratingAudio(key);
+                              try { await onRegenerateAudio({ type: "narration", sceneIndex: index }); }
+                              finally { setRegeneratingAudio(null); }
+                            }}
+                          >
+                            {isThis ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RefreshCw className="w-3 h-3 mr-1" />Rigenera</>}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {blobSfx.map(({ scene, index }) => {
+                    const key = `sfx-${index}`;
+                    const isThis = regeneratingAudio === key;
+                    return (
+                      <li key={key} className="flex items-center gap-1.5 text-muted-foreground py-0.5">
+                        <Sparkles className="w-3 h-3 text-yellow-400 shrink-0" />
+                        <span className="font-mono text-foreground shrink-0">#{scene.sceneNumber}</span>
+                        <Badge variant="outline" className="h-4 px-1 text-[9px] shrink-0">SFX</Badge>
+                        <span className="text-muted-foreground/70 truncate flex-1">— {scene.sfxPrompt?.slice(0, 30) || "effetto"}…</span>
+                        {onRegenerateAudio && (
+                          <Button
+                            variant="outline" size="sm" className="h-6 px-2 text-[10px] shrink-0"
+                            disabled={regeneratingAudio !== null}
+                            onClick={async () => {
+                              setRegeneratingAudio(key);
+                              try { await onRegenerateAudio({ type: "sfx", sceneIndex: index }); }
+                              finally { setRegeneratingAudio(null); }
+                            }}
+                          >
+                            {isThis ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RefreshCw className="w-3 h-3 mr-1" />Rigenera</>}
+                          </Button>
+                        )}
+                      </li>
+                    );
+                  })}
+                  {blobMusic && (
+                    <li className="flex items-center gap-1.5 text-muted-foreground py-0.5">
+                      <Music className="w-3 h-3 text-green-400 shrink-0" />
+                      <Badge variant="outline" className="h-4 px-1 text-[9px] shrink-0">MUSICA</Badge>
+                      <span className="text-muted-foreground/70 truncate flex-1">— colonna sonora di sottofondo</span>
+                      {onRegenerateAudio && (
+                        <Button
+                          variant="outline" size="sm" className="h-6 px-2 text-[10px] shrink-0"
+                          disabled={regeneratingAudio !== null}
+                          onClick={async () => {
+                            setRegeneratingAudio("music");
+                            try { await onRegenerateAudio({ type: "music" }); }
+                            finally { setRegeneratingAudio(null); }
+                          }}
+                        >
+                          {regeneratingAudio === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RefreshCw className="w-3 h-3 mr-1" />Rigenera</>}
+                        </Button>
+                      )}
+                    </li>
+                  )}
+                </ul>
+                <Button
+                  variant={ignoreBlobAssets ? "outline" : "secondary"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setIgnoreBlobAssets(v => !v)}
+                >
+                  {ignoreBlobAssets ? "Riattiva controllo audio" : "Ignora e procedi senza questi audio"}
+                </Button>
+              </div>
+            )}
+
             {/* Warnings */}
             {issues.length > 0 && (
               <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 space-y-1">
@@ -433,11 +535,21 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               onOpenChange(false);
               onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, musicVolume: musicVol });
             }}
-            disabled={loading || !!error || hasNonCompliantBlocking}
-            title={hasNonCompliantBlocking ? "Risolvi le scene non conformi o premi 'Ignora e procedi'" : undefined}
+            disabled={loading || !!error || hasNonCompliantBlocking || (hasBlobAssetsBlocking && !ignoreBlobAssets)}
+            title={
+              hasNonCompliantBlocking
+                ? "Risolvi le scene non conformi o premi 'Ignora e procedi'"
+                : (hasBlobAssetsBlocking && !ignoreBlobAssets)
+                  ? "Rigenera gli audio scaduti o premi 'Ignora e procedi senza questi audio'"
+                  : undefined
+            }
           >
             <Film className="w-4 h-4 mr-2" />
-            {hasNonCompliantBlocking ? `Bloccato (${nonCompliantScenes.length} non conformi)` : "Avvia Rendering"}
+            {hasNonCompliantBlocking
+              ? `Bloccato (${nonCompliantScenes.length} non conformi)`
+              : (hasBlobAssetsBlocking && !ignoreBlobAssets)
+                ? `Bloccato (${totalBlobAssets} audio scaduti)`
+                : "Avvia Rendering"}
           </Button>
         </DialogFooter>
       </DialogContent>
