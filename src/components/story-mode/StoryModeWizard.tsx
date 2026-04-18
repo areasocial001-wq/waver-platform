@@ -2916,33 +2916,93 @@ export const StoryModeWizard = () => {
         />
       )}
 
-      {/* Pre-render batch audio regen confirmation */}
+      {/* Pre-render batch audio regen confirmation — with detailed per-scene preview */}
       <AlertDialog open={showBatchAudioRegenDialog} onOpenChange={(o) => { if (!isBatchRegenAudio) setShowBatchAudioRegenDialog(o); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
               Audio scaduti rilevati
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              {batchAudioStats && (
-                <>
-                  <span className="block">
-                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale (Shotstack non può raggiungerli).
-                  </span>
-                  <span className="block text-xs">
-                    Vuoi rigenerarli tutti ora in batch prima di procedere al rendering?
-                  </span>
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {batchAudioStats && (
+                  <p className="text-sm">
+                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale.
+                  </p>
+                )}
+                <p className="text-xs">Seleziona quali rigenerare ora (puoi scegliere tutto o solo alcuni):</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {batchAudioDetails.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  className="text-primary hover:underline disabled:opacity-50"
+                  disabled={isBatchRegenAudio}
+                  onClick={() => setBatchSelectedKeys(new Set(batchAudioDetails.map(d => d.key)))}
+                >
+                  Seleziona tutto
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:underline disabled:opacity-50"
+                  disabled={isBatchRegenAudio}
+                  onClick={() => setBatchSelectedKeys(new Set())}
+                >
+                  Deseleziona tutto
+                </button>
+                <span className="text-muted-foreground">
+                  {batchSelectedKeys.size}/{batchAudioDetails.length} selezionati
+                </span>
+              </div>
+              <ScrollArea className="h-56 rounded-md border bg-muted/30 p-2">
+                <div className="space-y-1">
+                  {batchAudioDetails.map((d) => {
+                    const checked = batchSelectedKeys.has(d.key);
+                    const typeLabel = d.type === "audio" ? "🎙️ Voce narrante" : d.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : "🎵 Musica di sottofondo";
+                    const sceneLabel = d.type === "music" ? "Globale" : `Scena ${d.sceneNumber}`;
+                    return (
+                      <label
+                        key={d.key}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-2 py-2 text-sm cursor-pointer transition-colors",
+                          checked ? "bg-primary/10" : "hover:bg-muted/50",
+                          isBatchRegenAudio && "pointer-events-none opacity-60",
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={isBatchRegenAudio}
+                          onCheckedChange={(v) => {
+                            setBatchSelectedKeys((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(d.key); else next.delete(d.key);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="flex-1">{typeLabel}</span>
+                        <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                      </label>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={isBatchRegenAudio}
               onClick={() => {
                 setShowBatchAudioRegenDialog(false);
                 setBatchAudioStats(null);
+                setBatchAudioDetails([]);
+                setBatchSelectedKeys(new Set());
                 // User chose to skip — open render preview anyway (they can decide there)
                 setShowRenderPreview(true);
               }}
@@ -2950,18 +3010,108 @@ export const StoryModeWizard = () => {
               No, procedi così
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={isBatchRegenAudio}
+              disabled={isBatchRegenAudio || batchSelectedKeys.size === 0}
               onClick={(e) => { e.preventDefault(); handleBatchRegenAudio(); }}
             >
               {isBatchRegenAudio ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Rigenerazione…</>
               ) : (
-                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera tutti in batch</>
+                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera selezionati ({batchSelectedKeys.size})</>
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Final recovery failure dialog: shown when auto-recovery exhausts MAX_RECOVERY_ATTEMPTS */}
+      <AlertDialog open={showRecoveryFailureDialog} onOpenChange={setShowRecoveryFailureDialog}>
+        <AlertDialogContent className="max-w-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Recupero audio fallito ({MAX_RECOVERY_ATTEMPTS}/{MAX_RECOVERY_ATTEMPTS} tentativi)
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p className="text-sm">
+                  Dopo {MAX_RECOVERY_ATTEMPTS} tentativi automatici di rigenerazione, i seguenti asset audio risultano ancora non raggiungibili da Shotstack e <strong>non sono stati inclusi</strong> nel video finale:
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {recoveryFailureAssets.length > 0 && (
+            <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+              <div className="space-y-1">
+                {recoveryFailureAssets.map((a, i) => {
+                  const typeLabel = a.type === "narration" ? "🎙️ Voce narrante" : a.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : a.type === "music" ? "🎵 Musica di sottofondo" : `❓ ${a.type}`;
+                  const sceneLabel = a.type === "music" ? "Globale" : a.sceneNumber ? `Scena ${a.sceneNumber}` : "Sconosciuto";
+                  return (
+                    <div key={`${a.type}-${a.index ?? i}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm bg-destructive/5">
+                      <span className="flex-1">{typeLabel}</span>
+                      <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Suggerimento: rigenera manualmente questi asset dalle card delle scene (o dal pannello musica per la colonna sonora), poi rilancia il rendering finale.
+          </p>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowRecoveryFailureDialog(false);
+              setRecoveryFailureAssets([]);
+              setRecoveryFailureContext(null);
+            }}>
+              Chiudi
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                // Pre-select the failed assets in the batch dialog, then open it
+                if (!script) return;
+                const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+                const details: Array<{ key: string; realIdx: number; sceneNumber: number; type: "audio" | "sfx" | "music" }> = [];
+                recoveryFailureAssets.forEach((a) => {
+                  if (a.type === "music") {
+                    details.push({ key: "music-global", realIdx: -1, sceneNumber: 0, type: "music" });
+                  } else if (typeof a.index === "number") {
+                    const targetVid = vids[a.index];
+                    if (!targetVid) return;
+                    const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+                    if (realIdx < 0) return;
+                    const t: "audio" | "sfx" = a.type === "narration" ? "audio" : "sfx";
+                    details.push({ key: `${t}-${targetVid.sceneNumber}`, realIdx, sceneNumber: targetVid.sceneNumber, type: t });
+                  }
+                });
+                if (details.length > 0) {
+                  setBatchAudioDetails(details);
+                  setBatchSelectedKeys(new Set(details.map(d => d.key)));
+                  setBatchAudioStats({ blob: details.length, total: details.length, pct: 100 });
+                  setShowRecoveryFailureDialog(false);
+                  setRecoveryFailureAssets([]);
+                  // Save context so after batch regen the user is taken back to the right action
+                  setPendingRenderAction(recoveryFailureContext);
+                  setRecoveryFailureContext(null);
+                  setShowBatchAudioRegenDialog(true);
+                } else {
+                  setShowRecoveryFailureDialog(false);
+                }
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Rigenera manualmente e rilancia
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
     </div>
   );
 };
