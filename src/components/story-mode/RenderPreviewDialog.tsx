@@ -48,9 +48,11 @@ interface PreviewSummary {
 }
 
 export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
-  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender, onRegenerateScene,
+  open, onOpenChange, scenes, script, input, backgroundMusicUrl, onConfirmRender, onRegenerateScene, onRegenerateAudio,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [regeneratingAudio, setRegeneratingAudio] = useState<string | null>(null);
+  const [ignoreBlobAssets, setIgnoreBlobAssets] = useState(false);
   const [summary, setSummary] = useState<PreviewSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
