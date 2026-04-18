@@ -3103,18 +3103,7 @@ export const StoryModeWizard = () => {
                         <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
                         {isBlob && <Badge variant="secondary" className="text-xs">blob</Badge>}
                       </div>
-                      {playUrl ? (
-                        <audio
-                          controls
-                          preload="none"
-                          src={playUrl}
-                          className="w-full h-8"
-                          onError={(e) => { (e.currentTarget.parentElement?.querySelector(".audio-fallback") as HTMLElement | null)?.classList.remove("hidden"); }}
-                        />
-                      ) : (
-                        <span className="text-xs text-muted-foreground italic">Nessuna URL disponibile per la preview</span>
-                      )}
-                      <span className="audio-fallback hidden text-xs text-muted-foreground italic">⚠️ Audio non riproducibile (URL scaduto o non raggiungibile)</span>
+                      <AssetWaveform url={playUrl} />
                     </div>
                   );
                 })}
