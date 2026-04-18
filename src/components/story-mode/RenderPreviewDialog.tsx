@@ -25,6 +25,8 @@ interface RenderPreviewDialogProps {
   onConfirmRender: (volumes: RenderVolumes) => void;
   /** Inline regeneration handler — called when user clicks "Rigenera ora" on a non-compliant scene */
   onRegenerateScene?: (sceneIndex: number, type: "image" | "video") => Promise<void> | void;
+  /** Inline regeneration of expired blob: audio assets (narration / sfx / music) */
+  onRegenerateAudio?: (target: { type: "narration" | "sfx" | "music"; sceneIndex?: number }) => Promise<void> | void;
 }
 
 interface PreviewSummary {
