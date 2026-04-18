@@ -407,6 +407,25 @@ serve(async (req) => {
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
 
+    // Track skipped audio assets (blob URLs that can't be reached server-side)
+    const skippedAssets: { type: string; index?: number; url: string; reason: string }[] = [];
+    if (audioUrls) {
+      audioUrls.forEach((u, i) => {
+        if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'narration', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
+      });
+    }
+    if (sfxUrls) {
+      sfxUrls.forEach((u, i) => {
+        if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'sfx', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
+      });
+    }
+    if (backgroundMusicUrl && backgroundMusicUrl.startsWith('blob:')) {
+      skippedAssets.push({ type: 'music', url: backgroundMusicUrl, reason: 'blob URL non raggiungibile dal server' });
+    }
+    if (skippedAssets.length > 0) {
+      console.warn(`⚠️ Skipping ${skippedAssets.length} unreachable audio assets:`, skippedAssets);
+    }
+
     console.log('Concatenating videos:', { 
       count: videoUrls.length, 
       clipDurations,
@@ -793,18 +812,20 @@ serve(async (req) => {
           );
         }
 
-        // If render timeout, return segments for sequential playback
-        console.log('Shotstack render timeout, falling back to segments');
+        // If render timeout, DO NOT return videoUrls[0] as videoUrl — that misleads the UI
+        // into thinking the final video is ready. Force the client to poll renderId.
+        console.log('Shotstack render still processing after sync window — returning renderId for client polling');
         return new Response(
           JSON.stringify({
             success: true,
-            videoUrl: videoUrls[0],
+            videoUrl: null, // intentionally null so UI doesn't enable download
             segments: videoUrls,
             audioUrl: audioUrl,
             renderId,
             status: 'processing',
-            message: 'Video in elaborazione su Shotstack. Usa riproduzione sequenziale.',
+            message: 'Video in elaborazione su Shotstack. Continua a controllare lo stato.',
             method: 'shotstack-pending',
+            skippedAssets: skippedAssets.length > 0 ? skippedAssets : undefined,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
