@@ -1301,6 +1301,41 @@ export const StoryModeWizard = () => {
   };
 
   /**
+   * Append a failed recovery event to story_mode_projects.recovery_history (analytics).
+   * Read current array, append new entry, write back. Best-effort — no-op if no projectId.
+   */
+  const logRecoveryFailure = async (
+    context: "reassemble" | "generateAll",
+    assets: Array<{ type: string; index?: number; sceneNumber?: number; url?: string }>,
+    attempts: number,
+  ) => {
+    if (!projectId) return;
+    try {
+      const { data: row } = await supabase
+        .from("story_mode_projects")
+        .select("recovery_history")
+        .eq("id", projectId)
+        .single();
+      const prev = Array.isArray((row as any)?.recovery_history) ? (row as any).recovery_history : [];
+      const entry = {
+        timestamp: new Date().toISOString(),
+        context,
+        attempts,
+        assets: assets.map(a => ({
+          type: a.type,
+          sceneNumber: a.sceneNumber ?? null,
+          urlKind: a.url?.startsWith("blob:") ? "blob" : a.url ? "remote" : "unknown",
+        })),
+      };
+      // Cap history at 50 entries to avoid unbounded growth
+      const next = [...prev, entry].slice(-50);
+      await supabase.from("story_mode_projects").update({ recovery_history: next } as any).eq("id", projectId);
+    } catch (err) {
+      console.warn("Failed to log recovery history:", err);
+    }
+  };
+
+  /**
    * Pre-render check: scan all completed video scenes for blob: audio URLs.
    * If >50% are blob, open a confirm dialog to batch-regenerate them all
    * instead of forcing the user to click "Rigenera" one-by-one in the dialog.
