@@ -75,7 +75,11 @@ interface SavedProject {
   status: string;
   created_at: string;
   updated_at: string;
+  pending_render_id?: string | null;
+  render_started_at?: string | null;
 }
+
+const MAX_RECOVERY_ATTEMPTS = 3;
 
 // Helper to get auth headers with user's JWT token
 const getAuthHeaders = async () => {
