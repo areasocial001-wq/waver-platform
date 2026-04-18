@@ -790,6 +790,7 @@ serve(async (req) => {
                   audioUrl: audioUrl,
                   message: 'Video concatenato con Shotstack!',
                   method: 'shotstack',
+                  skippedAssets: skippedAssets.length > 0 ? skippedAssets : undefined,
                 }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
               );
@@ -807,6 +808,7 @@ serve(async (req) => {
               audioUrl: audioUrl,
               message: 'Video concatenato con Shotstack!',
               method: 'shotstack',
+              skippedAssets: skippedAssets.length > 0 ? skippedAssets : undefined,
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
