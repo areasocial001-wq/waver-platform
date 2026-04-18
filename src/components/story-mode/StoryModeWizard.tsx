@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -156,6 +158,18 @@ export const StoryModeWizard = () => {
   const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
   const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
   const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  // Detailed list of expired audio assets (per-scene), used by the batch dialog for selective regeneration
+  const [batchAudioDetails, setBatchAudioDetails] = useState<Array<{
+    key: string;
+    realIdx: number;
+    sceneNumber: number;
+    type: "audio" | "sfx" | "music";
+  }>>([]);
+  const [batchSelectedKeys, setBatchSelectedKeys] = useState<Set<string>>(new Set());
+  // Final failure dialog: shown when auto-recovery exhausts MAX_RECOVERY_ATTEMPTS
+  const [showRecoveryFailureDialog, setShowRecoveryFailureDialog] = useState(false);
+  const [recoveryFailureAssets, setRecoveryFailureAssets] = useState<Array<{ type: string; index?: number; sceneNumber?: number }>>([]);
+  const [recoveryFailureContext, setRecoveryFailureContext] = useState<"reassemble" | "generateAll" | null>(null);
   const [savedProjectsTick, setSavedProjectsTick] = useState(0);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
@@ -1298,15 +1312,37 @@ export const StoryModeWizard = () => {
     const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
     let blobCount = 0;
     let totalCount = 0;
+    const details: Array<{ key: string; realIdx: number; sceneNumber: number; type: "audio" | "sfx" | "music" }> = [];
     vids.forEach(s => {
-      if (s.audioUrl) { totalCount++; if (isBlob(s.audioUrl)) blobCount++; }
-      if (s.sfxUrl) { totalCount++; if (isBlob(s.sfxUrl)) blobCount++; }
+      const realIdx = script.scenes.findIndex(x => x.sceneNumber === s.sceneNumber);
+      if (s.audioUrl) {
+        totalCount++;
+        if (isBlob(s.audioUrl)) {
+          blobCount++;
+          details.push({ key: `audio-${s.sceneNumber}`, realIdx, sceneNumber: s.sceneNumber, type: "audio" });
+        }
+      }
+      if (s.sfxUrl) {
+        totalCount++;
+        if (isBlob(s.sfxUrl)) {
+          blobCount++;
+          details.push({ key: `sfx-${s.sceneNumber}`, realIdx, sceneNumber: s.sceneNumber, type: "sfx" });
+        }
+      }
     });
-    if (backgroundMusicUrl) { totalCount++; if (isBlob(backgroundMusicUrl)) blobCount++; }
+    if (backgroundMusicUrl) {
+      totalCount++;
+      if (isBlob(backgroundMusicUrl)) {
+        blobCount++;
+        details.push({ key: "music-global", realIdx: -1, sceneNumber: 0, type: "music" });
+      }
+    }
     if (totalCount === 0 || blobCount === 0) return true;
     const pct = Math.round((blobCount / totalCount) * 100);
     if (pct > 50) {
       setBatchAudioStats({ blob: blobCount, total: totalCount, pct });
+      setBatchAudioDetails(details);
+      setBatchSelectedKeys(new Set(details.map(d => d.key)));
       setShowBatchAudioRegenDialog(true);
       return false;
     }
@@ -1321,32 +1357,35 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Batch-regenerate all blob: audio assets across the project
+  // Batch-regenerate selected blob: audio assets across the project
   const handleBatchRegenAudio = async () => {
     if (!script) return;
+    const selected = batchAudioDetails.filter(d => batchSelectedKeys.has(d.key));
+    if (selected.length === 0) {
+      toast.warning("Nessun asset selezionato");
+      return;
+    }
     setIsBatchRegenAudio(true);
-    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
-    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
-    const tasks: Array<{ realIdx: number; type: "audio" | "sfx" }> = [];
-    vids.forEach((vid) => {
-      const realIdx = script.scenes.findIndex(s => s.sceneNumber === vid.sceneNumber);
-      if (realIdx < 0) return;
-      if (isBlob(vid.audioUrl)) tasks.push({ realIdx, type: "audio" });
-      if (isBlob(vid.sfxUrl)) tasks.push({ realIdx, type: "sfx" });
-    });
-    const needsMusic = isBlob(backgroundMusicUrl);
-    const total = tasks.length + (needsMusic ? 1 : 0);
+    const total = selected.length;
     toast.info(`Rigenerazione batch di ${total} audio scaduti…`);
     let done = 0;
-    for (const t of tasks) {
-      try { await regenerateSceneAsset(t.realIdx, t.type); done++; } catch (e) { console.warn("Batch regen failed:", e); }
-    }
-    if (needsMusic) {
-      try { await generateBackgroundMusic(); done++; } catch (e) { console.warn("Batch music regen failed:", e); }
+    for (const t of selected) {
+      try {
+        if (t.type === "music") {
+          await generateBackgroundMusic();
+        } else {
+          await regenerateSceneAsset(t.realIdx, t.type);
+        }
+        done++;
+      } catch (e) {
+        console.warn("Batch regen failed:", e);
+      }
     }
     setIsBatchRegenAudio(false);
     setShowBatchAudioRegenDialog(false);
     setBatchAudioStats(null);
+    setBatchAudioDetails([]);
+    setBatchSelectedKeys(new Set());
     toast.success(`${done}/${total} audio rigenerati`);
     setTimeout(() => saveProject(), 300);
     setShowRenderPreview(true);
@@ -1561,8 +1600,17 @@ export const StoryModeWizard = () => {
       // Auto-recover skipped (blob:) audio assets and re-trigger concat once (max 3 attempts)
       if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
         if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
-          toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+          toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi.`, { duration: 6000 });
           recoveryAttemptsRef.current = 0;
+          // Map skipped assets back to scene numbers for the failure dialog
+          const vids = script?.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl) ?? [];
+          const enriched = data.skippedAssets.map((a: { type: string; index?: number; url: string }) => ({
+            ...a,
+            sceneNumber: typeof a.index === "number" ? vids[a.index]?.sceneNumber : undefined,
+          }));
+          setRecoveryFailureAssets(enriched);
+          setRecoveryFailureContext("reassemble");
+          setShowRecoveryFailureDialog(true);
         } else {
           const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
           if (recovered) {
@@ -1923,8 +1971,16 @@ export const StoryModeWizard = () => {
         // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble (max 3 attempts)
         if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
           if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
-            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi.`, { duration: 6000 });
             recoveryAttemptsRef.current = 0;
+            const vids = script?.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl) ?? [];
+            const enriched = data.skippedAssets.map((a: { type: string; index?: number; url: string }) => ({
+              ...a,
+              sceneNumber: typeof a.index === "number" ? vids[a.index]?.sceneNumber : undefined,
+            }));
+            setRecoveryFailureAssets(enriched);
+            setRecoveryFailureContext("generateAll");
+            setShowRecoveryFailureDialog(true);
           } else {
             const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
             if (recovered) {
@@ -2860,33 +2916,93 @@ export const StoryModeWizard = () => {
         />
       )}
 
-      {/* Pre-render batch audio regen confirmation */}
+      {/* Pre-render batch audio regen confirmation — with detailed per-scene preview */}
       <AlertDialog open={showBatchAudioRegenDialog} onOpenChange={(o) => { if (!isBatchRegenAudio) setShowBatchAudioRegenDialog(o); }}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-orange-400" />
               Audio scaduti rilevati
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              {batchAudioStats && (
-                <>
-                  <span className="block">
-                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale (Shotstack non può raggiungerli).
-                  </span>
-                  <span className="block text-xs">
-                    Vuoi rigenerarli tutti ora in batch prima di procedere al rendering?
-                  </span>
-                </>
-              )}
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {batchAudioStats && (
+                  <p className="text-sm">
+                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale.
+                  </p>
+                )}
+                <p className="text-xs">Seleziona quali rigenerare ora (puoi scegliere tutto o solo alcuni):</p>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {batchAudioDetails.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  className="text-primary hover:underline disabled:opacity-50"
+                  disabled={isBatchRegenAudio}
+                  onClick={() => setBatchSelectedKeys(new Set(batchAudioDetails.map(d => d.key)))}
+                >
+                  Seleziona tutto
+                </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:underline disabled:opacity-50"
+                  disabled={isBatchRegenAudio}
+                  onClick={() => setBatchSelectedKeys(new Set())}
+                >
+                  Deseleziona tutto
+                </button>
+                <span className="text-muted-foreground">
+                  {batchSelectedKeys.size}/{batchAudioDetails.length} selezionati
+                </span>
+              </div>
+              <ScrollArea className="h-56 rounded-md border bg-muted/30 p-2">
+                <div className="space-y-1">
+                  {batchAudioDetails.map((d) => {
+                    const checked = batchSelectedKeys.has(d.key);
+                    const typeLabel = d.type === "audio" ? "🎙️ Voce narrante" : d.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : "🎵 Musica di sottofondo";
+                    const sceneLabel = d.type === "music" ? "Globale" : `Scena ${d.sceneNumber}`;
+                    return (
+                      <label
+                        key={d.key}
+                        className={cn(
+                          "flex items-center gap-3 rounded-md px-2 py-2 text-sm cursor-pointer transition-colors",
+                          checked ? "bg-primary/10" : "hover:bg-muted/50",
+                          isBatchRegenAudio && "pointer-events-none opacity-60",
+                        )}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          disabled={isBatchRegenAudio}
+                          onCheckedChange={(v) => {
+                            setBatchSelectedKeys((prev) => {
+                              const next = new Set(prev);
+                              if (v) next.add(d.key); else next.delete(d.key);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="flex-1">{typeLabel}</span>
+                        <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                      </label>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
           <AlertDialogFooter>
             <AlertDialogCancel
               disabled={isBatchRegenAudio}
               onClick={() => {
                 setShowBatchAudioRegenDialog(false);
                 setBatchAudioStats(null);
+                setBatchAudioDetails([]);
+                setBatchSelectedKeys(new Set());
                 // User chose to skip — open render preview anyway (they can decide there)
                 setShowRenderPreview(true);
               }}
@@ -2894,14 +3010,101 @@ export const StoryModeWizard = () => {
               No, procedi così
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={isBatchRegenAudio}
+              disabled={isBatchRegenAudio || batchSelectedKeys.size === 0}
               onClick={(e) => { e.preventDefault(); handleBatchRegenAudio(); }}
             >
               {isBatchRegenAudio ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Rigenerazione…</>
               ) : (
-                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera tutti in batch</>
+                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera selezionati ({batchSelectedKeys.size})</>
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Final recovery failure dialog: shown when auto-recovery exhausts MAX_RECOVERY_ATTEMPTS */}
+      <AlertDialog open={showRecoveryFailureDialog} onOpenChange={setShowRecoveryFailureDialog}>
+        <AlertDialogContent className="max-w-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Recupero audio fallito ({MAX_RECOVERY_ATTEMPTS}/{MAX_RECOVERY_ATTEMPTS} tentativi)
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p className="text-sm">
+                  Dopo {MAX_RECOVERY_ATTEMPTS} tentativi automatici di rigenerazione, i seguenti asset audio risultano ancora non raggiungibili da Shotstack e <strong>non sono stati inclusi</strong> nel video finale:
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {recoveryFailureAssets.length > 0 && (
+            <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+              <div className="space-y-1">
+                {recoveryFailureAssets.map((a, i) => {
+                  const typeLabel = a.type === "narration" ? "🎙️ Voce narrante" : a.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : a.type === "music" ? "🎵 Musica di sottofondo" : `❓ ${a.type}`;
+                  const sceneLabel = a.type === "music" ? "Globale" : a.sceneNumber ? `Scena ${a.sceneNumber}` : "Sconosciuto";
+                  return (
+                    <div key={`${a.type}-${a.index ?? i}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm bg-destructive/5">
+                      <span className="flex-1">{typeLabel}</span>
+                      <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Suggerimento: rigenera manualmente questi asset dalle card delle scene (o dal pannello musica per la colonna sonora), poi rilancia il rendering finale.
+          </p>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowRecoveryFailureDialog(false);
+              setRecoveryFailureAssets([]);
+              setRecoveryFailureContext(null);
+            }}>
+              Chiudi
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                // Pre-select the failed assets in the batch dialog, then open it
+                if (!script) return;
+                const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+                const details: Array<{ key: string; realIdx: number; sceneNumber: number; type: "audio" | "sfx" | "music" }> = [];
+                recoveryFailureAssets.forEach((a) => {
+                  if (a.type === "music") {
+                    details.push({ key: "music-global", realIdx: -1, sceneNumber: 0, type: "music" });
+                  } else if (typeof a.index === "number") {
+                    const targetVid = vids[a.index];
+                    if (!targetVid) return;
+                    const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+                    if (realIdx < 0) return;
+                    const t: "audio" | "sfx" = a.type === "narration" ? "audio" : "sfx";
+                    details.push({ key: `${t}-${targetVid.sceneNumber}`, realIdx, sceneNumber: targetVid.sceneNumber, type: t });
+                  }
+                });
+                if (details.length > 0) {
+                  setBatchAudioDetails(details);
+                  setBatchSelectedKeys(new Set(details.map(d => d.key)));
+                  setBatchAudioStats({ blob: details.length, total: details.length, pct: 100 });
+                  setShowRecoveryFailureDialog(false);
+                  setRecoveryFailureAssets([]);
+                  // Save context so after batch regen the user is taken back to the right action
+                  setPendingRenderAction(recoveryFailureContext);
+                  setRecoveryFailureContext(null);
+                  setShowBatchAudioRegenDialog(true);
+                } else {
+                  setShowRecoveryFailureDialog(false);
+                }
+              }}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Rigenera manualmente e rilancia
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
