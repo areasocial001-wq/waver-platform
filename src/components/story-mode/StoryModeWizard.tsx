@@ -1493,19 +1493,29 @@ export const StoryModeWizard = () => {
       const finalUrl = data?.videoUrl || data?.url;
       if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
 
-      // Auto-recover skipped (blob:) audio assets and re-trigger concat once
+      // Auto-recover skipped (blob:) audio assets and re-trigger concat once (max 3 attempts)
       if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
-        const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
-        if (recovered) {
-          toast.info("Ri-tentativo concat con audio rigenerati…");
-          setIsGenerating(false);
-          setTimeout(() => handleReassemble(volumeOverrides), 500);
-          return;
+        if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
+          toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+          recoveryAttemptsRef.current = 0;
+        } else {
+          const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
+          if (recovered) {
+            recoveryAttemptsRef.current += 1;
+            toast.info(`Ri-tentativo concat con audio rigenerati… (tentativo ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS})`);
+            setIsGenerating(false);
+            setTimeout(() => handleReassemble(volumeOverrides), 500);
+            return;
+          }
+          const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+          toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti.`, { duration: 8000 });
+          console.warn("Skipped assets (recovery failed):", data.skippedAssets);
         }
-        const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
-        toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti.`, { duration: 8000 });
-        console.warn("Skipped assets (recovery failed):", data.skippedAssets);
+      } else {
+        // Successful concat with no skipped assets — reset retry counter
+        recoveryAttemptsRef.current = 0;
       }
+
 
       if (data?.method === "shotstack-pending" && data?.renderId) {
         // CRITICAL: do NOT set finalVideoUrl when pending
@@ -1845,20 +1855,29 @@ export const StoryModeWizard = () => {
           setVideoSegments(data.segments);
         }
 
-        // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble
+        // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble (max 3 attempts)
         if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
-          const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
-          if (recovered) {
-            toast.info("Ri-tentativo concat con audio rigenerati…");
-            setStep("complete");
-            setIsGenerating(false);
-            setTimeout(() => handleReassemble(), 500);
-            return;
+          if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
+            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+            recoveryAttemptsRef.current = 0;
+          } else {
+            const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
+            if (recovered) {
+              recoveryAttemptsRef.current += 1;
+              toast.info(`Ri-tentativo concat con audio rigenerati… (tentativo ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS})`);
+              setStep("complete");
+              setIsGenerating(false);
+              setTimeout(() => handleReassemble(), 500);
+              return;
+            }
+            const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+            toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
+            console.warn("Skipped assets (recovery failed):", data.skippedAssets);
           }
-          const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
-          toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
-          console.warn("Skipped assets (recovery failed):", data.skippedAssets);
+        } else {
+          recoveryAttemptsRef.current = 0;
         }
+
 
         if (data?.method === "shotstack-pending" && data?.renderId) {
           // CRITICAL: do NOT set finalVideoUrl when pending — that would expose
