@@ -2859,6 +2859,53 @@ export const StoryModeWizard = () => {
           }}
         />
       )}
+
+      {/* Pre-render batch audio regen confirmation */}
+      <AlertDialog open={showBatchAudioRegenDialog} onOpenChange={(o) => { if (!isBatchRegenAudio) setShowBatchAudioRegenDialog(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              Audio scaduti rilevati
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              {batchAudioStats && (
+                <>
+                  <span className="block">
+                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale (Shotstack non può raggiungerli).
+                  </span>
+                  <span className="block text-xs">
+                    Vuoi rigenerarli tutti ora in batch prima di procedere al rendering?
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isBatchRegenAudio}
+              onClick={() => {
+                setShowBatchAudioRegenDialog(false);
+                setBatchAudioStats(null);
+                // User chose to skip — open render preview anyway (they can decide there)
+                setShowRenderPreview(true);
+              }}
+            >
+              No, procedi così
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isBatchRegenAudio}
+              onClick={(e) => { e.preventDefault(); handleBatchRegenAudio(); }}
+            >
+              {isBatchRegenAudio ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Rigenerazione…</>
+              ) : (
+                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera tutti in batch</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
