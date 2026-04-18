@@ -3112,6 +3112,3 @@ export const StoryModeWizard = () => {
     </div>
   );
 };
-    </div>
-  );
-};
