@@ -75,7 +75,11 @@ interface SavedProject {
   status: string;
   created_at: string;
   updated_at: string;
+  pending_render_id?: string | null;
+  render_started_at?: string | null;
 }
+
+const MAX_RECOVERY_ATTEMPTS = 3;
 
 // Helper to get auth headers with user's JWT token
 const getAuthHeaders = async () => {
@@ -149,9 +153,14 @@ export const StoryModeWizard = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showRenderPreview, setShowRenderPreview] = useState(false);
   const [pendingRenderAction, setPendingRenderAction] = useState<"reassemble" | "generateAll" | null>(null);
+  const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
+  const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
+  const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  const [savedProjectsTick, setSavedProjectsTick] = useState(0);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
+  const recoveryAttemptsRef = useRef(0);
 
   const waitForResume = async () => {
     while (pauseRef.current && !cancelRef.current) {
@@ -330,10 +339,20 @@ export const StoryModeWizard = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase.from("story_mode_projects")
-      .select("id, title, status, created_at, updated_at")
+      .select("id, title, status, created_at, updated_at, pending_render_id, render_started_at")
       .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(20);
-    if (data) setSavedProjects(data);
+    if (data) setSavedProjects(data as any);
   };
+
+  // Tick every 30s to refresh "Xm trascorsi" badge in the saved-projects list
+  useEffect(() => {
+    if (!showProjectList) return;
+    const hasActive = savedProjects.some(p => p.pending_render_id);
+    if (!hasActive) return;
+    const t = setInterval(() => setSavedProjectsTick(v => v + 1), 30000);
+    return () => clearInterval(t);
+  }, [showProjectList, savedProjects]);
+
 
   const persistProject = async (overrides?: {
     script?: StoryScript | null;
@@ -1267,8 +1286,73 @@ export const StoryModeWizard = () => {
     return recovered > 0;
   };
 
+  /**
+   * Pre-render check: scan all completed video scenes for blob: audio URLs.
+   * If >50% are blob, open a confirm dialog to batch-regenerate them all
+   * instead of forcing the user to click "Rigenera" one-by-one in the dialog.
+   */
+  const preRenderAudioCheck = (): boolean => {
+    if (!script) return true;
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    if (vids.length === 0) return true;
+    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
+    let blobCount = 0;
+    let totalCount = 0;
+    vids.forEach(s => {
+      if (s.audioUrl) { totalCount++; if (isBlob(s.audioUrl)) blobCount++; }
+      if (s.sfxUrl) { totalCount++; if (isBlob(s.sfxUrl)) blobCount++; }
+    });
+    if (backgroundMusicUrl) { totalCount++; if (isBlob(backgroundMusicUrl)) blobCount++; }
+    if (totalCount === 0 || blobCount === 0) return true;
+    const pct = Math.round((blobCount / totalCount) * 100);
+    if (pct > 50) {
+      setBatchAudioStats({ blob: blobCount, total: totalCount, pct });
+      setShowBatchAudioRegenDialog(true);
+      return false;
+    }
+    return true;
+  };
 
-  // Upload PDF/text file for description
+  // Open render preview only after the audio check passes
+  const openRenderPreview = (action: "reassemble" | "generateAll") => {
+    setPendingRenderAction(action);
+    if (preRenderAudioCheck()) {
+      setShowRenderPreview(true);
+    }
+  };
+
+  // Batch-regenerate all blob: audio assets across the project
+  const handleBatchRegenAudio = async () => {
+    if (!script) return;
+    setIsBatchRegenAudio(true);
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
+    const tasks: Array<{ realIdx: number; type: "audio" | "sfx" }> = [];
+    vids.forEach((vid) => {
+      const realIdx = script.scenes.findIndex(s => s.sceneNumber === vid.sceneNumber);
+      if (realIdx < 0) return;
+      if (isBlob(vid.audioUrl)) tasks.push({ realIdx, type: "audio" });
+      if (isBlob(vid.sfxUrl)) tasks.push({ realIdx, type: "sfx" });
+    });
+    const needsMusic = isBlob(backgroundMusicUrl);
+    const total = tasks.length + (needsMusic ? 1 : 0);
+    toast.info(`Rigenerazione batch di ${total} audio scaduti…`);
+    let done = 0;
+    for (const t of tasks) {
+      try { await regenerateSceneAsset(t.realIdx, t.type); done++; } catch (e) { console.warn("Batch regen failed:", e); }
+    }
+    if (needsMusic) {
+      try { await generateBackgroundMusic(); done++; } catch (e) { console.warn("Batch music regen failed:", e); }
+    }
+    setIsBatchRegenAudio(false);
+    setShowBatchAudioRegenDialog(false);
+    setBatchAudioStats(null);
+    toast.success(`${done}/${total} audio rigenerati`);
+    setTimeout(() => saveProject(), 300);
+    setShowRenderPreview(true);
+  };
+
+
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1474,19 +1558,29 @@ export const StoryModeWizard = () => {
       const finalUrl = data?.videoUrl || data?.url;
       if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
 
-      // Auto-recover skipped (blob:) audio assets and re-trigger concat once
+      // Auto-recover skipped (blob:) audio assets and re-trigger concat once (max 3 attempts)
       if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
-        const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
-        if (recovered) {
-          toast.info("Ri-tentativo concat con audio rigenerati…");
-          setIsGenerating(false);
-          setTimeout(() => handleReassemble(volumeOverrides), 500);
-          return;
+        if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
+          toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+          recoveryAttemptsRef.current = 0;
+        } else {
+          const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
+          if (recovered) {
+            recoveryAttemptsRef.current += 1;
+            toast.info(`Ri-tentativo concat con audio rigenerati… (tentativo ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS})`);
+            setIsGenerating(false);
+            setTimeout(() => handleReassemble(volumeOverrides), 500);
+            return;
+          }
+          const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+          toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti.`, { duration: 8000 });
+          console.warn("Skipped assets (recovery failed):", data.skippedAssets);
         }
-        const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
-        toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti.`, { duration: 8000 });
-        console.warn("Skipped assets (recovery failed):", data.skippedAssets);
+      } else {
+        // Successful concat with no skipped assets — reset retry counter
+        recoveryAttemptsRef.current = 0;
       }
+
 
       if (data?.method === "shotstack-pending" && data?.renderId) {
         // CRITICAL: do NOT set finalVideoUrl when pending
@@ -1826,20 +1920,29 @@ export const StoryModeWizard = () => {
           setVideoSegments(data.segments);
         }
 
-        // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble
+        // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble (max 3 attempts)
         if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
-          const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
-          if (recovered) {
-            toast.info("Ri-tentativo concat con audio rigenerati…");
-            setStep("complete");
-            setIsGenerating(false);
-            setTimeout(() => handleReassemble(), 500);
-            return;
+          if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
+            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+            recoveryAttemptsRef.current = 0;
+          } else {
+            const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
+            if (recovered) {
+              recoveryAttemptsRef.current += 1;
+              toast.info(`Ri-tentativo concat con audio rigenerati… (tentativo ${recoveryAttemptsRef.current}/${MAX_RECOVERY_ATTEMPTS})`);
+              setStep("complete");
+              setIsGenerating(false);
+              setTimeout(() => handleReassemble(), 500);
+              return;
+            }
+            const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+            toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
+            console.warn("Skipped assets (recovery failed):", data.skippedAssets);
           }
-          const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
-          toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
-          console.warn("Skipped assets (recovery failed):", data.skippedAssets);
+        } else {
+          recoveryAttemptsRef.current = 0;
         }
+
 
         if (data?.method === "shotstack-pending" && data?.renderId) {
           // CRITICAL: do NOT set finalVideoUrl when pending — that would expose
@@ -1944,12 +2047,24 @@ export const StoryModeWizard = () => {
               <p className="text-sm text-muted-foreground text-center py-4">Nessun progetto salvato</p>
             ) : (
               <div className="grid gap-2 max-h-60 overflow-y-auto">
-                {savedProjects.map(p => (
+                {savedProjects.map(p => {
+                  // Active render badge: pending_render_id set + render_started_at < 15min ago (else stale)
+                  const renderStartMs = p.render_started_at ? new Date(p.render_started_at).getTime() : 0;
+                  const _tick = savedProjectsTick; // re-eval on tick to refresh elapsed
+                  const elapsedMin = renderStartMs ? Math.floor((Date.now() - renderStartMs) / 60000) : 0;
+                  const isActiveRender = !!p.pending_render_id && renderStartMs > 0 && elapsedMin < 15;
+                  return (
                   <div key={p.id} className={cn("flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors", projectId === p.id ? "border-primary bg-primary/5" : "border-border")} onClick={() => loadProject(p.id)}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{p.title}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge variant="outline" className="text-xs">{p.status}</Badge>
+                        {isActiveRender && (
+                          <Badge variant="default" className="text-xs bg-primary/20 text-primary border-primary/40 animate-pulse flex items-center gap-1">
+                            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            Rendering ({elapsedMin}m)
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(p.updated_at).toLocaleDateString("it-IT")}</span>
                       </div>
                     </div>
@@ -1957,7 +2072,8 @@ export const StoryModeWizard = () => {
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -2405,7 +2521,7 @@ export const StoryModeWizard = () => {
               return (
                 <Button
                   variant="default"
-                  onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }}
+                  onClick={() => openRenderPreview("reassemble")}
                   disabled={isGenerating || renderStatus === "processing"}
                   className="bg-primary/90 hover:bg-primary"
                   title={`Salta la generazione delle scene e monta direttamente il video finale dalle ${completedVids.length} scene già pronte`}
@@ -2654,7 +2770,7 @@ export const StoryModeWizard = () => {
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
                   {script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length >= 2 && (
-                    <Button variant="secondary" onClick={() => { setPendingRenderAction("reassemble"); setShowRenderPreview(true); }} disabled={isGenerating}>
+                    <Button variant="secondary" onClick={() => openRenderPreview("reassemble")} disabled={isGenerating}>
                       {isGenerating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Film className="w-4 h-4 mr-2" />}
                       Rimonta Video Finale
                     </Button>
@@ -2743,6 +2859,53 @@ export const StoryModeWizard = () => {
           }}
         />
       )}
+
+      {/* Pre-render batch audio regen confirmation */}
+      <AlertDialog open={showBatchAudioRegenDialog} onOpenChange={(o) => { if (!isBatchRegenAudio) setShowBatchAudioRegenDialog(o); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-orange-400" />
+              Audio scaduti rilevati
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              {batchAudioStats && (
+                <>
+                  <span className="block">
+                    <strong className="text-foreground">{batchAudioStats.blob} su {batchAudioStats.total}</strong> asset audio ({batchAudioStats.pct}%) sono URL temporanei del browser e <strong>non saranno inclusi</strong> nel video finale (Shotstack non può raggiungerli).
+                  </span>
+                  <span className="block text-xs">
+                    Vuoi rigenerarli tutti ora in batch prima di procedere al rendering?
+                  </span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              disabled={isBatchRegenAudio}
+              onClick={() => {
+                setShowBatchAudioRegenDialog(false);
+                setBatchAudioStats(null);
+                // User chose to skip — open render preview anyway (they can decide there)
+                setShowRenderPreview(true);
+              }}
+            >
+              No, procedi così
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isBatchRegenAudio}
+              onClick={(e) => { e.preventDefault(); handleBatchRegenAudio(); }}
+            >
+              {isBatchRegenAudio ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Rigenerazione…</>
+              ) : (
+                <><RefreshCw className="w-4 h-4 mr-2" />Rigenera tutti in batch</>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
