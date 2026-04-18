@@ -1430,7 +1430,15 @@ export const StoryModeWizard = () => {
       const finalUrl = data?.videoUrl || data?.url;
       if (data?.segments && Array.isArray(data.segments)) setVideoSegments(data.segments);
 
+      // Warn user about skipped audio assets
+      if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
+        const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+        toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti.`, { duration: 8000 });
+        console.warn("Skipped assets:", data.skippedAssets);
+      }
+
       if (data?.method === "shotstack-pending" && data?.renderId) {
+        // CRITICAL: do NOT set finalVideoUrl when pending
         setPendingRenderId(data.renderId);
         setRenderStatus("processing");
         setRenderStartTime(Date.now());
@@ -1439,14 +1447,15 @@ export const StoryModeWizard = () => {
         setStep("complete");
         toast.info("Rendering in corso su Shotstack… il video apparirà automaticamente.");
         setTimeout(() => saveProject(), 500);
-      } else if (finalUrl) {
+      } else if (finalUrl && data?.method === "shotstack") {
         setFinalVideoUrl(finalUrl);
         setRenderStatus("completed");
         setStep("complete");
-        toast.success("Video finale rimontato! 🎬");
+        toast.success("Video finale rimontato con audio mixato! 🎬");
         setTimeout(() => saveProject(), 500);
       } else {
-        toast.error("Nessun URL video ricevuto dal montaggio.");
+        toast.error("Rimontaggio non riuscito — il backend non ha restituito un video unito. Riprova fra qualche secondo.");
+        setStep("complete");
       }
     } catch (err: any) {
       console.error("Reassemble error:", err);
@@ -1766,21 +1775,31 @@ export const StoryModeWizard = () => {
           setVideoSegments(data.segments);
         }
 
+        // Warn user about skipped audio assets (blob URLs unreachable from server)
+        if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
+          const types = [...new Set(data.skippedAssets.map((a: { type: string }) => a.type))].join(", ");
+          toast.warning(`⚠️ ${data.skippedAssets.length} asset audio scartati (${types}): URL temporanei scaduti. Ricarica/rigenera per includerli nel video finale.`, { duration: 8000 });
+          console.warn("Skipped assets:", data.skippedAssets);
+        }
+
         if (data?.method === "shotstack-pending" && data?.renderId) {
+          // CRITICAL: do NOT set finalVideoUrl when pending — that would expose
+          // the raw first-scene URL as if it were the final video.
           setPendingRenderId(data.renderId);
           setRenderStatus("processing");
           setRenderStartTime(Date.now());
           setRenderElapsed(0);
           if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
-          toast.info("Rendering finale in corso… apparirà automaticamente.");
-        } else if (finalUrl) {
+          toast.info("Rendering finale in corso… apparirà automaticamente quando pronto.");
+        } else if (finalUrl && data?.method === "shotstack") {
+          // Only set finalVideoUrl when Shotstack confirms the merged video is ready
           setFinalVideoUrl(finalUrl);
           setRenderStatus("completed");
-          if (data?.method === "shotstack") {
-            toast.success("Video finale con audio mixato generato! 🎬");
-          } else {
-            toast.success("Scene video pronte! Scarica le singole scene qui sotto. 🎬");
-          }
+          toast.success("Video finale con audio mixato generato! 🎬");
+        } else if (finalUrl) {
+          // Fallback method (segments) — explicit message that this is NOT a merged video
+          setVideoSegments(data?.segments || [finalUrl]);
+          toast.warning("Concat non disponibile — scarica le scene singolarmente.");
         } else {
           console.error("video-concat returned no URL:", data);
           toast.error("Concatenazione completata ma nessun URL video ricevuto. Scarica le scene singolarmente.");
