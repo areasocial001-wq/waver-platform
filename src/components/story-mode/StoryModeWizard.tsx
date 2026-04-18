@@ -1224,6 +1224,50 @@ export const StoryModeWizard = () => {
     } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
   };
 
+  /**
+   * Auto-recover audio assets that the backend skipped because they were blob: URLs
+   * (browser-only, unreachable from Shotstack). Regenerates narration/sfx via the
+   * same TTS / SFX pipeline and refreshes background music if it was a blob URL.
+   * Returns true if at least one asset was recovered (caller should re-trigger concat).
+   */
+  const recoverSkippedAudioAssets = async (
+    skipped: { type: string; index?: number; url: string }[],
+  ): Promise<boolean> => {
+    if (!script || !skipped?.length) return false;
+    let recovered = 0;
+    toast.info(`Recupero automatico di ${skipped.length} ${skipped.length === 1 ? "asset audio scaduto" : "asset audio scaduti"}…`);
+
+    // Group by type — vids order in concat == filtered scenes with completed video
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+
+    for (const item of skipped) {
+      try {
+        if ((item.type === "narration" || item.type === "sfx") && typeof item.index === "number") {
+          // Map back from vids[index] to the real script.scenes index
+          const targetVid = vids[item.index];
+          if (!targetVid) continue;
+          const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+          if (realIdx < 0) continue;
+          await regenerateSceneAsset(realIdx, item.type === "narration" ? "audio" : "sfx");
+          recovered++;
+        } else if (item.type === "music") {
+          const newUrl = await generateBackgroundMusic();
+          if (newUrl) recovered++;
+        }
+      } catch (err) {
+        console.warn(`Auto-recovery failed for ${item.type}#${item.index}:`, err);
+      }
+    }
+
+    if (recovered > 0) {
+      toast.success(`${recovered} ${recovered === 1 ? "asset audio rigenerato" : "asset audio rigenerati"}`);
+      // Persist updated scene assets so the next concat picks the new storage URLs
+      setTimeout(() => saveProject(), 300);
+    }
+    return recovered > 0;
+  };
+
+
   // Upload PDF/text file for description
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
