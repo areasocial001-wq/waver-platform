@@ -1646,6 +1646,8 @@ export const StoryModeWizard = () => {
           setRecoveryFailureAssets(enriched);
           setRecoveryFailureContext("reassemble");
           setShowRecoveryFailureDialog(true);
+          // Persist failure to recovery_history for analytics
+          logRecoveryFailure("reassemble", enriched, MAX_RECOVERY_ATTEMPTS);
         } else {
           const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
           if (recovered) {
@@ -2016,6 +2018,7 @@ export const StoryModeWizard = () => {
             setRecoveryFailureAssets(enriched);
             setRecoveryFailureContext("generateAll");
             setShowRecoveryFailureDialog(true);
+            logRecoveryFailure("generateAll", enriched, MAX_RECOVERY_ATTEMPTS);
           } else {
             const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
             if (recovered) {
