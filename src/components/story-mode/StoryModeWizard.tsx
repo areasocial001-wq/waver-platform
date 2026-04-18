@@ -1971,8 +1971,16 @@ export const StoryModeWizard = () => {
         // Auto-recover skipped (blob:) audio assets and re-trigger concat once via reassemble (max 3 attempts)
         if (data?.skippedAssets && Array.isArray(data.skippedAssets) && data.skippedAssets.length > 0) {
           if (recoveryAttemptsRef.current >= MAX_RECOVERY_ATTEMPTS) {
-            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi. Procedo senza gli audio scartati.`, { duration: 8000 });
+            toast.error(`❌ Recupero audio fallito dopo ${MAX_RECOVERY_ATTEMPTS} tentativi.`, { duration: 6000 });
             recoveryAttemptsRef.current = 0;
+            const vids = script?.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl) ?? [];
+            const enriched = data.skippedAssets.map((a: { type: string; index?: number; url: string }) => ({
+              ...a,
+              sceneNumber: typeof a.index === "number" ? vids[a.index]?.sceneNumber : undefined,
+            }));
+            setRecoveryFailureAssets(enriched);
+            setRecoveryFailureContext("generateAll");
+            setShowRecoveryFailureDialog(true);
           } else {
             const recovered = await recoverSkippedAudioAssets(data.skippedAssets);
             if (recovered) {
