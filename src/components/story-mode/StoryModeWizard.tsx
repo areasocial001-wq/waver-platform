@@ -2050,7 +2050,8 @@ export const StoryModeWizard = () => {
                 {savedProjects.map(p => {
                   // Active render badge: pending_render_id set + render_started_at < 15min ago (else stale)
                   const renderStartMs = p.render_started_at ? new Date(p.render_started_at).getTime() : 0;
-                  const elapsedMin = renderStartMs ? Math.floor((Date.now() + savedProjectsTick * 0 - renderStartMs) / 60000) : 0;
+                  const _tick = savedProjectsTick; // re-eval on tick to refresh elapsed
+                  const elapsedMin = renderStartMs ? Math.floor((Date.now() - renderStartMs) / 60000) : 0;
                   const isActiveRender = !!p.pending_render_id && renderStartMs > 0 && elapsedMin < 15;
                   return (
                   <div key={p.id} className={cn("flex items-center justify-between p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors", projectId === p.id ? "border-primary bg-primary/5" : "border-border")} onClick={() => loadProject(p.id)}>
