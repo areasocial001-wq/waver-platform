@@ -70,6 +70,19 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
 
+  // Detect blob: URLs in audio assets — these CANNOT be reached by the server
+  // and will be silently skipped by video-concat, leaving the final video without those tracks.
+  const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
+  const blobNarrations = vids
+    .map((s, i) => ({ scene: s, index: i }))
+    .filter(({ scene }) => isBlob(scene.audioUrl));
+  const blobSfx = vids
+    .map((s, i) => ({ scene: s, index: i }))
+    .filter(({ scene }) => isBlob(scene.sfxUrl));
+  const blobMusic = isBlob(backgroundMusicUrl);
+  const totalBlobAssets = blobNarrations.length + blobSfx.length + (blobMusic ? 1 : 0);
+  const hasBlobAssetsBlocking = totalBlobAssets > 0;
+
   const fetchPreview = async () => {
     setLoading(true);
     setError(null);
