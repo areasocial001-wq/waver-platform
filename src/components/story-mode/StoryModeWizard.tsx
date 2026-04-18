@@ -153,9 +153,14 @@ export const StoryModeWizard = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showRenderPreview, setShowRenderPreview] = useState(false);
   const [pendingRenderAction, setPendingRenderAction] = useState<"reassemble" | "generateAll" | null>(null);
+  const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
+  const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
+  const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  const [savedProjectsTick, setSavedProjectsTick] = useState(0);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
+  const recoveryAttemptsRef = useRef(0);
 
   const waitForResume = async () => {
     while (pauseRef.current && !cancelRef.current) {
@@ -334,10 +339,20 @@ export const StoryModeWizard = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { data } = await supabase.from("story_mode_projects")
-      .select("id, title, status, created_at, updated_at")
+      .select("id, title, status, created_at, updated_at, pending_render_id, render_started_at")
       .eq("user_id", user.id).order("updated_at", { ascending: false }).limit(20);
-    if (data) setSavedProjects(data);
+    if (data) setSavedProjects(data as any);
   };
+
+  // Tick every 30s to refresh "Xm trascorsi" badge in the saved-projects list
+  useEffect(() => {
+    if (!showProjectList) return;
+    const hasActive = savedProjects.some(p => p.pending_render_id);
+    if (!hasActive) return;
+    const t = setInterval(() => setSavedProjectsTick(v => v + 1), 30000);
+    return () => clearInterval(t);
+  }, [showProjectList, savedProjects]);
+
 
   const persistProject = async (overrides?: {
     script?: StoryScript | null;
