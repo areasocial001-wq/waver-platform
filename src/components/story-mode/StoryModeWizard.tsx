@@ -3079,15 +3079,42 @@ export const StoryModeWizard = () => {
           </AlertDialogHeader>
 
           {recoveryFailureAssets.length > 0 && (
-            <ScrollArea className="h-48 rounded-md border bg-muted/30 p-2">
+            <ScrollArea className="h-64 rounded-md border bg-muted/30 p-2">
               <div className="space-y-1">
                 {recoveryFailureAssets.map((a, i) => {
                   const typeLabel = a.type === "narration" ? "🎙️ Voce narrante" : a.type === "sfx" ? "🔊 Effetto sonoro (SFX)" : a.type === "music" ? "🎵 Musica di sottofondo" : `❓ ${a.type}`;
                   const sceneLabel = a.type === "music" ? "Globale" : a.sceneNumber ? `Scena ${a.sceneNumber}` : "Sconosciuto";
+                  // Resolve the freshest URL we have for this asset (script state > backend skipped url)
+                  let playUrl: string | null = null;
+                  if (a.type === "music") {
+                    playUrl = backgroundMusicUrl ?? null;
+                  } else if (a.sceneNumber && script) {
+                    const scene = script.scenes.find(s => s.sceneNumber === a.sceneNumber);
+                    if (scene) {
+                      playUrl = a.type === "narration" ? (scene.audioUrl ?? null) : (scene.sfxUrl ?? null);
+                    }
+                  }
+                  if (!playUrl) playUrl = (a as any).url ?? null;
+                  const isBlob = !!playUrl && playUrl.startsWith("blob:");
                   return (
-                    <div key={`${a.type}-${a.index ?? i}`} className="flex items-center gap-3 rounded-md px-2 py-2 text-sm bg-destructive/5">
-                      <span className="flex-1">{typeLabel}</span>
-                      <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                    <div key={`${a.type}-${a.index ?? i}`} className="flex flex-col gap-2 rounded-md px-2 py-2 text-sm bg-destructive/5">
+                      <div className="flex items-center gap-3">
+                        <span className="flex-1">{typeLabel}</span>
+                        <Badge variant="outline" className="text-xs">{sceneLabel}</Badge>
+                        {isBlob && <Badge variant="secondary" className="text-xs">blob</Badge>}
+                      </div>
+                      {playUrl ? (
+                        <audio
+                          controls
+                          preload="none"
+                          src={playUrl}
+                          className="w-full h-8"
+                          onError={(e) => { (e.currentTarget.parentElement?.querySelector(".audio-fallback") as HTMLElement | null)?.classList.remove("hidden"); }}
+                        />
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">Nessuna URL disponibile per la preview</span>
+                      )}
+                      <span className="audio-fallback hidden text-xs text-muted-foreground italic">⚠️ Audio non riproducibile (URL scaduto o non raggiungibile)</span>
                     </div>
                   );
                 })}
