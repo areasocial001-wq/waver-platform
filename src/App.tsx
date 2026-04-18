@@ -22,6 +22,7 @@ import LTXToolsPage from "./pages/LTXTools";
 import NLtoJSONPage from "./pages/NLtoJSON";
 import TimelineEditorPage from "./pages/TimelineEditorPage";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminRecoveryAnalytics from "./pages/AdminRecoveryAnalytics";
 import PricingPage from "./pages/Pricing";
 import LumaToolsPage from "./pages/LumaTools";
 import FacelessVideoPage from "./pages/FacelessVideo";
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/story-mode" element={<StoryMode />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/recovery-analytics" element={<AdminRecoveryAnalytics />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

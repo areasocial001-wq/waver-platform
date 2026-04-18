@@ -137,6 +137,13 @@ export default function AdminDashboard() {
             </Card>
           </div>
 
+          <div className="mb-6">
+            <Button variant="outline" onClick={() => navigate("/admin/recovery-analytics")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Recovery Analytics
+            </Button>
+          </div>
+
           <Tabs defaultValue="users" className="space-y-6">
             <TabsList>
               <TabsTrigger value="users" className="flex items-center gap-2">
