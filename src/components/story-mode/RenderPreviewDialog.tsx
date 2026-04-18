@@ -145,6 +145,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
       setSummary(null);
       setError(null);
       setIgnoreAspectWarnings(false);
+      setIgnoreBlobAssets(false);
     }
   }, [open]);
 
