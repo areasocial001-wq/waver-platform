@@ -1286,8 +1286,73 @@ export const StoryModeWizard = () => {
     return recovered > 0;
   };
 
+  /**
+   * Pre-render check: scan all completed video scenes for blob: audio URLs.
+   * If >50% are blob, open a confirm dialog to batch-regenerate them all
+   * instead of forcing the user to click "Rigenera" one-by-one in the dialog.
+   */
+  const preRenderAudioCheck = (): boolean => {
+    if (!script) return true;
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    if (vids.length === 0) return true;
+    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
+    let blobCount = 0;
+    let totalCount = 0;
+    vids.forEach(s => {
+      if (s.audioUrl) { totalCount++; if (isBlob(s.audioUrl)) blobCount++; }
+      if (s.sfxUrl) { totalCount++; if (isBlob(s.sfxUrl)) blobCount++; }
+    });
+    if (backgroundMusicUrl) { totalCount++; if (isBlob(backgroundMusicUrl)) blobCount++; }
+    if (totalCount === 0 || blobCount === 0) return true;
+    const pct = Math.round((blobCount / totalCount) * 100);
+    if (pct > 50) {
+      setBatchAudioStats({ blob: blobCount, total: totalCount, pct });
+      setShowBatchAudioRegenDialog(true);
+      return false;
+    }
+    return true;
+  };
 
-  // Upload PDF/text file for description
+  // Open render preview only after the audio check passes
+  const openRenderPreview = (action: "reassemble" | "generateAll") => {
+    setPendingRenderAction(action);
+    if (preRenderAudioCheck()) {
+      setShowRenderPreview(true);
+    }
+  };
+
+  // Batch-regenerate all blob: audio assets across the project
+  const handleBatchRegenAudio = async () => {
+    if (!script) return;
+    setIsBatchRegenAudio(true);
+    const vids = script.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
+    const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
+    const tasks: Array<{ realIdx: number; type: "audio" | "sfx" }> = [];
+    vids.forEach((vid) => {
+      const realIdx = script.scenes.findIndex(s => s.sceneNumber === vid.sceneNumber);
+      if (realIdx < 0) return;
+      if (isBlob(vid.audioUrl)) tasks.push({ realIdx, type: "audio" });
+      if (isBlob(vid.sfxUrl)) tasks.push({ realIdx, type: "sfx" });
+    });
+    const needsMusic = isBlob(backgroundMusicUrl);
+    const total = tasks.length + (needsMusic ? 1 : 0);
+    toast.info(`Rigenerazione batch di ${total} audio scaduti…`);
+    let done = 0;
+    for (const t of tasks) {
+      try { await regenerateSceneAsset(t.realIdx, t.type); done++; } catch (e) { console.warn("Batch regen failed:", e); }
+    }
+    if (needsMusic) {
+      try { await generateBackgroundMusic(); done++; } catch (e) { console.warn("Batch music regen failed:", e); }
+    }
+    setIsBatchRegenAudio(false);
+    setShowBatchAudioRegenDialog(false);
+    setBatchAudioStats(null);
+    toast.success(`${done}/${total} audio rigenerati`);
+    setTimeout(() => saveProject(), 300);
+    setShowRenderPreview(true);
+  };
+
+
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
