@@ -52,7 +52,9 @@ interface SceneCardProps {
   onPreviewAudio: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onRegenerate?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRegenerate?: (type: "image" | "audio" | "video" | "sfx", opts?: { correctionNote?: string }) => void;
+  onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
   onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
