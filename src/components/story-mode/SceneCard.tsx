@@ -176,6 +176,56 @@ export const SceneCard = ({
             )}
           </div>
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
+          {onRegenerate && (
+            <div className="flex gap-1 flex-wrap pt-1 border-t border-border/30">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => { onRegenerate("image"); toast.info(`Rigenero immagine scena ${scene.sceneNumber}`); }}
+                disabled={scene.imageStatus === "generating"}
+                title="Rigenera immagine"
+              >
+                <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
+                <Image className="w-2.5 h-2.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => { onRegenerate("video"); toast.info(`Rigenero video scena ${scene.sceneNumber}`); }}
+                disabled={scene.videoStatus === "generating" || !scene.imageUrl}
+                title={!scene.imageUrl ? "Genera prima l'immagine" : "Rigenera video"}
+              >
+                <RefreshCw className={cn("w-2.5 h-2.5", scene.videoStatus === "generating" && "animate-spin")} />
+                <Eye className="w-2.5 h-2.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => { onRegenerate("audio"); toast.info(`Rigenero audio scena ${scene.sceneNumber}`); }}
+                disabled={scene.audioStatus === "generating"}
+                title="Rigenera audio"
+              >
+                <RefreshCw className={cn("w-2.5 h-2.5", scene.audioStatus === "generating" && "animate-spin")} />
+                <Volume2 className="w-2.5 h-2.5" />
+              </Button>
+              {scene.sfxPrompt && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] gap-1"
+                  onClick={() => { onRegenerate("sfx"); toast.info(`Rigenero SFX scena ${scene.sceneNumber}`); }}
+                  disabled={scene.sfxStatus === "generating"}
+                  title="Rigenera SFX"
+                >
+                  <RefreshCw className={cn("w-2.5 h-2.5", scene.sfxStatus === "generating" && "animate-spin")} />
+                  🔊
+                </Button>
+              )}
+            </div>
+          )}
           {showCountdown && timeoutRemainingMs !== null && (
             <div className={cn(
               "flex items-center gap-1.5 text-[10px] font-mono px-2 py-1 rounded-md border",
