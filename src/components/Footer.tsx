@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import logoImg from "@/assets/logo.png";
+import studiobookLogo from "@/assets/studiobook-logo.png";
 
 export const Footer = () => {
   return (
@@ -9,6 +10,7 @@ export const Footer = () => {
           <div className="flex items-center gap-2">
             <img src={logoImg} alt="AI Production Hub" className="w-12 h-12 rounded-full object-cover shadow-[0_0_15px_hsl(217,91%,60%/0.3)]" />
             <span className="text-sm font-medium">AI Production Hub</span>
+            <img src={studiobookLogo} alt="StudioBook Edizioni" className="h-8 w-auto object-contain ml-2 bg-white/90 rounded px-1.5 py-0.5" />
             <span className="text-xs text-muted-foreground">v1.0</span>
           </div>
 
