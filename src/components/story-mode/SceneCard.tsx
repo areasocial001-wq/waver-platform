@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download, Mic, Unlock, AlertTriangle,
+  Image, Eye, Download, Mic, Unlock, AlertTriangle, Wand2, Check, Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
@@ -51,7 +52,9 @@ interface SceneCardProps {
   onPreviewAudio: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onRegenerate?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRegenerate?: (type: "image" | "audio" | "video" | "sfx", opts?: { correctionNote?: string }) => void;
+  onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
   onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
@@ -62,9 +65,12 @@ interface SceneCardProps {
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
-  onDuplicate, onDelete, onRegenerate, onUnstuck,
+  onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
+  // Local state for the correction note popover (image regen with guidance).
+  const [correctionNote, setCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
+  const [notePopoverOpen, setNotePopoverOpen] = useState(false);
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
   const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
@@ -178,17 +184,79 @@ export const SceneCard = ({
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
           {onRegenerate && (
             <div className="flex gap-1 flex-wrap pt-1 border-t border-border/30">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[10px] gap-1"
-                onClick={() => { onRegenerate("image"); toast.info(`Rigenero immagine scena ${scene.sceneNumber}`); }}
-                disabled={scene.imageStatus === "generating"}
-                title="Rigenera immagine"
-              >
-                <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
-                <Image className="w-2.5 h-2.5" />
-              </Button>
+              {/* Image regen with optional correction note popover */}
+              <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] gap-1"
+                    disabled={scene.imageStatus === "generating"}
+                    title="Rigenera immagine (con nota di correzione opzionale)"
+                  >
+                    <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
+                    <Image className="w-2.5 h-2.5" />
+                    <Wand2 className="w-2.5 h-2.5 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3 space-y-2" align="start">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Nota di correzione (opzionale)</Label>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Verrà appesa al prompt originale per guidare la rigenerazione. Es: "la ragazza indossa un vestito ocra lungo, non pantaloni".
+                    </p>
+                  </div>
+                  <Textarea
+                    value={correctionNote}
+                    onChange={e => setCorrectionNote(e.target.value)}
+                    placeholder="Cosa correggere rispetto al risultato precedente..."
+                    className="text-xs min-h-[70px]"
+                    autoFocus
+                  />
+                  <div className="flex justify-between gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => { setCorrectionNote(""); }}
+                    >
+                      Pulisci
+                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setNotePopoverOpen(false);
+                          onRegenerate("image");
+                          toast.info(`Rigenero immagine scena ${scene.sceneNumber}`);
+                        }}
+                      >
+                        Senza nota
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          const note = correctionNote.trim();
+                          setNotePopoverOpen(false);
+                          onRegenerate("image", note ? { correctionNote: note } : undefined);
+                          toast.info(
+                            note
+                              ? `Rigenero scena ${scene.sceneNumber} con correzione`
+                              : `Rigenero immagine scena ${scene.sceneNumber}`,
+                          );
+                        }}
+                      >
+                        <Wand2 className="w-3 h-3" />
+                        Rigenera
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -225,6 +293,16 @@ export const SceneCard = ({
                 </Button>
               )}
             </div>
+          )}
+
+          {/* Before/After comparison panel — appears after a regen if previous URL is kept */}
+          {(scene.previousImageUrl || scene.previousVideoUrl || scene.previousAudioUrl || scene.previousSfxUrl) && (
+            <BeforeAfterPanel
+              scene={scene}
+              aspectClass={aspectClass}
+              onKeepNew={onKeepNew}
+              onRollback={onRollback}
+            />
           )}
           {showCountdown && timeoutRemainingMs !== null && (
             <div className={cn(
@@ -486,4 +564,95 @@ const StatusDot = ({ status }: { status?: string }) => {
     : status === "error" ? "bg-destructive"
     : "bg-muted-foreground/30";
   return <div className={cn("w-2 h-2 rounded-full", color)} />;
+};
+
+/**
+ * Inline before/after comparison shown on the scene card after a regeneration.
+ * Lets the user keep the new asset (clears the backup) or roll back to the previous one.
+ * Supports image, video, audio and sfx — only the asset types with a `previousXxxUrl` are rendered.
+ */
+const BeforeAfterPanel = ({
+  scene,
+  aspectClass,
+  onKeepNew,
+  onRollback,
+}: {
+  scene: StoryScene;
+  aspectClass: string;
+  onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
+}) => {
+  const items: { type: "image" | "video" | "audio" | "sfx"; label: string; prev: string; next?: string }[] = [];
+  if (scene.previousImageUrl) items.push({ type: "image", label: "Immagine", prev: scene.previousImageUrl, next: scene.imageUrl });
+  if (scene.previousVideoUrl) items.push({ type: "video", label: "Video", prev: scene.previousVideoUrl, next: scene.videoUrl });
+  if (scene.previousAudioUrl) items.push({ type: "audio", label: "Audio", prev: scene.previousAudioUrl, next: scene.audioUrl });
+  if (scene.previousSfxUrl) items.push({ type: "sfx", label: "SFX", prev: scene.previousSfxUrl, next: scene.sfxUrl });
+  if (!items.length) return null;
+
+  return (
+    <div className="space-y-2 pt-2 mt-1 border-t border-primary/30">
+      {items.map(item => (
+        <div key={item.type} className="rounded-md border border-primary/30 bg-primary/5 p-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="outline" className="text-[10px] h-5 gap-1 border-primary/40">
+              <Wand2 className="w-2.5 h-2.5" /> Confronto {item.label}
+            </Badge>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => onRollback?.(item.type)}
+                title="Ripristina la versione precedente"
+              >
+                <Undo2 className="w-3 h-3" />
+                Ripristina
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => onKeepNew?.(item.type)}
+                title="Mantieni la nuova versione (scarta backup)"
+              >
+                <Check className="w-3 h-3" />
+                Mantieni
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <AssetPreview url={item.prev} type={item.type} aspectClass={aspectClass} label="Prima" />
+            <AssetPreview url={item.next} type={item.type} aspectClass={aspectClass} label="Dopo" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const AssetPreview = ({
+  url,
+  type,
+  aspectClass,
+  label,
+}: {
+  url?: string;
+  type: "image" | "video" | "audio" | "sfx";
+  aspectClass: string;
+  label: string;
+}) => {
+  const isVisual = type === "image" || type === "video";
+  return (
+    <div className="space-y-1">
+      <div className="text-[9px] text-muted-foreground uppercase tracking-wide font-semibold">{label}</div>
+      {!url ? (
+        <div className={cn("flex items-center justify-center bg-muted/30 rounded text-[10px] text-muted-foreground", isVisual ? aspectClass : "h-10")}>—</div>
+      ) : type === "image" ? (
+        <img src={url} alt={label} className={cn("w-full object-cover rounded", aspectClass)} />
+      ) : type === "video" ? (
+        <video src={url} className={cn("w-full object-cover rounded bg-black", aspectClass)} muted loop playsInline controls />
+      ) : (
+        <audio src={url} controls className="w-full h-8" />
+      )}
+    </div>
+  );
 };

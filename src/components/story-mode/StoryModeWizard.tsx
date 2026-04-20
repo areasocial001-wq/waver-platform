@@ -781,7 +781,12 @@ export const StoryModeWizard = () => {
   };
 
   // Regenerate single scene asset
-  const regenerateSceneAsset = async (index: number, type: "image" | "audio" | "video" | "sfx") => {
+  // `correctionNote` (optional, image only) is appended to the original prompt to guide the regen.
+  const regenerateSceneAsset = async (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    correctionNote?: string,
+  ) => {
     if (!script) return;
     const scene = script.scenes[index];
     setRegeneratingScene({ idx: index, type });
@@ -794,15 +799,17 @@ export const StoryModeWizard = () => {
         }
         updateScene(index, "imageStatus", "generating");
         const referenceImageUrl = input.imageUrl || undefined;
-        // Force explicit width/height matching the requested aspect ratio so Flux generates true vertical/horizontal frames
-        // instead of letterboxed outputs that Kling/Veo would later have to "fit" into the target canvas.
         const fluxDims = input.videoAspectRatio === "9:16"
           ? { width: 720, height: 1280 }
           : input.videoAspectRatio === "4:3"
           ? { width: 1024, height: 768 }
           : { width: 1280, height: 720 };
+        const note = (correctionNote || "").trim();
+        const guidedPrompt = note
+          ? `${scene.imagePrompt}. IMPORTANT correction: ${note}`
+          : scene.imagePrompt;
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
+          body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -816,19 +823,23 @@ export const StoryModeWizard = () => {
         const newImageUrl = data.imageUrl || data.url;
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
         const scenes = [...script.scenes];
+        const prev = scenes[index];
         scenes[index] = {
-          ...scenes[index],
+          ...prev,
+          // Keep previous image as backup so the user can compare or rollback.
+          previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
           imageUrl: newImageUrl,
           imageStatus: "completed",
           imageWidth: aspectCheck?.width,
           imageHeight: aspectCheck?.height,
           imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+          lastImageCorrectionNote: note || prev.lastImageCorrectionNote,
         };
         setScript({ ...script, scenes });
         if (aspectCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Immagine scena ${index + 1} rigenerata`);
+          toast.success(`Immagine scena ${index + 1} rigenerata${note ? " con correzione" : ""}`);
         }
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
@@ -842,7 +853,13 @@ export const StoryModeWizard = () => {
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], audioUrl: storageUrl, audioStatus: "completed" };
+        const prevA = scenes[index];
+        scenes[index] = {
+          ...prevA,
+          previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
+          audioUrl: storageUrl,
+          audioStatus: "completed",
+        };
         setScript({ ...script, scenes });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
@@ -933,8 +950,10 @@ export const StoryModeWizard = () => {
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
+        const prevV = scenes[index];
         scenes[index] = {
-          ...scenes[index],
+          ...prevV,
+          previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
           videoUrl,
           videoStatus: "completed",
           videoGeneratingStartedAt: undefined,
@@ -961,7 +980,13 @@ export const StoryModeWizard = () => {
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], sfxUrl: storageUrl, sfxStatus: "completed" };
+        const prevS = scenes[index];
+        scenes[index] = {
+          ...prevS,
+          previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
+          sfxUrl: storageUrl,
+          sfxStatus: "completed",
+        };
         setScript({ ...script, scenes });
         toast.success(`SFX scena ${index + 1} rigenerato`);
       }
@@ -977,7 +1002,51 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Quality/FPS rendering multiplier
+  // Discard the previous (backup) version of an asset, keeping the new one as final.
+  const keepNewAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (type === "image") delete s.previousImageUrl;
+    else if (type === "audio") delete s.previousAudioUrl;
+    else if (type === "video") delete s.previousVideoUrl;
+    else delete s.previousSfxUrl;
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.success(`Nuovo ${type} scena ${index + 1} confermato`);
+  };
+
+  // Roll back to the previous version: swap current with previous and clear backup.
+  const rollbackAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (type === "image" && s.previousImageUrl) {
+      s.imageUrl = s.previousImageUrl;
+      delete s.previousImageUrl;
+      delete s.imageAspectWarning;
+      s.imageWidth = undefined;
+      s.imageHeight = undefined;
+    } else if (type === "audio" && s.previousAudioUrl) {
+      s.audioUrl = s.previousAudioUrl;
+      delete s.previousAudioUrl;
+    } else if (type === "video" && s.previousVideoUrl) {
+      s.videoUrl = s.previousVideoUrl;
+      delete s.previousVideoUrl;
+      delete s.videoAspectWarning;
+      s.videoWidth = undefined;
+      s.videoHeight = undefined;
+    } else if (type === "sfx" && s.previousSfxUrl) {
+      s.sfxUrl = s.previousSfxUrl;
+      delete s.previousSfxUrl;
+    } else {
+      return;
+    }
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.info(`Versione precedente ${type} scena ${index + 1} ripristinata`);
+  };
+
   const renderingMultiplier = (() => {
     const qMul = input.videoQuality === "fhd" ? 1.8 : input.videoQuality === "sd" ? 0.6 : 1;
     const fMul = input.videoFps === "60" ? 1.5 : input.videoFps === "30" ? 1.1 : 1;
@@ -2636,7 +2705,9 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
-                onRegenerate={(type) => regenerateSceneAsset(idx, type)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
               />
             ))}
           </div>
@@ -2939,7 +3010,26 @@ export const StoryModeWizard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
-              <SceneCard key={idx} scene={scene} index={idx} mode="generation" aspectRatio={input.videoAspectRatio} voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} onUnstuck={() => unstuckScene(idx)} />
+              <SceneCard
+                key={idx}
+                scene={scene}
+                index={idx}
+                mode="generation"
+                aspectRatio={input.videoAspectRatio}
+                voices={voiceOptions}
+                defaultVoiceId={input.voiceId}
+                isEditing={false}
+                isPreviewLoading={false}
+                onToggleEdit={() => {}}
+                onUpdate={() => {}}
+                onPreviewAudio={() => {}}
+                onDuplicate={() => {}}
+                onDelete={() => {}}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
+                onUnstuck={() => unstuckScene(idx)}
+              />
             ))}
           </div>
         </div>
@@ -3122,7 +3212,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type) => regenerateSceneAsset(idx, type)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
                 onUnstuck={() => unstuckScene(idx)}
               />
             ))}
