@@ -140,10 +140,7 @@ serve(async (req) => {
         userId = userData.user.id;
       }
     }
-    // Get video URI from query params
-    const url = new URL(req.url);
-    const videoUri = url.searchParams.get("uri");
-    
+    // videoUri already parsed at the top of the handler
     if (!videoUri) {
       return new Response("Missing video URI", {
         status: 400,
