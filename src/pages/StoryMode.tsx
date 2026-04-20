@@ -1,16 +1,47 @@
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
 import { StoryModeWizard } from "@/components/story-mode/StoryModeWizard";
-import { Film, Lock, Sparkles, AlertTriangle } from "lucide-react";
+import { Film, Lock, Sparkles, AlertTriangle, HardDrive, Loader2 } from "lucide-react";
 import { useQuotas } from "@/hooks/useQuotas";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const StoryMode = () => {
   const { canUseStoryMode, remainingStoryMode, isStoryModeUnlimited, loading, quota } = useQuotas();
   const navigate = useNavigate();
+  const [optimizing, setOptimizing] = useState(false);
+
+  const handleOptimize = async () => {
+    setOptimizing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("migrate-base64-scenes", { body: {} });
+      if (error) throw error;
+      const migrated = data?.migrated ?? [];
+      const totals = migrated.reduce(
+        (acc: { scenes: number; bytes: number }, r: { scenesMigrated: number; bytesFreed: number }) => ({
+          scenes: acc.scenes + (r.scenesMigrated || 0),
+          bytes: acc.bytes + (r.bytesFreed || 0),
+        }),
+        { scenes: 0, bytes: 0 }
+      );
+      const mb = (totals.bytes / 1024 / 1024).toFixed(1);
+      if (totals.scenes === 0) {
+        toast.success("Nessun asset da migrare: i tuoi progetti sono già ottimizzati ✨");
+      } else {
+        toast.success(`✅ Ottimizzati ${totals.scenes} asset · ${mb} MB liberati dal database`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Errore sconosciuto";
+      toast.error(`Ottimizzazione fallita: ${msg}`);
+    } finally {
+      setOptimizing(false);
+    }
+  };
 
   return (
     <AuthGuard>
