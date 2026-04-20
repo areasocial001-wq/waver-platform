@@ -190,10 +190,15 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in video-proxy function:", error);
     return new Response(
-      JSON.stringify({ error: "Proxy error" }), 
+      JSON.stringify({
+        error: "PROXY_ERROR",
+        fallback: true,
+        message: (error as Error)?.message || "Proxy error",
+      }),
       {
+        // Return 200 so client can parse the JSON instead of crashing on a 500
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+        status: 200,
       }
     );
   }
