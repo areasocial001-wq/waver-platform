@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +76,7 @@ export const DbHealthDashboard = () => {
   const [vacuuming, setVacuuming] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [runningCron, setRunningCron] = useState(false);
+  const [runningCleanup, setRunningCleanup] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
   const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
@@ -178,6 +179,22 @@ export const DbHealthDashboard = () => {
       toast.error(err.message || "Errore durante l'esecuzione del job");
     } finally {
       setRunningCron(false);
+    }
+  };
+
+  const handleRunStorageCleanup = async () => {
+    setRunningCleanup(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cleanup-orphan-assets");
+      if (error) throw error;
+      toast.success(
+        `Pulizia completata: ${data?.files_deleted ?? 0} file eliminati, ${data?.mb_freed ?? 0} MB liberati`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante la pulizia storage");
+    } finally {
+      setRunningCleanup(false);
     }
   };
 
@@ -348,6 +365,13 @@ export const DbHealthDashboard = () => {
           </CardHeader>
         </Card>
       </div>
+
+      {/* Storage cleanup card — last run of cleanup-orphan-assets job */}
+      <StorageCleanupCard
+        log={maintenanceLog.find((l: any) => l.operation === "storage_cleanup") || null}
+        runningCleanup={runningCleanup}
+        onRun={handleRunStorageCleanup}
+      />
 
       {/* Historical chart */}
       <Card>
@@ -628,5 +652,85 @@ export const DbHealthDashboard = () => {
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+interface StorageCleanupCardProps {
+  log: {
+    created_at: string;
+    triggered_by: string;
+    tables_processed: number;
+    total_freed_bytes: number;
+    details?: {
+      files_scanned?: number;
+      files_deleted?: number;
+      mb_freed?: number;
+    };
+  } | null;
+  runningCleanup: boolean;
+  onRun: () => void;
+}
+
+const StorageCleanupCard = ({ log, runningCleanup, onRun }: StorageCleanupCardProps) => {
+  const filesDeleted = log?.details?.files_deleted ?? 0;
+  const filesScanned = log?.details?.files_scanned ?? 0;
+  const mbFreed = log?.details?.mb_freed ?? (log ? log.total_freed_bytes / 1024 / 1024 : 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5" />
+              Storage Cleanup
+            </CardTitle>
+            <CardDescription>
+              Pulizia settimanale degli asset orfani in <code className="text-xs">story-references/generated/</code> · cron: domenica 03:30 UTC
+            </CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={onRun} disabled={runningCleanup}>
+            {runningCleanup ? (
+              <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> In corso...</>
+            ) : (
+              <><Play className="h-4 w-4 mr-1" /> Esegui ora</>
+            )}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {!log ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            Nessuna esecuzione registrata. Il job partirà automaticamente domenica alle 03:30 UTC, oppure premi "Esegui ora".
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Ultima esecuzione</p>
+              <p className="text-sm font-semibold">
+                {new Date(log.created_at).toLocaleString("it-IT")}
+              </p>
+              <Badge variant={log.triggered_by?.startsWith("cron") ? "secondary" : "default"} className="text-xs mt-1">
+                {log.triggered_by?.startsWith("cron") ? "Auto" : "Manuale"}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">File scansionati</p>
+              <p className="text-2xl font-bold">{filesScanned.toLocaleString("it-IT")}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">File eliminati</p>
+              <p className="text-2xl font-bold">{filesDeleted.toLocaleString("it-IT")}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Spazio liberato</p>
+              <p className="text-2xl font-bold text-primary">
+                {mbFreed.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">MB</span>
+              </p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };

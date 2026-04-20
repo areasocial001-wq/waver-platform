@@ -1,9 +1,54 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+/**
+ * Persist a data: URL to the public `story-references` bucket and return the
+ * public URL. If the input is already an http(s) URL, it is returned as-is.
+ */
+async function persistDataUrlToStorage(
+  imageUrl: string,
+  userId: string,
+): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) {
+      console.warn("Missing service role / url, returning data URL as-is");
+      return imageUrl;
+    }
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) {
+      console.error("Storage upload failed, returning data URL:", upErr.message);
+      return imageUrl;
+    }
+    const { data: pub } = admin.storage
+      .from("story-references")
+      .getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch (err) {
+    console.error("persistDataUrlToStorage error:", err);
+    return imageUrl;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,6 +56,35 @@ serve(async (req) => {
   }
 
   try {
+    // Auth: required to know which user owns the upload path
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const token = authHeader.replace("Bearer ", "");
+    let userId: string | undefined;
+    try {
+      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+      if (!claimsError && claimsData?.claims) userId = claimsData.claims.sub as string;
+    } catch (_) { /* SDK without getClaims */ }
+    if (!userId) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return new Response(
+          JSON.stringify({ error: "Invalid authentication token" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      userId = userData.user.id;
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY is not set');
@@ -39,16 +113,8 @@ serve(async (req) => {
           {
             role: "user",
             content: [
-              {
-                type: "text",
-                text: prompt
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: referenceImage
-                }
-              }
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: referenceImage } }
             ]
           }
         ],
@@ -72,13 +138,10 @@ serve(async (req) => {
       messageContent: data.choices?.[0]?.message?.content?.substring?.(0, 200),
     }));
 
-    // Try multiple possible image locations in the response
     let editedImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
-    // Alternative: check if image is directly in content
+
     if (!editedImageUrl && data.choices?.[0]?.message?.content) {
       const content = data.choices[0].message.content;
-      // Check if content is an array with image objects
       if (Array.isArray(content)) {
         for (const item of content) {
           if (item.type === 'image_url' || item.type === 'image') {
@@ -89,7 +152,6 @@ serve(async (req) => {
       }
     }
 
-    // Alternative: check for base64 in response
     if (!editedImageUrl && data.choices?.[0]?.message?.images?.[0]) {
       const imageObj = data.choices[0].message.images[0];
       if (typeof imageObj === 'string' && imageObj.startsWith('data:')) {
@@ -103,7 +165,6 @@ serve(async (req) => {
       const assistantText = data.choices?.[0]?.message?.content;
       console.error("Full response data:", JSON.stringify(data).substring(0, 2000));
 
-      // Common case: model refuses watermark removal and answers with text only
       const looksLikeWatermarkRefusal =
         typeof assistantText === "string" &&
         /watermark/i.test(assistantText) &&
@@ -116,31 +177,24 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: errorMessage,
-          // Small excerpt for debugging / UX
           aiMessage: typeof assistantText === "string" ? assistantText.slice(0, 400) : null,
         }),
         { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
+    // Never return raw base64 — always persist to Storage first
+    const finalUrl = await persistDataUrlToStorage(editedImageUrl, userId);
+
     return new Response(
-      JSON.stringify({ 
-        imageUrl: editedImageUrl,
-        success: true 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      JSON.stringify({ imageUrl: finalUrl, success: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
     console.error("Error in edit-image function:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message || "Failed to edit image" 
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
+      JSON.stringify({ error: error.message || "Failed to edit image" }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
