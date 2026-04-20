@@ -3010,7 +3010,26 @@ export const StoryModeWizard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {script.scenes.map((scene, idx) => (
-              <SceneCard key={idx} scene={scene} index={idx} mode="generation" aspectRatio={input.videoAspectRatio} voices={voiceOptions} defaultVoiceId={input.voiceId} isEditing={false} isPreviewLoading={false} onToggleEdit={() => {}} onUpdate={() => {}} onPreviewAudio={() => {}} onDuplicate={() => {}} onDelete={() => {}} onUnstuck={() => unstuckScene(idx)} />
+              <SceneCard
+                key={idx}
+                scene={scene}
+                index={idx}
+                mode="generation"
+                aspectRatio={input.videoAspectRatio}
+                voices={voiceOptions}
+                defaultVoiceId={input.voiceId}
+                isEditing={false}
+                isPreviewLoading={false}
+                onToggleEdit={() => {}}
+                onUpdate={() => {}}
+                onPreviewAudio={() => {}}
+                onDuplicate={() => {}}
+                onDelete={() => {}}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
+                onUnstuck={() => unstuckScene(idx)}
+              />
             ))}
           </div>
         </div>
