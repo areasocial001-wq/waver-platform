@@ -6,6 +6,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/**
+ * If the given URL is a data:image/...;base64,... URL, decode it, upload to
+ * the public `story-references` bucket under generated/{userId}/...
+ * and return the public URL. Otherwise return the URL unchanged.
+ *
+ * This guarantees the database NEVER stores giant inline base64 blobs.
+ */
+async function persistDataUrlToStorage(
+  imageUrl: string,
+  userId: string,
+): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) {
+      console.warn("Missing service role / url, returning data URL as-is");
+      return imageUrl;
+    }
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) {
+      console.error("Storage upload failed, returning data URL:", upErr.message);
+      return imageUrl;
+    }
+    const { data: pub } = admin.storage
+      .from("story-references")
+      .getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch (err) {
+    console.error("persistDataUrlToStorage error:", err);
+    return imageUrl;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -87,11 +134,14 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const rawImageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!rawImageUrl) {
       throw new Error("No image generated");
     }
+
+    // Persist data URLs to Storage so we never store base64 inline downstream
+    const imageUrl = await persistDataUrlToStorage(rawImageUrl, userId);
 
     return new Response(JSON.stringify({ imageUrl, success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
