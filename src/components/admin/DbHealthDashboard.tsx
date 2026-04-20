@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar } from "recharts";
 import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -369,6 +369,7 @@ export const DbHealthDashboard = () => {
       {/* Storage cleanup card — last run of cleanup-orphan-assets job */}
       <StorageCleanupCard
         log={maintenanceLog.find((l: any) => l.operation === "storage_cleanup") || null}
+        history={maintenanceLog.filter((l: any) => l.operation === "storage_cleanup").slice(0, 12)}
         runningCleanup={runningCleanup}
         onRun={handleRunStorageCleanup}
       />
@@ -655,26 +656,39 @@ export const DbHealthDashboard = () => {
   );
 };
 
+interface StorageCleanupLog {
+  id?: string;
+  created_at: string;
+  triggered_by: string;
+  tables_processed: number;
+  total_freed_bytes: number;
+  details?: {
+    files_scanned?: number;
+    files_deleted?: number;
+    mb_freed?: number;
+  };
+}
+
 interface StorageCleanupCardProps {
-  log: {
-    created_at: string;
-    triggered_by: string;
-    tables_processed: number;
-    total_freed_bytes: number;
-    details?: {
-      files_scanned?: number;
-      files_deleted?: number;
-      mb_freed?: number;
-    };
-  } | null;
+  log: StorageCleanupLog | null;
+  history: StorageCleanupLog[];
   runningCleanup: boolean;
   onRun: () => void;
 }
 
-const StorageCleanupCard = ({ log, runningCleanup, onRun }: StorageCleanupCardProps) => {
+const StorageCleanupCard = ({ log, history, runningCleanup, onRun }: StorageCleanupCardProps) => {
   const filesDeleted = log?.details?.files_deleted ?? 0;
   const filesScanned = log?.details?.files_scanned ?? 0;
   const mbFreed = log?.details?.mb_freed ?? (log ? log.total_freed_bytes / 1024 / 1024 : 0);
+
+  // Build chart data from last 12 runs (oldest -> newest for left-to-right reading)
+  const chartData = [...history]
+    .reverse()
+    .map((l) => ({
+      date: new Date(l.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+      mb: +(l.details?.mb_freed ?? l.total_freed_bytes / 1024 / 1024).toFixed(2),
+      files: l.details?.files_deleted ?? 0,
+    }));
 
   return (
     <Card>
@@ -728,6 +742,33 @@ const StorageCleanupCard = ({ log, runningCleanup, onRun }: StorageCleanupCardPr
                 {mbFreed.toFixed(2)} <span className="text-sm font-normal text-muted-foreground">MB</span>
               </p>
             </div>
+          </div>
+        )}
+
+        {chartData.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-2">
+              Ultimi {chartData.length} run · MB liberati nel tempo
+            </p>
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="date" className="text-xs" tick={{ fontSize: 10 }} />
+                <YAxis className="text-xs" tick={{ fontSize: 10 }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "0.5rem",
+                    fontSize: "12px",
+                  }}
+                  formatter={(value: number, name: string) =>
+                    name === "mb" ? [`${value} MB`, "Liberati"] : [value, "File"]
+                  }
+                />
+                <Bar dataKey="mb" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         )}
       </CardContent>

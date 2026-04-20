@@ -6,6 +6,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/**
+ * Persist a data: URL to the public `story-references` bucket and return the
+ * public URL. If the input is already an http(s) URL, it is returned as-is.
+ */
+async function persistDataUrlToStorage(imageUrl: string, userId: string): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) return imageUrl;
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) return imageUrl;
+    const { data: pub } = admin.storage.from("story-references").getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch {
+    return imageUrl;
+  }
+}
+
 // Input validation schemas
 const statusSchema = z.object({
   action: z.literal('status'),
@@ -116,10 +145,11 @@ Deno.serve(async (req) => {
       const taskStatus = data.data?.status || data.status;
       
       if (taskStatus === "completed" || taskStatus === "SUCCESS") {
-        const imageUrl = data.data?.output?.image_url || 
+        const rawImageUrl = data.data?.output?.image_url || 
                         data.data?.output?.images?.[0] ||
                         data.data?.image_url ||
                         data.output?.image_url;
+        const imageUrl = rawImageUrl ? await persistDataUrlToStorage(rawImageUrl, userId) : rawImageUrl;
         
         return new Response(JSON.stringify({ 
           status: "completed",
