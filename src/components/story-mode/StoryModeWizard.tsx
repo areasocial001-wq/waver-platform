@@ -26,6 +26,8 @@ import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
 import { StoryScene, StoryScript, StoryStep, StoryModeInput, AssetVersion, AssetVersionHistory, MAX_VERSION_HISTORY } from "./types";
 import { SceneCard } from "./SceneCard";
+import { BulkTransitionPanel } from "./BulkTransitionPanel";
+import type { TransitionType } from "./types";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { apiLogger } from "@/lib/apiLogger";
