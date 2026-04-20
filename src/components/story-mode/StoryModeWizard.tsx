@@ -224,7 +224,8 @@ export const StoryModeWizard = () => {
 
   const prepareRenderVideoSources = useCallback(async (scenes: StoryScene[]) => {
     const resolved = await Promise.all(
-      scenes.map(async (scene) => ({
+      scenes.map(async (scene, index) => ({
+        index,
         sceneNumber: scene.sceneNumber,
         resolvedUrl: scene.videoUrl ? await resolveRenderVideoSource(scene.videoUrl) : null,
       }))
@@ -234,8 +235,16 @@ export const StoryModeWizard = () => {
       .filter((item) => !item.resolvedUrl)
       .map((item) => item.sceneNumber);
 
+    // Indexes (in original `scenes` array) of valid clips — caller MUST use these
+    // to filter clipDurations/audioUrls/sfxUrls/transitions in parallel, otherwise
+    // arrays go out of sync and Shotstack drops the last clip.
+    const validIndexes = resolved
+      .filter((item) => !!item.resolvedUrl)
+      .map((item) => item.index);
+
     return {
       validVideoUrls: resolved.map((item) => item.resolvedUrl).filter((url): url is string => !!url),
+      validIndexes,
       invalidSceneNumbers,
     };
   }, [resolveRenderVideoSource]);
@@ -1928,28 +1937,36 @@ export const StoryModeWizard = () => {
       const narrationUrls = vids.map(s => s.audioUrl || "");
       const sfxUrls = vids.map(s => s.sfxUrl || "");
 
-      const { validVideoUrls, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
-      if (validVideoUrls.length < 2) {
-        if (invalidSceneNumbers.length > 0) {
-          toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`);
-        }
-        toast.error("Non abbastanza URL video validi per il montaggio.");
+      const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
+      if (invalidSceneNumbers.length > 0) {
+        toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`, { duration: 8000 });
+        setRenderStatus("failed");
         setIsGenerating(false);
         return;
       }
-      const clipDurations = vids.map(s => Math.min(s.duration, 10));
+      if (validVideoUrls.length < 2) {
+        toast.error("Non abbastanza URL video validi per il montaggio.");
+        setRenderStatus("failed");
+        setIsGenerating(false);
+        return;
+      }
+      // Keep parallel arrays in sync with validVideoUrls
+      const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
+      const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
+      const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+      const alignedTransitions = validIndexes.map(i => transitions[i]);
       const { data, error } = await supabase.functions.invoke("video-concat", {
         body: {
           videoUrls: validVideoUrls,
-          clipDurations,
-          transition: transitions[0]?.type || "crossfade",
-          transitionDuration: transitions[0]?.duration || 0.5,
-          transitions,
+          clipDurations: alignedDurations,
+          transition: alignedTransitions[0]?.type || "crossfade",
+          transitionDuration: alignedTransitions[0]?.duration || 0.5,
+          transitions: alignedTransitions,
           resolution: input.videoQuality || "hd",
           aspectRatio: input.videoAspectRatio || "16:9",
           fps: input.videoFps || "24",
-          audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
-          sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+          audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
+          sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
           sfxVolume: (volumeOverrides?.sfxVolume ?? 70) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
@@ -2267,33 +2284,38 @@ export const StoryModeWizard = () => {
         const narrationUrls = vids.map(s => s.audioUrl || "");
         const sfxUrls = vids.map(s => s.sfxUrl || "");
 
-        const { validVideoUrls, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
+        const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
+        if (invalidSceneNumbers.length > 0) {
+          toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`, { duration: 8000 });
+          setRenderStatus("failed");
+          setPendingRenderId(null);
+          return;
+        }
         if (validVideoUrls.length < 2) {
-          if (invalidSceneNumbers.length > 0) {
-            toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`);
-          } else {
-            toast.error("Non abbastanza clip valide per completare il render finale.");
-          }
+          toast.error("Non abbastanza clip valide per completare il render finale.");
           setRenderStatus("failed");
           setPendingRenderId(null);
           return;
         }
 
-        // Collect clip durations for Shotstack
-        const clipDurations = vids.map(s => Math.min(s.duration, 10));
+        // Keep parallel arrays in sync with validVideoUrls (avoid scene drops)
+        const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
+        const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
+        const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+        const alignedTransitions = validIndexes.map(i => transitions[i]);
 
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: validVideoUrls,
-            clipDurations,
-            transition: transitions[0]?.type || "crossfade",
-            transitionDuration: transitions[0]?.duration || 0.5,
-            transitions,
+            clipDurations: alignedDurations,
+            transition: alignedTransitions[0]?.type || "crossfade",
+            transitionDuration: alignedTransitions[0]?.duration || 0.5,
+            transitions: alignedTransitions,
             resolution: input.videoQuality || "hd",
             aspectRatio: input.videoAspectRatio || "16:9",
             fps: input.videoFps || "24",
-            audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
-            sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+            audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
+            sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
             sfxVolume: 0.7,
             backgroundMusicUrl: backgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
