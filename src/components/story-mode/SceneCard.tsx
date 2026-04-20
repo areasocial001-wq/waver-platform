@@ -33,6 +33,34 @@ const CAMERA_MOVEMENTS = [
   "pan_right", "tilt_up", "tilt_down", "dolly_forward",
 ];
 
+// Quick correction-note presets shown as clickable chips inside the regen popovers.
+// Clicking a chip appends its text to the current note (with a comma separator).
+const IMAGE_CORRECTION_PRESETS = [
+  "mantieni stesso outfit",
+  "stessa identità del personaggio",
+  "stessa angolazione",
+  "cambia angolazione",
+  "più luce naturale",
+  "luce più drammatica",
+  "primo piano",
+  "campo lungo",
+  "rimuovi elementi sullo sfondo",
+  "colori più caldi",
+  "colori più freddi",
+  "espressione più seria",
+];
+
+const VIDEO_CORRECTION_PRESETS = [
+  "meno zoom, più stabile",
+  "movimento camera più lento",
+  "movimento camera più veloce",
+  "camera fissa",
+  "evita sbalzi bruschi",
+  "transizione più fluida",
+  "mantieni soggetto al centro",
+  "evita morphing del volto",
+];
+
 export interface VoiceOption {
   id: string;
   name: string;
@@ -55,7 +83,9 @@ interface SceneCardProps {
   onDelete: () => void;
   onRegenerate?: (type: "image" | "audio" | "video" | "sfx", opts?: { correctionNote?: string }) => void;
   onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
-  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
+  /** When `versionUrl` is provided, restore that specific entry from versionHistory. */
+  onRollback?: (type: "image" | "audio" | "video" | "sfx", versionUrl?: string) => void;
+  onDeleteVersion?: (type: "image" | "audio" | "video" | "sfx", versionUrl: string) => void;
   onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
