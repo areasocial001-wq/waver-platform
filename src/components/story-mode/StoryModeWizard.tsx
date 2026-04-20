@@ -19,7 +19,7 @@ import {
   Upload, Sparkles, Play, Check, ChevronRight, ChevronLeft,
   Film, Image, Volume2, Loader2, Download, RotateCcw, Pencil, Music, RefreshCw,
   Save, FolderOpen, Trash2, Clock, Eye, FileText, Timer, Mic, Square, Pause,
-  AlertTriangle, ShieldCheck, ListChecks, ImageIcon, VideoIcon, AudioLines,
+  AlertTriangle, ShieldCheck, ListChecks, AudioLines, Wand2,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
