@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import logoImg from "@/assets/logo.png";
+import studiobookLogo from "@/assets/studiobook-logo.png";
 
 export const Footer = () => {
   return (
