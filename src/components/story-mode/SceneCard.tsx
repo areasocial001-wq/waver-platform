@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType, AssetVersion } from "./types";
 import { useAuthVideo } from "@/hooks/useAuthVideo";
+import { TransitionPreview } from "./TransitionPreview";
 
 
 
@@ -546,6 +547,12 @@ export const SceneCard = ({
                   {[0.3, 0.5, 0.8, 1.0, 1.5].map(d => <SelectItem key={d} value={String(d)}>{d}s</SelectItem>)}
                 </SelectContent>
               </Select>
+              {/* Live mini preview of the selected transition */}
+              <TransitionPreview
+                type={(scene.transition || "crossfade") as TransitionType}
+                duration={scene.transitionDuration || 0.5}
+                size={56}
+              />
               <Input
                 value={scene.sfxPrompt || ""}
                 onChange={e => onUpdate("sfxPrompt", e.target.value)}
