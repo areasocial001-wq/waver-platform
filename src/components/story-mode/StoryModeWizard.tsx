@@ -3299,7 +3299,8 @@ export const StoryModeWizard = () => {
                 onDelete={() => {}}
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
-                onRollback={(type) => rollbackAsset(idx, type)}
+                onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
+                onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
                 onUnstuck={() => unstuckScene(idx)}
               />
             ))}
