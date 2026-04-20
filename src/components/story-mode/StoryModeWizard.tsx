@@ -351,6 +351,7 @@ export const StoryModeWizard = () => {
     : renderStatus === "completed" ? 100 : 0;
   const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
   const isRenderActive = renderStatus === "starting" || renderStatus === "processing" || !!pendingRenderId;
+  const showRenderDiagnostics = isRenderActive || renderStatus === "failed" || renderPollInfo.attempts > 0 || !!renderPollInfo.lastStatus || !!renderPollInfo.lastCheckedAt;
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
@@ -2459,16 +2460,23 @@ export const StoryModeWizard = () => {
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {isRenderActive && step !== "complete" && (
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => setStep("complete")}
-                  >
-                    <Film className="w-3.5 h-3.5 mr-1.5" />
-                    Vai al render
-                  </Button>
+                {isRenderActive && (
+                  step !== "complete" ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setStep("complete")}
+                    >
+                      <Film className="w-3.5 h-3.5 mr-1.5" />
+                      Vai al render
+                    </Button>
+                  ) : (
+                    <Badge variant="outline" className="h-8 px-3 inline-flex items-center">
+                      <Film className="w-3.5 h-3.5 mr-1.5" />
+                      Sei nel render
+                    </Badge>
+                  )
                 )}
                 <Badge variant={isRenderActive ? "secondary" : "destructive"}>
                   {isRenderActive ? "Rendering" : "Errore"}
@@ -2476,18 +2484,22 @@ export const StoryModeWizard = () => {
               </div>
             </div>
 
-            {isRenderActive && (
+            {showRenderDiagnostics && (
               <>
-                <Progress value={renderProgressPct} className="h-2" />
-                <div className="flex items-center justify-between text-xs text-muted-foreground gap-3 flex-wrap">
-                  <span>{Math.round(renderProgressPct)}% completato</span>
-                  <span className="flex items-center gap-1">
-                    <Timer className="w-3 h-3" />
-                    {renderRemainingSeconds > 60
-                      ? `~${Math.ceil(renderRemainingSeconds / 60)} min rimanenti`
-                      : `~${renderRemainingSeconds}s rimanenti`}
-                  </span>
-                </div>
+                {isRenderActive && (
+                  <>
+                    <Progress value={renderProgressPct} className="h-2" />
+                    <div className="flex items-center justify-between text-xs text-muted-foreground gap-3 flex-wrap">
+                      <span>{Math.round(renderProgressPct)}% completato</span>
+                      <span className="flex items-center gap-1">
+                        <Timer className="w-3 h-3" />
+                        {renderRemainingSeconds > 60
+                          ? `~${Math.ceil(renderRemainingSeconds / 60)} min rimanenti`
+                          : `~${renderRemainingSeconds}s rimanenti`}
+                      </span>
+                    </div>
+                  </>
+                )}
 
                 {/* Detailed Shotstack polling info */}
                 {(() => {
