@@ -1058,12 +1058,12 @@ export default function Landing() {
         className="relative z-10 border-t border-[hsl(224,30%,12%)] py-10"
       >
         <div className="container mx-auto px-4 text-center text-sm text-[hsl(215,20%,45%)]">
-          <div className="flex items-center justify-center gap-6 mb-3 flex-wrap">
-            <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover" />
-            <span className="font-semibold text-lg bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
+          <div className="grid grid-cols-3 items-center justify-items-center gap-6 mb-3 max-w-2xl mx-auto">
+            <img src={logoImg} alt="AI Production Hub" className="w-24 h-24 rounded-full object-cover justify-self-end" />
+            <span className="font-semibold text-lg bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent text-center whitespace-nowrap">
               AI Production Hub
             </span>
-            <img src={studiobookLogo} alt="StudioBook Edizioni" className="w-40 h-40 object-contain" />
+            <img src={studiobookLogo} alt="StudioBook Edizioni" className="w-40 h-40 object-contain justify-self-start" />
           </div>
           <p>© {new Date().getFullYear()} AI Production Hub — StudioBook Edizioni. Tutti i diritti riservati.</p>
         </div>
