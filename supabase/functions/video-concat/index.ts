@@ -648,13 +648,19 @@ serve(async (req) => {
           });
         }
 
-        // Add per-scene narration audio tracks
+        // Compute REAL effective video duration on the timeline (post-overlap).
+        // This is what the master clock landed on after the loop, minus the intro offset.
+        const effectiveVideoDuration = currentStart - introDuration;
+        const effectiveTotalDuration = introDuration + effectiveVideoDuration + (outro?.enabled ? outro.duration : 0);
+
+        // Add per-scene narration audio tracks — anchored to sceneStarts[i] so voice
+        // never drifts past its scene when transitions overlap.
         if (audioUrls && audioUrls.length > 0) {
           const narrationClips: any[] = [];
-          let narrationStart = introDuration;
           for (let i = 0; i < audioUrls.length; i++) {
             const clipLen = clipDurations?.[i] || 5;
             const rawUrl = audioUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
             if (rawUrl && !rawUrl.startsWith('blob:')) {
               const narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               narrationClips.push({
@@ -663,24 +669,24 @@ serve(async (req) => {
                   src: narrationSrc,
                   volume: narrationVolume,
                 },
-                start: narrationStart,
+                start: sceneStart,
                 length: clipLen,
               });
             }
-            narrationStart += clipLen;
           }
           if (narrationClips.length > 0) {
             timeline.tracks.push({ clips: narrationClips });
           }
         }
 
-        // Add per-scene SFX audio tracks
+        // Add per-scene SFX audio tracks — anchored to sceneStarts[i] so e.g. wave
+        // sound stays glued to the beach scene even with overlapping transitions.
         if (sfxUrls && sfxUrls.length > 0) {
           const sfxClips: any[] = [];
-          let sfxStart = introDuration;
           for (let i = 0; i < sfxUrls.length; i++) {
             const clipLen = clipDurations?.[i] || 5;
             const rawUrl = sfxUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
             if (rawUrl && !rawUrl.startsWith('blob:')) {
               const sfxSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               sfxClips.push({
@@ -689,21 +695,19 @@ serve(async (req) => {
                   src: sfxSrc,
                   volume: sfxVolume,
                 },
-                start: sfxStart,
+                start: sceneStart,
                 length: clipLen,
               });
             }
-            sfxStart += clipLen;
           }
           if (sfxClips.length > 0) {
             timeline.tracks.push({ clips: sfxClips });
           }
         }
 
-        // Add background music track
+        // Add background music track — uses EFFECTIVE total duration, not raw sum,
+        // so music length matches the actual final video.
         if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
-          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
-          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
           const normalizedMusicUrl = await normalizeAssetUrl(backgroundMusicUrl, supabase, supabaseUrl);
           timeline.tracks.push({
             clips: [{
@@ -713,7 +717,7 @@ serve(async (req) => {
                 volume: musicVolume,
               },
               start: 0,
-              length: totalDur,
+              length: effectiveTotalDuration,
             }],
           });
         }
