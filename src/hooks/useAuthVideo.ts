@@ -32,6 +32,15 @@ export function useAuthVideo(videoUrl: string | undefined, isActive: boolean) {
           } : {},
         });
         if (!res.ok) throw new Error(`Video fetch failed: ${res.status}`);
+        // Detect structured fallback JSON returned by video-proxy when source expired
+        const ct = res.headers.get("Content-Type") || "";
+        if (ct.includes("application/json")) {
+          const payload = await res.json().catch(() => null);
+          if (payload?.fallback) {
+            console.warn("Video source unavailable:", payload);
+            return; // leave blobUrl null; UI shows no video instead of crashing
+          }
+        }
         const blob = await res.blob();
         if (!cancelled) {
           setBlobUrl(prev => {
