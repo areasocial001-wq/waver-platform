@@ -317,9 +317,11 @@ serve(async (req) => {
           });
 
           console.log("Replicate image generation successful");
+          const replicateUrl = Array.isArray(output) ? output[0] : output;
+          const finalUrl = await persistDataUrlToStorage(replicateUrl as string, userId);
           return new Response(
             JSON.stringify({
-              imageUrl: Array.isArray(output) ? output[0] : output,
+              imageUrl: finalUrl,
               success: true,
               provider: 'replicate',
             }),
