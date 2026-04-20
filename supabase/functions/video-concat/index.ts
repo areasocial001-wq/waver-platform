@@ -515,6 +515,12 @@ serve(async (req) => {
         // Determine if we have dedicated audio tracks (narration/music)
         const hasDedicatedAudio = (audioUrls && audioUrls.some(u => !!u)) || !!backgroundMusicUrl || !!audioUrl;
 
+        // Track the REAL on-timeline start for each scene clip (after transition overlaps).
+        // Audio tracks (narration, SFX) MUST use these values — otherwise raw cumulative
+        // sums drift forward by ~transitionDuration per scene, causing "missing voice" or
+        // SFX firing on the wrong scene.
+        const sceneStarts: number[] = [];
+
         // Add video clips
         for (let i = 0; i < videoUrls.length; i++) {
           // Use custom duration or default to 5 seconds
