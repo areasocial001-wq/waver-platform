@@ -186,6 +186,60 @@ export const StoryModeWizard = () => {
   const cancelRef = useRef(false);
   const recoveryAttemptsRef = useRef(0);
 
+  const resolveRenderVideoSource = useCallback(async (url: string) => {
+    if (!url) return null;
+
+    if (url.startsWith("storage://")) {
+      const path = url.replace("storage://", "");
+      const bucketName = path.split("/")[0];
+      const filePath = path.substring(bucketName.length + 1);
+      const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(filePath, 60 * 60 * 2);
+      return error || !data?.signedUrl ? null : data.signedUrl;
+    }
+
+    if (url.includes("/functions/v1/video-proxy")) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+        });
+
+        if (!res.ok) return null;
+
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = await res.json().catch(() => null);
+          if (payload?.error) return null;
+        }
+
+        return url;
+      } catch {
+        return null;
+      }
+    }
+
+    return url.startsWith("http") ? url : null;
+  }, []);
+
+  const prepareRenderVideoSources = useCallback(async (scenes: StoryScene[]) => {
+    const resolved = await Promise.all(
+      scenes.map(async (scene) => ({
+        sceneNumber: scene.sceneNumber,
+        resolvedUrl: scene.videoUrl ? await resolveRenderVideoSource(scene.videoUrl) : null,
+      }))
+    );
+
+    const invalidSceneNumbers = resolved
+      .filter((item) => !item.resolvedUrl)
+      .map((item) => item.sceneNumber);
+
+    return {
+      validVideoUrls: resolved.map((item) => item.resolvedUrl).filter((url): url is string => !!url),
+      invalidSceneNumbers,
+    };
+  }, [resolveRenderVideoSource]);
+
   const waitForResume = async () => {
     while (pauseRef.current && !cancelRef.current) {
       await new Promise(r => setTimeout(r, 300));
@@ -1874,38 +1928,11 @@ export const StoryModeWizard = () => {
       const narrationUrls = vids.map(s => s.audioUrl || "");
       const sfxUrls = vids.map(s => s.sfxUrl || "");
 
-      const resolvedVideoUrls = await Promise.all(
-        vids.map(async (s) => {
-          const url = s.videoUrl!;
-          if (url.startsWith("storage://")) {
-            const path = url.replace("storage://", "");
-            const bucketName = path.split("/")[0];
-            const filePath = path.substring(bucketName.length + 1);
-            const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-            return urlData.publicUrl;
-          }
-          if (url.includes("/functions/v1/video-proxy")) {
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              const token = session?.access_token;
-              const res = await fetch(url, {
-                headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
-              });
-              if (!res.ok) return url;
-              const blob = await res.blob();
-              const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
-              const arrayBuffer = await blob.arrayBuffer();
-              const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
-              if (upErr) return url;
-              const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
-              return urlData.publicUrl;
-            } catch { return url; }
-          }
-          return url;
-        })
-      );
-      const validVideoUrls = resolvedVideoUrls.filter((u): u is string => !!u && u.startsWith("http"));
+      const { validVideoUrls, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
       if (validVideoUrls.length < 2) {
+        if (invalidSceneNumbers.length > 0) {
+          toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`);
+        }
         toast.error("Non abbastanza URL video validi per il montaggio.");
         setIsGenerating(false);
         return;
@@ -2240,44 +2267,15 @@ export const StoryModeWizard = () => {
         const narrationUrls = vids.map(s => s.audioUrl || "");
         const sfxUrls = vids.map(s => s.sfxUrl || "");
 
-        // Resolve storage:// and video-proxy URLs to public URLs for Shotstack compatibility
-        const resolvedVideoUrls = await Promise.all(
-          vids.map(async (s) => {
-            const url = s.videoUrl!;
-            if (url.startsWith("storage://")) {
-              const path = url.replace("storage://", "");
-              const bucketName = path.split("/")[0];
-              const filePath = path.substring(bucketName.length + 1);
-              const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-              return urlData.publicUrl;
-            }
-            // Video-proxy URLs need to be fetched with auth and re-uploaded
-            if (url.includes("/functions/v1/video-proxy")) {
-              try {
-                const { data: { session } } = await supabase.auth.getSession();
-                const token = session?.access_token;
-                const res = await fetch(url, {
-                  headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
-                });
-                if (!res.ok) return url;
-                const blob = await res.blob();
-                const fileName = `story-videos/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`;
-                const arrayBuffer = await blob.arrayBuffer();
-                const { error: upErr } = await supabase.storage.from("generated-videos").upload(fileName, new Uint8Array(arrayBuffer), { contentType: "video/mp4", upsert: true });
-                if (upErr) return url;
-                const { data: urlData } = supabase.storage.from("generated-videos").getPublicUrl(fileName);
-                return urlData.publicUrl;
-              } catch { return url; }
-            }
-            return url;
-          })
-        );
-
-        // Filter out any null/empty URLs
-        const validVideoUrls = resolvedVideoUrls.filter((u): u is string => !!u && u.startsWith("http"));
+        const { validVideoUrls, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
         if (validVideoUrls.length < 2) {
-          setFinalVideoUrl(vids[0].videoUrl!);
-          toast.success("Video finale pronto! 🎬");
+          if (invalidSceneNumbers.length > 0) {
+            toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`);
+          } else {
+            toast.error("Non abbastanza clip valide per completare il render finale.");
+          }
+          setRenderStatus("failed");
+          setPendingRenderId(null);
           return;
         }
 
