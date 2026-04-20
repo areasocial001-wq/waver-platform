@@ -503,6 +503,10 @@ serve(async (req) => {
         // Build Shotstack timeline clips
         const videoClips: any[] = [];
         let currentStart = 0;
+        // Track each scene's effective start time on the master timeline (after
+        // overlap). Used to align per-scene narration & SFX so they stay glued
+        // to their visual scene even when transitions overlap clips.
+        const sceneStarts: number[] = [];
         
         // Add intro if enabled
         const introDuration = intro?.enabled ? intro.duration : 0;
@@ -583,8 +587,17 @@ serve(async (req) => {
             clip.transition = effectsResult.transition;
           }
 
+          // Record the effective on-timeline start of this scene (after overlap)
+          // so narration & SFX can be positioned in lockstep with the visuals.
+          sceneStarts.push(clip.start);
+
           videoClips.push(clip);
-          currentStart += clipLength;
+          // Advance the timeline cursor to the END of this clip on the master
+          // timeline. With overlap (clip.start = prev currentStart - transDur)
+          // this becomes (currentStart - transDur + clipLength), which is the
+          // correct next reference point — both for placing the next clip AND
+          // for computing the real total video duration used by the music track.
+          currentStart = clip.start + clipLength;
         }
         
         // Add outro if enabled
