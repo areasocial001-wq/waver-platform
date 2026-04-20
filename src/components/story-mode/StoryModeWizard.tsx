@@ -135,7 +135,7 @@ export const StoryModeWizard = () => {
   const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [videoSegments, setVideoSegments] = useState<string[]>([]);
-  const [renderStatus, setRenderStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
+  const [renderStatus, setRenderStatus] = useState<"idle" | "starting" | "processing" | "completed" | "failed">("idle");
   const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
   const [renderStartTime, setRenderStartTime] = useState<number | null>(null);
   const [renderElapsed, setRenderElapsed] = useState(0);
@@ -350,7 +350,7 @@ export const StoryModeWizard = () => {
     ? Math.min(95, (renderElapsed / estimatedRenderSeconds) * 100)
     : renderStatus === "completed" ? 100 : 0;
   const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
-  const isRenderActive = renderStatus === "processing" || !!pendingRenderId;
+  const isRenderActive = renderStatus === "starting" || renderStatus === "processing" || !!pendingRenderId;
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
@@ -1858,8 +1858,11 @@ export const StoryModeWizard = () => {
     }
     setIsGenerating(true);
     setFinalVideoUrl(null);
-    setRenderStatus("idle");
+    setRenderStatus("starting");
     setPendingRenderId(null);
+    setRenderStartTime(Date.now());
+    setRenderElapsed(0);
+    setRenderPollInfo({ attempts: 0, lastCheckedAt: null, lastStatus: "preparing", nextCheckInMs: 0, consecutiveErrors: 0 });
     toast.info("Rimontaggio video finale in corso...");
     try {
       const transitions = vids.map((s) => ({
