@@ -589,8 +589,13 @@ serve(async (req) => {
             clip.transition = effectsResult.transition;
           }
 
+          // Record the actual start (post-overlap) before pushing
+          sceneStarts.push(clip.start);
           videoClips.push(clip);
-          currentStart += clipLength;
+          // Advance master clock by the EFFECTIVE duration of this clip on the timeline.
+          // For overlapped clips, currentStart should sit at clip.start + clipLength so the
+          // NEXT iteration computes its overlap from the correct anchor.
+          currentStart = clip.start + clipLength;
         }
         
         // Add outro if enabled
