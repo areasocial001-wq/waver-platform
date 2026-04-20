@@ -2936,6 +2936,21 @@ export const StoryModeWizard = () => {
             Trascina le scene per riordinarle • Clicca 🔊 per l'anteprima audio • ✏️ per modificare
           </div>
 
+          {/* Global "apply to all scenes" transition control */}
+          <BulkTransitionPanel
+            sceneCount={script.scenes.length}
+            onApply={(type, duration) => {
+              if (!script) return;
+              const updated = script.scenes.map((s) => ({
+                ...s,
+                transition: type,
+                transitionDuration: duration,
+              }));
+              setScript({ ...script, scenes: updated });
+              toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
+            }}
+          />
+
           <div className="grid gap-3">
             {script.scenes.map((scene, idx) => (
               <SceneCard
