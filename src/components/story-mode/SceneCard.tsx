@@ -219,6 +219,8 @@ export const SceneCard = ({
             <StatusDot status={scene.audioStatus} /><span>Audio</span>
             <StatusDot status={scene.sfxStatus} /><span>SFX</span>
             <StatusDot status={scene.videoStatus} /><span>Video</span>
+            <ServerReachBadge label="Voce" url={scene.audioUrl} />
+            {scene.sfxPrompt && <ServerReachBadge label="SFX" url={scene.sfxUrl} />}
             {voiceName && (
               <Badge variant="outline" className="ml-auto text-[10px] h-5 gap-1">
                 <Mic className="w-2.5 h-2.5" />{voiceName}
