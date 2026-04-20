@@ -184,17 +184,79 @@ export const SceneCard = ({
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
           {onRegenerate && (
             <div className="flex gap-1 flex-wrap pt-1 border-t border-border/30">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[10px] gap-1"
-                onClick={() => { onRegenerate("image"); toast.info(`Rigenero immagine scena ${scene.sceneNumber}`); }}
-                disabled={scene.imageStatus === "generating"}
-                title="Rigenera immagine"
-              >
-                <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
-                <Image className="w-2.5 h-2.5" />
-              </Button>
+              {/* Image regen with optional correction note popover */}
+              <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[10px] gap-1"
+                    disabled={scene.imageStatus === "generating"}
+                    title="Rigenera immagine (con nota di correzione opzionale)"
+                  >
+                    <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
+                    <Image className="w-2.5 h-2.5" />
+                    <Wand2 className="w-2.5 h-2.5 opacity-60" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3 space-y-2" align="start">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Nota di correzione (opzionale)</Label>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      Verrà appesa al prompt originale per guidare la rigenerazione. Es: "la ragazza indossa un vestito ocra lungo, non pantaloni".
+                    </p>
+                  </div>
+                  <Textarea
+                    value={correctionNote}
+                    onChange={e => setCorrectionNote(e.target.value)}
+                    placeholder="Cosa correggere rispetto al risultato precedente..."
+                    className="text-xs min-h-[70px]"
+                    autoFocus
+                  />
+                  <div className="flex justify-between gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => { setCorrectionNote(""); }}
+                    >
+                      Pulisci
+                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => {
+                          setNotePopoverOpen(false);
+                          onRegenerate("image");
+                          toast.info(`Rigenero immagine scena ${scene.sceneNumber}`);
+                        }}
+                      >
+                        Senza nota
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => {
+                          const note = correctionNote.trim();
+                          setNotePopoverOpen(false);
+                          onRegenerate("image", note ? { correctionNote: note } : undefined);
+                          toast.info(
+                            note
+                              ? `Rigenero scena ${scene.sceneNumber} con correzione`
+                              : `Rigenero immagine scena ${scene.sceneNumber}`,
+                          );
+                        }}
+                      >
+                        <Wand2 className="w-3 h-3" />
+                        Rigenera
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -231,6 +293,16 @@ export const SceneCard = ({
                 </Button>
               )}
             </div>
+          )}
+
+          {/* Before/After comparison panel — appears after a regen if previous URL is kept */}
+          {(scene.previousImageUrl || scene.previousVideoUrl || scene.previousAudioUrl || scene.previousSfxUrl) && (
+            <BeforeAfterPanel
+              scene={scene}
+              aspectClass={aspectClass}
+              onKeepNew={onKeepNew}
+              onRollback={onRollback}
+            />
           )}
           {showCountdown && timeoutRemainingMs !== null && (
             <div className={cn(
