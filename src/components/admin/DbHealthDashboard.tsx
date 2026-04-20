@@ -366,6 +366,13 @@ export const DbHealthDashboard = () => {
         </Card>
       </div>
 
+      {/* Storage cleanup card — last run of cleanup-orphan-assets job */}
+      <StorageCleanupCard
+        log={maintenanceLog.find((l: any) => l.operation === "storage_cleanup") || null}
+        runningCleanup={runningCleanup}
+        onRun={handleRunStorageCleanup}
+      />
+
       {/* Historical chart */}
       <Card>
         <CardHeader>
