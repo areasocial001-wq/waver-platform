@@ -34,6 +34,13 @@ export interface StoryScene {
   videoHeight?: number;
   /** Set when measured video aspect ratio deviates >5% from requested */
   videoAspectWarning?: string;
+  /** Previous asset URLs kept for visual before/after comparison after regeneration */
+  previousImageUrl?: string;
+  previousVideoUrl?: string;
+  previousAudioUrl?: string;
+  previousSfxUrl?: string;
+  /** Last correction note used for image regeneration (sticky for re-edits) */
+  lastImageCorrectionNote?: string;
 }
 
 export interface StoryScript {
