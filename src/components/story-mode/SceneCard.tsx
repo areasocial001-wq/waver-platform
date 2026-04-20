@@ -11,9 +11,10 @@ import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
   Image, Eye, Download, Mic, Unlock, AlertTriangle, Wand2, Check, Undo2,
+  History, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StoryScene, TransitionType } from "./types";
+import { StoryScene, TransitionType, AssetVersion } from "./types";
 import { useAuthVideo } from "@/hooks/useAuthVideo";
 
 
