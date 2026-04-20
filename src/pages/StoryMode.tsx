@@ -68,6 +68,18 @@ const StoryMode = () => {
               Da una semplice descrizione a un video professionale di ~60-80 secondi con narrazione,<br />
               scene generate e montaggio automatico
             </p>
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOptimize}
+                disabled={optimizing}
+                className="gap-2"
+              >
+                {optimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
+                {optimizing ? "Ottimizzazione in corso..." : "Ottimizza spazio progetti"}
+              </Button>
+            </div>
           </div>
 
           {!loading && !canUseStoryMode ? (
