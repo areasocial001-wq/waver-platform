@@ -1,9 +1,35 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+async function persistDataUrlToStorage(imageUrl: string, userId: string): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) return imageUrl;
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) return imageUrl;
+    const { data: pub } = admin.storage.from("story-references").getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch {
+    return imageUrl;
+  }
+}
 
 const ENDPOINTS = {
   singapore: "https://dashscope-intl.aliyuncs.com",

@@ -7,6 +7,47 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function persistDataUrlToStorage(imageUrl: string, userId: string): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) return imageUrl;
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) return imageUrl;
+    const { data: pub } = admin.storage.from("story-references").getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch {
+    return imageUrl;
+  }
+}
+
+function rewriteUrlsInPayload(payload: any, userId: string, promises: Promise<void>[]): void {
+  if (!payload || typeof payload !== "object") return;
+  for (const key of Object.keys(payload)) {
+    const val = payload[key];
+    if (typeof val === "string" && val.startsWith("data:")) {
+      promises.push(
+        persistDataUrlToStorage(val, userId).then((newUrl) => {
+          payload[key] = newUrl;
+        })
+      );
+    } else if (val && typeof val === "object") {
+      rewriteUrlsInPayload(val, userId, promises);
+    }
+  }
+}
+
 const statusSchema = z.object({
   action: z.literal('status'),
   taskId: z.string().min(1).max(100),
@@ -99,7 +140,11 @@ serve(async (req) => {
       }
 
       const data = await response.json();
-      console.log("Mystic status response:", JSON.stringify(data));
+      console.log("Mystic status response:", JSON.stringify(data).slice(0, 500));
+      // If Mystic ever returns base64 generated images, persist them to Storage first.
+      const rewrites: Promise<void>[] = [];
+      rewriteUrlsInPayload(data, userId, rewrites);
+      if (rewrites.length > 0) await Promise.all(rewrites);
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -145,7 +190,10 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("Mystic generation response:", JSON.stringify(data));
+    console.log("Mystic generation response:", JSON.stringify(data).slice(0, 500));
+    const rewrites: Promise<void>[] = [];
+    rewriteUrlsInPayload(data, userId, rewrites);
+    if (rewrites.length > 0) await Promise.all(rewrites);
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
