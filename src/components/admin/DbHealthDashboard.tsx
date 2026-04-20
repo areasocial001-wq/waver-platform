@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
-import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play } from "lucide-react";
+import { Database, RefreshCw, Clock, AlertTriangle, CheckCircle2, HardDrive, Activity, Loader2, Wrench, Hammer, History as HistoryIcon, Play, Trash2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +76,7 @@ export const DbHealthDashboard = () => {
   const [vacuuming, setVacuuming] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [runningCron, setRunningCron] = useState(false);
+  const [runningCleanup, setRunningCleanup] = useState(false);
   const [maintenanceResult, setMaintenanceResult] = useState<any>(null);
   const [maintenanceLog, setMaintenanceLog] = useState<any[]>([]);
 
@@ -178,6 +179,22 @@ export const DbHealthDashboard = () => {
       toast.error(err.message || "Errore durante l'esecuzione del job");
     } finally {
       setRunningCron(false);
+    }
+  };
+
+  const handleRunStorageCleanup = async () => {
+    setRunningCleanup(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cleanup-orphan-assets");
+      if (error) throw error;
+      toast.success(
+        `Pulizia completata: ${data?.files_deleted ?? 0} file eliminati, ${data?.mb_freed ?? 0} MB liberati`
+      );
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Errore durante la pulizia storage");
+    } finally {
+      setRunningCleanup(false);
     }
   };
 
