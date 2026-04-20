@@ -780,8 +780,30 @@ export const StoryModeWizard = () => {
     setScript({ ...script, scenes });
   };
 
+  // Push a previous asset URL into the per-scene version history (newest first, capped).
+  const pushVersionHistory = (
+    scene: StoryScene,
+    type: "image" | "audio" | "video" | "sfx",
+    prevUrl: string | undefined,
+    correctionNote?: string,
+  ): AssetVersionHistory => {
+    const history: AssetVersionHistory = { ...(scene.versionHistory || {}) };
+    if (!prevUrl) return history;
+    const entry: AssetVersion = {
+      id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: prevUrl,
+      createdAt: Date.now(),
+      correctionNote,
+    };
+    const list = history[type] || [];
+    // Avoid duplicate entries for the same url (e.g. rapid double-regens with same fallback)
+    const filtered = list.filter(v => v.url !== prevUrl);
+    history[type] = [entry, ...filtered].slice(0, MAX_VERSION_HISTORY);
+    return history;
+  };
+
   // Regenerate single scene asset
-  // `correctionNote` (optional, image only) is appended to the original prompt to guide the regen.
+  // `correctionNote` (optional, image+video) is appended to the original prompt to guide the regen.
   const regenerateSceneAsset = async (
     index: number,
     type: "image" | "audio" | "video" | "sfx",
