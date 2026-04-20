@@ -92,3 +92,6 @@ verify_jwt = false
 
 [functions.luma-image]
 verify_jwt = false
+
+[functions.cleanup-orphan-assets]
+verify_jwt = false
