@@ -7,6 +7,35 @@ const corsHeaders = {
 
 const LUMA_API_URL = "https://api.lumalabs.ai/dream-machine/v1";
 
+/**
+ * Persist a data: URL to the public `story-references` bucket and return the
+ * public URL. If the input is already an http(s) URL, it is returned as-is.
+ */
+async function persistDataUrlToStorage(imageUrl: string, userId: string): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) return imageUrl;
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) return imageUrl;
+    const { data: pub } = admin.storage.from("story-references").getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch {
+    return imageUrl;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -85,7 +114,8 @@ Deno.serve(async (req) => {
       console.log("[Luma Image] Poll result:", JSON.stringify(pollData));
 
       if (pollData.state === "completed") {
-        const imageUrl = pollData.assets?.image;
+        const rawImageUrl = pollData.assets?.image;
+        const imageUrl = rawImageUrl ? await persistDataUrlToStorage(rawImageUrl, userId) : rawImageUrl;
         return new Response(JSON.stringify({
           status: "completed",
           imageUrl,
