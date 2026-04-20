@@ -1540,9 +1540,23 @@ export const StoryModeWizard = () => {
 
   // Open render preview only after the audio check passes
   const openRenderPreview = (action: "reassemble" | "generateAll") => {
+    console.log("[openRenderPreview] clicked", {
+      action,
+      hasScript: !!script,
+      sceneCount: script?.scenes.length,
+      completedVideos: script?.scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length,
+      isGenerating,
+      renderStatus,
+      showRenderPreview,
+    });
     setPendingRenderAction(action);
-    if (preRenderAudioCheck()) {
+    const audioOk = preRenderAudioCheck();
+    console.log("[openRenderPreview] audio check passed:", audioOk);
+    if (audioOk) {
       setShowRenderPreview(true);
+      console.log("[openRenderPreview] setShowRenderPreview(true) called");
+    } else {
+      console.log("[openRenderPreview] blocked by audio check, batch dialog should be showing");
     }
   };
 
