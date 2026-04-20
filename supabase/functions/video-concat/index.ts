@@ -748,10 +748,12 @@ serve(async (req) => {
 
         // Dry-run mode: return timeline summary without actually rendering
         if (dryRun) {
-          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
-          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
-          const narrationCount = audioUrls?.filter(u => !!u).length || 0;
-          const sfxCount = sfxUrls?.filter(u => !!u).length || 0;
+          // Count actual clips placed (after filtering blob: URLs out)
+          const placedNarrationClips = (audioUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const placedSfxClips = (sfxUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const requestedNarration = (audioUrls || []).filter(u => !!u).length;
+          const requestedSfx = (sfxUrls || []).filter(u => !!u).length;
+          const placedMusic = !!backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:');
           const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
             track: idx + 1,
             clips: t.clips.length,
@@ -762,13 +764,30 @@ serve(async (req) => {
               dryRun: true,
               summary: {
                 totalScenes: videoUrls.length,
-                totalDuration: Math.round(totalDur * 10) / 10,
+                // Use EFFECTIVE duration (post-overlap), not raw sum
+                totalDuration: Math.round(effectiveTotalDuration * 10) / 10,
+                rawDuration: Math.round(((clipDurations?.reduce((s, d) => s + d, 0) || videoUrls.length * 5) + introDuration + (outro?.enabled ? outro.duration : 0)) * 10) / 10,
                 aspectRatio,
                 resolution,
                 fps,
-                narrationScenes: narrationCount,
-                sfxScenes: sfxCount,
-                hasBackgroundMusic: !!backgroundMusicUrl,
+                // Backwards-compat fields
+                narrationScenes: placedNarrationClips,
+                sfxScenes: placedSfxClips,
+                // Detailed breakdown — surfaced in RenderPreviewDialog
+                placedClips: {
+                  video: videoClips.filter((c: any) => c.asset?.type === 'video').length,
+                  narration: placedNarrationClips,
+                  sfx: placedSfxClips,
+                  music: placedMusic ? 1 : 0,
+                },
+                requestedClips: {
+                  narration: requestedNarration,
+                  sfx: requestedSfx,
+                  music: backgroundMusicUrl ? 1 : 0,
+                },
+                skippedAssets: skippedAssets.length > 0 ? skippedAssets : [],
+                sceneStarts: sceneStarts.map(s => Math.round(s * 100) / 100),
+                hasBackgroundMusic: placedMusic,
                 hasIntro: intro?.enabled || false,
                 hasOutro: outro?.enabled || false,
                 transitionType: transitions?.[0]?.type || transition,
