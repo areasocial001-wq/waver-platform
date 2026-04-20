@@ -265,8 +265,10 @@ export const StoryModeWizard = () => {
     let cancelled = false;
     const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
     const startedAt = renderStartTime || Date.now();
+    setRenderPollInfo({ attempts: 0, lastCheckedAt: null, lastStatus: "queued", consecutiveErrors: 0, nextCheckInMs: 8000 });
     const poll = async () => {
       let consecutiveErrors = 0;
+      let attempts = 0;
       while (!cancelled) {
         // Adaptive interval: 8s for first 2 min, then 15s
         const elapsed = Date.now() - startedAt;
@@ -277,8 +279,10 @@ export const StoryModeWizard = () => {
           break;
         }
         const interval = elapsed > 120_000 ? 15000 : 8000;
+        setRenderPollInfo(p => ({ ...p, nextCheckInMs: interval }));
         await new Promise(r => setTimeout(r, interval));
         if (cancelled) break;
+        attempts++;
         try {
           const { data, error } = await supabase.functions.invoke("video-concat", {
             body: { pollRenderId: pendingRenderId },
@@ -286,6 +290,7 @@ export const StoryModeWizard = () => {
           if (error) {
             consecutiveErrors++;
             console.error(`Poll error (${consecutiveErrors}):`, error);
+            setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: "error", consecutiveErrors }));
             if (consecutiveErrors >= 5) {
               setRenderStatus("failed");
               setPendingRenderId(null);
@@ -295,6 +300,7 @@ export const StoryModeWizard = () => {
             continue;
           }
           consecutiveErrors = 0;
+          setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: data?.status ?? "processing", consecutiveErrors: 0 }));
           if (data?.status === "completed" && data?.videoUrl) {
             setFinalVideoUrl(data.videoUrl);
             setRenderStatus("completed");
@@ -318,6 +324,7 @@ export const StoryModeWizard = () => {
         } catch (err) {
           consecutiveErrors++;
           console.error("Poll exception:", err);
+          setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: "error", consecutiveErrors }));
         }
       }
     };
@@ -330,6 +337,7 @@ export const StoryModeWizard = () => {
     if (renderStatus !== "processing" || !renderStartTime) return;
     const iv = setInterval(() => {
       setRenderElapsed(Math.floor((Date.now() - renderStartTime) / 1000));
+      setRenderTick(t => t + 1);
     }, 1000);
     return () => clearInterval(iv);
   }, [renderStatus, renderStartTime]);
