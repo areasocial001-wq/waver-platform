@@ -291,6 +291,38 @@ const getStoragePathFromUrl = (url: string, supabaseUrl: string): { bucket: stri
   }
 };
 
+// Sign a video-proxy URL with HMAC-SHA256 so external services (Shotstack)
+// can fetch it without a JWT. Token expires in 2 hours.
+const PROXY_SIGNING_SECRET = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+async function signVideoProxyUrl(proxyUrl: string): Promise<string> {
+  if (!PROXY_SIGNING_SECRET) return proxyUrl;
+  try {
+    const u = new URL(proxyUrl);
+    if (!u.pathname.endsWith("/video-proxy")) return proxyUrl;
+    const uri = u.searchParams.get("uri");
+    if (!uri) return proxyUrl;
+    const exp = Math.floor(Date.now() / 1000) + 2 * 60 * 60; // 2h validity
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(PROXY_SIGNING_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${uri}|${exp}`));
+    const token = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    u.searchParams.set("exp", String(exp));
+    u.searchParams.set("token", token);
+    return u.toString();
+  } catch (e) {
+    console.error("Failed to sign proxy URL:", e);
+    return proxyUrl;
+  }
+}
+
 const normalizeAssetUrl = async (
   url: string,
   supabase: ReturnType<typeof createClient>,
@@ -307,6 +339,11 @@ const normalizeAssetUrl = async (
     if (!error && data?.signedUrl) {
       return data.signedUrl;
     }
+  }
+
+  // If this is a video-proxy URL, sign it so Shotstack can fetch without JWT
+  if (url.includes("/functions/v1/video-proxy?")) {
+    return await signVideoProxyUrl(url);
   }
 
   return url;

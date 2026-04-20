@@ -57,50 +57,90 @@ function isAllowedUrl(uri: string): boolean {
   }
 }
 
+// HMAC-SHA256 signing for unauthenticated access (used by Shotstack to download videos)
+const SIGNING_SECRET = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+async function verifySignedToken(uri: string, expStr: string, token: string): Promise<boolean> {
+  if (!SIGNING_SECRET || !uri || !expStr || !token) return false;
+  const exp = parseInt(expStr, 10);
+  if (!Number.isFinite(exp) || Date.now() / 1000 > exp) return false;
+  try {
+    const enc = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(SIGNING_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const msg = `${uri}|${exp}`;
+    const sig = await crypto.subtle.sign("HMAC", key, enc.encode(msg));
+    const expected = Array.from(new Uint8Array(sig))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    // Constant-time-ish compare
+    if (expected.length !== token.length) return false;
+    let diff = 0;
+    for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+    return diff === 0;
+  } catch (e) {
+    console.error("Signature verification failed:", e);
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Auth check
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const token = authHeader.replace("Bearer ", "");
-    let userId: string | undefined;
-    try {
-      const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-      if (!claimsError && claimsData?.claims) {
-        userId = claimsData.claims.sub as string;
-      }
-    } catch (_) {
-      // getClaims not available in this SDK version
-    }
-    if (!userId) {
-      const { data: userData, error: userError } = await supabase.auth.getUser(token);
-      if (userError || !userData?.user) {
-        console.error("JWT validation failed:", userError);
-        return new Response(
-          JSON.stringify({ error: "Invalid authentication token" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      userId = userData.user.id;
-    }
-    // Get video URI from query params
     const url = new URL(req.url);
     const videoUri = url.searchParams.get("uri");
-    
+    const expStr = url.searchParams.get("exp");
+    const sigToken = url.searchParams.get("token");
+
+    // Path 1: signed token (no JWT required) — used by external services like Shotstack
+    let userId: string | undefined;
+    const hasValidSignature = !!videoUri && !!expStr && !!sigToken &&
+      (await verifySignedToken(videoUri, expStr, sigToken));
+
+    if (!hasValidSignature) {
+      // Path 2: standard JWT auth
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const token = authHeader.replace("Bearer ", "");
+      try {
+        const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+        if (!claimsError && claimsData?.claims) {
+          userId = claimsData.claims.sub as string;
+        }
+      } catch (_) {
+        // getClaims not available in this SDK version
+      }
+      if (!userId) {
+        const { data: userData, error: userError } = await supabase.auth.getUser(token);
+        if (userError || !userData?.user) {
+          console.error("JWT validation failed:", userError);
+          return new Response(
+            JSON.stringify({ error: "Invalid authentication token" }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        userId = userData.user.id;
+      }
+    }
+    // videoUri already parsed at the top of the handler
     if (!videoUri) {
       return new Response("Missing video URI", {
         status: 400,
