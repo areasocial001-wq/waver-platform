@@ -97,17 +97,27 @@ const getAspectRatioSize = (aspectRatio: string, resolution: string): { width: n
   }
 };
 
-// Map transition types to Shotstack format
-const mapTransition = (transition: string): string | null => {
+// Map transition types to Shotstack format.
+// Returns { in?: string, out?: string } — Shotstack uses `fade` on `out` to fade to BLACK,
+// and `fade` on `in` (with overlapping clips) to crossfade. So:
+//  - crossfade / dissolve = ONLY fade-in on next clip (overlap creates the dissolve)
+//  - fade_black / fade    = fade-out on prev + fade-in on next (gap to black)
+//  - wipe variants        = directional wipe in
+const mapTransition = (transition: string): { in?: string; out?: string } | null => {
   switch (transition) {
-    case 'fade': return 'fade';
-    case 'crossfade': return 'fade';
-    case 'fade_black': return 'fade';
-    case 'dissolve': return 'fade'; // Shotstack maps dissolve to fade
-    case 'wipe': return 'wipeRight';
-    case 'wipe_left': return 'wipeLeft';
-    case 'wipe_right': return 'wipeRight';
-    default: return null;
+    case 'fade':
+    case 'fade_black':
+      return { in: 'fade', out: 'fade' };
+    case 'crossfade':
+    case 'dissolve':
+      return { in: 'fade' }; // overlap + fade-in only = true crossfade
+    case 'wipe':
+    case 'wipe_right':
+      return { in: 'wipeRight' };
+    case 'wipe_left':
+      return { in: 'wipeLeft' };
+    default:
+      return null;
   }
 };
 
@@ -542,20 +552,25 @@ serve(async (req) => {
           const shotstackTransition = mapTransition(transType);
           
           if (shotstackTransition && i > 0) {
-            // Add fade-out to previous clip for smooth transition
-            const prevClip = videoClips[videoClips.length - 1];
-            if (prevClip && !prevClip.transition?.out) {
-              prevClip.transition = {
-                ...prevClip.transition,
-                out: shotstackTransition,
-              };
+            // Apply fade-out to previous clip ONLY for fade-to-black variants.
+            // For crossfade/dissolve we skip prev.out so the overlap produces a true cross-dissolve.
+            if (shotstackTransition.out) {
+              const prevClip = videoClips[videoClips.length - 1];
+              if (prevClip && !prevClip.transition?.out) {
+                prevClip.transition = {
+                  ...prevClip.transition,
+                  out: shotstackTransition.out,
+                };
+              }
             }
             // Add fade-in to current clip
-            clip.transition = {
-              ...effectsResult.transition,
-              in: shotstackTransition,
-            };
-            // Overlap clips for smooth transition
+            if (shotstackTransition.in) {
+              clip.transition = {
+                ...effectsResult.transition,
+                in: shotstackTransition.in,
+              };
+            }
+            // Overlap clips so the transition actually blends them
             clip.start = Math.max(0, currentStart - transDur);
           } else if (effectsResult.transition) {
             clip.transition = effectsResult.transition;
