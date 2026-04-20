@@ -8,6 +8,53 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * If the given URL is a data:image/...;base64,... URL, decode it, upload to
+ * the public `story-references` bucket under generated/{userId}/...
+ * and return the public URL. Otherwise return the URL unchanged.
+ *
+ * This guarantees the database NEVER stores giant inline base64 blobs.
+ */
+async function persistDataUrlToStorage(
+  imageUrl: string,
+  userId: string,
+): Promise<string> {
+  if (!imageUrl || !imageUrl.startsWith("data:")) return imageUrl;
+
+  const match = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return imageUrl;
+
+  const mime = match[1];
+  const b64 = match[2];
+  const ext = mime.split("/")[1]?.split("+")[0] || "png";
+  const fileName = `generated/${userId}/${crypto.randomUUID()}.${ext}`;
+
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!serviceKey || !supabaseUrl) {
+      console.warn("Missing service role / url, returning data URL as-is");
+      return imageUrl;
+    }
+    const admin = createClient(supabaseUrl, serviceKey);
+    const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const { error: upErr } = await admin.storage
+      .from("story-references")
+      .upload(fileName, binary, { contentType: mime, upsert: false });
+    if (upErr) {
+      console.error("Storage upload failed, returning data URL:", upErr.message);
+      return imageUrl;
+    }
+    const { data: pub } = admin.storage
+      .from("story-references")
+      .getPublicUrl(fileName);
+    return pub?.publicUrl || imageUrl;
+  } catch (err) {
+    console.error("persistDataUrlToStorage error:", err);
+    return imageUrl;
+  }
+}
+
 const requestSchema = z.object({
   prompt: z.string().min(1, 'Prompt obbligatorio').max(2000, 'Prompt troppo lungo'),
   width: z.number().int().min(256).max(2048).optional(),
@@ -232,8 +279,9 @@ serve(async (req) => {
       console.log("Reference image provided — using Lovable AI for character-consistent generation");
       const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
       if (lovableImageUrl) {
+        const finalUrl = await persistDataUrlToStorage(lovableImageUrl, userId);
         return new Response(
-          JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
+          JSON.stringify({ imageUrl: finalUrl, success: true, provider: 'lovable-ai' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       }
@@ -269,9 +317,11 @@ serve(async (req) => {
           });
 
           console.log("Replicate image generation successful");
+          const replicateUrl = Array.isArray(output) ? output[0] : output;
+          const finalUrl = await persistDataUrlToStorage(replicateUrl as string, userId);
           return new Response(
             JSON.stringify({
-              imageUrl: Array.isArray(output) ? output[0] : output,
+              imageUrl: finalUrl,
               success: true,
               provider: 'replicate',
             }),
@@ -305,8 +355,9 @@ serve(async (req) => {
       if (replicateFailed) {
         const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
         if (lovableImageUrl) {
+          const finalUrl = await persistDataUrlToStorage(lovableImageUrl, userId);
           return new Response(
-            JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
+            JSON.stringify({ imageUrl: finalUrl, success: true, provider: 'lovable-ai' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
           );
         }
@@ -328,8 +379,9 @@ serve(async (req) => {
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
     const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
     if (lovableImageUrl) {
+      const finalUrl = await persistDataUrlToStorage(lovableImageUrl, userId);
       return new Response(
-        JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
+        JSON.stringify({ imageUrl: finalUrl, success: true, provider: 'lovable-ai' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
