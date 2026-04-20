@@ -1041,6 +1041,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_jsonb_no_large_base64: {
+        Args: { _column_label: string; _data: Json; _table_label: string }
+        Returns: undefined
+      }
       get_db_health_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
