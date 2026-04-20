@@ -565,3 +565,94 @@ const StatusDot = ({ status }: { status?: string }) => {
     : "bg-muted-foreground/30";
   return <div className={cn("w-2 h-2 rounded-full", color)} />;
 };
+
+/**
+ * Inline before/after comparison shown on the scene card after a regeneration.
+ * Lets the user keep the new asset (clears the backup) or roll back to the previous one.
+ * Supports image, video, audio and sfx — only the asset types with a `previousXxxUrl` are rendered.
+ */
+const BeforeAfterPanel = ({
+  scene,
+  aspectClass,
+  onKeepNew,
+  onRollback,
+}: {
+  scene: StoryScene;
+  aspectClass: string;
+  onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
+  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
+}) => {
+  const items: { type: "image" | "video" | "audio" | "sfx"; label: string; prev: string; next?: string }[] = [];
+  if (scene.previousImageUrl) items.push({ type: "image", label: "Immagine", prev: scene.previousImageUrl, next: scene.imageUrl });
+  if (scene.previousVideoUrl) items.push({ type: "video", label: "Video", prev: scene.previousVideoUrl, next: scene.videoUrl });
+  if (scene.previousAudioUrl) items.push({ type: "audio", label: "Audio", prev: scene.previousAudioUrl, next: scene.audioUrl });
+  if (scene.previousSfxUrl) items.push({ type: "sfx", label: "SFX", prev: scene.previousSfxUrl, next: scene.sfxUrl });
+  if (!items.length) return null;
+
+  return (
+    <div className="space-y-2 pt-2 mt-1 border-t border-primary/30">
+      {items.map(item => (
+        <div key={item.type} className="rounded-md border border-primary/30 bg-primary/5 p-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="outline" className="text-[10px] h-5 gap-1 border-primary/40">
+              <Wand2 className="w-2.5 h-2.5" /> Confronto {item.label}
+            </Badge>
+            <div className="flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => onRollback?.(item.type)}
+                title="Ripristina la versione precedente"
+              >
+                <Undo2 className="w-3 h-3" />
+                Ripristina
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] gap-1"
+                onClick={() => onKeepNew?.(item.type)}
+                title="Mantieni la nuova versione (scarta backup)"
+              >
+                <Check className="w-3 h-3" />
+                Mantieni
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <AssetPreview url={item.prev} type={item.type} aspectClass={aspectClass} label="Prima" />
+            <AssetPreview url={item.next} type={item.type} aspectClass={aspectClass} label="Dopo" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const AssetPreview = ({
+  url,
+  type,
+  aspectClass,
+  label,
+}: {
+  url?: string;
+  type: "image" | "video" | "audio" | "sfx";
+  aspectClass: string;
+  label: string;
+}) => {
+  const isVisual = type === "image" || type === "video";
+  return (
+    <div className="space-y-1">
+      <div className="text-[9px] text-muted-foreground uppercase tracking-wide font-semibold">{label}</div>
+      {!url ? (
+        <div className={cn("flex items-center justify-center bg-muted/30 rounded text-[10px] text-muted-foreground", isVisual ? aspectClass : "h-10")}>—</div>
+      ) : type === "image" ? (
+        <img src={url} alt={label} className={cn("w-full object-cover rounded", aspectClass)} />
+      ) : type === "video" ? (
+        <video src={url} className={cn("w-full object-cover rounded bg-black", aspectClass)} muted loop playsInline controls />
+      ) : (
+        <audio src={url} controls className="w-full h-8" />
+      )}
+    </div>
+  );
+};
