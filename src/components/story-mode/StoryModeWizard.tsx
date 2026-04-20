@@ -853,7 +853,13 @@ export const StoryModeWizard = () => {
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], audioUrl: storageUrl, audioStatus: "completed" };
+        const prevA = scenes[index];
+        scenes[index] = {
+          ...prevA,
+          previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
+          audioUrl: storageUrl,
+          audioStatus: "completed",
+        };
         setScript({ ...script, scenes });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
