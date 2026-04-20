@@ -2705,7 +2705,9 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
-                onRegenerate={(type) => regenerateSceneAsset(idx, type)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
               />
             ))}
           </div>
