@@ -2449,9 +2449,22 @@ export const StoryModeWizard = () => {
                 </div>
               </div>
 
-              <Badge variant={isRenderActive ? "secondary" : "destructive"} className="shrink-0">
-                {isRenderActive ? "Rendering" : "Errore"}
-              </Badge>
+              <div className="flex items-center gap-2 shrink-0">
+                {isRenderActive && step !== "complete" && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setStep("complete")}
+                  >
+                    <Film className="w-3.5 h-3.5 mr-1.5" />
+                    Vai al render
+                  </Button>
+                )}
+                <Badge variant={isRenderActive ? "secondary" : "destructive"}>
+                  {isRenderActive ? "Rendering" : "Errore"}
+                </Badge>
+              </div>
             </div>
 
             {isRenderActive && (
@@ -2466,6 +2479,58 @@ export const StoryModeWizard = () => {
                       : `~${renderRemainingSeconds}s rimanenti`}
                   </span>
                 </div>
+
+                {/* Detailed Shotstack polling info */}
+                {(() => {
+                  // Use renderTick so "Xs fa" updates every second
+                  void renderTick;
+                  const lastCheckedSec = renderPollInfo.lastCheckedAt
+                    ? Math.max(0, Math.floor((Date.now() - renderPollInfo.lastCheckedAt) / 1000))
+                    : null;
+                  const nextCheckSec = renderPollInfo.lastCheckedAt
+                    ? Math.max(0, Math.ceil((renderPollInfo.nextCheckInMs - (Date.now() - renderPollInfo.lastCheckedAt)) / 1000))
+                    : Math.ceil(renderPollInfo.nextCheckInMs / 1000);
+                  const statusLabel = (() => {
+                    switch (renderPollInfo.lastStatus) {
+                      case "completed": return "✅ pronto";
+                      case "failed": return "❌ errore";
+                      case "error": return "⚠️ errore polling";
+                      case "queued": return "🟡 in coda";
+                      case "fetching": return "📥 download asset";
+                      case "rendering": return "🎬 in rendering";
+                      case "saving": return "💾 salvataggio";
+                      case "processing":
+                      default: return "⏳ in elaborazione";
+                    }
+                  })();
+                  return (
+                    <div className="flex items-center justify-between gap-3 flex-wrap text-[11px] text-muted-foreground border-t border-border/40 pt-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="font-medium text-foreground">Shotstack:</span>
+                          {statusLabel}
+                        </span>
+                        <span>•</span>
+                        <span>Tentativi: <span className="tabular-nums font-medium text-foreground">{renderPollInfo.attempts}</span></span>
+                        {renderPollInfo.consecutiveErrors > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-destructive">Errori consecutivi: {renderPollInfo.consecutiveErrors}/5</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span>
+                          Ultimo check: {lastCheckedSec === null ? "—" : lastCheckedSec === 0 ? "ora" : `${lastCheckedSec}s fa`}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Prossimo: {nextCheckSec <= 0 ? "in corso…" : `tra ~${nextCheckSec}s`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </CardContent>
