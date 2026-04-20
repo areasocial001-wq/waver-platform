@@ -980,7 +980,13 @@ export const StoryModeWizard = () => {
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
-        scenes[index] = { ...scenes[index], sfxUrl: storageUrl, sfxStatus: "completed" };
+        const prevS = scenes[index];
+        scenes[index] = {
+          ...prevS,
+          previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
+          sfxUrl: storageUrl,
+          sfxStatus: "completed",
+        };
         setScript({ ...script, scenes });
         toast.success(`SFX scena ${index + 1} rigenerato`);
       }
