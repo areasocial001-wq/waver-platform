@@ -781,7 +781,12 @@ export const StoryModeWizard = () => {
   };
 
   // Regenerate single scene asset
-  const regenerateSceneAsset = async (index: number, type: "image" | "audio" | "video" | "sfx") => {
+  // `correctionNote` (optional, image only) is appended to the original prompt to guide the regen.
+  const regenerateSceneAsset = async (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    correctionNote?: string,
+  ) => {
     if (!script) return;
     const scene = script.scenes[index];
     setRegeneratingScene({ idx: index, type });
@@ -794,15 +799,17 @@ export const StoryModeWizard = () => {
         }
         updateScene(index, "imageStatus", "generating");
         const referenceImageUrl = input.imageUrl || undefined;
-        // Force explicit width/height matching the requested aspect ratio so Flux generates true vertical/horizontal frames
-        // instead of letterboxed outputs that Kling/Veo would later have to "fit" into the target canvas.
         const fluxDims = input.videoAspectRatio === "9:16"
           ? { width: 720, height: 1280 }
           : input.videoAspectRatio === "4:3"
           ? { width: 1024, height: 768 }
           : { width: 1280, height: 720 };
+        const note = (correctionNote || "").trim();
+        const guidedPrompt = note
+          ? `${scene.imagePrompt}. IMPORTANT correction: ${note}`
+          : scene.imagePrompt;
         const { data, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: scene.imagePrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
+          body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
         if (error) throw error;
         if (data?.fallback || !data?.imageUrl) {
@@ -816,19 +823,23 @@ export const StoryModeWizard = () => {
         const newImageUrl = data.imageUrl || data.url;
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
         const scenes = [...script.scenes];
+        const prev = scenes[index];
         scenes[index] = {
-          ...scenes[index],
+          ...prev,
+          // Keep previous image as backup so the user can compare or rollback.
+          previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
           imageUrl: newImageUrl,
           imageStatus: "completed",
           imageWidth: aspectCheck?.width,
           imageHeight: aspectCheck?.height,
           imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+          lastImageCorrectionNote: note || prev.lastImageCorrectionNote,
         };
         setScript({ ...script, scenes });
         if (aspectCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Immagine scena ${index + 1} rigenerata`);
+          toast.success(`Immagine scena ${index + 1} rigenerata${note ? " con correzione" : ""}`);
         }
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
