@@ -503,10 +503,6 @@ serve(async (req) => {
         // Build Shotstack timeline clips
         const videoClips: any[] = [];
         let currentStart = 0;
-        // Track each scene's effective start time on the master timeline (after
-        // overlap). Used to align per-scene narration & SFX so they stay glued
-        // to their visual scene even when transitions overlap clips.
-        const sceneStarts: number[] = [];
         
         // Add intro if enabled
         const introDuration = intro?.enabled ? intro.duration : 0;
@@ -518,6 +514,12 @@ serve(async (req) => {
 
         // Determine if we have dedicated audio tracks (narration/music)
         const hasDedicatedAudio = (audioUrls && audioUrls.some(u => !!u)) || !!backgroundMusicUrl || !!audioUrl;
+
+        // Track the REAL on-timeline start for each scene clip (after transition overlaps).
+        // Audio tracks (narration, SFX) MUST use these values — otherwise raw cumulative
+        // sums drift forward by ~transitionDuration per scene, causing "missing voice" or
+        // SFX firing on the wrong scene.
+        const sceneStarts: number[] = [];
 
         // Add video clips
         for (let i = 0; i < videoUrls.length; i++) {
@@ -587,16 +589,12 @@ serve(async (req) => {
             clip.transition = effectsResult.transition;
           }
 
-          // Record the effective on-timeline start of this scene (after overlap)
-          // so narration & SFX can be positioned in lockstep with the visuals.
+          // Record the actual start (post-overlap) before pushing
           sceneStarts.push(clip.start);
-
           videoClips.push(clip);
-          // Advance the timeline cursor to the END of this clip on the master
-          // timeline. With overlap (clip.start = prev currentStart - transDur)
-          // this becomes (currentStart - transDur + clipLength), which is the
-          // correct next reference point — both for placing the next clip AND
-          // for computing the real total video duration used by the music track.
+          // Advance master clock by the EFFECTIVE duration of this clip on the timeline.
+          // For overlapped clips, currentStart should sit at clip.start + clipLength so the
+          // NEXT iteration computes its overlap from the correct anchor.
           currentStart = clip.start + clipLength;
         }
         
@@ -650,25 +648,19 @@ serve(async (req) => {
           });
         }
 
-        // Real video duration on the master timeline (excludes intro/outro).
-        // currentStart at this point = end of last video clip = sum of clipLen
-        // minus all overlaps. Subtract introDuration to isolate the video block.
-        const realVideoDuration = Math.max(0, currentStart - introDuration);
-        const outroDuration = outro?.enabled ? outro.duration : 0;
-        const realTotalDuration = introDuration + realVideoDuration + outroDuration;
+        // Compute REAL effective video duration on the timeline (post-overlap).
+        // This is what the master clock landed on after the loop, minus the intro offset.
+        const effectiveVideoDuration = currentStart - introDuration;
+        const effectiveTotalDuration = introDuration + effectiveVideoDuration + (outro?.enabled ? outro.duration : 0);
 
-        // Add per-scene narration audio tracks.
-        // CRITICAL: position each narration at sceneStarts[i] (the actual on-timeline
-        // start of its visual scene) instead of summing raw clipDurations. With
-        // overlapping crossfades, summing raw durations drifts forward by transDur
-        // per scene, so by scene 4-8 the narration would play after the video has
-        // already moved on (or even after the video ended → "missing voice").
+        // Add per-scene narration audio tracks — anchored to sceneStarts[i] so voice
+        // never drifts past its scene when transitions overlap.
         if (audioUrls && audioUrls.length > 0) {
           const narrationClips: any[] = [];
           for (let i = 0; i < audioUrls.length; i++) {
-            const rawUrl = audioUrls[i];
-            const sceneStart = sceneStarts[i] ?? (introDuration + i * (clipDurations?.[i] || 5));
             const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = audioUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
             if (rawUrl && !rawUrl.startsWith('blob:')) {
               const narrationSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               narrationClips.push({
@@ -687,17 +679,14 @@ serve(async (req) => {
           }
         }
 
-        // Add per-scene SFX audio tracks.
-        // Same fix as narration: anchor each SFX to the visual scene's actual
-        // start. This is what makes "wave SFX on the sea scene, wind SFX on the
-        // mountain scene" actually line up — without this they shift by N*transDur
-        // and the wave SFX ends up playing during the mountain scene.
+        // Add per-scene SFX audio tracks — anchored to sceneStarts[i] so e.g. wave
+        // sound stays glued to the beach scene even with overlapping transitions.
         if (sfxUrls && sfxUrls.length > 0) {
           const sfxClips: any[] = [];
           for (let i = 0; i < sfxUrls.length; i++) {
-            const rawUrl = sfxUrls[i];
-            const sceneStart = sceneStarts[i] ?? (introDuration + i * (clipDurations?.[i] || 5));
             const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = sfxUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
             if (rawUrl && !rawUrl.startsWith('blob:')) {
               const sfxSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
               sfxClips.push({
@@ -716,9 +705,8 @@ serve(async (req) => {
           }
         }
 
-        // Add background music track — use the REAL total duration (with overlap
-        // accounted for) so the music matches the actual video length instead of
-        // being cut short / extending past the end of the video.
+        // Add background music track — uses EFFECTIVE total duration, not raw sum,
+        // so music length matches the actual final video.
         if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
           const normalizedMusicUrl = await normalizeAssetUrl(backgroundMusicUrl, supabase, supabaseUrl);
           timeline.tracks.push({
@@ -729,7 +717,7 @@ serve(async (req) => {
                 volume: musicVolume,
               },
               start: 0,
-              length: realTotalDuration,
+              length: effectiveTotalDuration,
             }],
           });
         }
@@ -760,10 +748,12 @@ serve(async (req) => {
 
         // Dry-run mode: return timeline summary without actually rendering
         if (dryRun) {
-          const videoDuration = clipDurations?.reduce((sum, d) => sum + d, 0) || videoUrls.length * 5;
-          const totalDur = introDuration + videoDuration + (outro?.enabled ? outro.duration : 0);
-          const narrationCount = audioUrls?.filter(u => !!u).length || 0;
-          const sfxCount = sfxUrls?.filter(u => !!u).length || 0;
+          // Count actual clips placed (after filtering blob: URLs out)
+          const placedNarrationClips = (audioUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const placedSfxClips = (sfxUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const requestedNarration = (audioUrls || []).filter(u => !!u).length;
+          const requestedSfx = (sfxUrls || []).filter(u => !!u).length;
+          const placedMusic = !!backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:');
           const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
             track: idx + 1,
             clips: t.clips.length,
@@ -774,13 +764,30 @@ serve(async (req) => {
               dryRun: true,
               summary: {
                 totalScenes: videoUrls.length,
-                totalDuration: Math.round(totalDur * 10) / 10,
+                // Use EFFECTIVE duration (post-overlap), not raw sum
+                totalDuration: Math.round(effectiveTotalDuration * 10) / 10,
+                rawDuration: Math.round(((clipDurations?.reduce((s, d) => s + d, 0) || videoUrls.length * 5) + introDuration + (outro?.enabled ? outro.duration : 0)) * 10) / 10,
                 aspectRatio,
                 resolution,
                 fps,
-                narrationScenes: narrationCount,
-                sfxScenes: sfxCount,
-                hasBackgroundMusic: !!backgroundMusicUrl,
+                // Backwards-compat fields
+                narrationScenes: placedNarrationClips,
+                sfxScenes: placedSfxClips,
+                // Detailed breakdown — surfaced in RenderPreviewDialog
+                placedClips: {
+                  video: videoClips.filter((c: any) => c.asset?.type === 'video').length,
+                  narration: placedNarrationClips,
+                  sfx: placedSfxClips,
+                  music: placedMusic ? 1 : 0,
+                },
+                requestedClips: {
+                  narration: requestedNarration,
+                  sfx: requestedSfx,
+                  music: backgroundMusicUrl ? 1 : 0,
+                },
+                skippedAssets: skippedAssets.length > 0 ? skippedAssets : [],
+                sceneStarts: sceneStarts.map(s => Math.round(s * 100) / 100),
+                hasBackgroundMusic: placedMusic,
                 hasIntro: intro?.enabled || false,
                 hasOutro: outro?.enabled || false,
                 transitionType: transitions?.[0]?.type || transition,

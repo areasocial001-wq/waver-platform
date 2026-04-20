@@ -219,6 +219,8 @@ export const SceneCard = ({
             <StatusDot status={scene.audioStatus} /><span>Audio</span>
             <StatusDot status={scene.sfxStatus} /><span>SFX</span>
             <StatusDot status={scene.videoStatus} /><span>Video</span>
+            <ServerReachBadge label="Voce" url={scene.audioUrl} />
+            {scene.sfxPrompt && <ServerReachBadge label="SFX" url={scene.sfxUrl} />}
             {voiceName && (
               <Badge variant="outline" className="ml-auto text-[10px] h-5 gap-1">
                 <Mic className="w-2.5 h-2.5" />{voiceName}
@@ -601,6 +603,34 @@ const StatusDot = ({ status }: { status?: string }) => {
     : status === "error" ? "bg-destructive"
     : "bg-muted-foreground/30";
   return <div className={cn("w-2 h-2 rounded-full", color)} />;
+};
+
+/**
+ * Tiny badge showing whether an audio asset is "server-reachable":
+ *  - ✓ ok  (storage URL — Shotstack will fetch it)
+ *  - ⚠ blob (browser-only URL — server will silently skip it)
+ *  - ✗ none (asset missing)
+ */
+const ServerReachBadge = ({ label, url }: { label: string; url?: string | null }) => {
+  if (!url) {
+    return (
+      <Badge variant="outline" className="text-[10px] h-5 gap-1 border-destructive/40 text-destructive" title={`${label} mancante`}>
+        <X className="w-2.5 h-2.5" />{label}
+      </Badge>
+    );
+  }
+  if (url.startsWith("blob:")) {
+    return (
+      <Badge variant="outline" className="text-[10px] h-5 gap-1 border-orange-400/40 text-orange-400" title={`${label}: URL temporaneo del browser, il server non lo può raggiungere`}>
+        <AlertTriangle className="w-2.5 h-2.5" />{label}
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="text-[10px] h-5 gap-1 border-green-500/40 text-green-500" title={`${label} pronto sul server`}>
+      <Check className="w-2.5 h-2.5" />{label}
+    </Badge>
+  );
 };
 
 /**

@@ -32,6 +32,7 @@ interface RenderPreviewDialogProps {
 interface PreviewSummary {
   totalScenes: number;
   totalDuration: number;
+  rawDuration?: number;
   aspectRatio: string;
   resolution: string;
   fps: string;
@@ -45,6 +46,10 @@ interface PreviewSummary {
   narrationVolume: number;
   sfxVolume: number;
   musicVolume: number;
+  placedClips?: { video: number; narration: number; sfx: number; music: number };
+  requestedClips?: { narration: number; sfx: number; music: number };
+  skippedAssets?: { type: string; index?: number; url: string; reason: string }[];
+  sceneStarts?: number[];
 }
 
 export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
@@ -340,6 +345,55 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               <Badge variant="secondary">{summary.fps} FPS</Badge>
               <Badge variant="secondary">{summary.tracks.length} tracce</Badge>
             </div>
+
+            {/* Detailed render log — exposes what video-concat actually placed in the timeline */}
+            {summary.placedClips && (
+              <div className="p-3 rounded-lg border border-border bg-muted/20 space-y-1.5">
+                <p className="text-xs font-medium flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-primary" />
+                  Riepilogo timeline (video-concat)
+                </p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+                  <span className="text-muted-foreground">🎬 Clip video</span>
+                  <span className="font-mono text-foreground text-right">{summary.placedClips.video}</span>
+                  <span className="text-muted-foreground">🎙️ Clip narrazione</span>
+                  <span className="font-mono text-right">
+                    <span className={summary.placedClips.narration < (summary.requestedClips?.narration || 0) ? "text-orange-400" : "text-foreground"}>
+                      {summary.placedClips.narration}
+                    </span>
+                    {summary.requestedClips && summary.requestedClips.narration !== summary.placedClips.narration && (
+                      <span className="text-muted-foreground"> / {summary.requestedClips.narration} richiesti</span>
+                    )}
+                  </span>
+                  <span className="text-muted-foreground">✨ Clip SFX</span>
+                  <span className="font-mono text-right">
+                    <span className={summary.placedClips.sfx < (summary.requestedClips?.sfx || 0) ? "text-orange-400" : "text-foreground"}>
+                      {summary.placedClips.sfx}
+                    </span>
+                    {summary.requestedClips && summary.requestedClips.sfx !== summary.placedClips.sfx && (
+                      <span className="text-muted-foreground"> / {summary.requestedClips.sfx} richiesti</span>
+                    )}
+                  </span>
+                  <span className="text-muted-foreground">🎵 Musica</span>
+                  <span className="font-mono text-foreground text-right">
+                    {summary.placedClips.music ? "1 traccia" : "—"}
+                  </span>
+                  <span className="text-muted-foreground">⏱️ Durata effettiva</span>
+                  <span className="font-mono text-foreground text-right">{summary.totalDuration}s</span>
+                  {summary.rawDuration && summary.rawDuration !== summary.totalDuration && (
+                    <>
+                      <span className="text-muted-foreground/70">↳ senza overlap</span>
+                      <span className="font-mono text-muted-foreground/70 text-right">{summary.rawDuration}s</span>
+                    </>
+                  )}
+                </div>
+                {summary.skippedAssets && summary.skippedAssets.length > 0 && (
+                  <p className="text-[10px] text-orange-400 pt-1 border-t border-border/40">
+                    ⚠️ {summary.skippedAssets.length} asset scartati (non raggiungibili dal server)
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Aspect-ratio non-compliance — BLOCKING unless explicitly ignored */}
             {nonCompliantScenes.length > 0 && (
