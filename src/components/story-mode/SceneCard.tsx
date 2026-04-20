@@ -152,21 +152,30 @@ export const SceneCard = ({
   }, [scene.voiceId, defaultVoiceId, voices]);
   const aspectClass = aspectRatio === "9:16" ? "aspect-[9/16]" : aspectRatio === "4:3" ? "aspect-[4/3]" : "aspect-video";
 
+  // After regenerating the image, prefer showing the new image over the (now stale) video
+  // so the user can actually see the change. They can then regenerate the video too.
+  const imageJustRegenerated = !!scene.previousImageUrl && !!scene.imageUrl;
+
   if (mode === "generation") {
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {isVideoReady && isVideoLoading ? (
+          {!imageJustRegenerated && isVideoReady && isVideoLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
               <span className="ml-2 text-xs text-muted-foreground">Caricamento video...</span>
             </div>
-          ) : isVideoReady && playableVideoUrl ? (
+          ) : !imageJustRegenerated && isVideoReady && playableVideoUrl ? (
             <div className="w-full h-full bg-black">
               <video src={playableVideoUrl} className="w-full h-full object-contain" autoPlay muted loop playsInline />
             </div>
           ) : scene.imageUrl ? (
-            <img src={scene.imageUrl} alt={`Scene ${index + 1}`} className="w-full h-full object-cover" />
+            <img
+              key={scene.imageUrl}
+              src={scene.imageUrl}
+              alt={`Scene ${index + 1}`}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="flex items-center justify-center h-full">
               {scene.imageStatus === "generating" ? (
