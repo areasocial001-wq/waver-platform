@@ -379,8 +379,9 @@ serve(async (req) => {
     console.log("No REPLICATE_API_KEY, using Lovable AI directly");
     const lovableImageUrl = await generateWithLovableAI(prompt, style, referenceImageUrl, aspectRatio);
     if (lovableImageUrl) {
+      const finalUrl = await persistDataUrlToStorage(lovableImageUrl, userId);
       return new Response(
-        JSON.stringify({ imageUrl: lovableImageUrl, success: true, provider: 'lovable-ai' }),
+        JSON.stringify({ imageUrl: finalUrl, success: true, provider: 'lovable-ai' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
