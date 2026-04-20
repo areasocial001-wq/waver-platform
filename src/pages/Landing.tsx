@@ -1063,7 +1063,7 @@ export default function Landing() {
             <span className="font-semibold bg-gradient-to-r from-[hsl(217,91%,60%)] to-[hsl(270,60%,55%)] bg-clip-text text-transparent">
               AI Production Hub
             </span>
-            <img src={studiobookLogo} alt="StudioBook Edizioni" className="h-12 w-auto object-contain bg-white/90 rounded px-2 py-1 ml-2" />
+            <img src={studiobookLogo} alt="StudioBook Edizioni" className="w-24 h-24 object-contain ml-2" />
           </div>
           <p>© {new Date().getFullYear()} AI Production Hub — StudioBook Edizioni. Tutti i diritti riservati.</p>
         </div>
