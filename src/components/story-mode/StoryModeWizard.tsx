@@ -950,8 +950,10 @@ export const StoryModeWizard = () => {
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
+        const prevV = scenes[index];
         scenes[index] = {
-          ...scenes[index],
+          ...prevV,
+          previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
           videoUrl,
           videoStatus: "completed",
           videoGeneratingStartedAt: undefined,
