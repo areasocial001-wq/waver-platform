@@ -2694,17 +2694,118 @@ export const StoryModeWizard = () => {
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
             <Button variant="outline" onClick={saveProject} disabled={isSaving}><Save className="w-4 h-4 mr-2" />Salva Bozza</Button>
             <Button variant="outline" onClick={exportScriptPDF}><FileText className="w-4 h-4 mr-2" />Esporta PDF</Button>
-            {/* Auto-regenerate error scenes */}
+            {/* Auto-regenerate error scenes — button + preview popover */}
             {(() => {
               const issues = failedOrMissingScenes(script.scenes);
-              return issues.length > 0 ? (
-                <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
-                  {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  {isGenerating && regenProgress
-                    ? `Rigenerando ${regenProgress.current + 1}/${regenProgress.total}…`
-                    : `Rigenera Scene Fallite (${issues.length})`}
-                </Button>
-              ) : null;
+              if (issues.length === 0) return null;
+
+              // Per-scene breakdown of which assets are missing/failed
+              const breakdown = issues.map(({ scene, index }) => {
+                const missing: { type: "image" | "audio" | "sfx" | "video"; reason: string }[] = [];
+                if (scene.imageStatus === "error") missing.push({ type: "image", reason: "errore" });
+                else if (!scene.imageUrl) missing.push({ type: "image", reason: "mancante" });
+                if (scene.audioStatus === "error") missing.push({ type: "audio", reason: "errore" });
+                else if (!scene.audioUrl) missing.push({ type: "audio", reason: "mancante" });
+                if (scene.sfxStatus === "error") missing.push({ type: "sfx", reason: "errore" });
+                else if (scene.sfxPrompt && !scene.sfxUrl) missing.push({ type: "sfx", reason: "mancante" });
+                if (scene.videoStatus === "error") missing.push({ type: "video", reason: "errore" });
+                else if (!scene.videoUrl) missing.push({ type: "video", reason: "mancante" });
+                return { sceneNumber: scene.sceneNumber, index, missing };
+              });
+
+              const iconFor = (t: string) => {
+                if (t === "image") return <Image className="w-3 h-3" />;
+                if (t === "audio") return <Volume2 className="w-3 h-3" />;
+                if (t === "sfx") return <AudioLines className="w-3 h-3" />;
+                return <Film className="w-3 h-3" />;
+              };
+
+              return (
+                <div className="flex items-center gap-1">
+                  <Button variant="destructive" onClick={handleAutoRegenerateErrors} disabled={isGenerating}>
+                    {isGenerating && regenProgress ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                    {isGenerating && regenProgress
+                      ? `Rigenerando ${regenProgress.current}/${regenProgress.total}…`
+                      : `Rigenera Scene Fallite (${issues.length})`}
+                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        disabled={isGenerating}
+                        title="Mostra dettaglio scene fallite"
+                        className="shrink-0"
+                      >
+                        <ListChecks className="w-4 h-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-80 p-0">
+                      <div className="p-3 border-b border-border">
+                        <p className="font-semibold text-sm flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-destructive" />
+                          {issues.length} scene con problemi
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Rigenera in batch (max {REGEN_CONCURRENCY} parallele, retry ×{REGEN_MAX_RETRIES}) o apri la singola scena.
+                        </p>
+                      </div>
+                      <ScrollArea className="max-h-72">
+                        <ul className="divide-y divide-border">
+                          {breakdown.map((b) => (
+                            <li key={b.sceneNumber} className="p-3 flex items-start justify-between gap-2 hover:bg-muted/40 transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold text-foreground">Scena {b.sceneNumber}</p>
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {b.missing.map((m, i) => (
+                                    <Badge
+                                      key={i}
+                                      variant={m.reason === "errore" ? "destructive" : "outline"}
+                                      className="gap-1 text-[10px] py-0 px-1.5 h-5"
+                                    >
+                                      {iconFor(m.type)}
+                                      <span className="capitalize">{m.type}</span>
+                                      <span className="opacity-70">· {m.reason}</span>
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 shrink-0"
+                                onClick={() => {
+                                  setEditingSceneIndex(b.index);
+                                  // Scroll the scene card into view
+                                  setTimeout(() => {
+                                    const cards = document.querySelectorAll("[data-scene-card]");
+                                    cards[b.index]?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                  }, 50);
+                                }}
+                                title="Apri questa scena"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </ScrollArea>
+                      <div className="p-2 border-t border-border bg-muted/30">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="w-full"
+                          onClick={handleAutoRegenerateErrors}
+                          disabled={isGenerating}
+                        >
+                          <Wand2 className="w-3.5 h-3.5 mr-2" />
+                          Rigenera tutte ({issues.length})
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              );
             })()}
             {/* Regenerate non-compliant aspect-ratio images */}
             {(() => {
