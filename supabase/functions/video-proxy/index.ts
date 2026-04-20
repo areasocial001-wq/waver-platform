@@ -144,7 +144,25 @@ serve(async (req) => {
     });
 
     if (!videoResponse.ok && videoResponse.status !== 206) {
-      throw new Error(`Failed to fetch video: ${videoResponse.status}`);
+      const errorText = await videoResponse.text().catch(() => "");
+      console.error("Upstream fetch failed:", videoResponse.status, errorText.slice(0, 200));
+      // Expired/forbidden source URI (common for Google generative video files after TTL)
+      const isExpired = videoResponse.status === 403 || videoResponse.status === 404 || videoResponse.status === 410;
+      return new Response(
+        JSON.stringify({
+          error: isExpired ? "VIDEO_EXPIRED" : "UPSTREAM_ERROR",
+          fallback: true,
+          upstreamStatus: videoResponse.status,
+          message: isExpired
+            ? "The source video URL has expired. Please regenerate the video."
+            : `Upstream returned ${videoResponse.status}`,
+        }),
+        {
+          // Return 200 so client SDK can read the JSON body instead of throwing
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
 
     // Build response headers
