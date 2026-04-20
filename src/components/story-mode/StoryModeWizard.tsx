@@ -846,9 +846,10 @@ export const StoryModeWizard = () => {
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
         const scenes = [...script.scenes];
         const prev = scenes[index];
+        const newHistory = pushVersionHistory(prev, "image", prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : undefined, prev.lastImageCorrectionNote);
         scenes[index] = {
           ...prev,
-          // Keep previous image as backup so the user can compare or rollback.
+          // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
           previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
           imageUrl: newImageUrl,
           imageStatus: "completed",
@@ -856,6 +857,7 @@ export const StoryModeWizard = () => {
           imageHeight: aspectCheck?.height,
           imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
           lastImageCorrectionNote: note || prev.lastImageCorrectionNote,
+          versionHistory: newHistory,
         };
         setScript({ ...script, scenes });
         if (aspectCheck?.mismatch) {
@@ -876,17 +878,20 @@ export const StoryModeWizard = () => {
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevA = scenes[index];
+        const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
         scenes[index] = {
           ...prevA,
           previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
           audioUrl: storageUrl,
           audioStatus: "completed",
+          versionHistory: newHistoryA,
         };
         setScript({ ...script, scenes });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
         const startedAt = Date.now();
+        const noteV = (correctionNote || "").trim();
         const scenes0 = [...script.scenes];
         scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
         setScript({ ...script, scenes: scenes0 });
@@ -895,9 +900,12 @@ export const StoryModeWizard = () => {
           : input.videoAspectRatio === "16:9"
           ? ", horizontal 16:9 cinematic frame"
           : "";
+        const guidedVideoPrompt = noteV
+          ? `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}. IMPORTANT correction: ${noteV}`
+          : `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}`;
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
-            prompt: `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}`,
+            prompt: guidedVideoPrompt,
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
             aspect_ratio: input.videoAspectRatio,
@@ -973,6 +981,7 @@ export const StoryModeWizard = () => {
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
         const prevV = scenes[index];
+        const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
         scenes[index] = {
           ...prevV,
           previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
@@ -982,12 +991,14 @@ export const StoryModeWizard = () => {
           videoWidth: videoCheck?.width,
           videoHeight: videoCheck?.height,
           videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+          lastVideoCorrectionNote: noteV || prevV.lastVideoCorrectionNote,
+          versionHistory: newHistoryV,
         };
         setScript({ ...script, scenes });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Video scena ${index + 1} rigenerato`);
+          toast.success(`Video scena ${index + 1} rigenerato${noteV ? " con correzione" : ""}`);
         }
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
@@ -1003,11 +1014,13 @@ export const StoryModeWizard = () => {
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevS = scenes[index];
+        const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
         scenes[index] = {
           ...prevS,
           previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
           sfxUrl: storageUrl,
           sfxStatus: "completed",
+          versionHistory: newHistoryS,
         };
         setScript({ ...script, scenes });
         toast.success(`SFX scena ${index + 1} rigenerato`);
