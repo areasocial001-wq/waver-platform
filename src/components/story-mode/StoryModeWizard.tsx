@@ -1985,11 +1985,13 @@ export const StoryModeWizard = () => {
         setTimeout(() => saveProject(), 500);
       } else {
         toast.error("Rimontaggio non riuscito — il backend non ha restituito un video unito. Riprova fra qualche secondo.");
+        setRenderStatus("failed");
         setStep("complete");
       }
     } catch (err: any) {
       console.error("Reassemble error:", err);
       toast.error("Errore nel rimontaggio: " + (err.message || "sconosciuto"));
+      setRenderStatus("failed");
     } finally {
       setIsGenerating(false);
     }
@@ -2442,12 +2444,16 @@ export const StoryModeWizard = () => {
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {isRenderActive ? "Render finale in corso…" : "Rendering finale fallito"}
+                    {renderStatus === "starting"
+                      ? "Preparazione montaggio…"
+                      : isRenderActive ? "Render finale in corso…" : "Rendering finale fallito"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {isRenderActive
-                      ? `${sceneCount} scene · ${isHD ? "Alta qualità" : "Qualità standard"} · aggiornamento automatico appena pronto`
-                      : "Puoi riprovare con il bottone Rimonta Video Finale."}
+                    {renderStatus === "starting"
+                      ? "Verifica asset e invio a Shotstack…"
+                      : isRenderActive
+                        ? `${sceneCount} scene · ${isHD ? "Alta qualità" : "Qualità standard"} · aggiornamento automatico appena pronto`
+                        : "Puoi riprovare con il bottone Rimonta Video Finale."}
                   </p>
                 </div>
               </div>
