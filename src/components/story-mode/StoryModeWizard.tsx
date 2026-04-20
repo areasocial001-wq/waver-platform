@@ -334,6 +334,7 @@ export const StoryModeWizard = () => {
     ? Math.min(95, (renderElapsed / estimatedRenderSeconds) * 100)
     : renderStatus === "completed" ? 100 : 0;
   const renderRemainingSeconds = Math.max(0, estimatedRenderSeconds - renderElapsed);
+  const isRenderActive = renderStatus === "processing" || !!pendingRenderId;
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
@@ -2409,6 +2410,51 @@ export const StoryModeWizard = () => {
           </Button>
         </div>
       </div>
+
+      {(isRenderActive || (renderStatus === "failed" && !finalVideoUrl)) && (
+        <Card className="border-primary/30 bg-primary/5 sticky top-3 z-20 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-primary/10">
+          <CardContent className="pt-4 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                {isRenderActive ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-primary shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {isRenderActive ? "Render finale in corso…" : "Rendering finale fallito"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isRenderActive
+                      ? `${sceneCount} scene · ${isHD ? "Alta qualità" : "Qualità standard"} · aggiornamento automatico appena pronto`
+                      : "Puoi riprovare con il bottone Rimonta Video Finale."}
+                  </p>
+                </div>
+              </div>
+
+              <Badge variant={isRenderActive ? "secondary" : "destructive"} className="shrink-0">
+                {isRenderActive ? "Rendering" : "Errore"}
+              </Badge>
+            </div>
+
+            {isRenderActive && (
+              <>
+                <Progress value={renderProgressPct} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground gap-3 flex-wrap">
+                  <span>{Math.round(renderProgressPct)}% completato</span>
+                  <span className="flex items-center gap-1">
+                    <Timer className="w-3 h-3" />
+                    {renderRemainingSeconds > 60
+                      ? `~${Math.ceil(renderRemainingSeconds / 60)} min rimanenti`
+                      : `~${renderRemainingSeconds}s rimanenti`}
+                  </span>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Projects panel */}
       {showProjectList && (
