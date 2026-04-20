@@ -545,10 +545,13 @@ serve(async (req) => {
             clip.transform = effectsResult.transform;
           }
 
-          // Add transition effect between clips (per-scene or global)
+          // Add transition effect between clips (per-scene or global).
+          // Default to crossfade when no per-scene transition is provided so all
+          // scenes get a consistent blend (instead of a hard cut / frozen frame).
           const sceneTransition = transitions?.[i];
-          const transType = sceneTransition?.type || transition;
-          const transDur = sceneTransition?.duration || transitionDuration;
+          const rawTransType = sceneTransition?.type || transition;
+          const transType = (!rawTransType || rawTransType === 'none') ? 'crossfade' : rawTransType;
+          const transDur = sceneTransition?.duration ?? transitionDuration ?? 0.5;
           const shotstackTransition = mapTransition(transType);
           
           if (shotstackTransition && i > 0) {
@@ -570,7 +573,11 @@ serve(async (req) => {
                 in: shotstackTransition.in,
               };
             }
-            // Overlap clips so the transition actually blends them
+            // Overlap clips so transitions blend smoothly.
+            // CRITICAL: also overlap for fade-to-black variants — otherwise the prev
+            // clip ends, holds its last frame, then the next clip fades in, producing
+            // a "frozen image" pause. Overlapping makes the fade-out of prev and
+            // fade-in of next happen simultaneously over the transition window.
             clip.start = Math.max(0, currentStart - transDur);
           } else if (effectsResult.transition) {
             clip.transition = effectsResult.transition;
