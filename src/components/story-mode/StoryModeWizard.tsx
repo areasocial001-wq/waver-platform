@@ -3212,7 +3212,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type) => regenerateSceneAsset(idx, type)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onKeepNew={(type) => keepNewAsset(idx, type)}
+                onRollback={(type) => rollbackAsset(idx, type)}
                 onUnstuck={() => unstuckScene(idx)}
               />
             ))}
