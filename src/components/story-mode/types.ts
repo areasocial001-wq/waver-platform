@@ -34,14 +34,37 @@ export interface StoryScene {
   videoHeight?: number;
   /** Set when measured video aspect ratio deviates >5% from requested */
   videoAspectWarning?: string;
-  /** Previous asset URLs kept for visual before/after comparison after regeneration */
+  /** Previous asset URLs kept for visual before/after comparison after regeneration (legacy single-slot) */
   previousImageUrl?: string;
   previousVideoUrl?: string;
   previousAudioUrl?: string;
   previousSfxUrl?: string;
-  /** Last correction note used for image regeneration (sticky for re-edits) */
+  /** Last correction notes (sticky for re-edits) */
   lastImageCorrectionNote?: string;
+  lastVideoCorrectionNote?: string;
+  /** Full version history per asset — newest first. Capped at MAX_VERSION_HISTORY entries. */
+  versionHistory?: AssetVersionHistory;
 }
+
+export interface AssetVersion {
+  /** Stable id for selection */
+  id: string;
+  /** Asset URL */
+  url: string;
+  /** Epoch ms when this version was created */
+  createdAt: number;
+  /** Optional correction note used to produce this version (image/video) */
+  correctionNote?: string;
+}
+
+export interface AssetVersionHistory {
+  image?: AssetVersion[];
+  video?: AssetVersion[];
+  audio?: AssetVersion[];
+  sfx?: AssetVersion[];
+}
+
+export const MAX_VERSION_HISTORY = 10;
 
 export interface StoryScript {
   title: string;

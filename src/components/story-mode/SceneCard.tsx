@@ -11,9 +11,10 @@ import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
   Image, Eye, Download, Mic, Unlock, AlertTriangle, Wand2, Check, Undo2,
+  History, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StoryScene, TransitionType } from "./types";
+import { StoryScene, TransitionType, AssetVersion } from "./types";
 import { useAuthVideo } from "@/hooks/useAuthVideo";
 
 
@@ -30,6 +31,34 @@ const TRANSITIONS: { value: TransitionType; label: string; icon: string }[] = [
 const CAMERA_MOVEMENTS = [
   "static", "slow_zoom_in", "slow_zoom_out", "pan_left",
   "pan_right", "tilt_up", "tilt_down", "dolly_forward",
+];
+
+// Quick correction-note presets shown as clickable chips inside the regen popovers.
+// Clicking a chip appends its text to the current note (with a comma separator).
+const IMAGE_CORRECTION_PRESETS = [
+  "mantieni stesso outfit",
+  "stessa identità del personaggio",
+  "stessa angolazione",
+  "cambia angolazione",
+  "più luce naturale",
+  "luce più drammatica",
+  "primo piano",
+  "campo lungo",
+  "rimuovi elementi sullo sfondo",
+  "colori più caldi",
+  "colori più freddi",
+  "espressione più seria",
+];
+
+const VIDEO_CORRECTION_PRESETS = [
+  "meno zoom, più stabile",
+  "movimento camera più lento",
+  "movimento camera più veloce",
+  "camera fissa",
+  "evita sbalzi bruschi",
+  "transizione più fluida",
+  "mantieni soggetto al centro",
+  "evita morphing del volto",
 ];
 
 export interface VoiceOption {
@@ -54,7 +83,9 @@ interface SceneCardProps {
   onDelete: () => void;
   onRegenerate?: (type: "image" | "audio" | "video" | "sfx", opts?: { correctionNote?: string }) => void;
   onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
-  onRollback?: (type: "image" | "audio" | "video" | "sfx") => void;
+  /** When `versionUrl` is provided, restore that specific entry from versionHistory. */
+  onRollback?: (type: "image" | "audio" | "video" | "sfx", versionUrl?: string) => void;
+  onDeleteVersion?: (type: "image" | "audio" | "video" | "sfx", versionUrl: string) => void;
   onUnstuck?: () => void;
   onDragStart?: () => void;
   onDragOver?: (e: React.DragEvent) => void;
@@ -65,12 +96,15 @@ interface SceneCardProps {
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
-  onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onUnstuck,
+  onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onDeleteVersion, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
-  // Local state for the correction note popover (image regen with guidance).
-  const [correctionNote, setCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
-  const [notePopoverOpen, setNotePopoverOpen] = useState(false);
+  // Local state for the correction note popovers (image + video regen with guidance).
+  const [imageCorrectionNote, setImageCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
+  const [videoCorrectionNote, setVideoCorrectionNote] = useState(scene.lastVideoCorrectionNote || "");
+  const [imageNoteOpen, setImageNoteOpen] = useState(false);
+  const [videoNoteOpen, setVideoNoteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
   const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
@@ -184,90 +218,53 @@ export const SceneCard = ({
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
           {onRegenerate && (
             <div className="flex gap-1 flex-wrap pt-1 border-t border-border/30">
-              {/* Image regen with optional correction note popover */}
-              <Popover open={notePopoverOpen} onOpenChange={setNotePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-[10px] gap-1"
-                    disabled={scene.imageStatus === "generating"}
-                    title="Rigenera immagine (con nota di correzione opzionale)"
-                  >
-                    <RefreshCw className={cn("w-2.5 h-2.5", scene.imageStatus === "generating" && "animate-spin")} />
-                    <Image className="w-2.5 h-2.5" />
-                    <Wand2 className="w-2.5 h-2.5 opacity-60" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-3 space-y-2" align="start">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Nota di correzione (opzionale)</Label>
-                    <p className="text-[10px] text-muted-foreground leading-tight">
-                      Verrà appesa al prompt originale per guidare la rigenerazione. Es: "la ragazza indossa un vestito ocra lungo, non pantaloni".
-                    </p>
-                  </div>
-                  <Textarea
-                    value={correctionNote}
-                    onChange={e => setCorrectionNote(e.target.value)}
-                    placeholder="Cosa correggere rispetto al risultato precedente..."
-                    className="text-xs min-h-[70px]"
-                    autoFocus
-                  />
-                  <div className="flex justify-between gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => { setCorrectionNote(""); }}
-                    >
-                      Pulisci
-                    </Button>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => {
-                          setNotePopoverOpen(false);
-                          onRegenerate("image");
-                          toast.info(`Rigenero immagine scena ${scene.sceneNumber}`);
-                        }}
-                      >
-                        Senza nota
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs gap-1"
-                        onClick={() => {
-                          const note = correctionNote.trim();
-                          setNotePopoverOpen(false);
-                          onRegenerate("image", note ? { correctionNote: note } : undefined);
-                          toast.info(
-                            note
-                              ? `Rigenero scena ${scene.sceneNumber} con correzione`
-                              : `Rigenero immagine scena ${scene.sceneNumber}`,
-                          );
-                        }}
-                      >
-                        <Wand2 className="w-3 h-3" />
-                        Rigenera
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              {/* Image regen with optional correction note popover (chip presets supported) */}
+              <CorrectionNotePopover
+                open={imageNoteOpen}
+                onOpenChange={setImageNoteOpen}
+                note={imageCorrectionNote}
+                setNote={setImageCorrectionNote}
+                presets={IMAGE_CORRECTION_PRESETS}
+                title="Nota di correzione immagine"
+                placeholder='Es: "la ragazza indossa un vestito ocra lungo, non pantaloni"'
+                disabled={scene.imageStatus === "generating"}
+                spinning={scene.imageStatus === "generating"}
+                icon={<Image className="w-2.5 h-2.5" />}
+                onConfirm={(note) => {
+                  setImageNoteOpen(false);
+                  onRegenerate("image", note ? { correctionNote: note } : undefined);
+                  toast.info(
+                    note
+                      ? `Rigenero immagine scena ${scene.sceneNumber} con correzione`
+                      : `Rigenero immagine scena ${scene.sceneNumber}`,
+                  );
+                }}
+              />
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 px-2 text-[10px] gap-1"
-                onClick={() => { onRegenerate("video"); toast.info(`Rigenero video scena ${scene.sceneNumber}`); }}
+              {/* Video regen with optional correction note popover (camera-movement guidance) */}
+              <CorrectionNotePopover
+                open={videoNoteOpen}
+                onOpenChange={setVideoNoteOpen}
+                note={videoCorrectionNote}
+                setNote={setVideoCorrectionNote}
+                presets={VIDEO_CORRECTION_PRESETS}
+                title="Nota di correzione video"
+                placeholder='Es: "meno zoom, più stabile, evita morphing"'
                 disabled={scene.videoStatus === "generating" || !scene.imageUrl}
-                title={!scene.imageUrl ? "Genera prima l'immagine" : "Rigenera video"}
-              >
-                <RefreshCw className={cn("w-2.5 h-2.5", scene.videoStatus === "generating" && "animate-spin")} />
-                <Eye className="w-2.5 h-2.5" />
-              </Button>
+                disabledTitle={!scene.imageUrl ? "Genera prima l'immagine" : undefined}
+                spinning={scene.videoStatus === "generating"}
+                icon={<Eye className="w-2.5 h-2.5" />}
+                onConfirm={(note) => {
+                  setVideoNoteOpen(false);
+                  onRegenerate("video", note ? { correctionNote: note } : undefined);
+                  toast.info(
+                    note
+                      ? `Rigenero video scena ${scene.sceneNumber} con correzione`
+                      : `Rigenero video scena ${scene.sceneNumber}`,
+                  );
+                }}
+              />
+
               <Button
                 variant="ghost"
                 size="sm"
@@ -291,6 +288,30 @@ export const SceneCard = ({
                   <RefreshCw className={cn("w-2.5 h-2.5", scene.sfxStatus === "generating" && "animate-spin")} />
                   🔊
                 </Button>
+              )}
+
+              {/* Version history popover — appears when at least one asset has past versions */}
+              {hasAnyVersionHistory(scene) && (
+                <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[10px] gap-1 ml-auto text-primary"
+                      title="Storico versioni rigenerate"
+                    >
+                      <History className="w-2.5 h-2.5" />
+                      Storico
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-96 p-3 max-h-[60vh] overflow-y-auto" align="end">
+                    <VersionHistoryList
+                      scene={scene}
+                      onRollback={onRollback}
+                      onDeleteVersion={onDeleteVersion}
+                    />
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           )}
@@ -653,6 +674,226 @@ const AssetPreview = ({
       ) : (
         <audio src={url} controls className="w-full h-8" />
       )}
+    </div>
+  );
+};
+
+/**
+ * Reusable correction-note popover used for both image and video regen.
+ * Includes:
+ *  - a freeform textarea (sticky last note via parent state),
+ *  - a row of clickable "preset chips" appended to the note on click,
+ *  - "Senza nota" + "Rigenera" actions (with optional custom icons).
+ */
+const CorrectionNotePopover = ({
+  open, onOpenChange, note, setNote, presets, title, placeholder,
+  disabled, disabledTitle, spinning, icon, onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  note: string;
+  setNote: (v: string) => void;
+  presets: string[];
+  title: string;
+  placeholder: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  spinning?: boolean;
+  icon: React.ReactNode;
+  onConfirm: (note: string) => void;
+}) => {
+  const appendChip = (chip: string) => {
+    const trimmed = note.trim();
+    if (!trimmed) { setNote(chip); return; }
+    if (trimmed.toLowerCase().includes(chip.toLowerCase())) return; // avoid duplicate
+    setNote(trimmed.endsWith(",") || trimmed.endsWith(".") ? `${trimmed} ${chip}` : `${trimmed}, ${chip}`);
+  };
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px] gap-1"
+          disabled={disabled}
+          title={disabledTitle || `${title} (con nota di correzione opzionale)`}
+        >
+          <RefreshCw className={cn("w-2.5 h-2.5", spinning && "animate-spin")} />
+          {icon}
+          <Wand2 className="w-2.5 h-2.5 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 p-3 space-y-2" align="start">
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold">{title} (opzionale)</Label>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            Verrà appesa al prompt originale per guidare la rigenerazione.
+          </p>
+        </div>
+        {/* Quick preset chips */}
+        <div className="flex flex-wrap gap-1">
+          {presets.map((chip) => (
+            <button
+              key={chip}
+              type="button"
+              onClick={() => appendChip(chip)}
+              className="text-[10px] px-2 py-0.5 rounded-full border border-border bg-muted/30 hover:bg-primary/10 hover:border-primary/40 transition-colors"
+              title="Aggiungi alla nota"
+            >
+              + {chip}
+            </button>
+          ))}
+        </div>
+        <Textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={placeholder}
+          className="text-xs min-h-[70px]"
+          autoFocus
+        />
+        <div className="flex justify-between gap-2">
+          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setNote("")}>Pulisci</Button>
+          <div className="flex gap-1">
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onConfirm("")}>Senza nota</Button>
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => onConfirm(note.trim())}>
+              <Wand2 className="w-3 h-3" />
+              Rigenera
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+const hasAnyVersionHistory = (scene: StoryScene): boolean => {
+  const h = scene.versionHistory;
+  if (!h) return false;
+  return !!(h.image?.length || h.video?.length || h.audio?.length || h.sfx?.length);
+};
+
+const ASSET_LABELS: Record<"image" | "video" | "audio" | "sfx", string> = {
+  image: "🖼️ Immagini",
+  video: "🎬 Video",
+  audio: "🎙️ Audio",
+  sfx: "🔊 SFX",
+};
+
+/**
+ * Lists every past version (per asset type) saved in `scene.versionHistory`.
+ * Each entry shows a thumbnail/preview, when it was created, and the optional
+ * correction note. From here the user can restore any past version (which pushes
+ * the current one back into the stack) or permanently delete an entry.
+ */
+const VersionHistoryList = ({
+  scene,
+  onRollback,
+  onDeleteVersion,
+}: {
+  scene: StoryScene;
+  onRollback?: (type: "image" | "audio" | "video" | "sfx", versionUrl?: string) => void;
+  onDeleteVersion?: (type: "image" | "audio" | "video" | "sfx", versionUrl: string) => void;
+}) => {
+  const types: ("image" | "video" | "audio" | "sfx")[] = ["image", "video", "audio", "sfx"];
+  const sections = types
+    .map((t) => ({ type: t, versions: scene.versionHistory?.[t] || [] }))
+    .filter((s) => s.versions.length > 0);
+
+  if (!sections.length) return <div className="text-xs text-muted-foreground">Nessuna versione precedente.</div>;
+
+  const fmtTime = (ts: number) => {
+    const diff = Date.now() - ts;
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "ora";
+    if (m < 60) return `${m}m fa`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h fa`;
+    return `${Math.floor(h / 24)}g fa`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-1.5">
+        <History className="w-3.5 h-3.5 text-primary" />
+        <span className="text-xs font-semibold">Storico versioni</span>
+      </div>
+      {sections.map(({ type, versions }) => (
+        <div key={type} className="space-y-1.5">
+          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+            {ASSET_LABELS[type]} ({versions.length})
+          </div>
+          <div className="space-y-1.5">
+            {versions.map((v) => (
+              <VersionRow
+                key={v.id}
+                version={v}
+                type={type}
+                fmtTime={fmtTime}
+                onRestore={() => onRollback?.(type, v.url)}
+                onDelete={() => onDeleteVersion?.(type, v.url)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const VersionRow = ({
+  version, type, fmtTime, onRestore, onDelete,
+}: {
+  version: AssetVersion;
+  type: "image" | "video" | "audio" | "sfx";
+  fmtTime: (ts: number) => string;
+  onRestore: () => void;
+  onDelete: () => void;
+}) => {
+  const isVisual = type === "image" || type === "video";
+  return (
+    <div className="flex items-center gap-2 p-1.5 rounded-md border border-border/50 bg-muted/20 hover:bg-muted/40 transition-colors">
+      <div className="w-12 h-12 shrink-0 rounded overflow-hidden bg-black/30 flex items-center justify-center">
+        {type === "image" ? (
+          <img src={version.url} alt="version" className="w-full h-full object-cover" />
+        ) : type === "video" ? (
+          <video src={version.url} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+        ) : (
+          <Volume2 className="w-4 h-4 text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] text-muted-foreground">{fmtTime(version.createdAt)}</div>
+        {version.correctionNote ? (
+          <div className="text-[10px] truncate" title={version.correctionNote}>
+            <Wand2 className="w-2.5 h-2.5 inline mr-0.5 text-primary" />
+            {version.correctionNote}
+          </div>
+        ) : (
+          <div className="text-[10px] text-muted-foreground/60 italic">senza nota</div>
+        )}
+        {!isVisual && <audio src={version.url} controls className="w-full h-6 mt-0.5" />}
+      </div>
+      <div className="flex flex-col gap-0.5 shrink-0">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 px-2 text-[10px] gap-1"
+          onClick={onRestore}
+          title="Ripristina questa versione"
+        >
+          <Undo2 className="w-2.5 h-2.5" />
+          Usa
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-[10px] gap-1 text-destructive hover:bg-destructive/10"
+          onClick={onDelete}
+          title="Elimina questa versione dallo storico"
+        >
+          <X className="w-2.5 h-2.5" />
+        </Button>
+      </div>
     </div>
   );
 };

@@ -24,7 +24,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { jsPDF } from "jspdf";
 import { cn } from "@/lib/utils";
-import { StoryScene, StoryScript, StoryStep, StoryModeInput } from "./types";
+import { StoryScene, StoryScript, StoryStep, StoryModeInput, AssetVersion, AssetVersionHistory, MAX_VERSION_HISTORY } from "./types";
 import { SceneCard } from "./SceneCard";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
@@ -780,8 +780,30 @@ export const StoryModeWizard = () => {
     setScript({ ...script, scenes });
   };
 
+  // Push a previous asset URL into the per-scene version history (newest first, capped).
+  const pushVersionHistory = (
+    scene: StoryScene,
+    type: "image" | "audio" | "video" | "sfx",
+    prevUrl: string | undefined,
+    correctionNote?: string,
+  ): AssetVersionHistory => {
+    const history: AssetVersionHistory = { ...(scene.versionHistory || {}) };
+    if (!prevUrl) return history;
+    const entry: AssetVersion = {
+      id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      url: prevUrl,
+      createdAt: Date.now(),
+      correctionNote,
+    };
+    const list = history[type] || [];
+    // Avoid duplicate entries for the same url (e.g. rapid double-regens with same fallback)
+    const filtered = list.filter(v => v.url !== prevUrl);
+    history[type] = [entry, ...filtered].slice(0, MAX_VERSION_HISTORY);
+    return history;
+  };
+
   // Regenerate single scene asset
-  // `correctionNote` (optional, image only) is appended to the original prompt to guide the regen.
+  // `correctionNote` (optional, image+video) is appended to the original prompt to guide the regen.
   const regenerateSceneAsset = async (
     index: number,
     type: "image" | "audio" | "video" | "sfx",
@@ -824,9 +846,10 @@ export const StoryModeWizard = () => {
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
         const scenes = [...script.scenes];
         const prev = scenes[index];
+        const newHistory = pushVersionHistory(prev, "image", prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : undefined, prev.lastImageCorrectionNote);
         scenes[index] = {
           ...prev,
-          // Keep previous image as backup so the user can compare or rollback.
+          // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
           previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
           imageUrl: newImageUrl,
           imageStatus: "completed",
@@ -834,6 +857,7 @@ export const StoryModeWizard = () => {
           imageHeight: aspectCheck?.height,
           imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
           lastImageCorrectionNote: note || prev.lastImageCorrectionNote,
+          versionHistory: newHistory,
         };
         setScript({ ...script, scenes });
         if (aspectCheck?.mismatch) {
@@ -854,17 +878,20 @@ export const StoryModeWizard = () => {
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevA = scenes[index];
+        const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
         scenes[index] = {
           ...prevA,
           previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
           audioUrl: storageUrl,
           audioStatus: "completed",
+          versionHistory: newHistoryA,
         };
         setScript({ ...script, scenes });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
         const startedAt = Date.now();
+        const noteV = (correctionNote || "").trim();
         const scenes0 = [...script.scenes];
         scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
         setScript({ ...script, scenes: scenes0 });
@@ -873,9 +900,12 @@ export const StoryModeWizard = () => {
           : input.videoAspectRatio === "16:9"
           ? ", horizontal 16:9 cinematic frame"
           : "";
+        const guidedVideoPrompt = noteV
+          ? `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}. IMPORTANT correction: ${noteV}`
+          : `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}`;
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
-            prompt: `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}`,
+            prompt: guidedVideoPrompt,
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
             aspect_ratio: input.videoAspectRatio,
@@ -951,6 +981,7 @@ export const StoryModeWizard = () => {
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
         const scenes = [...script.scenes];
         const prevV = scenes[index];
+        const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
         scenes[index] = {
           ...prevV,
           previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
@@ -960,12 +991,14 @@ export const StoryModeWizard = () => {
           videoWidth: videoCheck?.width,
           videoHeight: videoCheck?.height,
           videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+          lastVideoCorrectionNote: noteV || prevV.lastVideoCorrectionNote,
+          versionHistory: newHistoryV,
         };
         setScript({ ...script, scenes });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Video scena ${index + 1} rigenerato`);
+          toast.success(`Video scena ${index + 1} rigenerato${noteV ? " con correzione" : ""}`);
         }
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
@@ -981,11 +1014,13 @@ export const StoryModeWizard = () => {
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevS = scenes[index];
+        const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
         scenes[index] = {
           ...prevS,
           previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
           sfxUrl: storageUrl,
           sfxStatus: "completed",
+          versionHistory: newHistoryS,
         };
         setScript({ ...script, scenes });
         toast.success(`SFX scena ${index + 1} rigenerato`);
@@ -1016,35 +1051,83 @@ export const StoryModeWizard = () => {
     toast.success(`Nuovo ${type} scena ${index + 1} confermato`);
   };
 
-  // Roll back to the previous version: swap current with previous and clear backup.
-  const rollbackAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+  // Roll back to a previous version. If `versionUrl` is given, restore that specific entry from history.
+  // Otherwise, restore the legacy single-slot `previousXxxUrl`.
+  // The currently active asset is pushed onto the history stack so it's not lost (round-trip safe).
+  const rollbackAsset = (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    versionUrl?: string,
+  ) => {
     if (!script) return;
     const scenes = [...script.scenes];
     const s = { ...scenes[index] };
-    if (type === "image" && s.previousImageUrl) {
-      s.imageUrl = s.previousImageUrl;
+    let targetUrl: string | undefined;
+    let currentUrl: string | undefined;
+
+    if (type === "image") currentUrl = s.imageUrl;
+    else if (type === "audio") currentUrl = s.audioUrl;
+    else if (type === "video") currentUrl = s.videoUrl;
+    else currentUrl = s.sfxUrl;
+
+    if (versionUrl) {
+      targetUrl = versionUrl;
+    } else {
+      if (type === "image") targetUrl = s.previousImageUrl;
+      else if (type === "audio") targetUrl = s.previousAudioUrl;
+      else if (type === "video") targetUrl = s.previousVideoUrl;
+      else targetUrl = s.previousSfxUrl;
+    }
+    if (!targetUrl) return;
+
+    // Push current asset to history before swapping (so it can be restored back).
+    s.versionHistory = pushVersionHistory(s, type, currentUrl);
+    // Remove the restored entry from history (avoid duplicate of "current").
+    if (s.versionHistory[type]) {
+      s.versionHistory[type] = s.versionHistory[type]!.filter(v => v.url !== targetUrl);
+    }
+
+    if (type === "image") {
+      s.imageUrl = targetUrl;
       delete s.previousImageUrl;
       delete s.imageAspectWarning;
       s.imageWidth = undefined;
       s.imageHeight = undefined;
-    } else if (type === "audio" && s.previousAudioUrl) {
-      s.audioUrl = s.previousAudioUrl;
+    } else if (type === "audio") {
+      s.audioUrl = targetUrl;
       delete s.previousAudioUrl;
-    } else if (type === "video" && s.previousVideoUrl) {
-      s.videoUrl = s.previousVideoUrl;
+    } else if (type === "video") {
+      s.videoUrl = targetUrl;
       delete s.previousVideoUrl;
       delete s.videoAspectWarning;
       s.videoWidth = undefined;
       s.videoHeight = undefined;
-    } else if (type === "sfx" && s.previousSfxUrl) {
-      s.sfxUrl = s.previousSfxUrl;
-      delete s.previousSfxUrl;
     } else {
-      return;
+      s.sfxUrl = targetUrl;
+      delete s.previousSfxUrl;
     }
     scenes[index] = s;
     setScript({ ...script, scenes });
-    toast.info(`Versione precedente ${type} scena ${index + 1} ripristinata`);
+    toast.info(`Versione ${type} scena ${index + 1} ripristinata`);
+  };
+
+  // Permanently delete a specific entry from the version history.
+  const deleteVersion = (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    versionUrl: string,
+  ) => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (!s.versionHistory?.[type]) return;
+    s.versionHistory = {
+      ...s.versionHistory,
+      [type]: s.versionHistory[type]!.filter(v => v.url !== versionUrl),
+    };
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.success(`Versione ${type} eliminata dallo storico`);
   };
 
   const renderingMultiplier = (() => {
@@ -2707,7 +2790,8 @@ export const StoryModeWizard = () => {
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
-                onRollback={(type) => rollbackAsset(idx, type)}
+                onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
+                onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
               />
             ))}
           </div>
@@ -3027,7 +3111,8 @@ export const StoryModeWizard = () => {
                 onDelete={() => {}}
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
-                onRollback={(type) => rollbackAsset(idx, type)}
+                onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
+                onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
                 onUnstuck={() => unstuckScene(idx)}
               />
             ))}
@@ -3214,7 +3299,8 @@ export const StoryModeWizard = () => {
                 onDelete={() => {}}
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
-                onRollback={(type) => rollbackAsset(idx, type)}
+                onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
+                onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
                 onUnstuck={() => unstuckScene(idx)}
               />
             ))}
