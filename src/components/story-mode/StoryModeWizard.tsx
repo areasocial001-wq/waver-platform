@@ -1002,7 +1002,51 @@ export const StoryModeWizard = () => {
     }
   };
 
-  // Quality/FPS rendering multiplier
+  // Discard the previous (backup) version of an asset, keeping the new one as final.
+  const keepNewAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (type === "image") delete s.previousImageUrl;
+    else if (type === "audio") delete s.previousAudioUrl;
+    else if (type === "video") delete s.previousVideoUrl;
+    else delete s.previousSfxUrl;
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.success(`Nuovo ${type} scena ${index + 1} confermato`);
+  };
+
+  // Roll back to the previous version: swap current with previous and clear backup.
+  const rollbackAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (type === "image" && s.previousImageUrl) {
+      s.imageUrl = s.previousImageUrl;
+      delete s.previousImageUrl;
+      delete s.imageAspectWarning;
+      s.imageWidth = undefined;
+      s.imageHeight = undefined;
+    } else if (type === "audio" && s.previousAudioUrl) {
+      s.audioUrl = s.previousAudioUrl;
+      delete s.previousAudioUrl;
+    } else if (type === "video" && s.previousVideoUrl) {
+      s.videoUrl = s.previousVideoUrl;
+      delete s.previousVideoUrl;
+      delete s.videoAspectWarning;
+      s.videoWidth = undefined;
+      s.videoHeight = undefined;
+    } else if (type === "sfx" && s.previousSfxUrl) {
+      s.sfxUrl = s.previousSfxUrl;
+      delete s.previousSfxUrl;
+    } else {
+      return;
+    }
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.info(`Versione precedente ${type} scena ${index + 1} ripristinata`);
+  };
+
   const renderingMultiplier = (() => {
     const qMul = input.videoQuality === "fhd" ? 1.8 : input.videoQuality === "sd" ? 0.6 : 1;
     const fMul = input.videoFps === "60" ? 1.5 : input.videoFps === "30" ? 1.1 : 1;
