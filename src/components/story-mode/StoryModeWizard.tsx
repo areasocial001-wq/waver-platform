@@ -186,6 +186,60 @@ export const StoryModeWizard = () => {
   const cancelRef = useRef(false);
   const recoveryAttemptsRef = useRef(0);
 
+  const resolveRenderVideoSource = useCallback(async (url: string) => {
+    if (!url) return null;
+
+    if (url.startsWith("storage://")) {
+      const path = url.replace("storage://", "");
+      const bucketName = path.split("/")[0];
+      const filePath = path.substring(bucketName.length + 1);
+      const { data, error } = await supabase.storage.from(bucketName).createSignedUrl(filePath, 60 * 60 * 2);
+      return error || !data?.signedUrl ? null : data.signedUrl;
+    }
+
+    if (url.includes("/functions/v1/video-proxy")) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}`, apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY } : {},
+        });
+
+        if (!res.ok) return null;
+
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const payload = await res.json().catch(() => null);
+          if (payload?.error) return null;
+        }
+
+        return url;
+      } catch {
+        return null;
+      }
+    }
+
+    return url.startsWith("http") ? url : null;
+  }, []);
+
+  const prepareRenderVideoSources = useCallback(async (scenes: StoryScene[]) => {
+    const resolved = await Promise.all(
+      scenes.map(async (scene) => ({
+        sceneNumber: scene.sceneNumber,
+        resolvedUrl: scene.videoUrl ? await resolveRenderVideoSource(scene.videoUrl) : null,
+      }))
+    );
+
+    const invalidSceneNumbers = resolved
+      .filter((item) => !item.resolvedUrl)
+      .map((item) => item.sceneNumber);
+
+    return {
+      validVideoUrls: resolved.map((item) => item.resolvedUrl).filter((url): url is string => !!url),
+      invalidSceneNumbers,
+    };
+  }, [resolveRenderVideoSource]);
+
   const waitForResume = async () => {
     while (pauseRef.current && !cancelRef.current) {
       await new Promise(r => setTimeout(r, 300));
