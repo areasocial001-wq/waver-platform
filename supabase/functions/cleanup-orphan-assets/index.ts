@@ -131,6 +131,27 @@ serve(async (req) => {
 
     console.log("[cleanup-orphan-assets] done:", JSON.stringify(summary));
 
+    // Persist a record into maintenance_log so the admin dashboard can show
+    // the most recent storage cleanup run without having to parse edge logs.
+    try {
+      await admin.from("maintenance_log").insert({
+        operation: "storage_cleanup",
+        status: "success",
+        triggered_by: req.headers.get("Authorization") ? "manual" : "cron_weekly",
+        tables_processed: usersProcessed.length,
+        total_freed_bytes: totalBytesFreed,
+        duration_ms: 0,
+        details: {
+          files_scanned: totalScanned,
+          files_deleted: totalDeleted,
+          mb_freed: summary.mb_freed,
+          users: usersProcessed.slice(0, 50),
+        },
+      });
+    } catch (logErr) {
+      console.warn("[cleanup-orphan-assets] failed to write maintenance_log:", logErr);
+    }
+
     return new Response(JSON.stringify(summary), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
