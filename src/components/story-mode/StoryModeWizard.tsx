@@ -2271,9 +2271,11 @@ export const StoryModeWizard = () => {
         if (validVideoUrls.length < 2) {
           if (invalidSceneNumbers.length > 0) {
             toast.error(`Video sorgente non più validi nelle scene ${invalidSceneNumbers.join(", ")}. Rigenera quelle scene prima del render.`);
+          } else {
+            toast.error("Non abbastanza clip valide per completare il render finale.");
           }
-          setFinalVideoUrl(vids[0].videoUrl!);
-          toast.success("Video finale pronto! 🎬");
+          setRenderStatus("failed");
+          setPendingRenderId(null);
           return;
         }
 
