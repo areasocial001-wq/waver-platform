@@ -1477,8 +1477,51 @@ export const StoryModeWizard = () => {
   const failedOrMissingScenes = (scenes: StoryScene[]) =>
     scenes.map((s, i) => ({ scene: s, index: i })).filter(({ scene }) => sceneHasIssues(scene));
 
+  // Detect transient network errors (Veo/Kling cold starts, edge function fetch failures)
+  // worth auto-retrying before marking the asset definitively broken.
+  const isTransientError = (err: any): boolean => {
+    const msg = (err?.message || String(err) || "").toLowerCase();
+    const name = (err?.name || "").toLowerCase();
+    return (
+      name.includes("functionsfetcherror") ||
+      msg.includes("failed to fetch") ||
+      msg.includes("failed to send a request") ||
+      msg.includes("network") ||
+      msg.includes("timed out") ||
+      msg.includes("etimedout") ||
+      msg.includes("econnreset") ||
+      msg.includes("503") ||
+      msg.includes("504") ||
+      msg.includes("temporarily")
+    );
+  };
+
+  // Concurrency-bounded promise pool — runs at most `limit` tasks in parallel
+  const runWithConcurrency = async <T,>(items: T[], limit: number, worker: (item: T, idx: number) => Promise<void>) => {
+    const queue = items.map((item, idx) => ({ item, idx }));
+    const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+      while (queue.length > 0) {
+        const next = queue.shift();
+        if (!next) break;
+        try {
+          await worker(next.item, next.idx);
+        } catch (err) {
+          // Errors are owned by the worker — never let them break the pool
+          console.error("[Pool] worker error swallowed:", err);
+        }
+      }
+    });
+    await Promise.all(runners);
+  };
+
   // Auto-regenerate all scenes that are in error or missing state
-  // Robust against per-scene errors: a single failure no longer aborts the whole batch.
+  // - Parallel (max 3 scene worker simultanei) → ~3x più veloce su 8+ scene
+  // - Retry automatico fino a 2 volte su errori di rete transienti (FunctionsFetchError, Failed to fetch, 503/504, timeout)
+  // - Una scena in errore non blocca le altre
+  // - Re-read dello stato React fra image→video step per evitare stale closure
+  const REGEN_CONCURRENCY = 3;
+  const REGEN_MAX_RETRIES = 2;
+
   const handleAutoRegenerateErrors = async () => {
     if (!script) return;
     const errorScenes = failedOrMissingScenes(script.scenes);
@@ -1486,86 +1529,108 @@ export const StoryModeWizard = () => {
       toast.info("Tutte le scene sono complete!");
       return;
     }
-    toast.info(`Rigenerazione di ${errorScenes.length} scene con problemi...`);
+    toast.info(`Rigenerazione di ${errorScenes.length} scene (max ${REGEN_CONCURRENCY} in parallelo, retry automatico ×${REGEN_MAX_RETRIES})...`);
     setIsGenerating(true);
     setRegenProgress({ current: 0, total: errorScenes.length });
 
-    const failures: { sceneNumber: number; type: string; error: string }[] = [];
-    let successCount = 0;
+    const failures: { sceneNumber: number; type: string; error: string; attempts: number }[] = [];
+    const completedSet = new Set<number>(); // sceneNumbers fully successful
+    let completedCount = 0;
 
-    // Helper: safely run a single asset regen, swallowing errors so the batch continues
-    const safeRegen = async (sceneIdx: number, sceneNumber: number, type: "image" | "audio" | "video" | "sfx") => {
-      try {
-        await regenerateSceneAsset(sceneIdx, type);
-      } catch (err: any) {
-        const msg = err?.message || String(err);
-        console.error(`[AutoRegen] Scene ${sceneNumber} ${type} failed:`, err);
-        failures.push({ sceneNumber, type, error: msg });
-        // Surface a quick toast but don't break the loop
-        toast.error(`Scena ${sceneNumber} (${type}) fallita`, {
-          description: msg.slice(0, 120),
-          duration: 4000,
-        });
+    // safeRegen with retry on transient errors (FunctionsFetchError / Failed to fetch / 503 etc.)
+    const safeRegen = async (sceneIdx: number, sceneNumber: number, type: "image" | "audio" | "video" | "sfx"): Promise<boolean> => {
+      let attempt = 0;
+      let lastErr: any = null;
+      while (attempt <= REGEN_MAX_RETRIES) {
+        try {
+          await regenerateSceneAsset(sceneIdx, type);
+          if (attempt > 0) {
+            console.log(`[AutoRegen] Scene ${sceneNumber} ${type} riuscito al tentativo ${attempt + 1}`);
+          }
+          return true;
+        } catch (err: any) {
+          lastErr = err;
+          const transient = isTransientError(err);
+          console.warn(`[AutoRegen] Scene ${sceneNumber} ${type} attempt ${attempt + 1}/${REGEN_MAX_RETRIES + 1} failed (transient=${transient})`, err);
+          if (!transient || attempt >= REGEN_MAX_RETRIES) break;
+          // Exponential backoff: 1.5s, 3s
+          const backoff = 1500 * Math.pow(2, attempt);
+          await new Promise((r) => setTimeout(r, backoff));
+          attempt++;
+        }
       }
+      const msg = lastErr?.message || String(lastErr);
+      failures.push({ sceneNumber, type, error: msg, attempts: attempt + 1 });
+      toast.error(`Scena ${sceneNumber} (${type}) fallita dopo ${attempt + 1} tentativ${attempt + 1 === 1 ? "o" : "i"}`, {
+        description: msg.slice(0, 120),
+        duration: 5000,
+      });
+      return false;
+    };
+
+    // Per-scene worker that handles all 4 asset types in correct order (image → audio → sfx → video)
+    const sceneWorker = async ({ index }: { scene: StoryScene; index: number }) => {
+      // Re-read latest scene snapshot (in case other parallel workers mutated state)
+      const latest = await new Promise<StoryScene | null>((resolve) => {
+        setScript((cur) => {
+          resolve(cur?.scenes[index] ?? null);
+          return cur;
+        });
+      });
+      if (!latest) return;
+      const sceneNumber = latest.sceneNumber;
+      let allOk = true;
+
+      if (latest.imageStatus === "error" || (!latest.imageUrl && latest.imageStatus !== "generating")) {
+        const ok = await safeRegen(index, sceneNumber, "image");
+        if (!ok) allOk = false;
+      }
+      if (latest.audioStatus === "error" || (!latest.audioUrl && latest.audioStatus !== "generating")) {
+        const ok = await safeRegen(index, sceneNumber, "audio");
+        if (!ok) allOk = false;
+      }
+      if ((latest.sfxStatus === "error" || (!latest.sfxUrl && latest.sfxStatus !== "generating")) && latest.sfxPrompt) {
+        const ok = await safeRegen(index, sceneNumber, "sfx");
+        if (!ok) allOk = false;
+      }
+
+      // Video step needs current image (just regenerated above)
+      const afterImg = await new Promise<StoryScene | null>((resolve) => {
+        setScript((cur) => {
+          resolve(cur?.scenes[index] ?? null);
+          return cur;
+        });
+      });
+      if (afterImg && (afterImg.videoStatus === "error" || (!afterImg.videoUrl && afterImg.videoStatus !== "generating"))) {
+        if (!afterImg.imageUrl) {
+          failures.push({ sceneNumber, type: "video", error: "Immagine mancante dopo rigenerazione", attempts: 0 });
+          toast.error(`Scena ${sceneNumber} (video) saltata: immagine non disponibile`);
+          allOk = false;
+        } else {
+          const ok = await safeRegen(index, sceneNumber, "video");
+          if (!ok) allOk = false;
+        }
+      }
+
+      if (allOk) completedSet.add(sceneNumber);
+      completedCount++;
+      setRegenProgress({ current: completedCount, total: errorScenes.length });
     };
 
     try {
-      for (let i = 0; i < errorScenes.length; i++) {
-        const { index } = errorScenes[i];
-        setRegenProgress({ current: i, total: errorScenes.length });
-
-        // CRITICAL: re-read latest scene state from React state via functional snapshot —
-        // previous iterations may have populated imageUrl/audioUrl that we now depend on.
-        // Using the stale `scene` from the initial filter caused video regen to skip or fail.
-        const latest = (await new Promise<StoryScene | null>((resolve) => {
-          setScript((cur) => {
-            resolve(cur?.scenes[index] ?? null);
-            return cur;
-          });
-        }));
-        if (!latest) continue;
-
-        if (latest.imageStatus === "error" || (!latest.imageUrl && latest.imageStatus !== "generating")) {
-          await safeRegen(index, latest.sceneNumber, "image");
-        }
-        if (latest.audioStatus === "error" || (!latest.audioUrl && latest.audioStatus !== "generating")) {
-          await safeRegen(index, latest.sceneNumber, "audio");
-        }
-        if (latest.sfxStatus === "error" || (!latest.sfxUrl && latest.sfxStatus !== "generating" && latest.sfxPrompt)) {
-          await safeRegen(index, latest.sceneNumber, "sfx");
-        }
-
-        // For video we MUST re-read again because image regen above just set imageUrl
-        const afterImg = await new Promise<StoryScene | null>((resolve) => {
-          setScript((cur) => {
-            resolve(cur?.scenes[index] ?? null);
-            return cur;
-          });
-        });
-        if (afterImg && (afterImg.videoStatus === "error" || (!afterImg.videoUrl && afterImg.videoStatus !== "generating"))) {
-          if (!afterImg.imageUrl) {
-            failures.push({ sceneNumber: afterImg.sceneNumber, type: "video", error: "Immagine mancante dopo rigenerazione" });
-            toast.error(`Scena ${afterImg.sceneNumber} (video) saltata: immagine non disponibile`);
-          } else {
-            await safeRegen(index, afterImg.sceneNumber, "video");
-          }
-        }
-
-        // Count as success if no failure was recorded for this scene in this iteration
-        const failedThisScene = failures.some(f => f.sceneNumber === errorScenes[i].scene.sceneNumber);
-        if (!failedThisScene) successCount++;
-      }
+      await runWithConcurrency(errorScenes, REGEN_CONCURRENCY, sceneWorker);
     } finally {
       setRegenProgress(null);
       setIsGenerating(false);
     }
 
+    const successCount = completedSet.size;
     if (failures.length === 0) {
       toast.success(`Rigenerazione completata! (${successCount}/${errorScenes.length} scene)`);
     } else {
       toast.warning(`Rigenerazione parziale: ${successCount}/${errorScenes.length} ok, ${failures.length} asset falliti`, {
-        description: failures.slice(0, 3).map(f => `S${f.sceneNumber} ${f.type}`).join(" • ") + (failures.length > 3 ? ` +${failures.length - 3}` : ""),
-        duration: 8000,
+        description: failures.slice(0, 3).map((f) => `S${f.sceneNumber} ${f.type}${f.attempts > 1 ? ` (${f.attempts}×)` : ""}`).join(" • ") + (failures.length > 3 ? ` +${failures.length - 3}` : ""),
+        duration: 10000,
       });
     }
   };
