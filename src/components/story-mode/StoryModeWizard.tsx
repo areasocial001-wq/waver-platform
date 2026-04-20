@@ -139,6 +139,14 @@ export const StoryModeWizard = () => {
   const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
   const [renderStartTime, setRenderStartTime] = useState<number | null>(null);
   const [renderElapsed, setRenderElapsed] = useState(0);
+  const [renderPollInfo, setRenderPollInfo] = useState<{
+    attempts: number;
+    lastCheckedAt: number | null;
+    lastStatus: string | null;
+    consecutiveErrors: number;
+    nextCheckInMs: number;
+  }>({ attempts: 0, lastCheckedAt: null, lastStatus: null, consecutiveErrors: 0, nextCheckInMs: 0 });
+  const [renderTick, setRenderTick] = useState(0);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
@@ -257,8 +265,10 @@ export const StoryModeWizard = () => {
     let cancelled = false;
     const POLL_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
     const startedAt = renderStartTime || Date.now();
+    setRenderPollInfo({ attempts: 0, lastCheckedAt: null, lastStatus: "queued", consecutiveErrors: 0, nextCheckInMs: 8000 });
     const poll = async () => {
       let consecutiveErrors = 0;
+      let attempts = 0;
       while (!cancelled) {
         // Adaptive interval: 8s for first 2 min, then 15s
         const elapsed = Date.now() - startedAt;
@@ -269,8 +279,10 @@ export const StoryModeWizard = () => {
           break;
         }
         const interval = elapsed > 120_000 ? 15000 : 8000;
+        setRenderPollInfo(p => ({ ...p, nextCheckInMs: interval }));
         await new Promise(r => setTimeout(r, interval));
         if (cancelled) break;
+        attempts++;
         try {
           const { data, error } = await supabase.functions.invoke("video-concat", {
             body: { pollRenderId: pendingRenderId },
@@ -278,6 +290,7 @@ export const StoryModeWizard = () => {
           if (error) {
             consecutiveErrors++;
             console.error(`Poll error (${consecutiveErrors}):`, error);
+            setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: "error", consecutiveErrors }));
             if (consecutiveErrors >= 5) {
               setRenderStatus("failed");
               setPendingRenderId(null);
@@ -287,6 +300,7 @@ export const StoryModeWizard = () => {
             continue;
           }
           consecutiveErrors = 0;
+          setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: data?.status ?? "processing", consecutiveErrors: 0 }));
           if (data?.status === "completed" && data?.videoUrl) {
             setFinalVideoUrl(data.videoUrl);
             setRenderStatus("completed");
@@ -310,6 +324,7 @@ export const StoryModeWizard = () => {
         } catch (err) {
           consecutiveErrors++;
           console.error("Poll exception:", err);
+          setRenderPollInfo(p => ({ ...p, attempts, lastCheckedAt: Date.now(), lastStatus: "error", consecutiveErrors }));
         }
       }
     };
@@ -322,6 +337,7 @@ export const StoryModeWizard = () => {
     if (renderStatus !== "processing" || !renderStartTime) return;
     const iv = setInterval(() => {
       setRenderElapsed(Math.floor((Date.now() - renderStartTime) / 1000));
+      setRenderTick(t => t + 1);
     }, 1000);
     return () => clearInterval(iv);
   }, [renderStatus, renderStartTime]);
@@ -2433,9 +2449,22 @@ export const StoryModeWizard = () => {
                 </div>
               </div>
 
-              <Badge variant={isRenderActive ? "secondary" : "destructive"} className="shrink-0">
-                {isRenderActive ? "Rendering" : "Errore"}
-              </Badge>
+              <div className="flex items-center gap-2 shrink-0">
+                {isRenderActive && step !== "complete" && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setStep("complete")}
+                  >
+                    <Film className="w-3.5 h-3.5 mr-1.5" />
+                    Vai al render
+                  </Button>
+                )}
+                <Badge variant={isRenderActive ? "secondary" : "destructive"}>
+                  {isRenderActive ? "Rendering" : "Errore"}
+                </Badge>
+              </div>
             </div>
 
             {isRenderActive && (
@@ -2450,6 +2479,58 @@ export const StoryModeWizard = () => {
                       : `~${renderRemainingSeconds}s rimanenti`}
                   </span>
                 </div>
+
+                {/* Detailed Shotstack polling info */}
+                {(() => {
+                  // Use renderTick so "Xs fa" updates every second
+                  void renderTick;
+                  const lastCheckedSec = renderPollInfo.lastCheckedAt
+                    ? Math.max(0, Math.floor((Date.now() - renderPollInfo.lastCheckedAt) / 1000))
+                    : null;
+                  const nextCheckSec = renderPollInfo.lastCheckedAt
+                    ? Math.max(0, Math.ceil((renderPollInfo.nextCheckInMs - (Date.now() - renderPollInfo.lastCheckedAt)) / 1000))
+                    : Math.ceil(renderPollInfo.nextCheckInMs / 1000);
+                  const statusLabel = (() => {
+                    switch (renderPollInfo.lastStatus) {
+                      case "completed": return "✅ pronto";
+                      case "failed": return "❌ errore";
+                      case "error": return "⚠️ errore polling";
+                      case "queued": return "🟡 in coda";
+                      case "fetching": return "📥 download asset";
+                      case "rendering": return "🎬 in rendering";
+                      case "saving": return "💾 salvataggio";
+                      case "processing":
+                      default: return "⏳ in elaborazione";
+                    }
+                  })();
+                  return (
+                    <div className="flex items-center justify-between gap-3 flex-wrap text-[11px] text-muted-foreground border-t border-border/40 pt-2">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="font-medium text-foreground">Shotstack:</span>
+                          {statusLabel}
+                        </span>
+                        <span>•</span>
+                        <span>Tentativi: <span className="tabular-nums font-medium text-foreground">{renderPollInfo.attempts}</span></span>
+                        {renderPollInfo.consecutiveErrors > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="text-destructive">Errori consecutivi: {renderPollInfo.consecutiveErrors}/5</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span>
+                          Ultimo check: {lastCheckedSec === null ? "—" : lastCheckedSec === 0 ? "ora" : `${lastCheckedSec}s fa`}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Prossimo: {nextCheckSec <= 0 ? "in corso…" : `tra ~${nextCheckSec}s`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </>
             )}
           </CardContent>
