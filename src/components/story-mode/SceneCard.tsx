@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import {
   Pencil, Volume2, Loader2, GripVertical, Copy, Trash2, RefreshCw,
-  Image, Eye, Download, Mic, Unlock, AlertTriangle,
+  Image, Eye, Download, Mic, Unlock, AlertTriangle, Wand2, Check, Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType } from "./types";
