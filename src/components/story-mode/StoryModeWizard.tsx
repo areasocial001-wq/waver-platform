@@ -29,6 +29,7 @@ import { SceneCard } from "./SceneCard";
 import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
+import { PreFlightAudioPanel, computePreFlight } from "./PreFlightAudioPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
@@ -3028,6 +3029,9 @@ export const StoryModeWizard = () => {
             );
           })()}
 
+          {/* Pre-flight audio check — surfaces missing/blob assets BEFORE wasting render credits */}
+          <PreFlightAudioPanel scenes={script.scenes} backgroundMusicUrl={backgroundMusicUrl} />
+
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
             <Button variant="outline" onClick={handleGenerateScript} disabled={isGeneratingScript}><RefreshCw className="w-4 h-4 mr-2" />Rigenera Script</Button>
@@ -3193,7 +3197,23 @@ export const StoryModeWizard = () => {
                 </Button>
               );
             })()}
-            <Button onClick={handleGenerateAll} className="flex-1" size="lg"><Play className="w-5 h-5 mr-2" />Avvia Produzione (~{formatTime(estimatedProductionTime)})</Button>
+            {(() => {
+              const pf = computePreFlight(script.scenes, backgroundMusicUrl);
+              return (
+                <Button
+                  onClick={handleGenerateAll}
+                  className="flex-1"
+                  size="lg"
+                  disabled={!pf.ok}
+                  title={pf.ok ? undefined : `${pf.blockingCount} asset audio bloccanti — risolvi prima del render`}
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  {pf.ok
+                    ? `Avvia Produzione (~${formatTime(estimatedProductionTime)})`
+                    : `Bloccato (${pf.blockingCount} asset audio)`}
+                </Button>
+              );
+            })()}
           </div>
         </div>
       )}
