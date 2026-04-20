@@ -139,6 +139,14 @@ export const StoryModeWizard = () => {
   const [pendingRenderId, setPendingRenderId] = useState<string | null>(null);
   const [renderStartTime, setRenderStartTime] = useState<number | null>(null);
   const [renderElapsed, setRenderElapsed] = useState(0);
+  const [renderPollInfo, setRenderPollInfo] = useState<{
+    attempts: number;
+    lastCheckedAt: number | null;
+    lastStatus: string | null;
+    consecutiveErrors: number;
+    nextCheckInMs: number;
+  }>({ attempts: 0, lastCheckedAt: null, lastStatus: null, consecutiveErrors: 0, nextCheckInMs: 0 });
+  const [renderTick, setRenderTick] = useState(0);
   const [backgroundMusicUrl, setBackgroundMusicUrl] = useState<string | null>(null);
   const [editingSceneIndex, setEditingSceneIndex] = useState<number | null>(null);
   const [previewLoadingIndex, setPreviewLoadingIndex] = useState<number | null>(null);
