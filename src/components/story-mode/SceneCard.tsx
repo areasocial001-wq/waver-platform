@@ -96,12 +96,15 @@ interface SceneCardProps {
 export const SceneCard = ({
   scene, index, isEditing, isPreviewLoading, isDragging,
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
-  onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onUnstuck,
+  onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onDeleteVersion, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
 }: SceneCardProps) => {
-  // Local state for the correction note popover (image regen with guidance).
-  const [correctionNote, setCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
-  const [notePopoverOpen, setNotePopoverOpen] = useState(false);
+  // Local state for the correction note popovers (image + video regen with guidance).
+  const [imageCorrectionNote, setImageCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
+  const [videoCorrectionNote, setVideoCorrectionNote] = useState(scene.lastVideoCorrectionNote || "");
+  const [imageNoteOpen, setImageNoteOpen] = useState(false);
+  const [videoNoteOpen, setVideoNoteOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
   const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
   const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
