@@ -1051,35 +1051,83 @@ export const StoryModeWizard = () => {
     toast.success(`Nuovo ${type} scena ${index + 1} confermato`);
   };
 
-  // Roll back to the previous version: swap current with previous and clear backup.
-  const rollbackAsset = (index: number, type: "image" | "audio" | "video" | "sfx") => {
+  // Roll back to a previous version. If `versionUrl` is given, restore that specific entry from history.
+  // Otherwise, restore the legacy single-slot `previousXxxUrl`.
+  // The currently active asset is pushed onto the history stack so it's not lost (round-trip safe).
+  const rollbackAsset = (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    versionUrl?: string,
+  ) => {
     if (!script) return;
     const scenes = [...script.scenes];
     const s = { ...scenes[index] };
-    if (type === "image" && s.previousImageUrl) {
-      s.imageUrl = s.previousImageUrl;
+    let targetUrl: string | undefined;
+    let currentUrl: string | undefined;
+
+    if (type === "image") currentUrl = s.imageUrl;
+    else if (type === "audio") currentUrl = s.audioUrl;
+    else if (type === "video") currentUrl = s.videoUrl;
+    else currentUrl = s.sfxUrl;
+
+    if (versionUrl) {
+      targetUrl = versionUrl;
+    } else {
+      if (type === "image") targetUrl = s.previousImageUrl;
+      else if (type === "audio") targetUrl = s.previousAudioUrl;
+      else if (type === "video") targetUrl = s.previousVideoUrl;
+      else targetUrl = s.previousSfxUrl;
+    }
+    if (!targetUrl) return;
+
+    // Push current asset to history before swapping (so it can be restored back).
+    s.versionHistory = pushVersionHistory(s, type, currentUrl);
+    // Remove the restored entry from history (avoid duplicate of "current").
+    if (s.versionHistory[type]) {
+      s.versionHistory[type] = s.versionHistory[type]!.filter(v => v.url !== targetUrl);
+    }
+
+    if (type === "image") {
+      s.imageUrl = targetUrl;
       delete s.previousImageUrl;
       delete s.imageAspectWarning;
       s.imageWidth = undefined;
       s.imageHeight = undefined;
-    } else if (type === "audio" && s.previousAudioUrl) {
-      s.audioUrl = s.previousAudioUrl;
+    } else if (type === "audio") {
+      s.audioUrl = targetUrl;
       delete s.previousAudioUrl;
-    } else if (type === "video" && s.previousVideoUrl) {
-      s.videoUrl = s.previousVideoUrl;
+    } else if (type === "video") {
+      s.videoUrl = targetUrl;
       delete s.previousVideoUrl;
       delete s.videoAspectWarning;
       s.videoWidth = undefined;
       s.videoHeight = undefined;
-    } else if (type === "sfx" && s.previousSfxUrl) {
-      s.sfxUrl = s.previousSfxUrl;
-      delete s.previousSfxUrl;
     } else {
-      return;
+      s.sfxUrl = targetUrl;
+      delete s.previousSfxUrl;
     }
     scenes[index] = s;
     setScript({ ...script, scenes });
-    toast.info(`Versione precedente ${type} scena ${index + 1} ripristinata`);
+    toast.info(`Versione ${type} scena ${index + 1} ripristinata`);
+  };
+
+  // Permanently delete a specific entry from the version history.
+  const deleteVersion = (
+    index: number,
+    type: "image" | "audio" | "video" | "sfx",
+    versionUrl: string,
+  ) => {
+    if (!script) return;
+    const scenes = [...script.scenes];
+    const s = { ...scenes[index] };
+    if (!s.versionHistory?.[type]) return;
+    s.versionHistory = {
+      ...s.versionHistory,
+      [type]: s.versionHistory[type]!.filter(v => v.url !== versionUrl),
+    };
+    scenes[index] = s;
+    setScript({ ...script, scenes });
+    toast.success(`Versione ${type} eliminata dallo storico`);
   };
 
   const renderingMultiplier = (() => {
