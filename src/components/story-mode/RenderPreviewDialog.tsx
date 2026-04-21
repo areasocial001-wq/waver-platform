@@ -8,6 +8,7 @@ import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Lay
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
+import { TransitionTimelinePreview } from "./TransitionTimelinePreview";
 
 export interface RenderVolumes {
   narrationVolume: number; // 0-100
@@ -166,7 +167,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Film className="w-5 h-5 text-primary" />
@@ -239,7 +240,10 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             </div>
 
-            {/* Main stats */}
+            {/* Timeline preview with zoom on transition zones — helps spot frozen frames before render */}
+            <TransitionTimelinePreview scenes={scenes} aspectRatio={input.videoAspectRatio} />
+
+
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-3 rounded-lg bg-muted/30">
                 <p className="text-2xl font-bold text-primary">{summary.totalScenes}</p>
