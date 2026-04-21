@@ -2,17 +2,24 @@ import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { ShieldCheck, AlertTriangle, Mic, Music, Volume2, Sparkles, Check, X, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryScene } from "./types";
+
+export interface BatchProgress {
+  current: number;
+  total: number;
+  label: string;
+}
 
 interface PreFlightAudioPanelProps {
   scenes: StoryScene[];
   backgroundMusicUrl: string | null;
   /** Called when user clicks "Rigenera audio scaduti". Receives the list of items to regenerate. */
   onRegenerateExpired?: (items: ExpiredAudioItem[]) => void | Promise<void>;
-  /** When true, shows a spinner and disables the regenerate button */
-  isRegenerating?: boolean;
+  /** When set, shows a detailed progress bar instead of the regenerate button */
+  progress?: BatchProgress | null;
 }
 
 export interface ExpiredAudioItem {
