@@ -2344,7 +2344,8 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
-    // TTS narration
+    // TTS narration — also adapts scene.duration to match the real measured voice length,
+    // so the video segment is generated with the right runtime and the narration is never cut.
     for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
       if (checkCancelled()) break;
@@ -2352,15 +2353,34 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
-        const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
-          method: "POST", headers: authHeaders,
-          body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
-        });
-        if (!r.ok) throw new Error("TTS failed");
-        const blob = await audioResponseToBlob(r);
+        const blob = await fetchAudioWithRetry(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST", headers: authHeaders,
+            body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
+          },
+          "ElevenLabs TTS",
+          `story-mode/scene-${i + 1}`,
+          { maxAttempts: 3 },
+        );
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
-        scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
+
+        // Measure the real audio duration and adapt scene.duration if the voice is
+        // significantly longer/shorter than the originally planned scene length.
+        const measured = await measureAudioBlobDuration(blob);
+        const adapted = adaptDurationToVoice(measured, scenes[i].duration);
+        if (adapted !== scenes[i].duration) {
+          apiLogger.info("StoryMode", "voice-sync", `Scena ${i + 1}: durata adattata ${scenes[i].duration}s → ${adapted}s (voce ${measured.toFixed(1)}s)`).catch(() => {});
+          toast.info(`Scena ${i + 1}: durata regolata a ${adapted}s per allineare la voce (${measured.toFixed(1)}s)`);
+        }
+        scenes[i] = {
+          ...scenes[i],
+          audioUrl: storageUrl,
+          audioStatus: "completed",
+          duration: adapted,
+          audioDuration: measured || undefined,
+        };
       } catch (err: any) {
         const msg = err.message || "Errore sconosciuto";
         toast.error(`Scena ${i + 1}: errore audio – ${msg}`);
