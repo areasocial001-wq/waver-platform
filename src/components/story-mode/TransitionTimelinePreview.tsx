@@ -169,7 +169,26 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             {validScenes.length} clip · {totalDuration.toFixed(1)}s · {transitions.length} transizioni
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={autoPlayhead ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2 gap-1"
+            onClick={() => setAutoPlayhead((p) => !p)}
+            title={autoPlayhead ? "Pausa playhead" : "Avvia playhead automatico"}
+          >
+            {autoPlayhead ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+            <span className="text-[10px] tabular-nums">{playheadSec.toFixed(1)}s</span>
+          </Button>
+          <Button
+            variant={snapEnabled ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2 text-[10px]"
+            onClick={() => setSnapEnabled((s) => !s)}
+            title="Quando zoomi oltre 3x, salta automaticamente alla transizione più vicina al playhead"
+          >
+            Snap {snapEnabled ? "ON" : "OFF"}
+          </Button>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setZoom((z) => Math.max(0.5, z - 0.5))} disabled={zoom <= 0.5}>
             <ZoomOut className="w-3.5 h-3.5" />
           </Button>
@@ -181,6 +200,23 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
           </Button>
           <Badge variant="outline" className="text-[10px] tabular-nums w-12 justify-center">{zoom.toFixed(1)}x</Badge>
         </div>
+      </div>
+
+      {/* Playhead position info */}
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+        <Badge variant="outline" className="text-[10px] font-mono">
+          {playheadSec.toFixed(2)}s / {totalDuration.toFixed(1)}s
+        </Badge>
+        {activeClip && (
+          <span>
+            Scena attiva: <span className="text-foreground/80 font-medium">S{activeClip.scene.sceneNumber}</span>
+          </span>
+        )}
+        {activeTz && (
+          <Badge variant="outline" className="border-primary/50 text-primary text-[10px]">
+            in transizione · {activeTz.type}
+          </Badge>
+        )}
       </div>
 
       {/* Scrollable timeline ribbon */}
