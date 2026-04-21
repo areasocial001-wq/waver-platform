@@ -850,6 +850,7 @@ export type Database = {
           created_at: string
           preferences: Json
           story_mode_auto_recovery: boolean
+          story_mode_lock_character_default: boolean
           updated_at: string
           user_id: string
         }
@@ -857,6 +858,7 @@ export type Database = {
           created_at?: string
           preferences?: Json
           story_mode_auto_recovery?: boolean
+          story_mode_lock_character_default?: boolean
           updated_at?: string
           user_id: string
         }
@@ -864,6 +866,7 @@ export type Database = {
           created_at?: string
           preferences?: Json
           story_mode_auto_recovery?: boolean
+          story_mode_lock_character_default?: boolean
           updated_at?: string
           user_id?: string
         }
