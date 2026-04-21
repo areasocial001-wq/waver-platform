@@ -292,6 +292,174 @@ export const AudioDebugPanel: React.FC = () => {
     setProbing(false);
   }, [checks]);
 
+  // Regenerate a single asset (TTS / SFX / Music) with retries + detailed log
+  const regenerateAsset = useCallback(async (key: string) => {
+    if (!project) return;
+    const target = checks.find((c) => c.key === key);
+    if (!target) return;
+
+    const log: AttemptLog[] = [];
+    const stamp = () => new Date().toISOString();
+    const pushLog = (entry: Omit<AttemptLog, "at">) => {
+      log.push({ at: stamp(), ...entry });
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, attempts: [...log], showAttempts: true } : c)));
+    };
+
+    setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, retrying: true, attempts: [], showAttempts: true } : c)));
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+      };
+
+      // Build endpoint + payload
+      let endpoint = "";
+      let body: Record<string, unknown> = {};
+      const cfg = project.inputConfig as Record<string, unknown>;
+      if (target.type === "narration") {
+        const sc = project.scenes[target.sceneIndex ?? -1];
+        if (!sc?.narration) throw new Error("Scena senza testo di narrazione");
+        endpoint = "elevenlabs-tts";
+        body = {
+          text: sc.narration,
+          voiceId: sc.voiceId || (cfg.voiceId as string) || "EXAVITQu4vr4xnSDxMaL",
+          language_code: (cfg.language as string) || "it",
+        };
+      } else if (target.type === "sfx") {
+        const sc = project.scenes[target.sceneIndex ?? -1];
+        const prompt = sc?.sfxPrompt || sc?.mood || "ambient background";
+        endpoint = "elevenlabs-sfx";
+        body = { prompt, duration: Math.min(sc?.duration ?? 5, 10) };
+      } else if (target.type === "music") {
+        endpoint = "elevenlabs-music";
+        const totalDuration = project.scenes.reduce((acc, s) => acc + Math.min(s.duration ?? 5, 10), 0);
+        body = {
+          prompt: project.suggestedMusic || "cinematic background score",
+          duration: Math.min(Math.max(totalDuration, 10), 300),
+        };
+      }
+
+      const MAX_ATTEMPTS = 3;
+      let blob: Blob | null = null;
+      let lastError = "";
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        pushLog({ step: "fetch", ok: true, message: `Tentativo ${attempt}/${MAX_ATTEMPTS} → ${endpoint}` });
+        try {
+          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
+            method: "POST", headers, body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            lastError = `HTTP ${res.status}: ${text.slice(0, 200)}`;
+            pushLog({ step: "fetch", ok: false, message: lastError });
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+            continue;
+          }
+
+          const ct = res.headers.get("content-type") || "";
+          let candidate: Uint8Array;
+          if (ct.includes("application/json")) {
+            const json = await res.json();
+            const b64 = json.audioContent || json.audio || json.audio_base64;
+            if (!b64) {
+              lastError = `Risposta JSON senza campo audioContent`;
+              pushLog({ step: "decode", ok: false, message: lastError });
+              await new Promise((r) => setTimeout(r, 800 * attempt));
+              continue;
+            }
+            const bin = atob(b64);
+            candidate = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) candidate[i] = bin.charCodeAt(i);
+            pushLog({ step: "decode", ok: true, message: `Base64 decodificato (${candidate.byteLength} byte)`, bytes: candidate.byteLength });
+          } else {
+            const buf = await res.arrayBuffer();
+            candidate = new Uint8Array(buf);
+            pushLog({ step: "decode", ok: true, message: `Stream binario ricevuto (${candidate.byteLength} byte)`, bytes: candidate.byteLength });
+          }
+
+          const head = candidate.slice(0, 16);
+          if (!isLikelyMp3Bytes(head)) {
+            const jw = looksLikeJson(head);
+            lastError = jw ? "Header non MP3 (sembra JSON)" : "Header MP3 non valido";
+            pushLog({ step: "validate", ok: false, message: lastError });
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+            continue;
+          }
+          pushLog({ step: "validate", ok: true, message: "Header MP3 valido (ID3 o sync MPEG)" });
+          blob = new Blob([candidate], { type: "audio/mpeg" });
+          break;
+        } catch (e) {
+          lastError = (e as Error).message;
+          pushLog({ step: "fetch", ok: false, message: `Eccezione: ${lastError}` });
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+        }
+      }
+
+      if (!blob) throw new Error(`Tutti i ${MAX_ATTEMPTS} tentativi hanno fallito. Ultimo errore: ${lastError}`);
+
+      // Upload to storage
+      const path = `${project.id}/${target.type}-${target.sceneIndex ?? "all"}-${Date.now()}.mp3`;
+      const { error: upErr } = await supabase.storage.from("audio").upload(path, blob, {
+        contentType: "audio/mpeg", upsert: true,
+      });
+      if (upErr) {
+        pushLog({ step: "upload", ok: false, message: upErr.message });
+        throw upErr;
+      }
+      const { data: pub } = supabase.storage.from("audio").getPublicUrl(path);
+      const newUrl = pub.publicUrl;
+      pushLog({ step: "upload", ok: true, message: `Caricato su storage: ${newUrl}` });
+
+      // Update DB
+      const updates: Record<string, unknown> = {};
+      if (target.type === "music") {
+        updates.background_music_url = newUrl;
+      } else if (target.sceneIndex != null) {
+        const updatedScenes = [...project.scenes];
+        const field = target.type === "narration" ? "audioUrl" : "sfxUrl";
+        updatedScenes[target.sceneIndex] = { ...updatedScenes[target.sceneIndex], [field]: newUrl };
+        updates.scenes = updatedScenes as unknown as Record<string, unknown>;
+      }
+      const { error: dbErr } = await supabase.from("story_mode_projects").update(updates).eq("id", project.id);
+      if (dbErr) {
+        pushLog({ step: "db-update", ok: false, message: dbErr.message });
+        throw dbErr;
+      }
+      pushLog({ step: "db-update", ok: true, message: "Progetto aggiornato in database" });
+
+      toast.success(`${target.label} rigenerato con successo`);
+
+      // Re-probe the freshly uploaded asset
+      const fresh = await probeAsset(newUrl);
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, url: newUrl, result: fresh, retrying: false } : c)));
+      // Refresh local project state
+      if (target.type === "music") {
+        setProject((p) => p ? { ...p, backgroundMusicUrl: newUrl } : p);
+      } else if (target.sceneIndex != null) {
+        setProject((p) => {
+          if (!p) return p;
+          const scenes = [...p.scenes];
+          const field = target.type === "narration" ? "audioUrl" : "sfxUrl";
+          scenes[target.sceneIndex!] = { ...scenes[target.sceneIndex!], [field]: newUrl };
+          return { ...p, scenes };
+        });
+      }
+    } catch (e) {
+      const msg = (e as Error).message;
+      pushLog({ step: "error", ok: false, message: msg });
+      toast.error(`Rigenerazione fallita: ${msg}`);
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, retrying: false } : c)));
+    }
+  }, [checks, project]);
+
+  const toggleAttempts = useCallback((key: string) => {
+    setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, showAttempts: !c.showAttempts } : c)));
+  }, []);
+
   const verdictBadge = (v?: Verdict) => {
     switch (v) {
       case "ok":
