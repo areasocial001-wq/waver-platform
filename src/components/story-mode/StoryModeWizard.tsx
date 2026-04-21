@@ -3134,12 +3134,30 @@ export const StoryModeWizard = () => {
             onRegenerateExpired={async (items) => { await runAudioBatchRegen(items); }}
           />
 
-          {/* Pre-flight video check — flags missing/blob/aspect/format clips before render */}
+          {/* Pre-flight video check — flags missing/blob/aspect/format/duration clips before render */}
           <PreFlightVideoPanel
             scenes={script.scenes}
             expectedAspect={input.videoAspectRatio}
             progress={batchProgress}
+            autoRecoveryEnabled={isAutoRecoveryEnabled()}
             onRegenerateProblematic={async (items) => { await runVideoBatchRegen(items); }}
+            onDurationMeasured={(r: MeasuredDuration) => {
+              // Persist measured duration + warning on the scene so the badge survives re-renders
+              setScript(prev => {
+                if (!prev) return prev;
+                const next = [...prev.scenes];
+                const cur = next[r.sceneIndex];
+                if (!cur) return prev;
+                // Skip when nothing changed (avoid re-render loop)
+                if (cur.videoDuration === r.measured && cur.videoDurationWarning === r.warning) return prev;
+                next[r.sceneIndex] = {
+                  ...cur,
+                  videoDuration: r.measured,
+                  videoDurationWarning: r.mismatch ? r.warning : undefined,
+                };
+                return { ...prev, scenes: next };
+              });
+            }}
           />
 
           <div className="flex gap-3 flex-wrap">
