@@ -1,11 +1,21 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ShieldCheck, AlertTriangle, Mic, Music, Volume2, Sparkles, Check, X, RefreshCw, Loader2 } from "lucide-react";
+import { ShieldCheck, AlertTriangle, Mic, Music, Volume2, Sparkles, Check, X, RefreshCw, Loader2, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryScene } from "./types";
+import { measureAndValidateAudioDuration } from "@/lib/aspectRatioCheck";
+
+/** Called once per scene when we measure narration audio duration — wizard persists it on the scene. */
+export interface MeasuredAudioDuration {
+  sceneIndex: number;
+  measured: number;
+  expected: number;
+  mismatch: boolean;
+  warning?: string;
+}
 
 export interface BatchProgress {
   current: number;
@@ -20,6 +30,8 @@ interface PreFlightAudioPanelProps {
   onRegenerateExpired?: (items: ExpiredAudioItem[]) => void | Promise<void>;
   /** When set, shows a detailed progress bar instead of the regenerate button */
   progress?: BatchProgress | null;
+  /** Called when client-side narration duration measurement finishes for a scene. */
+  onAudioDurationMeasured?: (result: MeasuredAudioDuration) => void;
 }
 
 export interface ExpiredAudioItem {
@@ -76,7 +88,7 @@ const STATE_CLASS: Record<AudioState, string> = {
  *
  * Caller uses the returned `ok` flag to enable/disable the render button.
  */
-export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, progress }: PreFlightAudioPanelProps) => {
+export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, progress, onAudioDurationMeasured }: PreFlightAudioPanelProps) => {
   const rows = useMemo(() => scenes.map((s, i) => {
     const narration = stateOf(s.audioUrl, true);
     const sfx = stateOf(s.sfxUrl, !!s.sfxPrompt);
@@ -85,16 +97,49 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
       sceneNumber: s.sceneNumber,
       narration,
       sfx,
+      hasDurationWarning: !!s.audioDurationWarning,
+      audioDuration: s.audioDuration,
+      sceneDuration: s.duration,
     };
   }), [scenes]);
 
   const music = stateOf(backgroundMusicUrl, true);
 
+  // Lazily measure real narration duration for each scene with a server-reachable audio URL.
+  const measuredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!onAudioDurationMeasured) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        if (!s.audioUrl || s.audioUrl.startsWith("blob:")) continue;
+        if (s.audioDuration !== undefined) continue;
+        const key = `${i}|${s.audioUrl}`;
+        if (measuredRef.current.has(key)) continue;
+        measuredRef.current.add(key);
+        const r = await measureAndValidateAudioDuration(s.audioUrl, s.duration).catch(() => null);
+        if (cancelled || !r) continue;
+        onAudioDurationMeasured({
+          sceneIndex: i,
+          measured: r.measured,
+          expected: r.expected,
+          mismatch: r.mismatch,
+          warning: r.warning,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scenes, onAudioDurationMeasured]);
+
   // Blocking = blob URLs (silently skipped server-side, ruin the final video).
   // Missing narration is also blocking — without voice the project is broken.
+  // Audio LONGER than scene duration is also blocking — voice gets cut off.
+  const durationOverflowCount = rows.filter(r => r.hasDurationWarning).length;
   const blockingCount =
     rows.filter(r => r.narration === "blob" || r.narration === "missing").length +
     rows.filter(r => r.sfx === "blob").length +
+    durationOverflowCount +
     (music === "blob" ? 1 : 0);
 
   const warningCount =
