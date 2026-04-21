@@ -138,6 +138,27 @@ export default function SettingsPage() {
                       onCheckedChange={handleToggleAutoRecovery}
                     />
                   </div>
+
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-card">
+                    <div className="space-y-1 flex-1">
+                      <Label htmlFor="lock-character-default" className="text-base font-medium">
+                        🔒 Blocca identità di default per tutte le rigenerazioni
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Quando rigeneri immagini o video di una scena, attiva automaticamente il vincolo di identità del personaggio
+                        (stesso volto, outfit e contesto delle altre scene) senza dover cliccare il toggle sulla singola scena.
+                      </p>
+                      <p className="text-xs text-muted-foreground/80">
+                        La preferenza per la singola scena, se impostata, ha precedenza su questo default globale.
+                      </p>
+                    </div>
+                    <Switch
+                      id="lock-character-default"
+                      checked={lockCharacterDefault}
+                      disabled={isSyncingPreference}
+                      onCheckedChange={handleToggleLockCharacterDefault}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
