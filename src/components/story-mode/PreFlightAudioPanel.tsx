@@ -293,6 +293,7 @@ export const computePreFlight = (
   const blockingCount =
     scenes.filter(s => !isServerReachable(s.audioUrl)).length +
     scenes.filter(s => !!s.sfxUrl && s.sfxUrl.startsWith("blob:")).length +
+    scenes.filter(s => !!s.audioDurationWarning).length +
     (backgroundMusicUrl?.startsWith("blob:") ? 1 : 0);
 
   const warningCount =
