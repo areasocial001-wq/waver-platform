@@ -30,12 +30,13 @@ import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem } from "./PreFlightAudioPanel";
-import { PreFlightVideoPanel, type ProblematicVideoItem } from "./PreFlightVideoPanel";
+import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
+import { isAutoRecoveryEnabled } from "@/lib/storyModePreferences";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
