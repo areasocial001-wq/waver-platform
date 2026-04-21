@@ -350,7 +350,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("Preview failed");
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
       setVoicePreviewAudio(audio);
