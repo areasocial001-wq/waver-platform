@@ -36,7 +36,7 @@ import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
-import { isAutoRecoveryEnabled } from "@/lib/storyModePreferences";
+import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
