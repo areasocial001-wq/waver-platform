@@ -86,7 +86,27 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
 
   const [zoom, setZoom] = useState(1.5);
   const [focusedTzIdx, setFocusedTzIdx] = useState<number | null>(transitions.length ? 0 : null);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [playheadSec, setPlayheadSec] = useState(0);
+  const [autoPlayhead, setAutoPlayhead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-advancing playhead: 1 sec / sec, wraps around totalDuration
+  useEffect(() => {
+    if (!autoPlayhead || totalDuration <= 0) return;
+    const start = performance.now();
+    const startedAt = playheadSec;
+    let raf = 0;
+    const tick = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      const next = (startedAt + elapsed) % totalDuration;
+      setPlayheadSec(next);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlayhead, totalDuration]);
 
   // When focus changes, scroll the timeline to center the transition zone
   useEffect(() => {
@@ -98,10 +118,37 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
     scrollRef.current.scrollTo({ left: Math.max(0, center - viewport / 2), behavior: "smooth" });
   }, [focusedTzIdx, zoom, transitions]);
 
+  // Snap-to-crossfade: when the user zooms in past 3x with snap enabled,
+  // automatically focus the transition closest to the current playhead and
+  // align the playhead to the midpoint of that crossfade.
+  useEffect(() => {
+    if (!snapEnabled || transitions.length === 0) return;
+    if (zoom < 3) return;
+    let bestIdx = 0;
+    let bestDist = Number.POSITIVE_INFINITY;
+    transitions.forEach((tz, i) => {
+      const mid = (tz.startSec + tz.endSec) / 2;
+      const d = Math.abs(mid - playheadSec);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    });
+    setFocusedTzIdx(bestIdx);
+    const tz = transitions[bestIdx];
+    setPlayheadSec((tz.startSec + tz.endSec) / 2);
+    // We intentionally only run this when zoom or snap toggles
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, snapEnabled]);
+
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const timelineWidth = Math.max(totalDuration * pxPerSec, 200);
 
   const focusedTz = focusedTzIdx != null ? transitions[focusedTzIdx] : null;
+
+  // Find which clip the playhead currently sits in
+  const activeClip = clips.find((c) => playheadSec >= c.start && playheadSec < c.end) || clips[clips.length - 1];
+  const activeTz = transitions.find((tz) => playheadSec >= tz.startSec && playheadSec <= tz.endSec) || null;
   const aspectClass = aspectRatio === "9:16" ? "aspect-[9/16]" : aspectRatio === "1:1" ? "aspect-square" : "aspect-video";
 
   if (validScenes.length === 0) {
