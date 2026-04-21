@@ -898,6 +898,7 @@ export const StoryModeWizard = () => {
     index: number,
     type: "image" | "audio" | "video" | "sfx",
     correctionNote?: string,
+    options?: { lockCharacter?: boolean },
   ) => {
     if (!script) return;
     const scene = script.scenes[index];
@@ -922,6 +923,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastImageCorrectionNote,
           nextCorrectionNote: correctionNote,
+          lockCharacter: options?.lockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-image", {
           body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
@@ -993,6 +995,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastVideoCorrectionNote,
           nextCorrectionNote: correctionNote,
+          lockCharacter: options?.lockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
@@ -3072,7 +3075,9 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3458,7 +3463,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3646,7 +3653,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
