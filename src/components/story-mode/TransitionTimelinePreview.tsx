@@ -86,7 +86,27 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
 
   const [zoom, setZoom] = useState(1.5);
   const [focusedTzIdx, setFocusedTzIdx] = useState<number | null>(transitions.length ? 0 : null);
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [playheadSec, setPlayheadSec] = useState(0);
+  const [autoPlayhead, setAutoPlayhead] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-advancing playhead: 1 sec / sec, wraps around totalDuration
+  useEffect(() => {
+    if (!autoPlayhead || totalDuration <= 0) return;
+    const start = performance.now();
+    const startedAt = playheadSec;
+    let raf = 0;
+    const tick = (now: number) => {
+      const elapsed = (now - start) / 1000;
+      const next = (startedAt + elapsed) % totalDuration;
+      setPlayheadSec(next);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlayhead, totalDuration]);
 
   // When focus changes, scroll the timeline to center the transition zone
   useEffect(() => {
@@ -98,10 +118,37 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
     scrollRef.current.scrollTo({ left: Math.max(0, center - viewport / 2), behavior: "smooth" });
   }, [focusedTzIdx, zoom, transitions]);
 
+  // Snap-to-crossfade: when the user zooms in past 3x with snap enabled,
+  // automatically focus the transition closest to the current playhead and
+  // align the playhead to the midpoint of that crossfade.
+  useEffect(() => {
+    if (!snapEnabled || transitions.length === 0) return;
+    if (zoom < 3) return;
+    let bestIdx = 0;
+    let bestDist = Number.POSITIVE_INFINITY;
+    transitions.forEach((tz, i) => {
+      const mid = (tz.startSec + tz.endSec) / 2;
+      const d = Math.abs(mid - playheadSec);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = i;
+      }
+    });
+    setFocusedTzIdx(bestIdx);
+    const tz = transitions[bestIdx];
+    setPlayheadSec((tz.startSec + tz.endSec) / 2);
+    // We intentionally only run this when zoom or snap toggles
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, snapEnabled]);
+
   const pxPerSec = PX_PER_SEC_BASE * zoom;
   const timelineWidth = Math.max(totalDuration * pxPerSec, 200);
 
   const focusedTz = focusedTzIdx != null ? transitions[focusedTzIdx] : null;
+
+  // Find which clip the playhead currently sits in
+  const activeClip = clips.find((c) => playheadSec >= c.start && playheadSec < c.end) || clips[clips.length - 1];
+  const activeTz = transitions.find((tz) => playheadSec >= tz.startSec && playheadSec <= tz.endSec) || null;
   const aspectClass = aspectRatio === "9:16" ? "aspect-[9/16]" : aspectRatio === "1:1" ? "aspect-square" : "aspect-video";
 
   if (validScenes.length === 0) {
@@ -122,7 +169,26 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             {validScenes.length} clip · {totalDuration.toFixed(1)}s · {transitions.length} transizioni
           </Badge>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={autoPlayhead ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2 gap-1"
+            onClick={() => setAutoPlayhead((p) => !p)}
+            title={autoPlayhead ? "Pausa playhead" : "Avvia playhead automatico"}
+          >
+            {autoPlayhead ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+            <span className="text-[10px] tabular-nums">{playheadSec.toFixed(1)}s</span>
+          </Button>
+          <Button
+            variant={snapEnabled ? "default" : "outline"}
+            size="sm"
+            className="h-7 px-2 text-[10px]"
+            onClick={() => setSnapEnabled((s) => !s)}
+            title="Quando zoomi oltre 3x, salta automaticamente alla transizione più vicina al playhead"
+          >
+            Snap {snapEnabled ? "ON" : "OFF"}
+          </Button>
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setZoom((z) => Math.max(0.5, z - 0.5))} disabled={zoom <= 0.5}>
             <ZoomOut className="w-3.5 h-3.5" />
           </Button>
@@ -136,13 +202,40 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
         </div>
       </div>
 
+      {/* Playhead position info */}
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+        <Badge variant="outline" className="text-[10px] font-mono">
+          {playheadSec.toFixed(2)}s / {totalDuration.toFixed(1)}s
+        </Badge>
+        {activeClip && (
+          <span>
+            Scena attiva: <span className="text-foreground/80 font-medium">S{activeClip.scene.sceneNumber}</span>
+          </span>
+        )}
+        {activeTz && (
+          <Badge variant="outline" className="border-primary/50 text-primary text-[10px]">
+            in transizione · {activeTz.type}
+          </Badge>
+        )}
+      </div>
+
       {/* Scrollable timeline ribbon */}
       <div
         ref={scrollRef}
         className="relative overflow-x-auto overflow-y-hidden bg-background/40 rounded border border-border/40"
         style={{ height: 84 }}
       >
-        <div className="relative" style={{ width: timelineWidth, height: "100%" }}>
+        <div
+          className="relative cursor-crosshair"
+          style={{ width: timelineWidth, height: "100%" }}
+          onClick={(e) => {
+            const target = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - target.left;
+            const sec = Math.max(0, Math.min(totalDuration, x / pxPerSec));
+            setAutoPlayhead(false);
+            setPlayheadSec(sec);
+          }}
+        >
           {/* Clips */}
           {clips.map((c) => (
             <div
@@ -168,7 +261,7 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             return (
               <button
                 key={`tz-${idx}`}
-                onClick={() => setFocusedTzIdx(idx)}
+                onClick={(e) => { e.stopPropagation(); setFocusedTzIdx(idx); setPlayheadSec((tz.startSec + tz.endSec) / 2); }}
                 className={cn(
                   "absolute top-0 bottom-0 z-10 transition-all border-x",
                   focused
@@ -184,6 +277,15 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
               </button>
             );
           })}
+
+          {/* Playhead */}
+          <div
+            className="absolute top-0 bottom-3 z-20 pointer-events-none"
+            style={{ left: playheadSec * pxPerSec - 1, width: 2 }}
+          >
+            <div className="w-full h-full bg-primary shadow-[0_0_8px] shadow-primary/60" />
+            <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary border border-background" />
+          </div>
 
           {/* Time ruler */}
           <div className="absolute bottom-0 left-0 right-0 h-3 border-t border-border/40 bg-background/60">
@@ -243,6 +345,15 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             transitionDuration={focusedTz.duration}
             transitionType={focusedTz.type}
             aspectClass={aspectClass}
+            externalT={
+              playheadSec >= focusedTz.startSec && playheadSec <= focusedTz.endSec
+                ? Math.max(0, Math.min(1, (playheadSec - focusedTz.startSec) / Math.max(0.01, focusedTz.duration)))
+                : undefined
+            }
+            onTChange={(nt) => {
+              setAutoPlayhead(false);
+              setPlayheadSec(focusedTz.startSec + nt * focusedTz.duration);
+            }}
           />
         </div>
       )}
@@ -263,6 +374,10 @@ interface CrossfadeInspectorProps {
   transitionDuration: number;
   transitionType: NonNullable<StoryScene["transition"]>;
   aspectClass: string;
+  /** Optional external scrubber position (0..1) controlled by parent playhead. */
+  externalT?: number;
+  /** Notify parent when scrubber is moved manually. */
+  onTChange?: (nt: number) => void;
 }
 
 const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
@@ -271,10 +386,17 @@ const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
   transitionDuration,
   transitionType,
   aspectClass,
+  externalT,
+  onTChange,
 }) => {
   // Scrubber position: 0 = start of transition (outgoing 100% visible)
   //                    1 = end of transition (incoming 100% visible)
-  const [t, setT] = useState(0.5);
+  const [internalT, setInternalT] = useState(0.5);
+  const t = externalT != null ? externalT : internalT;
+  const setT = (nt: number) => {
+    setInternalT(nt);
+    onTChange?.(nt);
+  };
   const [playing, setPlaying] = useState(false);
   const outVidRef = useRef<HTMLVideoElement>(null);
   const inVidRef = useRef<HTMLVideoElement>(null);
@@ -299,13 +421,15 @@ const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
   useEffect(() => {
     if (!playing) return;
     const interval = window.setInterval(() => {
-      setT((prev) => {
+      setInternalT((prev) => {
         const next = prev + 0.05;
-        return next > 1 ? 0 : next;
+        const wrapped = next > 1 ? 0 : next;
+        onTChange?.(wrapped);
+        return wrapped;
       });
     }, 80);
     return () => window.clearInterval(interval);
-  }, [playing]);
+  }, [playing, onTChange]);
 
   return (
     <div className="space-y-2">

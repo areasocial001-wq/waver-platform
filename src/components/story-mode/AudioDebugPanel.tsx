@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, Music, Mic, Volume2, AlertTriangle, CheckCircle2, FileAudio, Link2 } from "lucide-react";
+import { Loader2, RefreshCw, Music, Mic, Volume2, AlertTriangle, CheckCircle2, FileAudio, Link2, RotateCw, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * AudioDebugPanel
@@ -28,6 +29,10 @@ interface SceneRow {
   duration?: number;
   audioStatus?: string;
   sfxStatus?: string;
+  narration?: string;
+  voiceId?: string;
+  sfxPrompt?: string;
+  mood?: string;
 }
 
 interface ProjectSnapshot {
@@ -36,6 +41,8 @@ interface ProjectSnapshot {
   updatedAt: string;
   scenes: SceneRow[];
   backgroundMusicUrl: string | null;
+  suggestedMusic: string | null;
+  inputConfig: Record<string, unknown>;
 }
 
 type Verdict = "ok" | "warn" | "error" | "idle" | "checking";
@@ -48,7 +55,16 @@ interface ProbeResult {
   bytes?: number | null;
   isMp3Header: boolean | null;
   jsonWrapped: boolean | null;
+  failureReason?: string;
   notes: string[];
+}
+
+interface AttemptLog {
+  at: string;          // ISO timestamp
+  step: string;        // "fetch" | "decode" | "validate" | "upload" | "db-update"
+  ok: boolean;
+  message: string;
+  bytes?: number;
 }
 
 interface AssetCheck {
@@ -57,7 +73,11 @@ interface AssetCheck {
   type: "narration" | "sfx" | "music";
   url: string | null | undefined;
   sceneNumber?: number;
+  sceneIndex?: number;        // index in project.scenes for retry
   result?: ProbeResult;
+  retrying?: boolean;
+  attempts?: AttemptLog[];
+  showAttempts?: boolean;
 }
 
 const isHttp = (u?: string | null) => !!u && /^https?:\/\//i.test(u);
@@ -89,6 +109,27 @@ const looksLikeJson = (bytes: Uint8Array): boolean => {
   return bytes[i] === 0x7b /* { */ || bytes[i] === 0x5b /* [ */;
 };
 
+function classifyFailure(opts: {
+  reachable: boolean;
+  isMp3: boolean | null;
+  isJson: boolean | null;
+  bytes: number | null | undefined;
+  status?: number;
+  contentType?: string | null;
+}): string | undefined {
+  const { reachable, isMp3, isJson, bytes, status, contentType } = opts;
+  if (!reachable) return `URL non raggiungibile${status ? ` (HTTP ${status})` : ""}`;
+  if (isJson) return "Risposta JSON: l'edge function ha restituito errore o il base64 non è stato decodificato";
+  if (bytes != null && bytes > 0 && bytes < 1024) return "File troppo piccolo (<1KB), upload probabilmente troncato";
+  if (isMp3 === false) {
+    if (contentType && /audio\/(wav|ogg|mpeg|mp4)/i.test(contentType)) {
+      return `File audio in formato non-MP3 (${contentType})`;
+    }
+    return "Header MP3 mancante: file corrotto o codifica errata";
+  }
+  return undefined;
+}
+
 async function probeAsset(url: string): Promise<ProbeResult> {
   const notes: string[] = [];
   // blob: URLs cannot be reached server-side, but we can still inspect them client-side
@@ -97,23 +138,25 @@ async function probeAsset(url: string): Promise<ProbeResult> {
     try {
       const resp = await fetch(url);
       if (!resp.ok) {
-        return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `HTTP ${resp.status}`] };
+        return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `HTTP ${resp.status}`, notes: [...notes, `HTTP ${resp.status}`] };
       }
       const buf = await resp.arrayBuffer();
       const bytes = new Uint8Array(buf.slice(0, 16));
       const ok = isLikelyMp3Bytes(bytes);
       const jw = looksLikeJson(bytes);
+      const ct = resp.headers.get("content-type");
       return {
         verdict: ok ? "warn" : "error",
         reachable: true,
-        contentType: resp.headers.get("content-type"),
+        contentType: ct,
         bytes: buf.byteLength,
         isMp3Header: ok,
         jsonWrapped: jw,
+        failureReason: classifyFailure({ reachable: true, isMp3: ok, isJson: jw, bytes: buf.byteLength, contentType: ct }),
         notes: [...notes, ok ? "Header MP3 valido localmente" : jw ? "Sembra JSON, non MP3 grezzo" : "Header MP3 non riconosciuto"],
       };
     } catch (e) {
-      return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
+      return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `Fetch fallito: ${(e as Error).message}`, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
     }
   }
 
@@ -143,6 +186,7 @@ async function probeAsset(url: string): Promise<ProbeResult> {
         bytes: headBytes,
         isMp3Header: null,
         jsonWrapped: null,
+        failureReason: `URL non raggiungibile (HTTP ${get.status})`,
         notes: [...notes, `GET ${get.status}`],
       };
     }
@@ -161,10 +205,11 @@ async function probeAsset(url: string): Promise<ProbeResult> {
       bytes: headBytes,
       isMp3Header: ok,
       jsonWrapped: jw,
+      failureReason: classifyFailure({ reachable: true, isMp3: ok, isJson: jw, bytes: headBytes, status: headStatus, contentType: headContentType }),
       notes,
     };
   } catch (e) {
-    return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
+    return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `Fetch fallito: ${(e as Error).message}`, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
   }
 }
 
@@ -186,7 +231,7 @@ export const AudioDebugPanel: React.FC = () => {
       }
       const { data, error: qErr } = await supabase
         .from("story_mode_projects")
-        .select("id, title, updated_at, scenes, background_music_url")
+        .select("id, title, updated_at, scenes, background_music_url, suggested_music, input_config")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -204,19 +249,17 @@ export const AudioDebugPanel: React.FC = () => {
         updatedAt: data.updated_at,
         scenes: rawScenes,
         backgroundMusicUrl: (data as { background_music_url: string | null }).background_music_url,
+        suggestedMusic: (data as { suggested_music: string | null }).suggested_music ?? null,
+        inputConfig: (data as { input_config: Record<string, unknown> | null }).input_config ?? {},
       };
       setProject(snap);
       const list: AssetCheck[] = [];
-      if (snap.backgroundMusicUrl) {
-        list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: snap.backgroundMusicUrl });
-      } else {
-        list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: null });
-      }
+      list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: snap.backgroundMusicUrl });
       rawScenes.forEach((s, i) => {
         const num = s.sceneNumber ?? i + 1;
-        list.push({ key: `nar-${i}`, label: `Voce scena ${num}`, type: "narration", url: s.audioUrl, sceneNumber: num });
+        list.push({ key: `nar-${i}`, label: `Voce scena ${num}`, type: "narration", url: s.audioUrl, sceneNumber: num, sceneIndex: i });
         if (s.sfxUrl !== undefined && s.sfxUrl !== null) {
-          list.push({ key: `sfx-${i}`, label: `SFX scena ${num}`, type: "sfx", url: s.sfxUrl, sceneNumber: num });
+          list.push({ key: `sfx-${i}`, label: `SFX scena ${num}`, type: "sfx", url: s.sfxUrl, sceneNumber: num, sceneIndex: i });
         }
       });
       setChecks(list);
@@ -248,6 +291,174 @@ export const AudioDebugPanel: React.FC = () => {
     setChecks(out);
     setProbing(false);
   }, [checks]);
+
+  // Regenerate a single asset (TTS / SFX / Music) with retries + detailed log
+  const regenerateAsset = useCallback(async (key: string) => {
+    if (!project) return;
+    const target = checks.find((c) => c.key === key);
+    if (!target) return;
+
+    const log: AttemptLog[] = [];
+    const stamp = () => new Date().toISOString();
+    const pushLog = (entry: Omit<AttemptLog, "at">) => {
+      log.push({ at: stamp(), ...entry });
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, attempts: [...log], showAttempts: true } : c)));
+    };
+
+    setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, retrying: true, attempts: [], showAttempts: true } : c)));
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+      };
+
+      // Build endpoint + payload
+      let endpoint = "";
+      let body: Record<string, unknown> = {};
+      const cfg = project.inputConfig as Record<string, unknown>;
+      if (target.type === "narration") {
+        const sc = project.scenes[target.sceneIndex ?? -1];
+        if (!sc?.narration) throw new Error("Scena senza testo di narrazione");
+        endpoint = "elevenlabs-tts";
+        body = {
+          text: sc.narration,
+          voiceId: sc.voiceId || (cfg.voiceId as string) || "EXAVITQu4vr4xnSDxMaL",
+          language_code: (cfg.language as string) || "it",
+        };
+      } else if (target.type === "sfx") {
+        const sc = project.scenes[target.sceneIndex ?? -1];
+        const prompt = sc?.sfxPrompt || sc?.mood || "ambient background";
+        endpoint = "elevenlabs-sfx";
+        body = { prompt, duration: Math.min(sc?.duration ?? 5, 10) };
+      } else if (target.type === "music") {
+        endpoint = "elevenlabs-music";
+        const totalDuration = project.scenes.reduce((acc, s) => acc + Math.min(s.duration ?? 5, 10), 0);
+        body = {
+          prompt: project.suggestedMusic || "cinematic background score",
+          duration: Math.min(Math.max(totalDuration, 10), 300),
+        };
+      }
+
+      const MAX_ATTEMPTS = 3;
+      let blob: Blob | null = null;
+      let lastError = "";
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        pushLog({ step: "fetch", ok: true, message: `Tentativo ${attempt}/${MAX_ATTEMPTS} → ${endpoint}` });
+        try {
+          const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
+            method: "POST", headers, body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            lastError = `HTTP ${res.status}: ${text.slice(0, 200)}`;
+            pushLog({ step: "fetch", ok: false, message: lastError });
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+            continue;
+          }
+
+          const ct = res.headers.get("content-type") || "";
+          let candidate: Uint8Array;
+          if (ct.includes("application/json")) {
+            const json = await res.json();
+            const b64 = json.audioContent || json.audio || json.audio_base64;
+            if (!b64) {
+              lastError = `Risposta JSON senza campo audioContent`;
+              pushLog({ step: "decode", ok: false, message: lastError });
+              await new Promise((r) => setTimeout(r, 800 * attempt));
+              continue;
+            }
+            const bin = atob(b64);
+            candidate = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) candidate[i] = bin.charCodeAt(i);
+            pushLog({ step: "decode", ok: true, message: `Base64 decodificato (${candidate.byteLength} byte)`, bytes: candidate.byteLength });
+          } else {
+            const buf = await res.arrayBuffer();
+            candidate = new Uint8Array(buf);
+            pushLog({ step: "decode", ok: true, message: `Stream binario ricevuto (${candidate.byteLength} byte)`, bytes: candidate.byteLength });
+          }
+
+          const head = candidate.slice(0, 16);
+          if (!isLikelyMp3Bytes(head)) {
+            const jw = looksLikeJson(head);
+            lastError = jw ? "Header non MP3 (sembra JSON)" : "Header MP3 non valido";
+            pushLog({ step: "validate", ok: false, message: lastError });
+            await new Promise((r) => setTimeout(r, 800 * attempt));
+            continue;
+          }
+          pushLog({ step: "validate", ok: true, message: "Header MP3 valido (ID3 o sync MPEG)" });
+          blob = new Blob([candidate.buffer.slice(0) as ArrayBuffer], { type: "audio/mpeg" });
+          break;
+        } catch (e) {
+          lastError = (e as Error).message;
+          pushLog({ step: "fetch", ok: false, message: `Eccezione: ${lastError}` });
+          await new Promise((r) => setTimeout(r, 800 * attempt));
+        }
+      }
+
+      if (!blob) throw new Error(`Tutti i ${MAX_ATTEMPTS} tentativi hanno fallito. Ultimo errore: ${lastError}`);
+
+      // Upload to storage
+      const path = `${project.id}/${target.type}-${target.sceneIndex ?? "all"}-${Date.now()}.mp3`;
+      const { error: upErr } = await supabase.storage.from("audio").upload(path, blob, {
+        contentType: "audio/mpeg", upsert: true,
+      });
+      if (upErr) {
+        pushLog({ step: "upload", ok: false, message: upErr.message });
+        throw upErr;
+      }
+      const { data: pub } = supabase.storage.from("audio").getPublicUrl(path);
+      const newUrl = pub.publicUrl;
+      pushLog({ step: "upload", ok: true, message: `Caricato su storage: ${newUrl}` });
+
+      // Update DB
+      const updates: Record<string, unknown> = {};
+      if (target.type === "music") {
+        updates.background_music_url = newUrl;
+      } else if (target.sceneIndex != null) {
+        const updatedScenes = [...project.scenes];
+        const field = target.type === "narration" ? "audioUrl" : "sfxUrl";
+        updatedScenes[target.sceneIndex] = { ...updatedScenes[target.sceneIndex], [field]: newUrl };
+        updates.scenes = updatedScenes as unknown as Record<string, unknown>;
+      }
+      const { error: dbErr } = await supabase.from("story_mode_projects").update(updates).eq("id", project.id);
+      if (dbErr) {
+        pushLog({ step: "db-update", ok: false, message: dbErr.message });
+        throw dbErr;
+      }
+      pushLog({ step: "db-update", ok: true, message: "Progetto aggiornato in database" });
+
+      toast.success(`${target.label} rigenerato con successo`);
+
+      // Re-probe the freshly uploaded asset
+      const fresh = await probeAsset(newUrl);
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, url: newUrl, result: fresh, retrying: false } : c)));
+      // Refresh local project state
+      if (target.type === "music") {
+        setProject((p) => p ? { ...p, backgroundMusicUrl: newUrl } : p);
+      } else if (target.sceneIndex != null) {
+        setProject((p) => {
+          if (!p) return p;
+          const scenes = [...p.scenes];
+          const field = target.type === "narration" ? "audioUrl" : "sfxUrl";
+          scenes[target.sceneIndex!] = { ...scenes[target.sceneIndex!], [field]: newUrl };
+          return { ...p, scenes };
+        });
+      }
+    } catch (e) {
+      const msg = (e as Error).message;
+      pushLog({ step: "error", ok: false, message: msg });
+      toast.error(`Rigenerazione fallita: ${msg}`);
+      setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, retrying: false } : c)));
+    }
+  }, [checks, project]);
+
+  const toggleAttempts = useCallback((key: string) => {
+    setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, showAttempts: !c.showAttempts } : c)));
+  }, []);
 
   const verdictBadge = (v?: Verdict) => {
     switch (v) {
@@ -360,6 +571,17 @@ export const AudioDebugPanel: React.FC = () => {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {urlKind(c.url)}
                       {verdictBadge(c.result?.verdict)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => regenerateAsset(c.key)}
+                        disabled={c.retrying || (c.type !== "music" && c.sceneIndex == null)}
+                        title="Rigenera questo asset con retry automatici e validazione MP3"
+                      >
+                        {c.retrying ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RotateCw className="w-3 h-3 mr-1" />}
+                        Rigenera
+                      </Button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-muted-foreground">
@@ -394,12 +616,48 @@ export const AudioDebugPanel: React.FC = () => {
                       {c.url}
                     </div>
                   )}
+                  {c.result?.failureReason && (
+                    <div className="rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive flex items-start gap-1.5">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span><span className="font-semibold">Motivo: </span>{c.result.failureReason}</span>
+                    </div>
+                  )}
                   {c.result?.notes && c.result.notes.length > 0 && (
                     <ul className="text-[11px] text-muted-foreground list-disc list-inside space-y-0.5">
                       {c.result.notes.map((n, idx) => (
                         <li key={idx}>{n}</li>
                       ))}
                     </ul>
+                  )}
+                  {c.attempts && c.attempts.length > 0 && (
+                    <div className="border-t border-border/40 pt-2 mt-2 space-y-1.5">
+                      <button
+                        onClick={() => toggleAttempts(c.key)}
+                        className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {c.showAttempts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        Log tentativi ({c.attempts.length})
+                      </button>
+                      {c.showAttempts && (
+                        <div className="space-y-1 font-mono text-[10px] bg-muted/30 rounded p-2 max-h-48 overflow-y-auto">
+                          {c.attempts.map((a, idx) => (
+                            <div
+                              key={idx}
+                              className={cn(
+                                "flex items-start gap-2",
+                                a.ok ? "text-foreground/80" : "text-destructive",
+                              )}
+                            >
+                              <span className="text-muted-foreground shrink-0">
+                                {new Date(a.at).toLocaleTimeString("it-IT", { hour12: false })}
+                              </span>
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{a.step}</Badge>
+                              <span className="break-all">{a.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
