@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, RefreshCw, Music, Mic, Volume2, AlertTriangle, CheckCircle2, FileAudio, Link2 } from "lucide-react";
+import { Loader2, RefreshCw, Music, Mic, Volume2, AlertTriangle, CheckCircle2, FileAudio, Link2, RotateCw, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * AudioDebugPanel
