@@ -284,6 +284,8 @@ export const SceneCard = ({
                 stylePromptModifier={stylePromptModifier}
                 videoAspectRatio={videoAspectRatio}
                 previousCorrectionNote={scene.lastImageCorrectionNote}
+                lockCharacterDefault={lockCharacterDefault}
+                onLockCharacterChange={(v) => onUpdate("lockCharacter", v)}
                 onConfirm={(note, opts) => {
                   setImageNoteOpen(false);
                   onRegenerate("image", {
@@ -316,6 +318,8 @@ export const SceneCard = ({
                 stylePromptModifier={stylePromptModifier}
                 videoAspectRatio={videoAspectRatio}
                 previousCorrectionNote={scene.lastVideoCorrectionNote}
+                lockCharacterDefault={lockCharacterDefault}
+                onLockCharacterChange={(v) => onUpdate("lockCharacter", v)}
                 onConfirm={(note, opts) => {
                   setVideoNoteOpen(false);
                   onRegenerate("video", {
