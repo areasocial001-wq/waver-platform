@@ -3075,7 +3075,9 @@ export const StoryModeWizard = () => {
                 onDragOver={() => setDragOverIndex(idx)}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
                 onDrop={() => { if (dragIndex !== null) handleDragDrop(dragIndex, idx); setDragIndex(null); setDragOverIndex(null); }}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3461,7 +3463,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3649,7 +3653,9 @@ export const StoryModeWizard = () => {
                 onPreviewAudio={() => {}}
                 onDuplicate={() => {}}
                 onDelete={() => {}}
-                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote)}
+                onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
+                stylePromptModifier={input.stylePromptModifier}
+                videoAspectRatio={input.videoAspectRatio}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
