@@ -933,7 +933,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastImageCorrectionNote,
           nextCorrectionNote: correctionNote,
-          lockCharacter: options?.lockCharacter,
+          lockCharacter: effectiveLockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-image", {
           body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
@@ -1005,7 +1005,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastVideoCorrectionNote,
           nextCorrectionNote: correctionNote,
-          lockCharacter: options?.lockCharacter,
+          lockCharacter: effectiveLockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
