@@ -29,7 +29,8 @@ import { SceneCard } from "./SceneCard";
 import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
-import { PreFlightAudioPanel, computePreFlight } from "./PreFlightAudioPanel";
+import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem } from "./PreFlightAudioPanel";
+import { PreFlightVideoPanel, type ProblematicVideoItem } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
@@ -170,6 +171,10 @@ export const StoryModeWizard = () => {
   const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
   const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
   const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  // Detailed progress for the pre-flight regen panels (audio + video). Null = idle.
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+  // Track which projectIds have already triggered auto-recovery so a re-render doesn't loop
+  const autoRecoveryFiredRef = useRef<Set<string>>(new Set());
   // Detailed list of expired audio assets (per-scene), used by the batch dialog for selective regeneration
   const [batchAudioDetails, setBatchAudioDetails] = useState<Array<{
     key: string;
@@ -1663,6 +1668,85 @@ export const StoryModeWizard = () => {
     setShowRenderPreview(true);
   };
 
+  // Unified handler used by the pre-flight panels AND auto-recovery on reload.
+  // Updates `batchProgress` step-by-step so the UI shows e.g. "Voce scena 3/8…".
+  const runAudioBatchRegen = async (items: ExpiredAudioItem[]): Promise<number> => {
+    if (items.length === 0) return 0;
+    setIsBatchRegenAudio(true);
+    let done = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const label =
+        it.type === "music"
+          ? `Musica di sottofondo`
+          : it.type === "audio"
+            ? `Voce scena ${it.sceneNumber}`
+            : `SFX scena ${it.sceneNumber}`;
+      setBatchProgress({ current: i, total: items.length, label });
+      try {
+        if (it.type === "music") await generateBackgroundMusic();
+        else await regenerateSceneAsset(it.sceneIndex, it.type);
+        done++;
+      } catch (e) {
+        console.warn("Pre-flight audio regen failed:", e);
+      }
+    }
+    setBatchProgress({ current: items.length, total: items.length, label: "Completato" });
+    setTimeout(() => setBatchProgress(null), 800);
+    setIsBatchRegenAudio(false);
+    setTimeout(() => saveProject(), 300);
+    return done;
+  };
+
+  const runVideoBatchRegen = async (items: ProblematicVideoItem[]): Promise<number> => {
+    if (items.length === 0) return 0;
+    let done = 0;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      setBatchProgress({ current: i, total: items.length, label: `Video scena ${it.sceneNumber}` });
+      try {
+        await regenerateSceneAsset(it.sceneIndex, "video");
+        done++;
+      } catch (e) {
+        console.warn("Pre-flight video regen failed:", e);
+      }
+    }
+    setBatchProgress({ current: items.length, total: items.length, label: "Completato" });
+    setTimeout(() => setBatchProgress(null), 800);
+    setTimeout(() => saveProject(), 300);
+    return done;
+  };
+
+  // Auto-recovery on reload: when a saved project is loaded and contains blob: audio
+  // assets (which only existed in the previous browser session), automatically kick off
+  // regeneration so the user doesn't have to click manually.
+  useEffect(() => {
+    if (!projectId || !script || step !== "script") return;
+    if (autoRecoveryFiredRef.current.has(projectId)) return;
+    if (isBatchRegenAudio || batchProgress) return;
+
+    const expired: ExpiredAudioItem[] = [];
+    script.scenes.forEach((s, i) => {
+      if (s.audioUrl?.startsWith("blob:")) {
+        expired.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+      if (s.sfxUrl?.startsWith("blob:")) {
+        expired.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+    });
+    if (backgroundMusicUrl?.startsWith("blob:")) {
+      expired.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
+    }
+
+    if (expired.length === 0) return;
+
+    autoRecoveryFiredRef.current.add(projectId);
+    toast.info(`Recupero automatico di ${expired.length} audio scaduti dalla sessione precedente…`);
+    runAudioBatchRegen(expired).then(done => {
+      if (done > 0) toast.success(`Auto-recovery: ${done}/${expired.length} audio rigenerati`);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, step]);
 
   const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3033,28 +3117,16 @@ export const StoryModeWizard = () => {
           <PreFlightAudioPanel
             scenes={script.scenes}
             backgroundMusicUrl={backgroundMusicUrl}
-            isRegenerating={isBatchRegenAudio}
-            onRegenerateExpired={async (items) => {
-              if (items.length === 0) return;
-              setIsBatchRegenAudio(true);
-              toast.info(`Rigenerazione di ${items.length} audio scaduti…`);
-              let done = 0;
-              for (const it of items) {
-                try {
-                  if (it.type === "music") {
-                    await generateBackgroundMusic();
-                  } else {
-                    await regenerateSceneAsset(it.sceneIndex, it.type);
-                  }
-                  done++;
-                } catch (e) {
-                  console.warn("Pre-flight regen failed:", e);
-                }
-              }
-              setIsBatchRegenAudio(false);
-              toast.success(`${done}/${items.length} audio rigenerati`);
-              setTimeout(() => saveProject(), 300);
-            }}
+            progress={batchProgress}
+            onRegenerateExpired={async (items) => { await runAudioBatchRegen(items); }}
+          />
+
+          {/* Pre-flight video check — flags missing/blob/aspect/format clips before render */}
+          <PreFlightVideoPanel
+            scenes={script.scenes}
+            expectedAspect={input.videoAspectRatio}
+            progress={batchProgress}
+            onRegenerateProblematic={async (items) => { await runVideoBatchRegen(items); }}
           />
 
           <div className="flex gap-3 flex-wrap">
