@@ -792,6 +792,7 @@ const CorrectionNotePopover = ({
   open, onOpenChange, note, setNote, presets, title, placeholder,
   disabled, disabledTitle, spinning, icon, onConfirm,
   kind, scene, stylePromptModifier, videoAspectRatio, previousCorrectionNote,
+  lockCharacterDefault = false, onLockCharacterChange,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -810,9 +811,27 @@ const CorrectionNotePopover = ({
   stylePromptModifier?: string;
   videoAspectRatio?: string;
   previousCorrectionNote?: string;
+  /** Project-wide default for the identity lock toggle (from user settings). */
+  lockCharacterDefault?: boolean;
+  /** Persists the toggle as a sticky scene preference so it survives across regens. */
+  onLockCharacterChange?: (v: boolean) => void;
 }) => {
-  const [lockCharacter, setLockCharacter] = useState(false);
+  // Initial value priority: explicit per-scene preference → global default.
+  const initialLock = scene.lockCharacter ?? lockCharacterDefault;
+  const [lockCharacter, setLockCharacter] = useState(initialLock);
   const [showDiff, setShowDiff] = useState(false);
+
+  // Re-sync when the popover (re)opens, so a freshly persisted scene value or a
+  // changed global default propagates back into the local toggle.
+  useEffect(() => {
+    if (open) setLockCharacter(scene.lockCharacter ?? lockCharacterDefault);
+  }, [open, scene.lockCharacter, lockCharacterDefault]);
+
+  const handleLockToggle = (v: boolean) => {
+    setLockCharacter(v);
+    // Persist as a sticky scene preference (so the user doesn't have to re-toggle next time).
+    onLockCharacterChange?.(v);
+  };
 
   const builderArgs = {
     scene,
@@ -836,6 +855,18 @@ const CorrectionNotePopover = ({
   }, [scene.imagePrompt, scene.cameraMovement, scene.mood, scene.narration, scene.duration, stylePromptModifier, videoAspectRatio, previousCorrectionNote, note, lockCharacter, kind]);
 
   const promptChanged = beforePrompt !== afterPrompt;
+
+  // Compute a line-level diff so that "Dopo" can highlight the rows that didn't exist in "Prima".
+  // We split on sentence-like boundaries (".") so the heavily-templated prompt becomes readable.
+  const diffLines = useMemo(() => {
+    const splitToLines = (s: string) =>
+      s.split(/(?<=\.)\s+(?=[A-Z])/g).map((line) => line.trim()).filter(Boolean);
+    const beforeSet = new Set(splitToLines(beforePrompt));
+    return splitToLines(afterPrompt).map((line) => ({
+      text: line,
+      added: !beforeSet.has(line),
+    }));
+  }, [beforePrompt, afterPrompt]);
 
   const appendChip = (chip: string) => {
     const trimmed = note.trim();
@@ -887,20 +918,30 @@ const CorrectionNotePopover = ({
           autoFocus
         />
 
-        {/* Character identity lock — forces the prompt builder to add a hard identity guard */}
+        {/* Character identity lock — sticky per scene; default comes from global pref. */}
         <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 p-2">
           <div className="space-y-0.5 min-w-0">
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-medium">🔒 Blocca identità personaggio</span>
               {lockCharacter && (
                 <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/40 text-primary">attivo</Badge>
               )}
+              {scene.lockCharacter !== undefined && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 border-muted-foreground/40 text-muted-foreground" title="Preferenza salvata sulla scena">
+                  sticky scena
+                </Badge>
+              )}
+              {scene.lockCharacter === undefined && lockCharacterDefault && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 border-muted-foreground/40 text-muted-foreground" title="Default globale dalle Impostazioni Story Mode">
+                  default progetto
+                </Badge>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground leading-tight">
-              Forza volto, outfit e contesto identici alle altre scene. Utile quando la rigenerazione cambia persona o vestiti.
+              Forza volto, outfit e contesto identici alle altre scene. La scelta resta memorizzata sulla scena.
             </p>
           </div>
-          <Switch checked={lockCharacter} onCheckedChange={setLockCharacter} />
+          <Switch checked={lockCharacter} onCheckedChange={handleLockToggle} />
         </div>
 
         {/* Live diff of the actual prompt that will be sent to the generator */}
@@ -935,15 +976,33 @@ const CorrectionNotePopover = ({
                 </pre>
               </div>
               <div>
-                <div className="text-[9px] font-semibold uppercase tracking-wide text-primary mb-1">Dopo (verrà inviato al generatore)</div>
-                <pre className={cn(
-                  "text-[10px] leading-snug font-mono whitespace-pre-wrap p-2 rounded border max-h-40 overflow-y-auto",
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-primary mb-1 flex items-center gap-1.5">
+                  <span>Dopo (verrà inviato al generatore)</span>
+                  {diffLines.some((l) => l.added) && (
+                    <Badge variant="outline" className="text-[9px] h-4 px-1 border-green-500/40 text-green-500">
+                      righe verdi = aggiunte
+                    </Badge>
+                  )}
+                </div>
+                <div className={cn(
+                  "text-[10px] leading-snug font-mono p-2 rounded border max-h-40 overflow-y-auto space-y-0.5",
                   promptChanged
                     ? "bg-primary/5 border-primary/30 text-foreground"
                     : "bg-background/60 border-border/40"
                 )}>
-                  {afterPrompt}
-                </pre>
+                  {diffLines.map((line, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "px-1 py-0.5 rounded whitespace-pre-wrap",
+                        line.added && "bg-green-500/15 border-l-2 border-green-500/60 pl-1.5",
+                      )}
+                    >
+                      {line.added && <span className="text-green-500/80 mr-1">+</span>}
+                      {line.text}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
