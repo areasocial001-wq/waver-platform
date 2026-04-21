@@ -76,7 +76,7 @@ const STATE_CLASS: Record<AudioState, string> = {
  *
  * Caller uses the returned `ok` flag to enable/disable the render button.
  */
-export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, isRegenerating }: PreFlightAudioPanelProps) => {
+export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, progress }: PreFlightAudioPanelProps) => {
   const rows = useMemo(() => scenes.map((s, i) => {
     const narration = stateOf(s.audioUrl, true);
     const sfx = stateOf(s.sfxUrl, !!s.sfxPrompt);
@@ -162,7 +162,22 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
           </p>
         )}
 
-        {canRegenerate && (
+        {progress && progress.total > 0 && (
+          <div className="space-y-1 pt-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                {progress.label}
+              </span>
+              <span className="font-mono text-muted-foreground">
+                {progress.current}/{progress.total}
+              </span>
+            </div>
+            <Progress value={(progress.current / Math.max(progress.total, 1)) * 100} className="h-1.5" />
+          </div>
+        )}
+
+        {canRegenerate && !progress && (
           <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
             <p className="text-[11px] text-muted-foreground">
               {expiredItems.length} asset audio scaduti o mancanti rilevati
@@ -175,14 +190,10 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
               size="sm"
               variant={blockingCount > 0 ? "destructive" : "outline"}
               onClick={() => onRegenerateExpired?.(expiredItems)}
-              disabled={isRegenerating}
               className="h-7 text-xs"
             >
-              {isRegenerating ? (
-                <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Rigenerazione…</>
-              ) : (
-                <><RefreshCw className="w-3 h-3 mr-1.5" />Rigenera audio scaduti</>
-              )}
+              <RefreshCw className="w-3 h-3 mr-1.5" />Rigenera audio scaduti
+            </Button>
             </Button>
           </div>
         )}
