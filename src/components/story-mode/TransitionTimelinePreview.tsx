@@ -278,6 +278,15 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             );
           })}
 
+          {/* Playhead */}
+          <div
+            className="absolute top-0 bottom-3 z-20 pointer-events-none"
+            style={{ left: playheadSec * pxPerSec - 1, width: 2 }}
+          >
+            <div className="w-full h-full bg-primary shadow-[0_0_8px] shadow-primary/60" />
+            <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-primary border border-background" />
+          </div>
+
           {/* Time ruler */}
           <div className="absolute bottom-0 left-0 right-0 h-3 border-t border-border/40 bg-background/60">
             {Array.from({ length: Math.ceil(totalDuration) + 1 }, (_, i) => i).map((s) => (
