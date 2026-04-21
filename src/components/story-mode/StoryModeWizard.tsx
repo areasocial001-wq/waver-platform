@@ -3088,6 +3088,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3476,6 +3477,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3666,6 +3668,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
