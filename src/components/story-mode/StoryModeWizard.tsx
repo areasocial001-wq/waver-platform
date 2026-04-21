@@ -3118,7 +3118,7 @@ export const StoryModeWizard = () => {
             scenes={script.scenes}
             backgroundMusicUrl={backgroundMusicUrl}
             progress={batchProgress}
-            onRegenerateExpired={(items) => runAudioBatchRegen(items)}
+            onRegenerateExpired={async (items) => { await runAudioBatchRegen(items); }}
           />
 
           {/* Pre-flight video check — flags missing/blob/aspect/format clips before render */}
@@ -3126,7 +3126,7 @@ export const StoryModeWizard = () => {
             scenes={script.scenes}
             expectedAspect={input.videoAspectRatio}
             progress={batchProgress}
-            onRegenerateProblematic={(items) => runVideoBatchRegen(items)}
+            onRegenerateProblematic={async (items) => { await runVideoBatchRegen(items); }}
           />
 
           <div className="flex gap-3 flex-wrap">
