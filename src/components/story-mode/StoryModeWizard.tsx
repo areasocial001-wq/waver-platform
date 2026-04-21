@@ -1718,34 +1718,46 @@ export const StoryModeWizard = () => {
     return done;
   };
 
-  // Auto-recovery on reload: when a saved project is loaded and contains blob: audio
-  // assets (which only existed in the previous browser session), automatically kick off
-  // regeneration so the user doesn't have to click manually.
+  // Auto-recovery on reload: when a saved project is loaded and contains blob:
+  // assets (audio OR video — only existed in the previous browser session),
+  // automatically kick off regeneration so the user doesn't have to click manually.
+  // Respects the user-level toggle (Settings → Story Mode → Auto-recovery).
   useEffect(() => {
     if (!projectId || !script || step !== "script") return;
     if (autoRecoveryFiredRef.current.has(projectId)) return;
     if (isBatchRegenAudio || batchProgress) return;
+    if (!isAutoRecoveryEnabled()) return;
 
-    const expired: ExpiredAudioItem[] = [];
+    const expiredAudio: ExpiredAudioItem[] = [];
+    const expiredVideo: ProblematicVideoItem[] = [];
     script.scenes.forEach((s, i) => {
       if (s.audioUrl?.startsWith("blob:")) {
-        expired.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
+        expiredAudio.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
       }
       if (s.sfxUrl?.startsWith("blob:")) {
-        expired.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+        expiredAudio.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+      if (s.videoUrl?.startsWith("blob:")) {
+        expiredVideo.push({ sceneIndex: i, sceneNumber: s.sceneNumber, reasons: ["blob"] });
       }
     });
     if (backgroundMusicUrl?.startsWith("blob:")) {
-      expired.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
+      expiredAudio.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
     }
 
-    if (expired.length === 0) return;
+    const totalExpired = expiredAudio.length + expiredVideo.length;
+    if (totalExpired === 0) return;
 
     autoRecoveryFiredRef.current.add(projectId);
-    toast.info(`Recupero automatico di ${expired.length} audio scaduti dalla sessione precedente…`);
-    runAudioBatchRegen(expired).then(done => {
-      if (done > 0) toast.success(`Auto-recovery: ${done}/${expired.length} audio rigenerati`);
-    });
+    toast.info(`Recupero automatico di ${totalExpired} asset scaduti dalla sessione precedente…`);
+    (async () => {
+      let doneAudio = 0;
+      let doneVideo = 0;
+      if (expiredAudio.length > 0) doneAudio = await runAudioBatchRegen(expiredAudio);
+      if (expiredVideo.length > 0) doneVideo = await runVideoBatchRegen(expiredVideo);
+      const total = doneAudio + doneVideo;
+      if (total > 0) toast.success(`Auto-recovery: ${total}/${totalExpired} asset rigenerati`);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, step]);
 
