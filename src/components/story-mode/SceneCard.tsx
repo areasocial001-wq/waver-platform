@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { StoryScene, TransitionType, AssetVersion } from "./types";
 import { useAuthVideo } from "@/hooks/useAuthVideo";
 import { TransitionPreview } from "./TransitionPreview";
+import { Switch } from "@/components/ui/switch";
+import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 
 
@@ -82,7 +84,14 @@ interface SceneCardProps {
   onPreviewAudio: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onRegenerate?: (type: "image" | "audio" | "video" | "sfx", opts?: { correctionNote?: string }) => void;
+  onRegenerate?: (
+    type: "image" | "audio" | "video" | "sfx",
+    opts?: { correctionNote?: string; lockCharacter?: boolean },
+  ) => void;
+  /** Style modifier of the project — used to render the live prompt preview inside the regen popover. */
+  stylePromptModifier?: string;
+  /** Aspect ratio of the project — also used by the live prompt preview. */
+  videoAspectRatio?: string;
   onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
   /** When `versionUrl` is provided, restore that specific entry from versionHistory. */
   onRollback?: (type: "image" | "audio" | "video" | "sfx", versionUrl?: string) => void;
@@ -99,6 +108,7 @@ export const SceneCard = ({
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onDeleteVersion, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
+  stylePromptModifier, videoAspectRatio,
 }: SceneCardProps) => {
   // Local state for the correction note popovers (image + video regen with guidance).
   const [imageCorrectionNote, setImageCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
