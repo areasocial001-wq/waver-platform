@@ -345,6 +345,15 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             transitionDuration={focusedTz.duration}
             transitionType={focusedTz.type}
             aspectClass={aspectClass}
+            externalT={
+              playheadSec >= focusedTz.startSec && playheadSec <= focusedTz.endSec
+                ? Math.max(0, Math.min(1, (playheadSec - focusedTz.startSec) / Math.max(0.01, focusedTz.duration)))
+                : undefined
+            }
+            onTChange={(nt) => {
+              setAutoPlayhead(false);
+              setPlayheadSec(focusedTz.startSec + nt * focusedTz.duration);
+            }}
           />
         </div>
       )}
