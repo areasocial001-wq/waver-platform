@@ -5,11 +5,12 @@ import ProviderSettings from "@/components/ProviderSettings";
 import ProviderPriceComparison from "@/components/ProviderPriceComparison";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Zap, Bell, Shield, DollarSign, Film } from "lucide-react";
+import { Settings, Zap, Bell, Shield, DollarSign, Film, FileAudio } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
+import { AudioDebugPanel } from "@/components/story-mode/AudioDebugPanel";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
 import {
   isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase,
@@ -75,7 +76,7 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="providers" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="providers" className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 <span className="hidden sm:inline">Provider</span>
@@ -87,6 +88,10 @@ export default function SettingsPage() {
               <TabsTrigger value="story-mode" className="flex items-center gap-2">
                 <Film className="h-4 w-4" />
                 <span className="hidden sm:inline">Story Mode</span>
+              </TabsTrigger>
+              <TabsTrigger value="audio-debug" className="flex items-center gap-2">
+                <FileAudio className="h-4 w-4" />
+                <span className="hidden sm:inline">Debug Audio</span>
               </TabsTrigger>
               <TabsTrigger value="notifications" className="flex items-center gap-2">
                 <Bell className="h-4 w-4" />
@@ -161,6 +166,10 @@ export default function SettingsPage() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="audio-debug">
+              <AudioDebugPanel />
             </TabsContent>
 
             <TabsContent value="notifications">
