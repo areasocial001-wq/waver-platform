@@ -201,7 +201,9 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
 
         {!allOk && (
           <p className="text-xs text-muted-foreground">
-            {blockingCount > 0
+            {durationOverflowCount > 0
+              ? `${durationOverflowCount} narrazione/i più lunga della scena: la voce verrà tagliata. Accorcia il testo o aumenta la durata della scena.`
+              : blockingCount > 0
               ? "Asset audio non raggiungibili dal server: rigenerali prima del render altrimenti il video finale sarà incompleto."
               : "Alcune scene non hanno SFX configurato — il video verrà comunque generato senza."}
           </p>
@@ -246,11 +248,14 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
         {!allOk && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-1.5 pt-1">
             {rows
-              .filter(r => r.narration !== "ok" || r.sfx === "blob" || r.sfx === "missing")
+              .filter(r => r.narration !== "ok" || r.sfx === "blob" || r.sfx === "missing" || r.hasDurationWarning)
               .map(r => (
                 <div
                   key={r.idx}
-                  className="flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border border-border/40 bg-background/30"
+                  className={cn(
+                    "flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border bg-background/30",
+                    r.hasDurationWarning ? "border-destructive/40" : "border-border/40",
+                  )}
                 >
                   <span className="font-mono text-foreground shrink-0">#{r.sceneNumber}</span>
                   <span className={cn("flex items-center gap-0.5", STATE_CLASS[r.narration])} title={`Narrazione: ${STATE_LABEL[r.narration]}`}>
@@ -261,6 +266,15 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
                     <Sparkles className="w-2.5 h-2.5" />
                     {r.sfx === "ok" ? <Check className="w-2.5 h-2.5" /> : r.sfx === "n/a" ? "—" : <X className="w-2.5 h-2.5" />}
                   </span>
+                  {r.hasDurationWarning && r.audioDuration !== undefined && (
+                    <span
+                      className="ml-auto flex items-center gap-0.5 text-destructive font-mono"
+                      title={`Voce ${r.audioDuration.toFixed(1)}s vs scena ${r.sceneDuration.toFixed(1)}s`}
+                    >
+                      <Clock className="w-2.5 h-2.5" />
+                      {r.audioDuration.toFixed(1)}s
+                    </span>
+                  )}
                 </div>
               ))
             }
