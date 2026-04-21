@@ -190,6 +190,12 @@ export const StoryModeWizard = () => {
   const [recoveryFailureAssets, setRecoveryFailureAssets] = useState<Array<{ type: string; index?: number; sceneNumber?: number }>>([]);
   const [recoveryFailureContext, setRecoveryFailureContext] = useState<"reassemble" | "generateAll" | null>(null);
   const [savedProjectsTick, setSavedProjectsTick] = useState(0);
+  // Global user pref: lock character identity by default on every regeneration.
+  // Hydrated from localStorage immediately, then refreshed from Supabase.
+  const [lockCharacterDefault, setLockCharacterDefault] = useState<boolean>(isLockCharacterDefaultEnabled());
+  useEffect(() => {
+    void loadLockCharacterDefaultFromSupabase().then(setLockCharacterDefault);
+  }, []);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
