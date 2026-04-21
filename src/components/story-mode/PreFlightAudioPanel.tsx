@@ -69,7 +69,7 @@ const STATE_CLASS: Record<AudioState, string> = {
  *
  * Caller uses the returned `ok` flag to enable/disable the render button.
  */
-export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl }: PreFlightAudioPanelProps) => {
+export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, isRegenerating }: PreFlightAudioPanelProps) => {
   const rows = useMemo(() => scenes.map((s, i) => {
     const narration = stateOf(s.audioUrl, true);
     const sfx = stateOf(s.sfxUrl, !!s.sfxPrompt);
