@@ -261,7 +261,7 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
             return (
               <button
                 key={`tz-${idx}`}
-                onClick={() => setFocusedTzIdx(idx)}
+                onClick={(e) => { e.stopPropagation(); setFocusedTzIdx(idx); setPlayheadSec((tz.startSec + tz.endSec) / 2); }}
                 className={cn(
                   "absolute top-0 bottom-0 z-10 transition-all border-x",
                   focused
