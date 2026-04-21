@@ -616,13 +616,6 @@ export const AudioDebugPanel: React.FC = () => {
                       {c.url}
                     </div>
                   )}
-                  {c.result?.notes && c.result.notes.length > 0 && (
-                    <ul className="text-[11px] text-muted-foreground list-disc list-inside space-y-0.5">
-                      {c.result.notes.map((n, idx) => (
-                        <li key={idx}>{n}</li>
-                      ))}
-                    </ul>
-                  )}
                   {c.result?.failureReason && (
                     <div className="rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive flex items-start gap-1.5">
                       <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
