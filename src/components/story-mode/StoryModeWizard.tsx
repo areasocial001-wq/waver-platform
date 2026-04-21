@@ -37,6 +37,7 @@ import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 import { isAutoRecoveryEnabled } from "@/lib/storyModePreferences";
+import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -915,10 +916,13 @@ export const StoryModeWizard = () => {
           : input.videoAspectRatio === "4:3"
           ? { width: 1024, height: 768 }
           : { width: 1280, height: 720 };
-        const note = (correctionNote || "").trim();
-        const guidedPrompt = note
-          ? `${scene.imagePrompt}. IMPORTANT correction: ${note}`
-          : scene.imagePrompt;
+        const { prompt: guidedPrompt, effectiveCorrectionNote } = buildImageRegenerationPrompt({
+          scene,
+          stylePrompt: input.stylePromptModifier,
+          aspectRatio: input.videoAspectRatio,
+          previousCorrectionNote: scene.lastImageCorrectionNote,
+          nextCorrectionNote: correctionNote,
+        });
         const { data, error } = await supabase.functions.invoke("generate-image", {
           body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
         });
@@ -945,14 +949,14 @@ export const StoryModeWizard = () => {
           imageWidth: aspectCheck?.width,
           imageHeight: aspectCheck?.height,
           imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
-          lastImageCorrectionNote: note || prev.lastImageCorrectionNote,
+          lastImageCorrectionNote: effectiveCorrectionNote || prev.lastImageCorrectionNote,
           versionHistory: newHistory,
         };
         setScript({ ...script, scenes });
         if (aspectCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Immagine scena ${index + 1} rigenerata${note ? " con correzione" : ""}`);
+          toast.success(`Immagine scena ${index + 1} rigenerata${effectiveCorrectionNote ? " con correzione" : ""}`);
         }
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
@@ -980,18 +984,16 @@ export const StoryModeWizard = () => {
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
         const startedAt = Date.now();
-        const noteV = (correctionNote || "").trim();
         const scenes0 = [...script.scenes];
         scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
         setScript({ ...script, scenes: scenes0 });
-        const orientationHint = input.videoAspectRatio === "9:16"
-          ? ", vertical 9:16 portrait composition, full vertical frame"
-          : input.videoAspectRatio === "16:9"
-          ? ", horizontal 16:9 cinematic frame"
-          : "";
-        const guidedVideoPrompt = noteV
-          ? `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}. IMPORTANT correction: ${noteV}`
-          : `${scene.imagePrompt}, ${scene.cameraMovement.replace(/_/g, " ")}${orientationHint}`;
+        const { prompt: guidedVideoPrompt, effectiveCorrectionNote: effectiveVideoCorrection } = buildVideoRegenerationPrompt({
+          scene,
+          stylePrompt: input.stylePromptModifier,
+          aspectRatio: input.videoAspectRatio,
+          previousCorrectionNote: scene.lastVideoCorrectionNote,
+          nextCorrectionNote: correctionNote,
+        });
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
             prompt: guidedVideoPrompt,
@@ -1080,14 +1082,14 @@ export const StoryModeWizard = () => {
           videoWidth: videoCheck?.width,
           videoHeight: videoCheck?.height,
           videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
-          lastVideoCorrectionNote: noteV || prevV.lastVideoCorrectionNote,
+          lastVideoCorrectionNote: effectiveVideoCorrection || prevV.lastVideoCorrectionNote,
           versionHistory: newHistoryV,
         };
         setScript({ ...script, scenes });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
-          toast.success(`Video scena ${index + 1} rigenerato${noteV ? " con correzione" : ""}`);
+          toast.success(`Video scena ${index + 1} rigenerato${effectiveVideoCorrection ? " con correzione" : ""}`);
         }
       } else if (type === "sfx") {
         const sfxPrompt = scene.sfxPrompt || scene.mood || "ambient background";
