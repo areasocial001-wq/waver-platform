@@ -390,7 +390,7 @@ export const AudioDebugPanel: React.FC = () => {
             continue;
           }
           pushLog({ step: "validate", ok: true, message: "Header MP3 valido (ID3 o sync MPEG)" });
-          blob = new Blob([candidate], { type: "audio/mpeg" });
+          blob = new Blob([candidate.buffer.slice(0) as ArrayBuffer], { type: "audio/mpeg" });
           break;
         } catch (e) {
           lastError = (e as Error).message;
