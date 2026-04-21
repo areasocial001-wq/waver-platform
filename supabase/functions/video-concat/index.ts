@@ -98,19 +98,25 @@ const getAspectRatioSize = (aspectRatio: string, resolution: string): { width: n
 };
 
 // Map transition types to Shotstack format.
-// Returns { in?: string, out?: string } — Shotstack uses `fade` on `out` to fade to BLACK,
-// and `fade` on `in` (with overlapping clips) to crossfade. So:
-//  - crossfade / dissolve = ONLY fade-in on next clip (overlap creates the dissolve)
-//  - fade_black / fade    = fade-out on prev + fade-in on next (gap to black)
+// Shotstack uses `fade` on `out` to fade the OUTGOING clip and `fade` on `in`
+// (with overlapping clips) to fade the INCOMING clip. For a true cross-dissolve
+// with no held last frame, BOTH clips need to fade across the overlap window.
+//
+//  - crossfade / dissolve = fade-out prev + fade-in next (true cross-dissolve)
+//  - fade_black / fade    = fade-out prev + fade-in next, NOT overlapped (gap to black)
 //  - wipe variants        = directional wipe in
+//
+// Previous behaviour (`{ in: 'fade' }` only) caused the outgoing clip to keep
+// playing at full opacity under the incoming clip; if the source video file was
+// even slightly shorter than the requested clip length, Shotstack froze the last
+// frame for the duration of the overlap → visible "fermo fotogramma".
 const mapTransition = (transition: string): { in?: string; out?: string } | null => {
   switch (transition) {
     case 'fade':
     case 'fade_black':
-      return { in: 'fade', out: 'fade' };
     case 'crossfade':
     case 'dissolve':
-      return { in: 'fade' }; // overlap + fade-in only = true crossfade
+      return { in: 'fade', out: 'fade' };
     case 'wipe':
     case 'wipe_right':
       return { in: 'wipeRight' };

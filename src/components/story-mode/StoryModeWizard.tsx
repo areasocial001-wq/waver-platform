@@ -123,6 +123,37 @@ const useDownloadFile = (setLoadingId: (id: string | null) => void) => {
   };
 };
 
+/**
+ * Convert an ElevenLabs edge-function response into an audio Blob.
+ *
+ * Both `elevenlabs-tts` and `elevenlabs-music` return JSON of the form
+ * `{ audioContent: <base64 mp3>, format: "mp3" }`. Calling `response.blob()`
+ * directly would yield a JSON-as-text blob (not playable audio) which, once
+ * uploaded to storage and fed to Shotstack, results in a SILENT track in the
+ * final render. This helper decodes the base64 payload to a real MP3 Blob.
+ *
+ * Falls back to `response.blob()` for raw-binary endpoints (e.g. SFX) so the
+ * helper is safe to use as a single audio entry point.
+ */
+const audioResponseToBlob = async (response: Response): Promise<Blob> => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await response.json();
+    const base64: string | undefined = data?.audioContent;
+    if (!base64 || typeof base64 !== "string") {
+      throw new Error("Risposta audio non valida: campo audioContent mancante");
+    }
+    // Decode base64 in chunks to avoid call-stack issues on large payloads.
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
+    return new Blob([bytes], { type: mime });
+  }
+  // Raw binary endpoint (e.g. elevenlabs-sfx) — return as-is.
+  return response.blob();
+};
+
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
@@ -319,7 +350,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("Preview failed");
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
       setVoicePreviewAudio(audio);
@@ -721,7 +752,7 @@ export const StoryModeWizard = () => {
                 body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
               });
               if (!r.ok) continue;
-              const blob = await r.blob();
+              const blob = await audioResponseToBlob(r);
               const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
               migrated[i] = { ...migrated[i], audioUrl: storageUrl, audioStatus: "completed" };
               reuploadedAudio++;
@@ -850,7 +881,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("TTS preview failed");
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const url = URL.createObjectURL(blob);
       updateScene(index, "previewAudioUrl", url);
       // Auto-play
@@ -979,7 +1010,7 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
         });
         if (!response.ok) throw new Error("TTS failed");
-        const blob = await response.blob();
+        const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevA = scenes[index];
@@ -1507,7 +1538,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ prompt: script.suggestedMusic, duration: Math.min(script.scenes.reduce((a, s) => a + s.duration, 0), 120) }),
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
@@ -2234,7 +2265,7 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
         });
         if (!r.ok) throw new Error("TTS failed");
-        const blob = await r.blob();
+        const blob = await audioResponseToBlob(r);
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
         scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
