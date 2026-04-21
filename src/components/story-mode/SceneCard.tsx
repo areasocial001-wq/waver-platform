@@ -277,9 +277,17 @@ export const SceneCard = ({
                 disabled={scene.imageStatus === "generating"}
                 spinning={scene.imageStatus === "generating"}
                 icon={<Image className="w-2.5 h-2.5" />}
-                onConfirm={(note) => {
+                kind="image"
+                scene={scene}
+                stylePromptModifier={stylePromptModifier}
+                videoAspectRatio={videoAspectRatio}
+                previousCorrectionNote={scene.lastImageCorrectionNote}
+                onConfirm={(note, opts) => {
                   setImageNoteOpen(false);
-                  onRegenerate("image", note ? { correctionNote: note } : undefined);
+                  onRegenerate("image", {
+                    ...(note ? { correctionNote: note } : {}),
+                    ...(opts?.lockCharacter ? { lockCharacter: true } : {}),
+                  });
                   toast.info(
                     note
                       ? `Rigenero immagine scena ${scene.sceneNumber} con correzione`
@@ -301,9 +309,17 @@ export const SceneCard = ({
                 disabledTitle={!scene.imageUrl ? "Genera prima l'immagine" : undefined}
                 spinning={scene.videoStatus === "generating"}
                 icon={<Eye className="w-2.5 h-2.5" />}
-                onConfirm={(note) => {
+                kind="video"
+                scene={scene}
+                stylePromptModifier={stylePromptModifier}
+                videoAspectRatio={videoAspectRatio}
+                previousCorrectionNote={scene.lastVideoCorrectionNote}
+                onConfirm={(note, opts) => {
                   setVideoNoteOpen(false);
-                  onRegenerate("video", note ? { correctionNote: note } : undefined);
+                  onRegenerate("video", {
+                    ...(note ? { correctionNote: note } : {}),
+                    ...(opts?.lockCharacter ? { lockCharacter: true } : {}),
+                  });
                   toast.info(
                     note
                       ? `Rigenero video scena ${scene.sceneNumber} con correzione`
