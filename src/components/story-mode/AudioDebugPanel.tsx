@@ -571,6 +571,17 @@ export const AudioDebugPanel: React.FC = () => {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {urlKind(c.url)}
                       {verdictBadge(c.result?.verdict)}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => regenerateAsset(c.key)}
+                        disabled={c.retrying || (c.type !== "music" && c.sceneIndex == null)}
+                        title="Rigenera questo asset con retry automatici e validazione MP3"
+                      >
+                        {c.retrying ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RotateCw className="w-3 h-3 mr-1" />}
+                        Rigenera
+                      </Button>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-muted-foreground">
