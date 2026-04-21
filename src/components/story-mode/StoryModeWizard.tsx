@@ -29,7 +29,8 @@ import { SceneCard } from "./SceneCard";
 import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
-import { PreFlightAudioPanel, computePreFlight } from "./PreFlightAudioPanel";
+import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem } from "./PreFlightAudioPanel";
+import { PreFlightVideoPanel, type ProblematicVideoItem } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
@@ -170,6 +171,10 @@ export const StoryModeWizard = () => {
   const [showBatchAudioRegenDialog, setShowBatchAudioRegenDialog] = useState(false);
   const [batchAudioStats, setBatchAudioStats] = useState<{ blob: number; total: number; pct: number } | null>(null);
   const [isBatchRegenAudio, setIsBatchRegenAudio] = useState(false);
+  // Detailed progress for the pre-flight regen panels (audio + video). Null = idle.
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
+  // Track which projectIds have already triggered auto-recovery so a re-render doesn't loop
+  const autoRecoveryFiredRef = useRef<Set<string>>(new Set());
   // Detailed list of expired audio assets (per-scene), used by the batch dialog for selective regeneration
   const [batchAudioDetails, setBatchAudioDetails] = useState<Array<{
     key: string;
