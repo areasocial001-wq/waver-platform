@@ -92,6 +92,8 @@ interface SceneCardProps {
   stylePromptModifier?: string;
   /** Aspect ratio of the project — also used by the live prompt preview. */
   videoAspectRatio?: string;
+  /** Global user-pref: when true, "lock character identity" is on by default in regen popovers. */
+  lockCharacterDefault?: boolean;
   onKeepNew?: (type: "image" | "audio" | "video" | "sfx") => void;
   /** When `versionUrl` is provided, restore that specific entry from versionHistory. */
   onRollback?: (type: "image" | "audio" | "video" | "sfx", versionUrl?: string) => void;
