@@ -1,13 +1,26 @@
 import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, AlertTriangle, Mic, Music, Volume2, Sparkles, Check, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldCheck, AlertTriangle, Mic, Music, Volume2, Sparkles, Check, X, RefreshCw, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StoryScene } from "./types";
 
 interface PreFlightAudioPanelProps {
   scenes: StoryScene[];
   backgroundMusicUrl: string | null;
+  /** Called when user clicks "Rigenera audio scaduti". Receives the list of items to regenerate. */
+  onRegenerateExpired?: (items: ExpiredAudioItem[]) => void | Promise<void>;
+  /** When true, shows a spinner and disables the regenerate button */
+  isRegenerating?: boolean;
+}
+
+export interface ExpiredAudioItem {
+  type: "audio" | "sfx" | "music";
+  /** Index in scenes[] (-1 for global music) */
+  sceneIndex: number;
+  /** Display number for the scene (0 for music) */
+  sceneNumber: number;
 }
 
 export interface PreFlightResult {
@@ -56,7 +69,7 @@ const STATE_CLASS: Record<AudioState, string> = {
  *
  * Caller uses the returned `ok` flag to enable/disable the render button.
  */
-export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl }: PreFlightAudioPanelProps) => {
+export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateExpired, isRegenerating }: PreFlightAudioPanelProps) => {
   const rows = useMemo(() => scenes.map((s, i) => {
     const narration = stateOf(s.audioUrl, true);
     const sfx = stateOf(s.sfxUrl, !!s.sfxPrompt);
@@ -82,6 +95,25 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl }: PreFlightAud
     (music === "missing" ? 1 : 0);
 
   const allOk = blockingCount === 0 && warningCount === 0;
+
+  // Items that can be auto-regenerated: anything that's blob: (expired) or missing narration.
+  const expiredItems = useMemo<ExpiredAudioItem[]>(() => {
+    const list: ExpiredAudioItem[] = [];
+    scenes.forEach((s, i) => {
+      if (s.audioUrl?.startsWith("blob:") || (!s.audioUrl && s.narration)) {
+        list.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+      if (s.sfxUrl?.startsWith("blob:")) {
+        list.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+    });
+    if (backgroundMusicUrl?.startsWith("blob:")) {
+      list.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
+    }
+    return list;
+  }, [scenes, backgroundMusicUrl]);
+
+  const canRegenerate = expiredItems.length > 0 && !!onRegenerateExpired;
 
   return (
     <Card className={cn(
@@ -121,6 +153,31 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl }: PreFlightAud
               ? "Asset audio non raggiungibili dal server: rigenerali prima del render altrimenti il video finale sarà incompleto."
               : "Alcune scene non hanno SFX configurato — il video verrà comunque generato senza."}
           </p>
+        )}
+
+        {canRegenerate && (
+          <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+            <p className="text-[11px] text-muted-foreground">
+              {expiredItems.length} asset audio scaduti o mancanti rilevati
+              {" · "}
+              {expiredItems.filter(i => i.type === "audio").length > 0 && `voci: ${expiredItems.filter(i => i.type === "audio").length}`}
+              {expiredItems.filter(i => i.type === "sfx").length > 0 && ` · SFX: ${expiredItems.filter(i => i.type === "sfx").length}`}
+              {expiredItems.some(i => i.type === "music") && ` · musica`}
+            </p>
+            <Button
+              size="sm"
+              variant={blockingCount > 0 ? "destructive" : "outline"}
+              onClick={() => onRegenerateExpired?.(expiredItems)}
+              disabled={isRegenerating}
+              className="h-7 text-xs"
+            >
+              {isRegenerating ? (
+                <><Loader2 className="w-3 h-3 mr-1.5 animate-spin" />Rigenerazione…</>
+              ) : (
+                <><RefreshCw className="w-3 h-3 mr-1.5" />Rigenera audio scaduti</>
+              )}
+            </Button>
+          </div>
         )}
 
         {/* Compact per-scene grid, only when there are issues */}
