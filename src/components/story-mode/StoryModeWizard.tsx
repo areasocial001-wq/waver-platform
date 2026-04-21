@@ -3144,6 +3144,64 @@ export const StoryModeWizard = () => {
             );
           })()}
 
+          {/* Bulk character-lock toggle — applies scene.lockCharacter sticky pref to ALL scenes in one click */}
+          {(() => {
+            const total = script.scenes.length;
+            const locked = script.scenes.filter((s) => s.lockCharacter === true).length;
+            const allLocked = total > 0 && locked === total;
+            const noneLocked = locked === 0;
+            return (
+              <Card className="border-dashed">
+                <CardContent className="py-3 px-4 flex flex-wrap items-center gap-3 justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+                    <div className="text-sm">
+                      <span className="font-medium">Blocca identità personaggio</span>
+                      <span className="text-muted-foreground ml-2">
+                        ({locked}/{total} scene con preferenza sticky)
+                      </span>
+                    </div>
+                    {lockCharacterDefault && (
+                      <Badge variant="outline" className="text-xs">
+                        default progetto attivo
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={allLocked}
+                      onClick={() => {
+                        const next = script.scenes.map((s) => ({ ...s, lockCharacter: true }));
+                        setScript({ ...script, scenes: next });
+                        toast.success(`Blocco identità attivato su tutte le ${total} scene`);
+                      }}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-2" />
+                      Applica a tutte le scene
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={noneLocked}
+                      onClick={() => {
+                        const next = script.scenes.map((s) => {
+                          const { lockCharacter: _omit, ...rest } = s;
+                          return rest as StoryScene;
+                        });
+                        setScript({ ...script, scenes: next });
+                        toast.success(`Preferenza sticky rimossa da tutte le scene${lockCharacterDefault ? " (resta attivo il default progetto)" : ""}`);
+                      }}
+                    >
+                      Rimuovi da tutte
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           {/* Pre-flight audio check — surfaces missing/blob assets BEFORE wasting render credits */}
           <PreFlightAudioPanel
             scenes={script.scenes}
