@@ -29,7 +29,7 @@ import { SceneCard } from "./SceneCard";
 import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
-import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem } from "./PreFlightAudioPanel";
+import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem, type MeasuredAudioDuration } from "./PreFlightAudioPanel";
 import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
@@ -3132,6 +3132,21 @@ export const StoryModeWizard = () => {
             backgroundMusicUrl={backgroundMusicUrl}
             progress={batchProgress}
             onRegenerateExpired={async (items) => { await runAudioBatchRegen(items); }}
+            onAudioDurationMeasured={(r: MeasuredAudioDuration) => {
+              setScript((prev) => {
+                if (!prev) return prev;
+                const next = [...prev.scenes];
+                const cur = next[r.sceneIndex];
+                if (!cur) return prev;
+                if (cur.audioDuration === r.measured && cur.audioDurationWarning === r.warning) return prev;
+                next[r.sceneIndex] = {
+                  ...cur,
+                  audioDuration: r.measured,
+                  audioDurationWarning: r.mismatch ? r.warning : undefined,
+                };
+                return { ...prev, scenes: next };
+              });
+            }}
           />
 
           {/* Pre-flight video check — flags missing/blob/aspect/format/duration clips before render */}
