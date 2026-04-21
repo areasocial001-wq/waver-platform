@@ -38,6 +38,10 @@ export interface StoryScene {
   videoDuration?: number;
   /** Set when measured video duration deviates >10% from scene.duration */
   videoDurationWarning?: string;
+  /** Real measured duration (seconds) of the narration audio file */
+  audioDuration?: number;
+  /** Set when narration audio is LONGER than scene.duration (would be cut by render) */
+  audioDurationWarning?: string;
   /** Previous asset URLs kept for visual before/after comparison after regeneration (legacy single-slot) */
   previousImageUrl?: string;
   previousVideoUrl?: string;

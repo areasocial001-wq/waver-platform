@@ -181,3 +181,52 @@ export async function measureAndValidateVideoDuration(
     video.src = url;
   });
 }
+
+/**
+ * Loads only the metadata of an audio URL via a hidden <audio> element and
+ * compares its real duration against the expected scene duration.
+ *
+ * For narration we only flag a mismatch when the audio is LONGER than expected
+ * (Shotstack would cut the voice off). Audio shorter than the scene is fine —
+ * the video continues playing in silence.
+ *
+ * @param tolerance fractional tolerance ABOVE expected (default 0.05 = 5% longer is OK)
+ */
+export async function measureAndValidateAudioDuration(
+  url: string,
+  expectedSeconds: number,
+  tolerance = 0.05,
+): Promise<DurationCheckResult | null> {
+  if (!expectedSeconds || expectedSeconds <= 0) return null;
+  return new Promise((resolve) => {
+    const audio = document.createElement("audio");
+    audio.crossOrigin = "anonymous";
+    audio.preload = "metadata";
+    let settled = false;
+    const finish = (r: DurationCheckResult | null) => {
+      if (settled) return;
+      settled = true;
+      try { audio.src = ""; audio.remove(); } catch { /* noop */ }
+      resolve(r);
+    };
+    audio.onloadedmetadata = () => {
+      const measured = audio.duration;
+      if (!measured || !isFinite(measured)) {
+        finish(null);
+        return;
+      }
+      // Only flag when audio exceeds (1 + tolerance) * expected
+      const overflow = (measured - expectedSeconds) / expectedSeconds;
+      const mismatch = overflow > tolerance;
+      const deviation = Math.abs(overflow);
+      const result: DurationCheckResult = { measured, expected: expectedSeconds, deviation, mismatch };
+      if (mismatch) {
+        result.warning = `Voce troppo lunga: scena ${expectedSeconds.toFixed(1)}s ma audio ${measured.toFixed(1)}s. Verrà tagliata nel render — accorcia la narrazione o aumenta la durata della scena.`;
+      }
+      finish(result);
+    };
+    audio.onerror = () => finish(null);
+    setTimeout(() => finish(null), 15000);
+    audio.src = url;
+  });
+}
