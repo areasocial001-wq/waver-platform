@@ -76,11 +76,13 @@ export function buildImageRegenerationPrompt({
 
 export function buildVideoRegenerationPrompt({
   scene,
+  stylePrompt,
   aspectRatio,
   previousCorrectionNote,
   nextCorrectionNote,
 }: {
   scene: StoryScene;
+  stylePrompt?: string;
   aspectRatio?: VideoAspectRatio;
   previousCorrectionNote?: string;
   nextCorrectionNote?: string;
@@ -94,6 +96,7 @@ export function buildVideoRegenerationPrompt({
     scene.narration ? `NARRATION CONTEXT: ${normalizeText(scene.narration)}.` : "",
     scene.mood ? `MOOD TO PRESERVE: ${normalizeText(scene.mood)}.` : "",
     scene.cameraMovement ? `CAMERA MOVEMENT LOCK: ${humanizeCameraMovement(scene.cameraMovement)}.` : "",
+    stylePrompt ? `STYLE LOCK: ${normalizeText(stylePrompt)}.` : "",
     aspectRatio ? `ASPECT RATIO LOCK: ${aspectRatio}.` : "",
     `DURATION TARGET: ${scene.duration}s.`,
     "ANIMATION LOCK: animate the provided source image faithfully; do not replace the subject, do not change the outfit or location, and do not introduce unrelated events.",

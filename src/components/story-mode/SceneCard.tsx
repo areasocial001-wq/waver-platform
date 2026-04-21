@@ -798,7 +798,7 @@ const CorrectionNotePopover = ({
         <div className="space-y-1">
           <Label className="text-xs font-semibold">{title} (opzionale)</Label>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            Verrà appesa al prompt originale per guidare la rigenerazione.
+            La correzione resta sticky per la scena e viene trattata come vincolo prioritario nelle prossime rigenerazioni.
           </p>
         </div>
         {/* Quick preset chips */}
