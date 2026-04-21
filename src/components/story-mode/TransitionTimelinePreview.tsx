@@ -374,6 +374,10 @@ interface CrossfadeInspectorProps {
   transitionDuration: number;
   transitionType: NonNullable<StoryScene["transition"]>;
   aspectClass: string;
+  /** Optional external scrubber position (0..1) controlled by parent playhead. */
+  externalT?: number;
+  /** Notify parent when scrubber is moved manually. */
+  onTChange?: (nt: number) => void;
 }
 
 const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
@@ -382,10 +386,17 @@ const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
   transitionDuration,
   transitionType,
   aspectClass,
+  externalT,
+  onTChange,
 }) => {
   // Scrubber position: 0 = start of transition (outgoing 100% visible)
   //                    1 = end of transition (incoming 100% visible)
-  const [t, setT] = useState(0.5);
+  const [internalT, setInternalT] = useState(0.5);
+  const t = externalT != null ? externalT : internalT;
+  const setT = (nt: number) => {
+    setInternalT(nt);
+    onTChange?.(nt);
+  };
   const [playing, setPlaying] = useState(false);
   const outVidRef = useRef<HTMLVideoElement>(null);
   const inVidRef = useRef<HTMLVideoElement>(null);
