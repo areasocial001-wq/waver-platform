@@ -11,7 +11,10 @@ import { Label } from "@/components/ui/label";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
-import { isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase } from "@/lib/storyModePreferences";
+import {
+  isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase,
+  isLockCharacterDefaultEnabled, setLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase,
+} from "@/lib/storyModePreferences";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
