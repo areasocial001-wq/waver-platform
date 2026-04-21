@@ -623,6 +623,49 @@ export const AudioDebugPanel: React.FC = () => {
                       ))}
                     </ul>
                   )}
+                  {c.result?.failureReason && (
+                    <div className="rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive flex items-start gap-1.5">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span><span className="font-semibold">Motivo: </span>{c.result.failureReason}</span>
+                    </div>
+                  )}
+                  {c.result?.notes && c.result.notes.length > 0 && (
+                    <ul className="text-[11px] text-muted-foreground list-disc list-inside space-y-0.5">
+                      {c.result.notes.map((n, idx) => (
+                        <li key={idx}>{n}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {c.attempts && c.attempts.length > 0 && (
+                    <div className="border-t border-border/40 pt-2 mt-2 space-y-1.5">
+                      <button
+                        onClick={() => toggleAttempts(c.key)}
+                        className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        {c.showAttempts ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        Log tentativi ({c.attempts.length})
+                      </button>
+                      {c.showAttempts && (
+                        <div className="space-y-1 font-mono text-[10px] bg-muted/30 rounded p-2 max-h-48 overflow-y-auto">
+                          {c.attempts.map((a, idx) => (
+                            <div
+                              key={idx}
+                              className={cn(
+                                "flex items-start gap-2",
+                                a.ok ? "text-foreground/80" : "text-destructive",
+                              )}
+                            >
+                              <span className="text-muted-foreground shrink-0">
+                                {new Date(a.at).toLocaleTimeString("it-IT", { hour12: false })}
+                              </span>
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">{a.step}</Badge>
+                              <span className="break-all">{a.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               {checks.length === 0 && (
