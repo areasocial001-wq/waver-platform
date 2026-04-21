@@ -752,7 +752,7 @@ export const StoryModeWizard = () => {
                 body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
               });
               if (!r.ok) continue;
-              const blob = await r.blob();
+              const blob = await audioResponseToBlob(r);
               const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
               migrated[i] = { ...migrated[i], audioUrl: storageUrl, audioStatus: "completed" };
               reuploadedAudio++;
@@ -881,7 +881,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
       });
       if (!response.ok) throw new Error("TTS preview failed");
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const url = URL.createObjectURL(blob);
       updateScene(index, "previewAudioUrl", url);
       // Auto-play
@@ -1010,7 +1010,7 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
         });
         if (!response.ok) throw new Error("TTS failed");
-        const blob = await response.blob();
+        const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
         const scenes = [...script.scenes];
         const prevA = scenes[index];
@@ -1538,7 +1538,7 @@ export const StoryModeWizard = () => {
         body: JSON.stringify({ prompt: script.suggestedMusic, duration: Math.min(script.scenes.reduce((a, s) => a + s.duration, 0), 120) }),
       });
       if (!response.ok) throw new Error(`Music failed: ${response.status}`);
-      const blob = await response.blob();
+      const blob = await audioResponseToBlob(response);
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
@@ -2265,7 +2265,7 @@ export const StoryModeWizard = () => {
           body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
         });
         if (!r.ok) throw new Error("TTS failed");
-        const blob = await r.blob();
+        const blob = await audioResponseToBlob(r);
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
         scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
