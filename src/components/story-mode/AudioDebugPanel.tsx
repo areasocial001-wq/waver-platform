@@ -231,7 +231,7 @@ export const AudioDebugPanel: React.FC = () => {
       }
       const { data, error: qErr } = await supabase
         .from("story_mode_projects")
-        .select("id, title, updated_at, scenes, background_music_url")
+        .select("id, title, updated_at, scenes, background_music_url, suggested_music, input_config")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
         .limit(1)
@@ -249,19 +249,17 @@ export const AudioDebugPanel: React.FC = () => {
         updatedAt: data.updated_at,
         scenes: rawScenes,
         backgroundMusicUrl: (data as { background_music_url: string | null }).background_music_url,
+        suggestedMusic: (data as { suggested_music: string | null }).suggested_music ?? null,
+        inputConfig: (data as { input_config: Record<string, unknown> | null }).input_config ?? {},
       };
       setProject(snap);
       const list: AssetCheck[] = [];
-      if (snap.backgroundMusicUrl) {
-        list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: snap.backgroundMusicUrl });
-      } else {
-        list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: null });
-      }
+      list.push({ key: "music", label: "Musica di sottofondo", type: "music", url: snap.backgroundMusicUrl });
       rawScenes.forEach((s, i) => {
         const num = s.sceneNumber ?? i + 1;
-        list.push({ key: `nar-${i}`, label: `Voce scena ${num}`, type: "narration", url: s.audioUrl, sceneNumber: num });
+        list.push({ key: `nar-${i}`, label: `Voce scena ${num}`, type: "narration", url: s.audioUrl, sceneNumber: num, sceneIndex: i });
         if (s.sfxUrl !== undefined && s.sfxUrl !== null) {
-          list.push({ key: `sfx-${i}`, label: `SFX scena ${num}`, type: "sfx", url: s.sfxUrl, sceneNumber: num });
+          list.push({ key: `sfx-${i}`, label: `SFX scena ${num}`, type: "sfx", url: s.sfxUrl, sceneNumber: num, sceneIndex: i });
         }
       });
       setChecks(list);
