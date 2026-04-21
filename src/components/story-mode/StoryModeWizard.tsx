@@ -910,6 +910,10 @@ export const StoryModeWizard = () => {
     const scene = script.scenes[index];
     setRegeneratingScene({ idx: index, type });
 
+    // Effective lock-character: explicit option wins → fallback to sticky scene pref → fallback to global default.
+    const effectiveLockCharacter =
+      options?.lockCharacter ?? scene.lockCharacter ?? lockCharacterDefault;
+
     try {
       if (type === "image") {
         if (!input.imageUrl && refImageError) {
