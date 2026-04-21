@@ -713,19 +713,65 @@ serve(async (req) => {
 
         // Add background music track — uses EFFECTIVE total duration, not raw sum,
         // so music length matches the actual final video.
+        // CRITICAL: Shotstack will not auto-extend a clip beyond its source duration,
+        // so when the music file is shorter than the video we need to LOOP it by adding
+        // multiple back-to-back clips with a tiny crossfade overlap to avoid audible cuts.
         if (backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:')) {
           const normalizedMusicUrl = await normalizeAssetUrl(backgroundMusicUrl, supabase, supabaseUrl);
-          timeline.tracks.push({
-            clips: [{
-              asset: {
-                type: 'audio',
-                src: normalizedMusicUrl,
-                volume: musicVolume,
-              },
+
+          // Probe music duration via HEAD/Range request — best-effort, falls back to assuming
+          // music is long enough if probe fails.
+          let musicDuration = effectiveTotalDuration;
+          try {
+            const probe = await fetch(normalizedMusicUrl, { method: 'HEAD' });
+            const contentLength = parseInt(probe.headers.get('content-length') || '0', 10);
+            // Rough estimate: 128kbps mp3 ≈ 16KB/s. Used only as a sanity check; if music is
+            // clearly shorter than video, we loop. Otherwise we trust a single clip.
+            if (contentLength > 0) {
+              const estimatedSeconds = contentLength / 16000;
+              if (estimatedSeconds < effectiveTotalDuration - 1) {
+                musicDuration = estimatedSeconds;
+              }
+            }
+          } catch (probeErr) {
+            console.warn('Music duration probe failed, assuming single clip is enough:', probeErr);
+          }
+
+          const musicClips: any[] = [];
+          if (musicDuration >= effectiveTotalDuration - 0.5) {
+            // Single clip covers the whole video.
+            musicClips.push({
+              asset: { type: 'audio', src: normalizedMusicUrl, volume: musicVolume },
               start: 0,
               length: effectiveTotalDuration,
-            }],
-          });
+            });
+          } else {
+            // Loop music with 0.5s overlap between repetitions to mask the seam.
+            const SEAM_OVERLAP = 0.5;
+            const safeChunkLen = Math.max(musicDuration - SEAM_OVERLAP, 1);
+            let cursor = 0;
+            let loopIdx = 0;
+            while (cursor < effectiveTotalDuration - 0.05 && loopIdx < 30) {
+              const remaining = effectiveTotalDuration - cursor;
+              const clipLen = Math.min(musicDuration, remaining);
+              musicClips.push({
+                asset: {
+                  type: 'audio',
+                  src: normalizedMusicUrl,
+                  volume: musicVolume,
+                  // Fade in/out on each loop seam so repetitions blend instead of clicking.
+                  effect: loopIdx === 0 ? 'fadeOut' : (clipLen >= remaining - 0.05 ? 'fadeIn' : 'fadeInFadeOut'),
+                },
+                start: cursor,
+                length: clipLen,
+              });
+              cursor += safeChunkLen;
+              loopIdx++;
+            }
+            console.log(`Music looped ${loopIdx}x to cover ${effectiveTotalDuration}s (source ${musicDuration}s)`);
+          }
+
+          timeline.tracks.push({ clips: musicClips });
         }
 
         // Build render request — use explicit size for vertical/square to avoid Shotstack

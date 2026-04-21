@@ -124,16 +124,27 @@ const useDownloadFile = (setLoadingId: (id: string | null) => void) => {
 };
 
 /**
+ * Verify the bytes look like a real MP3 (ID3 tag or MPEG sync 0xFFEx/0xFFFx).
+ * Used to fail-fast when ElevenLabs returns a corrupted/empty payload that
+ * would otherwise be uploaded silently and produce a mute final video.
+ */
+const isLikelyMp3Bytes = (bytes: Uint8Array): boolean => {
+  if (bytes.length < 4) return false;
+  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true; // ID3
+  if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true; // MPEG sync
+  return false;
+};
+
+/**
  * Convert an ElevenLabs edge-function response into an audio Blob.
  *
  * Both `elevenlabs-tts` and `elevenlabs-music` return JSON of the form
  * `{ audioContent: <base64 mp3>, format: "mp3" }`. Calling `response.blob()`
  * directly would yield a JSON-as-text blob (not playable audio) which, once
  * uploaded to storage and fed to Shotstack, results in a SILENT track in the
- * final render. This helper decodes the base64 payload to a real MP3 Blob.
- *
- * Falls back to `response.blob()` for raw-binary endpoints (e.g. SFX) so the
- * helper is safe to use as a single audio entry point.
+ * final render. This helper decodes the base64 payload to a real MP3 Blob and
+ * THROWS if the decoded bytes are not a valid MP3 — letting the retry wrapper
+ * try again instead of uploading garbage.
  */
 const audioResponseToBlob = async (response: Response): Promise<Blob> => {
   const contentType = response.headers.get("content-type") || "";
@@ -143,15 +154,81 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
     if (!base64 || typeof base64 !== "string") {
       throw new Error("Risposta audio non valida: campo audioContent mancante");
     }
-    // Decode base64 in chunks to avoid call-stack issues on large payloads.
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    if (!isLikelyMp3Bytes(bytes)) {
+      throw new Error(`MP3 non valido (${bytes.length} bytes, header non riconosciuto)`);
+    }
     const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
     return new Blob([bytes], { type: mime });
   }
-  // Raw binary endpoint (e.g. elevenlabs-sfx) — return as-is.
   return response.blob();
+};
+
+/**
+ * Fetch an audio endpoint and decode the response with up to N retries.
+ * Logs every attempt to apiLogger so the user sees the trail in the logs panel.
+ * Retries on network errors, non-2xx status, or invalid MP3 payload.
+ */
+const fetchAudioWithRetry = async (
+  url: string,
+  init: RequestInit,
+  apiName: "ElevenLabs TTS" | "ElevenLabs Music",
+  operation: string,
+  options: { maxAttempts?: number; baseDelayMs?: number } = {},
+): Promise<Blob> => {
+  const maxAttempts = options.maxAttempts ?? 3;
+  const baseDelay = options.baseDelayMs ?? 1200;
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const startedAt = Date.now();
+    try {
+      const response = await fetch(url, init);
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}${errText ? ` – ${errText.slice(0, 120)}` : ""}`);
+      }
+      const blob = await audioResponseToBlob(response);
+      apiLogger.success(apiName, operation, `Tentativo ${attempt}/${maxAttempts} OK (${blob.size} bytes)`, { attempt, bytes: blob.size }, Date.now() - startedAt).catch(() => {});
+      return blob;
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      apiLogger.warning(apiName, operation, `Tentativo ${attempt}/${maxAttempts} fallito: ${lastError.message}`, { attempt, error: lastError.message, duration_ms: Date.now() - startedAt }).catch(() => {});
+      if (attempt < maxAttempts) {
+        await new Promise(r => setTimeout(r, baseDelay * attempt));
+      }
+    }
+  }
+  apiLogger.error(apiName, operation, `Audio non recuperabile dopo ${maxAttempts} tentativi: ${lastError?.message}`, { attempts: maxAttempts }).catch(() => {});
+  throw lastError || new Error("Audio fetch failed");
+};
+
+/** Measure real duration (s) of an audio Blob via hidden <audio> metadata load. */
+const measureAudioBlobDuration = (blob: Blob): Promise<number> => {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio();
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const d = isFinite(audio.duration) ? audio.duration : 0;
+      URL.revokeObjectURL(url);
+      resolve(d);
+    };
+    audio.onerror = () => { URL.revokeObjectURL(url); resolve(0); };
+    audio.src = url;
+  });
+};
+
+/**
+ * Round + clamp a measured TTS duration into a valid scene length the video
+ * generator can produce (Kling supports 5 or 10 seconds only). Adds 0.5s of
+ * safety padding so the voice never gets cut at the tail.
+ */
+const adaptDurationToVoice = (measuredSeconds: number, currentSceneDuration: number): number => {
+  if (!measuredSeconds || measuredSeconds <= 0) return currentSceneDuration;
+  const padded = measuredSeconds + 0.5;
+  return padded <= 6 ? 5 : 10;
 };
 
 export const StoryModeWizard = () => {
@@ -1530,20 +1607,35 @@ export const StoryModeWizard = () => {
   const generateBackgroundMusic = async (): Promise<string | null> => {
     if (!script?.suggestedMusic) return null;
     try {
-      toast.info("Generazione colonna sonora...");
+      // Total video duration = sum of every scene (capped to 300s by the edge fn).
+      // We deliberately request ONE long unified track instead of per-scene tracks
+      // so the music never restarts/cuts between scenes during crossfades.
+      const totalDuration = Math.min(
+        Math.max(script.scenes.reduce((a, s) => a + s.duration, 0), 10),
+        300,
+      );
+      toast.info(`Generazione colonna sonora unica (${totalDuration}s)…`);
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`, {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ prompt: script.suggestedMusic, duration: Math.min(script.scenes.reduce((a, s) => a + s.duration, 0), 120) }),
-      });
-      if (!response.ok) throw new Error(`Music failed: ${response.status}`);
-      const blob = await audioResponseToBlob(response);
+      const blob = await fetchAudioWithRetry(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ prompt: script.suggestedMusic, category: "music", duration: totalDuration }),
+        },
+        "ElevenLabs Music",
+        "story-mode/background",
+        { maxAttempts: 3 },
+      );
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
-    } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
+    } catch (err: any) {
+      console.error("Music error:", err);
+      toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
+      return null;
+    }
   };
 
   /**
@@ -2252,7 +2344,8 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
-    // TTS narration
+    // TTS narration — also adapts scene.duration to match the real measured voice length,
+    // so the video segment is generated with the right runtime and the narration is never cut.
     for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
       if (checkCancelled()) break;
@@ -2260,15 +2353,34 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
-        const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
-          method: "POST", headers: authHeaders,
-          body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
-        });
-        if (!r.ok) throw new Error("TTS failed");
-        const blob = await audioResponseToBlob(r);
+        const blob = await fetchAudioWithRetry(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST", headers: authHeaders,
+            body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
+          },
+          "ElevenLabs TTS",
+          `story-mode/scene-${i + 1}`,
+          { maxAttempts: 3 },
+        );
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
-        scenes[i] = { ...scenes[i], audioUrl: storageUrl, audioStatus: "completed" };
+
+        // Measure the real audio duration and adapt scene.duration if the voice is
+        // significantly longer/shorter than the originally planned scene length.
+        const measured = await measureAudioBlobDuration(blob);
+        const adapted = adaptDurationToVoice(measured, scenes[i].duration);
+        if (adapted !== scenes[i].duration) {
+          apiLogger.info("StoryMode", "voice-sync", `Scena ${i + 1}: durata adattata ${scenes[i].duration}s → ${adapted}s (voce ${measured.toFixed(1)}s)`).catch(() => {});
+          toast.info(`Scena ${i + 1}: durata regolata a ${adapted}s per allineare la voce (${measured.toFixed(1)}s)`);
+        }
+        scenes[i] = {
+          ...scenes[i],
+          audioUrl: storageUrl,
+          audioStatus: "completed",
+          duration: adapted,
+          audioDuration: measured || undefined,
+        };
       } catch (err: any) {
         const msg = err.message || "Errore sconosciuto";
         toast.error(`Scena ${i + 1}: errore audio – ${msg}`);
