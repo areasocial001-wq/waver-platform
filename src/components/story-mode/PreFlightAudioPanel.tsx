@@ -194,7 +194,6 @@ export const PreFlightAudioPanel = ({ scenes, backgroundMusicUrl, onRegenerateEx
             >
               <RefreshCw className="w-3 h-3 mr-1.5" />Rigenera audio scaduti
             </Button>
-            </Button>
           </div>
         )}
 
