@@ -3038,28 +3038,16 @@ export const StoryModeWizard = () => {
           <PreFlightAudioPanel
             scenes={script.scenes}
             backgroundMusicUrl={backgroundMusicUrl}
-            isRegenerating={isBatchRegenAudio}
-            onRegenerateExpired={async (items) => {
-              if (items.length === 0) return;
-              setIsBatchRegenAudio(true);
-              toast.info(`Rigenerazione di ${items.length} audio scaduti…`);
-              let done = 0;
-              for (const it of items) {
-                try {
-                  if (it.type === "music") {
-                    await generateBackgroundMusic();
-                  } else {
-                    await regenerateSceneAsset(it.sceneIndex, it.type);
-                  }
-                  done++;
-                } catch (e) {
-                  console.warn("Pre-flight regen failed:", e);
-                }
-              }
-              setIsBatchRegenAudio(false);
-              toast.success(`${done}/${items.length} audio rigenerati`);
-              setTimeout(() => saveProject(), 300);
-            }}
+            progress={batchProgress}
+            onRegenerateExpired={(items) => runAudioBatchRegen(items)}
+          />
+
+          {/* Pre-flight video check — flags missing/blob/aspect/format clips before render */}
+          <PreFlightVideoPanel
+            scenes={script.scenes}
+            expectedAspect={input.videoAspectRatio}
+            progress={batchProgress}
+            onRegenerateProblematic={(items) => runVideoBatchRegen(items)}
           />
 
           <div className="flex gap-3 flex-wrap">
