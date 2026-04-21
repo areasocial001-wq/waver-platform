@@ -34,6 +34,10 @@ export interface StoryScene {
   videoHeight?: number;
   /** Set when measured video aspect ratio deviates >5% from requested */
   videoAspectWarning?: string;
+  /** Real measured duration (seconds) of the generated video file */
+  videoDuration?: number;
+  /** Set when measured video duration deviates >10% from scene.duration */
+  videoDurationWarning?: string;
   /** Previous asset URLs kept for visual before/after comparison after regeneration (legacy single-slot) */
   previousImageUrl?: string;
   previousVideoUrl?: string;

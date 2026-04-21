@@ -127,3 +127,57 @@ export async function measureAndValidateVideoAspect(
     video.src = url;
   });
 }
+
+export interface DurationCheckResult {
+  measured: number;
+  expected: number;
+  /** Absolute relative deviation, e.g. 0.12 = 12% off */
+  deviation: number;
+  mismatch: boolean;
+  warning?: string;
+}
+
+/**
+ * Loads only the metadata of a video URL via a hidden <video> element and
+ * compares its real duration against the expected scene duration.
+ * Returns null when the browser cannot read the metadata (CORS / bad URL / blob expired).
+ *
+ * @param tolerance fractional tolerance (default 0.10 = 10%)
+ */
+export async function measureAndValidateVideoDuration(
+  url: string,
+  expectedSeconds: number,
+  tolerance = 0.10,
+): Promise<DurationCheckResult | null> {
+  if (!expectedSeconds || expectedSeconds <= 0) return null;
+  return new Promise((resolve) => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.preload = "metadata";
+    video.muted = true;
+    let settled = false;
+    const finish = (r: DurationCheckResult | null) => {
+      if (settled) return;
+      settled = true;
+      try { video.src = ""; video.remove(); } catch { /* noop */ }
+      resolve(r);
+    };
+    video.onloadedmetadata = () => {
+      const measured = video.duration;
+      if (!measured || !isFinite(measured)) {
+        finish(null);
+        return;
+      }
+      const deviation = Math.abs(measured - expectedSeconds) / expectedSeconds;
+      const mismatch = deviation > tolerance;
+      const result: DurationCheckResult = { measured, expected: expectedSeconds, deviation, mismatch };
+      if (mismatch) {
+        result.warning = `Durata non conforme: scena ${expectedSeconds.toFixed(1)}s ma video ${measured.toFixed(1)}s (scarto ${Math.round(deviation * 100)}%). Rigenera per allinearla.`;
+      }
+      finish(result);
+    };
+    video.onerror = () => finish(null);
+    setTimeout(() => finish(null), 15000);
+    video.src = url;
+  });
+}
