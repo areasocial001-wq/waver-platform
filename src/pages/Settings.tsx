@@ -11,23 +11,30 @@ import { Label } from "@/components/ui/label";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
-import { isAutoRecoveryEnabled, setAutoRecoveryEnabled } from "@/lib/storyModePreferences";
+import { isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase } from "@/lib/storyModePreferences";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { thresholds, notifyOnChange, saveSettings } = useApiMonitoring();
   const [autoRecovery, setAutoRecovery] = useState(true);
+  const [isSyncingPreference, setIsSyncingPreference] = useState(true);
 
   useEffect(() => {
+    // Hydrate from local cache immediately, then refresh from Supabase
     setAutoRecovery(isAutoRecoveryEnabled());
+    (async () => {
+      const remote = await loadAutoRecoveryFromSupabase();
+      setAutoRecovery(remote);
+      setIsSyncingPreference(false);
+    })();
   }, []);
 
   const handleToggleAutoRecovery = (next: boolean) => {
     setAutoRecovery(next);
-    setAutoRecoveryEnabled(next);
+    setAutoRecoveryEnabled(next); // writes local + fires Supabase sync
     toast.success(next
-      ? "Auto-recovery attivato: gli asset scaduti verranno rigenerati automaticamente al reload."
-      : "Auto-recovery disattivato: dovrai cliccare 'Rigenera' manualmente nel pannello pre-flight.");
+      ? "Auto-recovery attivato: gli asset scaduti verranno rigenerati automaticamente al reload (sincronizzato su tutti i tuoi dispositivi)."
+      : "Auto-recovery disattivato: dovrai cliccare 'Rigenera' manualmente nel pannello pre-flight (sincronizzato su tutti i tuoi dispositivi).");
   };
 
   const handleSaveThresholds = async (newThresholds: ThresholdSettings, notify: boolean) => {
@@ -110,6 +117,7 @@ export default function SettingsPage() {
                     <Switch
                       id="auto-recovery"
                       checked={autoRecovery}
+                      disabled={isSyncingPreference}
                       onCheckedChange={handleToggleAutoRecovery}
                     />
                   </div>

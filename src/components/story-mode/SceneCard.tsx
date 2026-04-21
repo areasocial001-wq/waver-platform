@@ -227,6 +227,31 @@ export const SceneCard = ({
               </Badge>
             )}
           </div>
+          {/* Duration mismatch badge — surfaces video/audio length issues without scrolling to pre-flight */}
+          {(scene.videoDurationWarning || scene.audioDurationWarning) && (
+            <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+              {scene.videoDurationWarning && scene.videoDuration !== undefined && (
+                <Badge
+                  variant="outline"
+                  className="h-5 gap-1 border-amber-500/40 text-amber-500 font-mono"
+                  title={scene.videoDurationWarning}
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  Video {scene.videoDuration.toFixed(1)}s / attesa {scene.duration}s
+                </Badge>
+              )}
+              {scene.audioDurationWarning && scene.audioDuration !== undefined && (
+                <Badge
+                  variant="outline"
+                  className="h-5 gap-1 border-destructive/40 text-destructive font-mono"
+                  title={scene.audioDurationWarning}
+                >
+                  <AlertTriangle className="w-2.5 h-2.5" />
+                  Voce {scene.audioDuration.toFixed(1)}s / attesa {scene.duration}s
+                </Badge>
+              )}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground line-clamp-2">{scene.narration}</p>
           {onRegenerate && (
             <div className="flex gap-1 flex-wrap pt-1 border-t border-border/30">
