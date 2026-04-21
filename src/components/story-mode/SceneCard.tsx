@@ -785,6 +785,7 @@ const AssetPreview = ({
 const CorrectionNotePopover = ({
   open, onOpenChange, note, setNote, presets, title, placeholder,
   disabled, disabledTitle, spinning, icon, onConfirm,
+  kind, scene, stylePromptModifier, videoAspectRatio, previousCorrectionNote,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -797,8 +798,39 @@ const CorrectionNotePopover = ({
   disabledTitle?: string;
   spinning?: boolean;
   icon: React.ReactNode;
-  onConfirm: (note: string) => void;
+  onConfirm: (note: string, opts: { lockCharacter: boolean }) => void;
+  kind: "image" | "video";
+  scene: StoryScene;
+  stylePromptModifier?: string;
+  videoAspectRatio?: string;
+  previousCorrectionNote?: string;
 }) => {
+  const [lockCharacter, setLockCharacter] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  const builderArgs = {
+    scene,
+    stylePrompt: stylePromptModifier,
+    aspectRatio: videoAspectRatio as never,
+    previousCorrectionNote,
+  } as const;
+
+  const beforePrompt = useMemo(() => {
+    return kind === "image"
+      ? buildImageRegenerationPrompt({ ...builderArgs, nextCorrectionNote: undefined, lockCharacter: false }).prompt
+      : buildVideoRegenerationPrompt({ ...builderArgs, nextCorrectionNote: undefined, lockCharacter: false }).prompt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.imagePrompt, scene.cameraMovement, scene.mood, scene.narration, scene.duration, stylePromptModifier, videoAspectRatio, previousCorrectionNote, kind]);
+
+  const afterPrompt = useMemo(() => {
+    return kind === "image"
+      ? buildImageRegenerationPrompt({ ...builderArgs, nextCorrectionNote: note, lockCharacter }).prompt
+      : buildVideoRegenerationPrompt({ ...builderArgs, nextCorrectionNote: note, lockCharacter }).prompt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.imagePrompt, scene.cameraMovement, scene.mood, scene.narration, scene.duration, stylePromptModifier, videoAspectRatio, previousCorrectionNote, note, lockCharacter, kind]);
+
+  const promptChanged = beforePrompt !== afterPrompt;
+
   const appendChip = (chip: string) => {
     const trimmed = note.trim();
     if (!trimmed) { setNote(chip); return; }
@@ -820,7 +852,7 @@ const CorrectionNotePopover = ({
           <Wand2 className="w-2.5 h-2.5 opacity-60" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-3 space-y-2" align="start">
+      <PopoverContent className="w-[28rem] p-3 space-y-2 max-h-[80vh] overflow-y-auto" align="start">
         <div className="space-y-1">
           <Label className="text-xs font-semibold">{title} (opzionale)</Label>
           <p className="text-[10px] text-muted-foreground leading-tight">
@@ -848,11 +880,74 @@ const CorrectionNotePopover = ({
           className="text-xs min-h-[70px]"
           autoFocus
         />
+
+        {/* Character identity lock — forces the prompt builder to add a hard identity guard */}
+        <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/30 p-2">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium">🔒 Blocca identità personaggio</span>
+              {lockCharacter && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 border-primary/40 text-primary">attivo</Badge>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Forza volto, outfit e contesto identici alle altre scene. Utile quando la rigenerazione cambia persona o vestiti.
+            </p>
+          </div>
+          <Switch checked={lockCharacter} onCheckedChange={setLockCharacter} />
+        </div>
+
+        {/* Live diff of the actual prompt that will be sent to the generator */}
+        <div className="rounded-md border border-border/60 bg-muted/20">
+          <button
+            type="button"
+            onClick={() => setShowDiff((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 text-[10px] hover:bg-muted/40 transition-colors"
+          >
+            <span className="font-medium flex items-center gap-1.5">
+              <Eye className="w-3 h-3" />
+              Anteprima prompt (prima → dopo)
+              {promptChanged && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-500/40 text-amber-500">
+                  modificato
+                </Badge>
+              )}
+              {!promptChanged && note.trim() === "" && !lockCharacter && (
+                <Badge variant="outline" className="text-[9px] h-4 px-1 border-muted-foreground/30 text-muted-foreground">
+                  nessuna modifica
+                </Badge>
+              )}
+            </span>
+            <span className="text-muted-foreground">{showDiff ? "−" : "+"}</span>
+          </button>
+          {showDiff && (
+            <div className="border-t border-border/60 p-2 space-y-2">
+              <div>
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Prima</div>
+                <pre className="text-[10px] leading-snug font-mono whitespace-pre-wrap bg-background/60 p-2 rounded border border-border/40 max-h-32 overflow-y-auto">
+                  {beforePrompt}
+                </pre>
+              </div>
+              <div>
+                <div className="text-[9px] font-semibold uppercase tracking-wide text-primary mb-1">Dopo (verrà inviato al generatore)</div>
+                <pre className={cn(
+                  "text-[10px] leading-snug font-mono whitespace-pre-wrap p-2 rounded border max-h-40 overflow-y-auto",
+                  promptChanged
+                    ? "bg-primary/5 border-primary/30 text-foreground"
+                    : "bg-background/60 border-border/40"
+                )}>
+                  {afterPrompt}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-between gap-2">
           <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setNote("")}>Pulisci</Button>
           <div className="flex gap-1">
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onConfirm("")}>Senza nota</Button>
-            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => onConfirm(note.trim())}>
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => onConfirm("", { lockCharacter })}>Senza nota</Button>
+            <Button size="sm" className="h-7 text-xs gap-1" onClick={() => onConfirm(note.trim(), { lockCharacter })}>
               <Wand2 className="w-3 h-3" />
               Rigenera
             </Button>
