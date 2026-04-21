@@ -50,6 +50,8 @@ export interface StoryScene {
   /** Last correction notes (sticky for re-edits) */
   lastImageCorrectionNote?: string;
   lastVideoCorrectionNote?: string;
+  /** Sticky preference: when true, regenerations of this scene default to character identity lock. */
+  lockCharacter?: boolean;
   /** Full version history per asset — newest first. Capped at MAX_VERSION_HISTORY entries. */
   versionHistory?: AssetVersionHistory;
 }

@@ -36,7 +36,7 @@ import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
-import { isAutoRecoveryEnabled } from "@/lib/storyModePreferences";
+import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
@@ -190,6 +190,12 @@ export const StoryModeWizard = () => {
   const [recoveryFailureAssets, setRecoveryFailureAssets] = useState<Array<{ type: string; index?: number; sceneNumber?: number }>>([]);
   const [recoveryFailureContext, setRecoveryFailureContext] = useState<"reassemble" | "generateAll" | null>(null);
   const [savedProjectsTick, setSavedProjectsTick] = useState(0);
+  // Global user pref: lock character identity by default on every regeneration.
+  // Hydrated from localStorage immediately, then refreshed from Supabase.
+  const [lockCharacterDefault, setLockCharacterDefault] = useState<boolean>(isLockCharacterDefaultEnabled());
+  useEffect(() => {
+    void loadLockCharacterDefaultFromSupabase().then(setLockCharacterDefault);
+  }, []);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
@@ -904,6 +910,10 @@ export const StoryModeWizard = () => {
     const scene = script.scenes[index];
     setRegeneratingScene({ idx: index, type });
 
+    // Effective lock-character: explicit option wins → fallback to sticky scene pref → fallback to global default.
+    const effectiveLockCharacter =
+      options?.lockCharacter ?? scene.lockCharacter ?? lockCharacterDefault;
+
     try {
       if (type === "image") {
         if (!input.imageUrl && refImageError) {
@@ -923,7 +933,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastImageCorrectionNote,
           nextCorrectionNote: correctionNote,
-          lockCharacter: options?.lockCharacter,
+          lockCharacter: effectiveLockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-image", {
           body: { prompt: guidedPrompt, model: "flux", style: input.stylePromptModifier, aspectRatio: input.videoAspectRatio, ...fluxDims, ...(referenceImageUrl ? { referenceImageUrl, characterFidelity: input.characterFidelity } : {}) },
@@ -995,7 +1005,7 @@ export const StoryModeWizard = () => {
           aspectRatio: input.videoAspectRatio,
           previousCorrectionNote: scene.lastVideoCorrectionNote,
           nextCorrectionNote: correctionNote,
-          lockCharacter: options?.lockCharacter,
+          lockCharacter: effectiveLockCharacter,
         });
         const { data, error } = await supabase.functions.invoke("generate-video", {
           body: {
@@ -3078,6 +3088,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3466,6 +3477,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}
@@ -3656,6 +3668,7 @@ export const StoryModeWizard = () => {
                 onRegenerate={(type, opts) => regenerateSceneAsset(idx, type, opts?.correctionNote, { lockCharacter: opts?.lockCharacter })}
                 stylePromptModifier={input.stylePromptModifier}
                 videoAspectRatio={input.videoAspectRatio}
+                lockCharacterDefault={lockCharacterDefault}
                 onKeepNew={(type) => keepNewAsset(idx, type)}
                 onRollback={(type, versionUrl) => rollbackAsset(idx, type, versionUrl)}
                 onDeleteVersion={(type, versionUrl) => deleteVersion(idx, type, versionUrl)}

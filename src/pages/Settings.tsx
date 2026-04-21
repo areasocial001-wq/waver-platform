@@ -11,20 +11,29 @@ import { Label } from "@/components/ui/label";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
-import { isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase } from "@/lib/storyModePreferences";
+import {
+  isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase,
+  isLockCharacterDefaultEnabled, setLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase,
+} from "@/lib/storyModePreferences";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
   const { thresholds, notifyOnChange, saveSettings } = useApiMonitoring();
   const [autoRecovery, setAutoRecovery] = useState(true);
+  const [lockCharacterDefault, setLockCharacterDefault] = useState(false);
   const [isSyncingPreference, setIsSyncingPreference] = useState(true);
 
   useEffect(() => {
     // Hydrate from local cache immediately, then refresh from Supabase
     setAutoRecovery(isAutoRecoveryEnabled());
+    setLockCharacterDefault(isLockCharacterDefaultEnabled());
     (async () => {
-      const remote = await loadAutoRecoveryFromSupabase();
-      setAutoRecovery(remote);
+      const [remoteAuto, remoteLock] = await Promise.all([
+        loadAutoRecoveryFromSupabase(),
+        loadLockCharacterDefaultFromSupabase(),
+      ]);
+      setAutoRecovery(remoteAuto);
+      setLockCharacterDefault(remoteLock);
       setIsSyncingPreference(false);
     })();
   }, []);
@@ -35,6 +44,14 @@ export default function SettingsPage() {
     toast.success(next
       ? "Auto-recovery attivato: gli asset scaduti verranno rigenerati automaticamente al reload (sincronizzato su tutti i tuoi dispositivi)."
       : "Auto-recovery disattivato: dovrai cliccare 'Rigenera' manualmente nel pannello pre-flight (sincronizzato su tutti i tuoi dispositivi).");
+  };
+
+  const handleToggleLockCharacterDefault = (next: boolean) => {
+    setLockCharacterDefault(next);
+    setLockCharacterDefaultEnabled(next);
+    toast.success(next
+      ? "Blocca identità di default attivato: ogni rigenerazione di scena partirà con il lock attivo (sincronizzato su tutti i dispositivi)."
+      : "Blocca identità di default disattivato: dovrai attivarlo manualmente sulla singola scena quando serve.");
   };
 
   const handleSaveThresholds = async (newThresholds: ThresholdSettings, notify: boolean) => {
@@ -119,6 +136,27 @@ export default function SettingsPage() {
                       checked={autoRecovery}
                       disabled={isSyncingPreference}
                       onCheckedChange={handleToggleAutoRecovery}
+                    />
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-lg border bg-card">
+                    <div className="space-y-1 flex-1">
+                      <Label htmlFor="lock-character-default" className="text-base font-medium">
+                        🔒 Blocca identità di default per tutte le rigenerazioni
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Quando rigeneri immagini o video di una scena, attiva automaticamente il vincolo di identità del personaggio
+                        (stesso volto, outfit e contesto delle altre scene) senza dover cliccare il toggle sulla singola scena.
+                      </p>
+                      <p className="text-xs text-muted-foreground/80">
+                        La preferenza per la singola scena, se impostata, ha precedenza su questo default globale.
+                      </p>
+                    </div>
+                    <Switch
+                      id="lock-character-default"
+                      checked={lockCharacterDefault}
+                      disabled={isSyncingPreference}
+                      onCheckedChange={handleToggleLockCharacterDefault}
                     />
                   </div>
                 </CardContent>
