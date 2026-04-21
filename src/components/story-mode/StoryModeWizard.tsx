@@ -3030,7 +3030,32 @@ export const StoryModeWizard = () => {
           })()}
 
           {/* Pre-flight audio check — surfaces missing/blob assets BEFORE wasting render credits */}
-          <PreFlightAudioPanel scenes={script.scenes} backgroundMusicUrl={backgroundMusicUrl} />
+          <PreFlightAudioPanel
+            scenes={script.scenes}
+            backgroundMusicUrl={backgroundMusicUrl}
+            isRegenerating={isBatchRegenAudio}
+            onRegenerateExpired={async (items) => {
+              if (items.length === 0) return;
+              setIsBatchRegenAudio(true);
+              toast.info(`Rigenerazione di ${items.length} audio scaduti…`);
+              let done = 0;
+              for (const it of items) {
+                try {
+                  if (it.type === "music") {
+                    await generateBackgroundMusic();
+                  } else {
+                    await regenerateSceneAsset(it.sceneIndex, it.type);
+                  }
+                  done++;
+                } catch (e) {
+                  console.warn("Pre-flight regen failed:", e);
+                }
+              }
+              setIsBatchRegenAudio(false);
+              toast.success(`${done}/${items.length} audio rigenerati`);
+              setTimeout(() => saveProject(), 300);
+            }}
+          />
 
           <div className="flex gap-3 flex-wrap">
             <Button variant="outline" onClick={() => setStep("input")}><ChevronLeft className="w-4 h-4 mr-2" />Modifica Input</Button>
