@@ -109,6 +109,27 @@ const looksLikeJson = (bytes: Uint8Array): boolean => {
   return bytes[i] === 0x7b /* { */ || bytes[i] === 0x5b /* [ */;
 };
 
+function classifyFailure(opts: {
+  reachable: boolean;
+  isMp3: boolean | null;
+  isJson: boolean | null;
+  bytes: number | null | undefined;
+  status?: number;
+  contentType?: string | null;
+}): string | undefined {
+  const { reachable, isMp3, isJson, bytes, status, contentType } = opts;
+  if (!reachable) return `URL non raggiungibile${status ? ` (HTTP ${status})` : ""}`;
+  if (isJson) return "Risposta JSON: l'edge function ha restituito errore o il base64 non è stato decodificato";
+  if (bytes != null && bytes > 0 && bytes < 1024) return "File troppo piccolo (<1KB), upload probabilmente troncato";
+  if (isMp3 === false) {
+    if (contentType && /audio\/(wav|ogg|mpeg|mp4)/i.test(contentType)) {
+      return `File audio in formato non-MP3 (${contentType})`;
+    }
+    return "Header MP3 mancante: file corrotto o codifica errata";
+  }
+  return undefined;
+}
+
 async function probeAsset(url: string): Promise<ProbeResult> {
   const notes: string[] = [];
   // blob: URLs cannot be reached server-side, but we can still inspect them client-side
@@ -117,23 +138,25 @@ async function probeAsset(url: string): Promise<ProbeResult> {
     try {
       const resp = await fetch(url);
       if (!resp.ok) {
-        return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `HTTP ${resp.status}`] };
+        return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `HTTP ${resp.status}`, notes: [...notes, `HTTP ${resp.status}`] };
       }
       const buf = await resp.arrayBuffer();
       const bytes = new Uint8Array(buf.slice(0, 16));
       const ok = isLikelyMp3Bytes(bytes);
       const jw = looksLikeJson(bytes);
+      const ct = resp.headers.get("content-type");
       return {
         verdict: ok ? "warn" : "error",
         reachable: true,
-        contentType: resp.headers.get("content-type"),
+        contentType: ct,
         bytes: buf.byteLength,
         isMp3Header: ok,
         jsonWrapped: jw,
+        failureReason: classifyFailure({ reachable: true, isMp3: ok, isJson: jw, bytes: buf.byteLength, contentType: ct }),
         notes: [...notes, ok ? "Header MP3 valido localmente" : jw ? "Sembra JSON, non MP3 grezzo" : "Header MP3 non riconosciuto"],
       };
     } catch (e) {
-      return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
+      return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `Fetch fallito: ${(e as Error).message}`, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
     }
   }
 
@@ -163,6 +186,7 @@ async function probeAsset(url: string): Promise<ProbeResult> {
         bytes: headBytes,
         isMp3Header: null,
         jsonWrapped: null,
+        failureReason: `URL non raggiungibile (HTTP ${get.status})`,
         notes: [...notes, `GET ${get.status}`],
       };
     }
@@ -181,10 +205,11 @@ async function probeAsset(url: string): Promise<ProbeResult> {
       bytes: headBytes,
       isMp3Header: ok,
       jsonWrapped: jw,
+      failureReason: classifyFailure({ reachable: true, isMp3: ok, isJson: jw, bytes: headBytes, status: headStatus, contentType: headContentType }),
       notes,
     };
   } catch (e) {
-    return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
+    return { verdict: "error", reachable: false, isMp3Header: null, jsonWrapped: null, failureReason: `Fetch fallito: ${(e as Error).message}`, notes: [...notes, `Fetch fallito: ${(e as Error).message}`] };
   }
 }
 
