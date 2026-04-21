@@ -1607,20 +1607,35 @@ export const StoryModeWizard = () => {
   const generateBackgroundMusic = async (): Promise<string | null> => {
     if (!script?.suggestedMusic) return null;
     try {
-      toast.info("Generazione colonna sonora...");
+      // Total video duration = sum of every scene (capped to 300s by the edge fn).
+      // We deliberately request ONE long unified track instead of per-scene tracks
+      // so the music never restarts/cuts between scenes during crossfades.
+      const totalDuration = Math.min(
+        Math.max(script.scenes.reduce((a, s) => a + s.duration, 0), 10),
+        300,
+      );
+      toast.info(`Generazione colonna sonora unica (${totalDuration}s)…`);
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`, {
-        method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify({ prompt: script.suggestedMusic, duration: Math.min(script.scenes.reduce((a, s) => a + s.duration, 0), 120) }),
-      });
-      if (!response.ok) throw new Error(`Music failed: ${response.status}`);
-      const blob = await audioResponseToBlob(response);
+      const blob = await fetchAudioWithRetry(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
+        {
+          method: "POST",
+          headers: authHeaders,
+          body: JSON.stringify({ prompt: script.suggestedMusic, category: "music", duration: totalDuration }),
+        },
+        "ElevenLabs Music",
+        "story-mode/background",
+        { maxAttempts: 3 },
+      );
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
-    } catch (err: any) { console.error("Music error:", err); toast.error("Errore colonna sonora"); return null; }
+    } catch (err: any) {
+      console.error("Music error:", err);
+      toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
+      return null;
+    }
   };
 
   /**
