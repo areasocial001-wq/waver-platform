@@ -110,7 +110,7 @@ export const SceneCard = ({
   mode, voices, defaultVoiceId, aspectRatio = "16:9", onToggleEdit, onUpdate, onPreviewAudio,
   onDuplicate, onDelete, onRegenerate, onKeepNew, onRollback, onDeleteVersion, onUnstuck,
   onDragStart, onDragOver, onDragEnd, onDrop,
-  stylePromptModifier, videoAspectRatio,
+  stylePromptModifier, videoAspectRatio, lockCharacterDefault = false,
 }: SceneCardProps) => {
   // Local state for the correction note popovers (image + video regen with guidance).
   const [imageCorrectionNote, setImageCorrectionNote] = useState(scene.lastImageCorrectionNote || "");
