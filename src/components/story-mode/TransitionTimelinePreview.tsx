@@ -421,13 +421,15 @@ const CrossfadeInspector: React.FC<CrossfadeInspectorProps> = ({
   useEffect(() => {
     if (!playing) return;
     const interval = window.setInterval(() => {
-      setT((prev) => {
+      setInternalT((prev) => {
         const next = prev + 0.05;
-        return next > 1 ? 0 : next;
+        const wrapped = next > 1 ? 0 : next;
+        onTChange?.(wrapped);
+        return wrapped;
       });
     }, 80);
     return () => window.clearInterval(interval);
-  }, [playing]);
+  }, [playing, onTChange]);
 
   return (
     <div className="space-y-2">
