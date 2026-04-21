@@ -123,6 +123,37 @@ const useDownloadFile = (setLoadingId: (id: string | null) => void) => {
   };
 };
 
+/**
+ * Convert an ElevenLabs edge-function response into an audio Blob.
+ *
+ * Both `elevenlabs-tts` and `elevenlabs-music` return JSON of the form
+ * `{ audioContent: <base64 mp3>, format: "mp3" }`. Calling `response.blob()`
+ * directly would yield a JSON-as-text blob (not playable audio) which, once
+ * uploaded to storage and fed to Shotstack, results in a SILENT track in the
+ * final render. This helper decodes the base64 payload to a real MP3 Blob.
+ *
+ * Falls back to `response.blob()` for raw-binary endpoints (e.g. SFX) so the
+ * helper is safe to use as a single audio entry point.
+ */
+const audioResponseToBlob = async (response: Response): Promise<Blob> => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const data = await response.json();
+    const base64: string | undefined = data?.audioContent;
+    if (!base64 || typeof base64 !== "string") {
+      throw new Error("Risposta audio non valida: campo audioContent mancante");
+    }
+    // Decode base64 in chunks to avoid call-stack issues on large payloads.
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
+    return new Blob([bytes], { type: mime });
+  }
+  // Raw binary endpoint (e.g. elevenlabs-sfx) — return as-is.
+  return response.blob();
+};
+
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
