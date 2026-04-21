@@ -30,12 +30,13 @@ import { BulkTransitionPanel } from "./BulkTransitionPanel";
 import { LivePreviewCard } from "./LivePreviewCard";
 import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem } from "./PreFlightAudioPanel";
-import { PreFlightVideoPanel, type ProblematicVideoItem } from "./PreFlightVideoPanel";
+import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions } from "@/hooks/useVoiceOptions";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
+import { isAutoRecoveryEnabled } from "@/lib/storyModePreferences";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -1717,34 +1718,46 @@ export const StoryModeWizard = () => {
     return done;
   };
 
-  // Auto-recovery on reload: when a saved project is loaded and contains blob: audio
-  // assets (which only existed in the previous browser session), automatically kick off
-  // regeneration so the user doesn't have to click manually.
+  // Auto-recovery on reload: when a saved project is loaded and contains blob:
+  // assets (audio OR video — only existed in the previous browser session),
+  // automatically kick off regeneration so the user doesn't have to click manually.
+  // Respects the user-level toggle (Settings → Story Mode → Auto-recovery).
   useEffect(() => {
     if (!projectId || !script || step !== "script") return;
     if (autoRecoveryFiredRef.current.has(projectId)) return;
     if (isBatchRegenAudio || batchProgress) return;
+    if (!isAutoRecoveryEnabled()) return;
 
-    const expired: ExpiredAudioItem[] = [];
+    const expiredAudio: ExpiredAudioItem[] = [];
+    const expiredVideo: ProblematicVideoItem[] = [];
     script.scenes.forEach((s, i) => {
       if (s.audioUrl?.startsWith("blob:")) {
-        expired.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
+        expiredAudio.push({ type: "audio", sceneIndex: i, sceneNumber: s.sceneNumber });
       }
       if (s.sfxUrl?.startsWith("blob:")) {
-        expired.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+        expiredAudio.push({ type: "sfx", sceneIndex: i, sceneNumber: s.sceneNumber });
+      }
+      if (s.videoUrl?.startsWith("blob:")) {
+        expiredVideo.push({ sceneIndex: i, sceneNumber: s.sceneNumber, reasons: ["blob"] });
       }
     });
     if (backgroundMusicUrl?.startsWith("blob:")) {
-      expired.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
+      expiredAudio.push({ type: "music", sceneIndex: -1, sceneNumber: 0 });
     }
 
-    if (expired.length === 0) return;
+    const totalExpired = expiredAudio.length + expiredVideo.length;
+    if (totalExpired === 0) return;
 
     autoRecoveryFiredRef.current.add(projectId);
-    toast.info(`Recupero automatico di ${expired.length} audio scaduti dalla sessione precedente…`);
-    runAudioBatchRegen(expired).then(done => {
-      if (done > 0) toast.success(`Auto-recovery: ${done}/${expired.length} audio rigenerati`);
-    });
+    toast.info(`Recupero automatico di ${totalExpired} asset scaduti dalla sessione precedente…`);
+    (async () => {
+      let doneAudio = 0;
+      let doneVideo = 0;
+      if (expiredAudio.length > 0) doneAudio = await runAudioBatchRegen(expiredAudio);
+      if (expiredVideo.length > 0) doneVideo = await runVideoBatchRegen(expiredVideo);
+      const total = doneAudio + doneVideo;
+      if (total > 0) toast.success(`Auto-recovery: ${total}/${totalExpired} asset rigenerati`);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, step]);
 
@@ -3121,12 +3134,30 @@ export const StoryModeWizard = () => {
             onRegenerateExpired={async (items) => { await runAudioBatchRegen(items); }}
           />
 
-          {/* Pre-flight video check — flags missing/blob/aspect/format clips before render */}
+          {/* Pre-flight video check — flags missing/blob/aspect/format/duration clips before render */}
           <PreFlightVideoPanel
             scenes={script.scenes}
             expectedAspect={input.videoAspectRatio}
             progress={batchProgress}
+            autoRecoveryEnabled={isAutoRecoveryEnabled()}
             onRegenerateProblematic={async (items) => { await runVideoBatchRegen(items); }}
+            onDurationMeasured={(r: MeasuredDuration) => {
+              // Persist measured duration + warning on the scene so the badge survives re-renders
+              setScript(prev => {
+                if (!prev) return prev;
+                const next = [...prev.scenes];
+                const cur = next[r.sceneIndex];
+                if (!cur) return prev;
+                // Skip when nothing changed (avoid re-render loop)
+                if (cur.videoDuration === r.measured && cur.videoDurationWarning === r.warning) return prev;
+                next[r.sceneIndex] = {
+                  ...cur,
+                  videoDuration: r.measured,
+                  videoDurationWarning: r.mismatch ? r.warning : undefined,
+                };
+                return { ...prev, scenes: next };
+              });
+            }}
           />
 
           <div className="flex gap-3 flex-wrap">

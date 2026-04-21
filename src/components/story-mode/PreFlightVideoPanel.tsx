@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { ShieldCheck, AlertTriangle, Film, RefreshCw, Loader2 } from "lucide-rea
 import { cn } from "@/lib/utils";
 import type { StoryScene } from "./types";
 import type { BatchProgress } from "./PreFlightAudioPanel";
+import { measureAndValidateVideoDuration } from "@/lib/aspectRatioCheck";
 
 export interface ProblematicVideoItem {
   sceneIndex: number;
@@ -15,14 +16,24 @@ export interface ProblematicVideoItem {
   reasons: VideoIssue[];
 }
 
-export type VideoIssue = "missing" | "blob" | "aspect" | "format";
+export type VideoIssue = "missing" | "blob" | "aspect" | "format" | "duration";
 
 const REASON_LABEL: Record<VideoIssue, string> = {
   missing: "video assente",
   blob: "URL scaduto (blob)",
   aspect: "aspect ratio errato",
   format: "formato non supportato",
+  duration: "durata incoerente",
 };
+
+/** Called once per scene when we measure its real duration — wizard persists it on the scene. */
+export interface MeasuredDuration {
+  sceneIndex: number;
+  measured: number;
+  expected: number;
+  mismatch: boolean;
+  warning?: string;
+}
 
 interface PreFlightVideoPanelProps {
   scenes: StoryScene[];
@@ -30,6 +41,10 @@ interface PreFlightVideoPanelProps {
   expectedAspect?: string;
   onRegenerateProblematic?: (items: ProblematicVideoItem[]) => void | Promise<void>;
   progress?: BatchProgress | null;
+  /** Called when client-side duration measurement finishes for a scene. */
+  onDurationMeasured?: (result: MeasuredDuration) => void;
+  /** When false, the panel will NOT auto-trigger regeneration of blob: URLs (user opted out) */
+  autoRecoveryEnabled?: boolean;
 }
 
 const SUPPORTED_FORMATS = ["mp4", "mov", "webm", "m4v"];
@@ -51,12 +66,15 @@ const detectFormatIssue = (url?: string | null): boolean => {
  *  - blob: URLs (server can't reach them — would silently break the render)
  *  - aspect ratio mismatch (already measured client-side)
  *  - unsupported file format
+ *  - duration mismatch vs scene.duration (±10% tolerance) — measured here on first sight
  */
 export const PreFlightVideoPanel = ({
   scenes,
   expectedAspect,
   onRegenerateProblematic,
   progress,
+  onDurationMeasured,
+  autoRecoveryEnabled = true,
 }: PreFlightVideoPanelProps) => {
   const items = useMemo<ProblematicVideoItem[]>(() => {
     const out: ProblematicVideoItem[] = [];
@@ -70,6 +88,7 @@ export const PreFlightVideoPanel = ({
       else if (s.videoUrl.startsWith("blob:")) reasons.push("blob");
       if (s.videoAspectWarning) reasons.push("aspect");
       if (s.videoUrl && detectFormatIssue(s.videoUrl)) reasons.push("format");
+      if (s.videoDurationWarning) reasons.push("duration");
 
       if (reasons.length > 0) {
         out.push({ sceneIndex: i, sceneNumber: s.sceneNumber, reasons });
@@ -78,12 +97,44 @@ export const PreFlightVideoPanel = ({
     return out;
   }, [scenes]);
 
-  // Auto-trigger regeneration if blob URLs are detected on mount
+  // Track which (sceneIndex|videoUrl) pairs we already measured to avoid re-measuring on each render.
+  const measuredRef = useRef<Set<string>>(new Set());
+
+  // Lazily measure real video duration for each completed scene (server-reachable URLs only).
+  // We skip blob: (auto-recovery handles those) and skip already-measured scenes.
   useEffect(() => {
+    if (!onDurationMeasured) return;
+    let cancelled = false;
+    (async () => {
+      for (let i = 0; i < scenes.length; i++) {
+        const s = scenes[i];
+        if (!s.videoUrl || s.videoUrl.startsWith("blob:")) continue;
+        if (s.videoDuration !== undefined) continue; // already persisted
+        const key = `${i}|${s.videoUrl}`;
+        if (measuredRef.current.has(key)) continue;
+        measuredRef.current.add(key);
+        const r = await measureAndValidateVideoDuration(s.videoUrl, s.duration).catch(() => null);
+        if (cancelled || !r) continue;
+        onDurationMeasured({
+          sceneIndex: i,
+          measured: r.measured,
+          expected: r.expected,
+          mismatch: r.mismatch,
+          warning: r.warning,
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scenes, onDurationMeasured]);
+
+  // Auto-trigger regeneration if blob URLs are detected on mount (respects user opt-out).
+  useEffect(() => {
+    if (!autoRecoveryEnabled) return;
     const blobItems = items.filter(i => i.reasons.includes("blob"));
     if (blobItems.length > 0 && onRegenerateProblematic) {
       onRegenerateProblematic(blobItems);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
   const completedCount = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl).length;
