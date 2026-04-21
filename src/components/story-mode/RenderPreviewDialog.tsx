@@ -240,7 +240,10 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               </div>
             </div>
 
-            {/* Main stats */}
+            {/* Timeline preview with zoom on transition zones — helps spot frozen frames before render */}
+            <TransitionTimelinePreview scenes={scenes} aspectRatio={input.videoAspectRatio} />
+
+
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-3 rounded-lg bg-muted/30">
                 <p className="text-2xl font-bold text-primary">{summary.totalScenes}</p>
