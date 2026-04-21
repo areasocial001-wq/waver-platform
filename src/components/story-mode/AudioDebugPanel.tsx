@@ -29,6 +29,10 @@ interface SceneRow {
   duration?: number;
   audioStatus?: string;
   sfxStatus?: string;
+  narration?: string;
+  voiceId?: string;
+  sfxPrompt?: string;
+  mood?: string;
 }
 
 interface ProjectSnapshot {
@@ -37,6 +41,8 @@ interface ProjectSnapshot {
   updatedAt: string;
   scenes: SceneRow[];
   backgroundMusicUrl: string | null;
+  suggestedMusic: string | null;
+  inputConfig: Record<string, unknown>;
 }
 
 type Verdict = "ok" | "warn" | "error" | "idle" | "checking";
@@ -49,7 +55,16 @@ interface ProbeResult {
   bytes?: number | null;
   isMp3Header: boolean | null;
   jsonWrapped: boolean | null;
+  failureReason?: string;
   notes: string[];
+}
+
+interface AttemptLog {
+  at: string;          // ISO timestamp
+  step: string;        // "fetch" | "decode" | "validate" | "upload" | "db-update"
+  ok: boolean;
+  message: string;
+  bytes?: number;
 }
 
 interface AssetCheck {
@@ -58,7 +73,11 @@ interface AssetCheck {
   type: "narration" | "sfx" | "music";
   url: string | null | undefined;
   sceneNumber?: number;
+  sceneIndex?: number;        // index in project.scenes for retry
   result?: ProbeResult;
+  retrying?: boolean;
+  attempts?: AttemptLog[];
+  showAttempts?: boolean;
 }
 
 const isHttp = (u?: string | null) => !!u && /^https?:\/\//i.test(u);
