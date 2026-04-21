@@ -43,12 +43,14 @@ export function buildImageRegenerationPrompt({
   aspectRatio,
   previousCorrectionNote,
   nextCorrectionNote,
+  lockCharacter,
 }: {
   scene: StoryScene;
   stylePrompt?: string;
   aspectRatio?: VideoAspectRatio;
   previousCorrectionNote?: string;
   nextCorrectionNote?: string;
+  lockCharacter?: boolean;
 }) {
   const effectiveCorrectionNote = nextCorrectionNote
     ? mergeCorrectionNotes(previousCorrectionNote, nextCorrectionNote)
@@ -62,6 +64,9 @@ export function buildImageRegenerationPrompt({
     stylePrompt ? `STYLE LOCK: ${normalizeText(stylePrompt)}.` : "",
     aspectRatio ? `ASPECT RATIO LOCK: ${aspectRatio}.` : "",
     "CONTINUITY LOCK: keep the same subject identity, outfit, setting, scene logic, and overall composition unless a correction explicitly asks to change one of them.",
+    lockCharacter
+      ? "CHARACTER LOCK (HIGHEST PRIORITY): the main character must be the EXACT SAME person as in previous scenes — same face shape, eyes, nose, mouth, skin tone, hair color/length/style, body build, height, age. Same outfit (same garments, same colors, same accessories). Same setting/context unless a correction explicitly changes it. Do NOT swap the character for a different person, do NOT change clothing, do NOT alter facial features. Anatomically correct human body, no morphing, no extra limbs."
+      : "",
     buildCorrectionBlock(effectiveCorrectionNote),
     "Do not invent random objects, characters, clothing changes, locations, or actions. Prefer strict fidelity to the brief over creativity.",
   ]
@@ -80,12 +85,14 @@ export function buildVideoRegenerationPrompt({
   aspectRatio,
   previousCorrectionNote,
   nextCorrectionNote,
+  lockCharacter,
 }: {
   scene: StoryScene;
   stylePrompt?: string;
   aspectRatio?: VideoAspectRatio;
   previousCorrectionNote?: string;
   nextCorrectionNote?: string;
+  lockCharacter?: boolean;
 }) {
   const effectiveCorrectionNote = nextCorrectionNote
     ? mergeCorrectionNotes(previousCorrectionNote, nextCorrectionNote)
@@ -100,6 +107,9 @@ export function buildVideoRegenerationPrompt({
     aspectRatio ? `ASPECT RATIO LOCK: ${aspectRatio}.` : "",
     `DURATION TARGET: ${scene.duration}s.`,
     "ANIMATION LOCK: animate the provided source image faithfully; do not replace the subject, do not change the outfit or location, and do not introduce unrelated events.",
+    lockCharacter
+      ? "CHARACTER LOCK (HIGHEST PRIORITY): keep the EXACT SAME person from the source image throughout every frame — identical face, hair, skin tone, body, outfit and accessories. No identity drift, no face morphing, no outfit change, no character swap mid-shot."
+      : "",
     buildCorrectionBlock(effectiveCorrectionNote),
     "Avoid nonsense motion, face morphing, body deformation, random camera swings, and story changes. Keep the action literal and stable.",
   ]
