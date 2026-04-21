@@ -225,7 +225,17 @@ export const TransitionTimelinePreview: React.FC<TransitionTimelinePreviewProps>
         className="relative overflow-x-auto overflow-y-hidden bg-background/40 rounded border border-border/40"
         style={{ height: 84 }}
       >
-        <div className="relative" style={{ width: timelineWidth, height: "100%" }}>
+        <div
+          className="relative cursor-crosshair"
+          style={{ width: timelineWidth, height: "100%" }}
+          onClick={(e) => {
+            const target = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - target.left;
+            const sec = Math.max(0, Math.min(totalDuration, x / pxPerSec));
+            setAutoPlayhead(false);
+            setPlayheadSec(sec);
+          }}
+        >
           {/* Clips */}
           {clips.map((c) => (
             <div
