@@ -2220,10 +2220,14 @@ export const StoryModeWizard = () => {
           fps: input.videoFps || "24",
           audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
           sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-          sfxVolume: (volumeOverrides?.sfxVolume ?? 18) / 100,
+          sfxVolume: (volumeOverrides?.sfxVolume ?? 22) / 100,
+          ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
+          ambienceVolume: (volumeOverrides?.ambienceVolume ?? 18) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
           narrationVolume: (volumeOverrides?.narrationVolume ?? script.narrationVolume ?? 100) / 100,
+          autoMix: volumeOverrides?.autoMix ?? true,
+          lufsTarget: volumeOverrides?.lufsTarget ?? -14,
         },
       });
       if (error) throw error;
@@ -2593,10 +2597,14 @@ export const StoryModeWizard = () => {
             fps: input.videoFps || "24",
             audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
             sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            sfxVolume: 0.18,
+            sfxVolume: 0.22,
+            ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
+            ambienceVolume: 0.18,
             backgroundMusicUrl: resolvedBackgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
+            autoMix: true,
+            lufsTarget: -14,
           },
         });
         if (error) throw error;

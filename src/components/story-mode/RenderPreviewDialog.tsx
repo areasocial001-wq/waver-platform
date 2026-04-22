@@ -3,17 +3,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw } from "lucide-react";
+import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw, Wind, Sliders } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
 import { TransitionTimelinePreview } from "./TransitionTimelinePreview";
+import { getAudioMix } from "@/lib/storyModeAudioMix";
 
 export interface RenderVolumes {
   narrationVolume: number; // 0-100
   sfxVolume: number;       // 0-100
   musicVolume: number;     // 0-100
+  ambienceVolume?: number; // 0-100 — separate continuous beds (wind/sea); optional for back-compat
+  autoMix?: boolean;
+  lufsTarget?: number;
 }
 
 interface RenderPreviewDialogProps {
@@ -39,6 +44,7 @@ interface PreviewSummary {
   fps: string;
   narrationScenes: number;
   sfxScenes: number;
+  ambienceScenes?: number;
   hasBackgroundMusic: boolean;
   hasIntro: boolean;
   hasOutro: boolean;
@@ -46,9 +52,13 @@ interface PreviewSummary {
   tracks: { track: number; clips: number; type: string }[];
   narrationVolume: number;
   sfxVolume: number;
+  ambienceVolume?: number;
   musicVolume: number;
-  placedClips?: { video: number; narration: number; sfx: number; music: number };
-  requestedClips?: { narration: number; sfx: number; music: number };
+  autoMix?: boolean;
+  lufsTarget?: number;
+  effectiveVolumes?: { narration: number; sfx: number; ambience: number; music: number };
+  placedClips?: { video: number; narration: number; sfx: number; ambience?: number; music: number };
+  requestedClips?: { narration: number; sfx: number; ambience?: number; music: number };
   skippedAssets?: { type: string; index?: number; url: string; reason: string }[];
   sceneStarts?: number[];
 }
@@ -64,10 +74,16 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
   const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
-  // Editable volumes
-  const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
-  const [sfxVol, setSfxVol] = useState(18);
-  const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
+  // Editable volumes — initialised from global Audio Mix preferences
+  const globalMix = React.useMemo(() => getAudioMix(), []);
+  const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? globalMix.narrationVolume);
+  const [sfxVol, setSfxVol] = useState(globalMix.sfxVolume);
+  const [ambienceVol, setAmbienceVol] = useState(globalMix.ambienceVolume);
+  const [musicVol, setMusicVol] = useState(script.musicVolume ?? globalMix.musicVolume);
+  const [autoMix, setAutoMix] = useState(globalMix.autoMix);
+  const [lufsTarget, setLufsTarget] = useState(globalMix.lufsTarget);
+  const [musicAudible, setMusicAudible] = useState<null | boolean>(null);
+  const [verifyingMusic, setVerifyingMusic] = useState(false);
 
   // Identify scenes whose generated assets don't match the requested aspect ratio
   const nonCompliantScenes = scenes
@@ -120,9 +136,13 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
           sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
           sfxVolume: sfxVol / 100,
+          ambienceUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+          ambienceVolume: ambienceVol / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: musicVol / 100,
           narrationVolume: narrationVol / 100,
+          autoMix,
+          lufsTarget,
           dryRun: true,
         },
       });
@@ -142,9 +162,13 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   React.useEffect(() => {
     if (open && !summary && !loading) {
-      setNarrationVol(script.narrationVolume ?? 100);
-      setMusicVol(script.musicVolume ?? 25);
-      setSfxVol(18);
+      const g = getAudioMix();
+      setNarrationVol(script.narrationVolume ?? g.narrationVolume);
+      setMusicVol(script.musicVolume ?? g.musicVolume);
+      setSfxVol(g.sfxVolume);
+      setAmbienceVol(g.ambienceVolume);
+      setAutoMix(g.autoMix);
+      setLufsTarget(g.lufsTarget);
       fetchPreview();
     }
     if (!open) {
@@ -152,6 +176,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
       setError(null);
       setIgnoreAspectWarnings(false);
       setIgnoreBlobAssets(false);
+      setMusicAudible(null);
     }
   }, [open]);
 
@@ -304,11 +329,11 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                 />
               </div>
 
-              {/* SFX volume */}
+              {/* SFX volume (punctual hits) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-yellow-400" /> Effetti Sonori
+                    <Sparkles className="w-3 h-3 text-yellow-400" /> Effetti Sonori (puntuali)
                   </Label>
                   <span className="text-xs font-medium tabular-nums">{sfxVol}%</span>
                 </div>
@@ -317,6 +342,21 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                   min={0} max={100} step={5}
                   onValueChange={v => setSfxVol(v[0])}
                   disabled={summary.sfxScenes === 0}
+                />
+              </div>
+
+              {/* Ambience volume (continuous wind/sea/forest beds) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Wind className="w-3 h-3 text-blue-400" /> Ambience (vento/mare)
+                  </Label>
+                  <span className="text-xs font-medium tabular-nums">{ambienceVol}%</span>
+                </div>
+                <Slider
+                  value={[ambienceVol]}
+                  min={0} max={100} step={5}
+                  onValueChange={v => setAmbienceVol(v[0])}
                 />
               </div>
 
@@ -335,7 +375,74 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                   disabled={!summary.hasBackgroundMusic}
                 />
               </div>
+
+              {/* Auto-mix toggle (server-side ducking + LUFS-targeted gain) */}
+              <div className="flex items-center justify-between gap-3 p-2 rounded border bg-card/50">
+                <div className="flex-1 min-w-0">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Sliders className="w-3 h-3 text-primary" /> Auto-mix LUFS
+                    <Badge variant="secondary" className="text-[9px] h-4 px-1">{lufsTarget} LUFS</Badge>
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Bilancia voce/musica/ambience tenendo la narrazione sempre dominante.
+                  </p>
+                </div>
+                <Switch checked={autoMix} onCheckedChange={setAutoMix} />
+              </div>
             </div>
+
+            {/* Music presence indicator */}
+            {summary.hasBackgroundMusic && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded border border-green-500/30 bg-green-500/5 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Music className="w-3.5 h-3.5 text-green-400" />
+                  Colonna sonora unificata: <strong className="text-green-400">inclusa nel render</strong>
+                  {musicAudible === false && <span className="text-orange-400">(non rilevata nel file finale!)</span>}
+                  {musicAudible === true && <span className="text-emerald-400">✓ verificata nel MP4</span>}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  disabled={verifyingMusic || !onRegenerateAudio}
+                  onClick={async () => {
+                    if (!onRegenerateAudio) return;
+                    setRegeneratingAudio("music");
+                    try { await onRegenerateAudio({ type: "music" }); }
+                    finally { setRegeneratingAudio(null); }
+                  }}
+                >
+                  {regeneratingAudio === "music"
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <><RefreshCw className="w-3 h-3 mr-1" />Rigenera musica</>}
+                </Button>
+              </div>
+            )}
+            {!summary.hasBackgroundMusic && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded border border-orange-500/30 bg-orange-500/5 text-xs">
+                <span className="flex items-center gap-1.5 text-orange-400">
+                  <Music className="w-3.5 h-3.5" />
+                  Nessuna colonna sonora rilevata sul progetto
+                </span>
+                {onRegenerateAudio && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    disabled={regeneratingAudio !== null}
+                    onClick={async () => {
+                      setRegeneratingAudio("music");
+                      try { await onRegenerateAudio({ type: "music" }); }
+                      finally { setRegeneratingAudio(null); }
+                    }}
+                  >
+                    {regeneratingAudio === "music"
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <><RefreshCw className="w-3 h-3 mr-1" />Genera musica</>}
+                  </Button>
+                )}
+              </div>
+            )}
 
             {/* Transition info */}
             <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/20">
@@ -591,7 +698,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           <Button
             onClick={() => {
               onOpenChange(false);
-              onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, musicVolume: musicVol });
+              onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, ambienceVolume: ambienceVol, musicVolume: musicVol, autoMix, lufsTarget });
             }}
             disabled={loading || !!error || hasNonCompliantBlocking || (hasBlobAssetsBlocking && !ignoreBlobAssets)}
             title={

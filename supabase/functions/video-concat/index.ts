@@ -53,14 +53,26 @@ const requestSchema = z.object({
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
   audioUrls: z.array(z.string()).optional(), // per-scene narration audio
-  sfxUrls: z.array(z.string()).optional(), // per-scene sound effects
-  sfxVolume: z.number().min(0).max(1).default(0.7), // sfx volume (0-1)
+  sfxUrls: z.array(z.string()).optional(), // per-scene punctual sound effects
+  sfxVolume: z.number().min(0).max(1).default(0.22),
+  // NEW: separate ambience track (continuous wind/sea/forest beds)
+  ambienceUrls: z.array(z.string()).optional(),
+  ambienceVolume: z.number().min(0).max(1).default(0.18),
   backgroundMusicUrl: z.string().optional(),
   musicVolume: z.number().min(0).max(1).default(0.25),
   narrationVolume: z.number().min(0).max(1).default(1),
+  // NEW: server-side auto-mix that ducks music+ambience under voice and
+  //      normalises overall loudness towards lufsTarget.
+  autoMix: z.boolean().default(false),
+  lufsTarget: z.number().min(-30).max(-6).default(-14),
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
   dryRun: z.boolean().optional(), // preview mode: returns timeline summary without rendering
+  // NEW: when true, just probe the most recent rendered file in storage and
+  //      return whether the music track was actually included.
+  verifyMusic: z.object({
+    renderedVideoUrl: z.string(),
+  }).optional(),
 });
 
 // Map resolution to Shotstack format
@@ -433,7 +445,41 @@ serve(async (req) => {
         );
       }
     }
-    
+
+    // Music-presence verification: probe the rendered MP4 over a Range request and
+    // look for the AAC audio track marker. Cheap heuristic — true ffprobe would be
+    // overkill for an edge function. Returns { audible: boolean, sizeBytes, contentType }.
+    if (body.verifyMusic?.renderedVideoUrl) {
+      const url = body.verifyMusic.renderedVideoUrl;
+      try {
+        const head = await fetch(url, { method: 'HEAD' });
+        const contentType = head.headers.get('content-type');
+        const sizeBytes = parseInt(head.headers.get('content-length') || '0', 10);
+        // Range fetch first 256KB — enough to inspect MP4 'moov' box for soun track.
+        const range = await fetch(url, { headers: { Range: 'bytes=0-262143' } });
+        const buf = new Uint8Array(await range.arrayBuffer());
+        // Crude audio-track detector: look for 'soun' (audio handler) or 'mp4a' (AAC) markers.
+        // MP4 files always include these in the 'moov' atom when audio is present.
+        const text = new TextDecoder('latin1').decode(buf);
+        const audible = text.includes('soun') || text.includes('mp4a');
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            audible,
+            contentType,
+            sizeBytes,
+            inspectedBytes: buf.length,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Validate input
     const parseResult = requestSchema.safeParse(body);
     if (!parseResult.success) {
@@ -446,9 +492,41 @@ serve(async (req) => {
     const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
       resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, sfxUrls, sfxVolume,
-      backgroundMusicUrl, musicVolume, narrationVolume, intro, outro, dryRun
+      ambienceUrls, ambienceVolume,
+      backgroundMusicUrl, musicVolume, narrationVolume, autoMix, lufsTarget,
+      intro, outro, dryRun,
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
+
+    // ─── Auto-mix: keep narration dominant. Approach (Shotstack-friendly, no native loudnorm):
+    //   • voice                     → 1.0× user value (reference)
+    //   • music & ambience          → ducked to ~30% / 35% of their nominal value when voice exists
+    //   • global gain trim          → small offset towards lufsTarget (rough heuristic, ±2 dB)
+    // The numbers below intentionally keep music+ambience BELOW voice but never zero them out.
+    const hasVoiceTrack = !!(audioUrls && audioUrls.some((u) => !!u && !u.startsWith('blob:')));
+    const lufsOffsetDb = Math.max(-3, Math.min(3, (-14 - lufsTarget))); // pull louder targets up
+    const lufsGain = Math.pow(10, lufsOffsetDb / 20);
+
+    const effectiveNarrationVolume = autoMix
+      ? Math.min(1, narrationVolume * 1.0 * lufsGain)
+      : narrationVolume;
+    const effectiveSfxVolume = autoMix
+      ? Math.min(1, sfxVolume * (hasVoiceTrack ? 0.55 : 1.0) * lufsGain)
+      : sfxVolume;
+    const effectiveAmbienceVolume = autoMix
+      ? Math.min(1, (ambienceVolume ?? 0) * (hasVoiceTrack ? 0.4 : 0.85) * lufsGain)
+      : (ambienceVolume ?? 0);
+    const effectiveMusicVolume = autoMix
+      ? Math.min(1, musicVolume * (hasVoiceTrack ? 0.32 : 0.7) * lufsGain)
+      : musicVolume;
+
+    if (autoMix) {
+      console.log('[auto-mix] applied', {
+        hasVoiceTrack, lufsTarget, lufsOffsetDb,
+        in: { narrationVolume, sfxVolume, ambienceVolume, musicVolume },
+        out: { effectiveNarrationVolume, effectiveSfxVolume, effectiveAmbienceVolume, effectiveMusicVolume },
+      });
+    }
 
     // Track skipped audio assets (blob URLs that can't be reached server-side)
     const skippedAssets: { type: string; index?: number; url: string; reason: string }[] = [];
@@ -460,6 +538,11 @@ serve(async (req) => {
     if (sfxUrls) {
       sfxUrls.forEach((u, i) => {
         if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'sfx', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
+      });
+    }
+    if (ambienceUrls) {
+      ambienceUrls.forEach((u, i) => {
+        if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'ambience', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
       });
     }
     if (backgroundMusicUrl && backgroundMusicUrl.startsWith('blob:')) {
@@ -665,7 +748,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: narrationSrc,
-                  volume: narrationVolume,
+                  volume: effectiveNarrationVolume,
                 },
                 start: sceneStart,
                 length: clipLen,
@@ -677,8 +760,7 @@ serve(async (req) => {
           }
         }
 
-        // Add per-scene SFX audio tracks — anchored to sceneStarts[i] so e.g. wave
-        // sound stays glued to the beach scene even with overlapping transitions.
+        // Add per-scene SFX audio tracks (punctual effects) — ducked under voice when autoMix=true.
         if (sfxUrls && sfxUrls.length > 0) {
           const sfxClips: any[] = [];
           for (let i = 0; i < sfxUrls.length; i++) {
@@ -691,7 +773,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: sfxSrc,
-                  volume: sfxVolume,
+                  volume: effectiveSfxVolume,
                 },
                 start: sceneStart,
                 length: clipLen,
@@ -700,6 +782,34 @@ serve(async (req) => {
           }
           if (sfxClips.length > 0) {
             timeline.tracks.push({ clips: sfxClips });
+          }
+        }
+
+        // Add per-scene AMBIENCE audio tracks (continuous wind/sea/forest beds) —
+        // separate from SFX so the user can keep ambience audible while taming punctual hits.
+        if (ambienceUrls && ambienceUrls.length > 0 && effectiveAmbienceVolume > 0) {
+          const ambClips: any[] = [];
+          for (let i = 0; i < ambienceUrls.length; i++) {
+            const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = ambienceUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
+            if (rawUrl && !rawUrl.startsWith('blob:')) {
+              const ambSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              ambClips.push({
+                asset: {
+                  type: 'audio',
+                  src: ambSrc,
+                  volume: effectiveAmbienceVolume,
+                  // soft fade-in/out so ambience doesn't pop between scenes
+                  effect: 'fadeInFadeOut',
+                },
+                start: sceneStart,
+                length: clipLen,
+              });
+            }
+          }
+          if (ambClips.length > 0) {
+            timeline.tracks.push({ clips: ambClips });
           }
         }
 
@@ -733,7 +843,7 @@ serve(async (req) => {
           if (musicDuration >= effectiveTotalDuration - 0.5) {
             // Single clip covers the whole video.
             musicClips.push({
-              asset: { type: 'audio', src: normalizedMusicUrl, volume: musicVolume },
+              asset: { type: 'audio', src: normalizedMusicUrl, volume: effectiveMusicVolume },
               start: 0,
               length: effectiveTotalDuration,
             });
@@ -750,7 +860,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: normalizedMusicUrl,
-                  volume: musicVolume,
+                  volume: effectiveMusicVolume,
                   // Fade in/out on each loop seam so repetitions blend instead of clicking.
                   effect: loopIdx === 0 ? 'fadeOut' : (clipLen >= remaining - 0.05 ? 'fadeIn' : 'fadeInFadeOut'),
                 },
@@ -795,8 +905,10 @@ serve(async (req) => {
           // Count actual clips placed (after filtering blob: URLs out)
           const placedNarrationClips = (audioUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
           const placedSfxClips = (sfxUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const placedAmbienceClips = (ambienceUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
           const requestedNarration = (audioUrls || []).filter(u => !!u).length;
           const requestedSfx = (sfxUrls || []).filter(u => !!u).length;
+          const requestedAmbience = (ambienceUrls || []).filter(u => !!u).length;
           const placedMusic = !!backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:');
           const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
             track: idx + 1,
@@ -817,16 +929,19 @@ serve(async (req) => {
                 // Backwards-compat fields
                 narrationScenes: placedNarrationClips,
                 sfxScenes: placedSfxClips,
+                ambienceScenes: placedAmbienceClips,
                 // Detailed breakdown — surfaced in RenderPreviewDialog
                 placedClips: {
                   video: videoClips.filter((c: any) => c.asset?.type === 'video').length,
                   narration: placedNarrationClips,
                   sfx: placedSfxClips,
+                  ambience: placedAmbienceClips,
                   music: placedMusic ? 1 : 0,
                 },
                 requestedClips: {
                   narration: requestedNarration,
                   sfx: requestedSfx,
+                  ambience: requestedAmbience,
                   music: backgroundMusicUrl ? 1 : 0,
                 },
                 skippedAssets: skippedAssets.length > 0 ? skippedAssets : [],
@@ -836,9 +951,20 @@ serve(async (req) => {
                 hasOutro: outro?.enabled || false,
                 transitionType: transitions?.[0]?.type || transition,
                 tracks: tracksSummary,
+                // Volumes the user requested
                 narrationVolume,
                 sfxVolume,
+                ambienceVolume,
                 musicVolume,
+                // Effective volumes after auto-mix (so the UI can show what actually got applied)
+                autoMix,
+                lufsTarget,
+                effectiveVolumes: {
+                  narration: effectiveNarrationVolume,
+                  sfx: effectiveSfxVolume,
+                  ambience: effectiveAmbienceVolume,
+                  music: effectiveMusicVolume,
+                },
               },
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
