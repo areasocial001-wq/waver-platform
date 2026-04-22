@@ -15,10 +15,10 @@ import { getAudioMix } from "@/lib/storyModeAudioMix";
 export interface RenderVolumes {
   narrationVolume: number; // 0-100
   sfxVolume: number;       // 0-100
-  ambienceVolume: number;  // 0-100 — wind/sea/forest beds, separate from punctual SFX
   musicVolume: number;     // 0-100
-  autoMix: boolean;
-  lufsTarget: number;      // negative dB
+  ambienceVolume?: number; // 0-100 — separate continuous beds (wind/sea); optional for back-compat
+  autoMix?: boolean;
+  lufsTarget?: number;
 }
 
 interface RenderPreviewDialogProps {
