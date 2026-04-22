@@ -74,10 +74,16 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
   const [ignoreAspectWarnings, setIgnoreAspectWarnings] = useState(false);
   const [regeneratingIndex, setRegeneratingIndex] = useState<number | null>(null);
 
-  // Editable volumes
-  const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
-  const [sfxVol, setSfxVol] = useState(18);
-  const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
+  // Editable volumes — initialised from global Audio Mix preferences
+  const globalMix = React.useMemo(() => getAudioMix(), []);
+  const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? globalMix.narrationVolume);
+  const [sfxVol, setSfxVol] = useState(globalMix.sfxVolume);
+  const [ambienceVol, setAmbienceVol] = useState(globalMix.ambienceVolume);
+  const [musicVol, setMusicVol] = useState(script.musicVolume ?? globalMix.musicVolume);
+  const [autoMix, setAutoMix] = useState(globalMix.autoMix);
+  const [lufsTarget, setLufsTarget] = useState(globalMix.lufsTarget);
+  const [musicAudible, setMusicAudible] = useState<null | boolean>(null);
+  const [verifyingMusic, setVerifyingMusic] = useState(false);
 
   // Identify scenes whose generated assets don't match the requested aspect ratio
   const nonCompliantScenes = scenes
@@ -130,9 +136,13 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           audioUrls: narrationUrls.some(u => !!u) ? narrationUrls : undefined,
           sfxUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
           sfxVolume: sfxVol / 100,
+          ambienceUrls: sfxUrls.some(u => !!u) ? sfxUrls : undefined,
+          ambienceVolume: ambienceVol / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: musicVol / 100,
           narrationVolume: narrationVol / 100,
+          autoMix,
+          lufsTarget,
           dryRun: true,
         },
       });
@@ -152,9 +162,13 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   React.useEffect(() => {
     if (open && !summary && !loading) {
-      setNarrationVol(script.narrationVolume ?? 100);
-      setMusicVol(script.musicVolume ?? 25);
-      setSfxVol(18);
+      const g = getAudioMix();
+      setNarrationVol(script.narrationVolume ?? g.narrationVolume);
+      setMusicVol(script.musicVolume ?? g.musicVolume);
+      setSfxVol(g.sfxVolume);
+      setAmbienceVol(g.ambienceVolume);
+      setAutoMix(g.autoMix);
+      setLufsTarget(g.lufsTarget);
       fetchPreview();
     }
     if (!open) {
@@ -162,6 +176,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
       setError(null);
       setIgnoreAspectWarnings(false);
       setIgnoreBlobAssets(false);
+      setMusicAudible(null);
     }
   }, [open]);
 
