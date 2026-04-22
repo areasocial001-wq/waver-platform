@@ -3922,10 +3922,38 @@ export const StoryModeWizard = () => {
                 {backgroundMusicUrl && (
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                     <Music className="w-5 h-5 text-primary shrink-0" />
-                    <div className="flex-1"><p className="text-sm font-medium">Colonna Sonora</p><audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" /></div>
-                    <Button variant="outline" size="sm" disabled={downloadingId === "music"} onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3", "music")}>
-                      {downloadingId === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                    </Button>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium">Colonna Sonora</p>
+                        {musicVerification?.audible === true && (
+                          <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px]">
+                            <Check className="w-3 h-3 mr-1" />Inclusa nel render
+                          </Badge>
+                        )}
+                        {musicVerification?.audible === false && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            {musicVerification.retried ? "Ancora mancante dopo retry" : "Non rilevata nel render"}
+                          </Badge>
+                        )}
+                      </div>
+                      <audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button variant="outline" size="sm" disabled={downloadingId === "music"} onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3", "music")}>
+                        {downloadingId === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                      </Button>
+                      {musicVerification?.audible === false && (
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          musicRetryRef.current = 0;
+                          setMusicVerification(null);
+                          const newUrl = await generateBackgroundMusic();
+                          if (newUrl) setTimeout(() => handleReassemble(), 500);
+                        }}>
+                          <RefreshCw className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-3 flex-wrap">
