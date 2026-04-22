@@ -53,14 +53,26 @@ const requestSchema = z.object({
   audioUrl: z.string().optional(),
   audioVolume: z.number().min(0).max(100).default(100),
   audioUrls: z.array(z.string()).optional(), // per-scene narration audio
-  sfxUrls: z.array(z.string()).optional(), // per-scene sound effects
-  sfxVolume: z.number().min(0).max(1).default(0.7), // sfx volume (0-1)
+  sfxUrls: z.array(z.string()).optional(), // per-scene punctual sound effects
+  sfxVolume: z.number().min(0).max(1).default(0.22),
+  // NEW: separate ambience track (continuous wind/sea/forest beds)
+  ambienceUrls: z.array(z.string()).optional(),
+  ambienceVolume: z.number().min(0).max(1).default(0.18),
   backgroundMusicUrl: z.string().optional(),
   musicVolume: z.number().min(0).max(1).default(0.25),
   narrationVolume: z.number().min(0).max(1).default(1),
+  // NEW: server-side auto-mix that ducks music+ambience under voice and
+  //      normalises overall loudness towards lufsTarget.
+  autoMix: z.boolean().default(false),
+  lufsTarget: z.number().min(-30).max(-6).default(-14),
   intro: introOutroSchema.optional(),
   outro: introOutroSchema.optional(),
   dryRun: z.boolean().optional(), // preview mode: returns timeline summary without rendering
+  // NEW: when true, just probe the most recent rendered file in storage and
+  //      return whether the music track was actually included.
+  verifyMusic: z.object({
+    renderedVideoUrl: z.string(),
+  }).optional(),
 });
 
 // Map resolution to Shotstack format
