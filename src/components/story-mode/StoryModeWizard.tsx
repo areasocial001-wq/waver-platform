@@ -37,6 +37,7 @@ import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
+import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
@@ -308,6 +309,18 @@ export const StoryModeWizard = () => {
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
   const recoveryAttemptsRef = useRef(0);
+  // Tracks how many times we already retried regenerating background music after
+  // the post-render verification failed. Capped at 1 — if it still fails, we
+  // surface a warning to the user instead of looping forever.
+  const musicRetryRef = useRef(0);
+  const MAX_MUSIC_RETRIES = 1;
+  const [musicVerification, setMusicVerification] = useState<{
+    audible: boolean | null;
+    checkedAt: number | null;
+    retried: boolean;
+    sizeBytes?: number;
+    contentType?: string;
+  } | null>(null);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
@@ -496,6 +509,10 @@ export const StoryModeWizard = () => {
               new Notification("Video pronto! 🎬", { body: "Il tuo video finale è stato renderizzato con successo.", icon: "/favicon.ico" });
             }
             setTimeout(() => saveProject(), 500);
+            // Fire-and-forget post-render music verification (does not block UI).
+            // If the rendered MP4 has no audible track and we did request music,
+            // regenerate music + reassemble once.
+            void verifyAndRetryMusic(data.videoUrl);
             break;
           } else if (data?.status === "failed") {
             setRenderStatus("failed");
@@ -1495,68 +1512,76 @@ export const StoryModeWizard = () => {
     });
   };
 
-  // Infer a subtle ambient SFX bed from the actual scene content.
-  // Priority: explicit scene prompt > narration/image context > generic mood.
-  const inferAmbientSfxPrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "sfxPrompt">): string => {
-    const explicit = scene.sfxPrompt?.trim();
+  // Infer a CONTINUOUS ambience bed (wind, sea, forest, rain) from scene content.
+  // This is meant to play softly under the entire scene — never punctual hits.
+  const inferAmbiencePrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "ambiencePrompt">): string => {
+    const explicit = scene.ambiencePrompt?.trim();
     if (explicit) return explicit;
 
     const combined = `${scene.narration || ""} ${scene.imagePrompt || ""} ${scene.mood || ""}`.toLowerCase();
 
-    if (/(mare|sea|ocean|beach|spiaggia|shore|coast|waves?|onde?|surf|seagull|gabbian|vento|wind|breeze|scogliera)/i.test(combined)) {
-      return "subtle seaside ambience with gentle sea waves and coastal wind, light shore wash, distant seabirds, no horror stingers, no impacts, no music, soft background only";
+    if (/(mare|sea|ocean|beach|spiaggia|shore|coast|waves?|onde?|surf|seagull|gabbian|scogliera)/i.test(combined)) {
+      return "continuous gentle seaside ambience: soft sea waves and coastal wind, distant seabirds, no horror stingers, no impacts, no music, smooth uninterrupted bed";
     }
     if (/(forest|woods|bosco|foresta|leaves|foglie|river|stream|creek|ruscello)/i.test(combined)) {
-      return "subtle natural ambience with soft wind through leaves, distant birds and light water movement, no music, no cinematic hits, background only";
+      return "continuous natural ambience: soft wind through leaves, distant birds, light water movement, no music, no cinematic hits, smooth uninterrupted bed";
     }
     if (/(rain|pioggia|storm|tempesta|thunder|tuono)/i.test(combined)) {
-      return "subtle weather ambience with soft rain, distant thunder and controlled wind bed, no jump scares, no music, background only";
+      return "continuous weather ambience: soft steady rain and controlled wind bed, far thunder, no jump scares, no music, smooth uninterrupted bed";
+    }
+    if (/(vento|wind|breeze|aria)/i.test(combined)) {
+      return "continuous gentle wind ambience: light breeze through open space, no impacts, no music, smooth uninterrupted bed";
     }
 
     const m = (scene.mood || "").toLowerCase();
-    const map: Record<string, string> = {
-      outdoor: "gentle wind blowing through trees, birds chirping",
-      nature: "forest ambiance, gentle stream, birds singing",
-      city: "city ambiance, distant traffic, crowd murmur",
-      urban: "urban street sounds, footsteps, distant cars",
-      rain: "rain falling on a roof, gentle thunder in the distance",
-      storm: "heavy rain, thunder, wind howling",
-      night: "crickets chirping, gentle night breeze, owl hooting",
-      horror: "creepy atmosphere, eerie whispers, creaking wood",
-      suspense: "tense atmosphere, low rumble, heartbeat",
-      tension: "tense atmosphere, low rumble, rising suspense",
-      war: "distant explosions, gunfire, helicopters",
-      battle: "sword clashing, battle cries, shields hitting",
-      space: "deep space ambiance, electronic hum, cosmic whoosh",
-      ocean: "ocean waves crashing, seagulls, wind",
-      beach: "waves on beach, seagulls, gentle wind",
-      forest: "forest ambiance, rustling leaves, bird calls",
-      desert: "desert wind, sand blowing, distant eagle cry",
-      celebration: "crowd cheering, applause, festive sounds",
-      romantic: "soft piano notes, gentle breeze, heartbeat",
-      sad: "gentle rain, melancholic wind, distant church bell",
-      happy: "cheerful atmosphere, birds singing, children laughing",
-      mysterious: "mysterious ambiance, echoing footsteps, distant whispers",
-      epic: "epic whoosh, rising tension, powerful rumble",
-      calm: "gentle stream, soft breeze, birds in the distance",
-      peaceful: "peaceful meadow, gentle wind, soft birdsong",
+    const ambienceMap: Record<string, string> = {
+      outdoor: "gentle wind through trees, soft birds in the distance, no music, continuous bed",
+      nature: "soft forest ambience, gentle stream, birds singing, continuous bed",
+      city: "low city ambience, distant traffic, light crowd murmur, continuous bed",
+      urban: "low urban ambience, distant cars, faint city hum, continuous bed",
+      night: "soft night ambience: crickets, gentle breeze, very low and steady",
+      ocean: "soft ocean waves and wind, continuous bed, no impacts",
+      beach: "soft beach waves and gentle wind, continuous bed",
+      forest: "soft forest ambience: rustling leaves, distant birds, continuous bed",
+      desert: "soft desert wind, very steady, continuous bed",
+      space: "deep low space ambience, soft electronic hum, continuous bed",
+      calm: "soft natural ambience: gentle breeze, distant birds, continuous bed",
+      peaceful: "soft meadow ambience: gentle wind, soft birdsong, continuous bed",
     };
-    for (const [key, prompt] of Object.entries(map)) {
+    for (const [key, prompt] of Object.entries(ambienceMap)) {
       if (m.includes(key)) return prompt;
     }
-    // Fallback: use the mood itself as a prompt
-    return `subtle environmental ambience for a ${scene.mood} scene, soft background only, no music, no stingers, no loud cinematic effects`;
+    // Generic safe fallback — never horror/dramatic.
+    return `subtle environmental ambience matching a ${scene.mood || "neutral"} scene, soft continuous background bed, no music, no stingers, no loud cinematic hits`;
   };
 
-  // Generate SFX for a scene
+  // Infer PUNCTUAL sound effects only when the scene clearly has discrete events
+  // (footsteps, doors, impacts). Returns null when nothing punctual is needed —
+  // in that case we skip SFX generation entirely so it never fights with voice.
+  const inferSfxPrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "sfxPrompt">): string | null => {
+    const explicit = scene.sfxPrompt?.trim();
+    if (explicit) return explicit;
+
+    const combined = `${scene.narration || ""} ${scene.imagePrompt || ""}`.toLowerCase();
+    if (/(footstep|passi|porta\b|door|bussare|knock|spada|sword|shot|sparo|explosion|esplosione|crash|schianto|campana|bell|telefono|phone|clock|orologio|gun|fire|fuoco)/i.test(combined)) {
+      return "subtle punctual sound effects matching the scene actions, low volume, no music, no continuous bed, just discrete hits";
+    }
+    return null;
+  };
+
+  /** @deprecated kept for backward compatibility — alias to ambience prompt. */
+  const inferAmbientSfxPrompt = inferAmbiencePrompt;
+
+  // Generate punctual SFX for a scene (returns null if no SFX is needed)
   const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
-    const sfxPrompt = inferAmbientSfxPrompt(scene);
+    const sfxPrompt = inferSfxPrompt(scene);
+    if (!sfxPrompt) return null;
     try {
       const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
@@ -1564,6 +1589,26 @@ export const StoryModeWizard = () => {
       return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
+      return null;
+    }
+  };
+
+  // Generate continuous ambience bed for a scene (always returns a prompt).
+  const generateSceneAmbience = async (scene: StoryScene): Promise<string | null> => {
+    const ambiencePrompt = inferAmbiencePrompt(scene);
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
+      });
+      if (!response.ok) throw new Error(`Ambience failed: ${response.status}`);
+      const blob = await response.blob();
+      const storageUrl = await uploadBlobToStorage(blob, "story-ambience", "mp3", `Ambience Scena`);
+      return storageUrl;
+    } catch (err) {
+      console.error("Ambience generation error:", err);
       return null;
     }
   };
@@ -1655,11 +1700,56 @@ export const StoryModeWizard = () => {
   };
 
   /**
-   * Auto-recover audio assets that the backend skipped because they were blob: URLs
-   * (browser-only, unreachable from Shotstack). Regenerates narration/sfx via the
-   * same TTS / SFX pipeline and refreshes background music if it was a blob URL.
-   * Returns true if at least one asset was recovered (caller should re-trigger concat).
+   * Post-render music verification: probes the rendered MP4 server-side for an
+   * audible audio track, and — when we DID send a backgroundMusicUrl but the
+   * track ends up missing/silent — regenerates only the music and triggers a
+   * single reassemble retry. Capped by MAX_MUSIC_RETRIES to avoid infinite loops.
    */
+  const verifyAndRetryMusic = async (renderedVideoUrl: string): Promise<void> => {
+    if (!renderedVideoUrl) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: { verifyMusic: { renderedVideoUrl } },
+      });
+      if (error) {
+        console.warn("[music-verify] probe error:", error);
+        return;
+      }
+      const audible = !!data?.audible;
+      setMusicVerification({
+        audible,
+        checkedAt: Date.now(),
+        retried: musicRetryRef.current > 0,
+        sizeBytes: data?.sizeBytes,
+        contentType: data?.contentType,
+      });
+      // Only attempt a retry when we asked for music in the first place
+      // and the verification says the audio track is missing.
+      if (audible || !backgroundMusicUrl || !script?.suggestedMusic) {
+        if (audible) {
+          console.log("[music-verify] OK — audio track detected in final render.");
+        }
+        return;
+      }
+      if (musicRetryRef.current >= MAX_MUSIC_RETRIES) {
+        toast.warning("⚠️ La colonna sonora risulta ancora mancante nel video finale dopo il retry. Puoi rigenerare manualmente la musica.", { duration: 8000 });
+        return;
+      }
+      musicRetryRef.current += 1;
+      toast.info(`🎵 Colonna sonora non rilevata nel render — rigenerazione e nuovo montaggio (tentativo ${musicRetryRef.current}/${MAX_MUSIC_RETRIES})…`, { duration: 6000 });
+      const newMusicUrl = await generateBackgroundMusic();
+      if (!newMusicUrl) {
+        toast.error("Impossibile rigenerare la colonna sonora. Riprova manualmente più tardi.");
+        return;
+      }
+      // Reassemble — handleReassemble reads the latest backgroundMusicUrl from state,
+      // which generateBackgroundMusic just updated via setBackgroundMusicUrl.
+      setTimeout(() => handleReassemble(), 500);
+    } catch (err) {
+      console.warn("[music-verify] unexpected error:", err);
+    }
+  };
+
   const recoverSkippedAudioAssets = async (
     skipped: { type: string; index?: number; url: string }[],
   ): Promise<boolean> => {
@@ -1680,6 +1770,22 @@ export const StoryModeWizard = () => {
           if (realIdx < 0) continue;
           await regenerateSceneAsset(realIdx, item.type === "narration" ? "audio" : "sfx");
           recovered++;
+        } else if (item.type === "ambience" && typeof item.index === "number") {
+          // Ambience isn't yet wired through regenerateSceneAsset — regenerate inline.
+          const targetVid = vids[item.index];
+          if (!targetVid) continue;
+          const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+          if (realIdx < 0) continue;
+          const newUrl = await generateSceneAmbience(script.scenes[realIdx]);
+          if (newUrl) {
+            setScript(prev => {
+              if (!prev) return prev;
+              const updatedScenes = [...prev.scenes];
+              updatedScenes[realIdx] = { ...updatedScenes[realIdx], ambienceUrl: newUrl, ambienceStatus: "completed" };
+              return { ...prev, scenes: updatedScenes };
+            });
+            recovered++;
+          }
         } else if (item.type === "music") {
           const newUrl = await generateBackgroundMusic();
           if (newUrl) recovered++;
@@ -2189,6 +2295,7 @@ export const StoryModeWizard = () => {
       // Build positional narration array aligned with video clips
       const narrationUrls = vids.map(s => s.audioUrl || "");
       const sfxUrls = vids.map(s => s.sfxUrl || "");
+      const ambienceUrls = vids.map(s => s.ambienceUrl || "");
 
       const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
       if (invalidSceneNumbers.length > 0) {
@@ -2207,6 +2314,7 @@ export const StoryModeWizard = () => {
       const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
       const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
       const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+      const alignedAmbience = validIndexes.map(i => ambienceUrls[i] || "");
       const alignedTransitions = validIndexes.map(i => transitions[i]);
       const { data, error } = await supabase.functions.invoke("video-concat", {
         body: {
@@ -2221,7 +2329,7 @@ export const StoryModeWizard = () => {
           audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
           sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
           sfxVolume: (volumeOverrides?.sfxVolume ?? 22) / 100,
-          ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
+          ambienceUrls: alignedAmbience.some(u => !!u) ? alignedAmbience : undefined,
           ambienceVolume: (volumeOverrides?.ambienceVolume ?? 18) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
@@ -2305,6 +2413,8 @@ export const StoryModeWizard = () => {
       toast.error("Ricarica l'immagine di riferimento prima di generare.");
       return;
     }
+    musicRetryRef.current = 0;
+    setMusicVerification(null);
 
     // Warn if this is the last available project
     if (!isStoryModeUnlimited && remainingStoryMode <= 1 && remainingStoryMode > 0) {
@@ -2412,16 +2522,35 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
-    // SFX per scene (based on mood)
+    // Ambience bed (continuous wind/sea/forest) — always generated, low volume.
+    // Punctual SFX is generated only when the scene clearly has discrete events;
+    // otherwise we skip it so it never overlaps with the voice.
     for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
       if (checkCancelled()) break;
       try {
-        const sfxPrompt = inferAmbientSfxPrompt(scenes[i]);
-        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt };
+        const ambiencePrompt = inferAmbiencePrompt(scenes[i]);
+        scenes[i] = { ...scenes[i], ambienceStatus: "generating", ambiencePrompt };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const sfxUrl = await generateSceneSfx(scenes[i]);
-        scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+        const ambienceUrl = await generateSceneAmbience(scenes[i]);
+        scenes[i] = { ...scenes[i], ambienceUrl: ambienceUrl || undefined, ambienceStatus: ambienceUrl ? "completed" : "error" };
+      } catch (err: any) {
+        toast.error(`Scena ${i + 1}: errore ambience – ${err?.message || "sconosciuto"}`);
+        scenes[i] = { ...scenes[i], ambienceStatus: "error" };
+      }
+
+      // Punctual SFX (only if needed)
+      try {
+        const sfxPrompt = inferSfxPrompt(scenes[i]);
+        if (sfxPrompt) {
+          scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt };
+          setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+          const sfxUrl = await generateSceneSfx(scenes[i]);
+          scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+        } else {
+          // Mark as completed-but-empty so the UI doesn't show an error pill
+          scenes[i] = { ...scenes[i], sfxStatus: "idle", sfxUrl: undefined };
+        }
       } catch (err: any) {
         toast.error(`Scena ${i + 1}: errore SFX – ${err?.message || "sconosciuto"}`);
         scenes[i] = { ...scenes[i], sfxStatus: "error" };
@@ -2561,9 +2690,10 @@ export const StoryModeWizard = () => {
           type: s.transition || "crossfade",
           duration: s.transitionDuration || 0.5,
         }));
-        // Build positional narration/sfx arrays aligned with video clips
+        // Build positional narration/sfx/ambience arrays aligned with video clips
         const narrationUrls = vids.map(s => s.audioUrl || "");
         const sfxUrls = vids.map(s => s.sfxUrl || "");
+        const ambienceUrls = vids.map(s => s.ambienceUrl || "");
 
         const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
         if (invalidSceneNumbers.length > 0) {
@@ -2583,8 +2713,10 @@ export const StoryModeWizard = () => {
         const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
         const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
         const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+        const alignedAmbience = validIndexes.map(i => ambienceUrls[i] || "");
         const alignedTransitions = validIndexes.map(i => transitions[i]);
 
+        const globalMix = getAudioMix();
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: validVideoUrls,
@@ -2597,9 +2729,9 @@ export const StoryModeWizard = () => {
             fps: input.videoFps || "24",
             audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
             sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            sfxVolume: 0.22,
-            ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            ambienceVolume: 0.18,
+            sfxVolume: globalMix.sfxVolume / 100,
+            ambienceUrls: alignedAmbience.some(u => !!u) ? alignedAmbience : undefined,
+            ambienceVolume: globalMix.ambienceVolume / 100,
             backgroundMusicUrl: resolvedBackgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
@@ -3790,10 +3922,38 @@ export const StoryModeWizard = () => {
                 {backgroundMusicUrl && (
                   <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
                     <Music className="w-5 h-5 text-primary shrink-0" />
-                    <div className="flex-1"><p className="text-sm font-medium">Colonna Sonora</p><audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" /></div>
-                    <Button variant="outline" size="sm" disabled={downloadingId === "music"} onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3", "music")}>
-                      {downloadingId === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                    </Button>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium">Colonna Sonora</p>
+                        {musicVerification?.audible === true && (
+                          <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px]">
+                            <Check className="w-3 h-3 mr-1" />Inclusa nel render
+                          </Badge>
+                        )}
+                        {musicVerification?.audible === false && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            {musicVerification.retried ? "Ancora mancante dopo retry" : "Non rilevata nel render"}
+                          </Badge>
+                        )}
+                      </div>
+                      <audio src={backgroundMusicUrl} controls className="w-full mt-1 h-8" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <Button variant="outline" size="sm" disabled={downloadingId === "music"} onClick={() => downloadFile(backgroundMusicUrl, "soundtrack.mp3", "music")}>
+                        {downloadingId === "music" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                      </Button>
+                      {musicVerification?.audible === false && (
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          musicRetryRef.current = 0;
+                          setMusicVerification(null);
+                          const newUrl = await generateBackgroundMusic();
+                          if (newUrl) setTimeout(() => handleReassemble(), 500);
+                        }}>
+                          <RefreshCw className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 )}
                 <div className="flex gap-3 flex-wrap">
