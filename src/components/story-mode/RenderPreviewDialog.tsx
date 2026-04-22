@@ -375,7 +375,74 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                   disabled={!summary.hasBackgroundMusic}
                 />
               </div>
+
+              {/* Auto-mix toggle (server-side ducking + LUFS-targeted gain) */}
+              <div className="flex items-center justify-between gap-3 p-2 rounded border bg-card/50">
+                <div className="flex-1 min-w-0">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Sliders className="w-3 h-3 text-primary" /> Auto-mix LUFS
+                    <Badge variant="secondary" className="text-[9px] h-4 px-1">{lufsTarget} LUFS</Badge>
+                  </Label>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Bilancia voce/musica/ambience tenendo la narrazione sempre dominante.
+                  </p>
+                </div>
+                <Switch checked={autoMix} onCheckedChange={setAutoMix} />
+              </div>
             </div>
+
+            {/* Music presence indicator */}
+            {summary.hasBackgroundMusic && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded border border-green-500/30 bg-green-500/5 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Music className="w-3.5 h-3.5 text-green-400" />
+                  Colonna sonora unificata: <strong className="text-green-400">inclusa nel render</strong>
+                  {musicAudible === false && <span className="text-orange-400">(non rilevata nel file finale!)</span>}
+                  {musicAudible === true && <span className="text-emerald-400">✓ verificata nel MP4</span>}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px]"
+                  disabled={verifyingMusic || !onRegenerateAudio}
+                  onClick={async () => {
+                    if (!onRegenerateAudio) return;
+                    setRegeneratingAudio("music");
+                    try { await onRegenerateAudio({ type: "music" }); }
+                    finally { setRegeneratingAudio(null); }
+                  }}
+                >
+                  {regeneratingAudio === "music"
+                    ? <Loader2 className="w-3 h-3 animate-spin" />
+                    : <><RefreshCw className="w-3 h-3 mr-1" />Rigenera musica</>}
+                </Button>
+              </div>
+            )}
+            {!summary.hasBackgroundMusic && (
+              <div className="flex items-center justify-between gap-2 p-2 rounded border border-orange-500/30 bg-orange-500/5 text-xs">
+                <span className="flex items-center gap-1.5 text-orange-400">
+                  <Music className="w-3.5 h-3.5" />
+                  Nessuna colonna sonora rilevata sul progetto
+                </span>
+                {onRegenerateAudio && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-[10px]"
+                    disabled={regeneratingAudio !== null}
+                    onClick={async () => {
+                      setRegeneratingAudio("music");
+                      try { await onRegenerateAudio({ type: "music" }); }
+                      finally { setRegeneratingAudio(null); }
+                    }}
+                  >
+                    {regeneratingAudio === "music"
+                      ? <Loader2 className="w-3 h-3 animate-spin" />
+                      : <><RefreshCw className="w-3 h-3 mr-1" />Genera musica</>}
+                  </Button>
+                )}
+              </div>
+            )}
 
             {/* Transition info */}
             <div className="flex items-center justify-between text-sm p-2 rounded bg-muted/20">
