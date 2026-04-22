@@ -4012,14 +4012,40 @@ export const StoryModeWizard = () => {
                         <Button variant="outline" size="sm" onClick={async () => {
                           musicRetryRef.current = 0;
                           setMusicVerification(null);
+                          setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "manual-retry" }));
                           const newUrl = await generateBackgroundMusic();
-                          if (newUrl) setTimeout(() => handleReassemble(), 500);
+                          if (newUrl) {
+                            setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "regenerate-ok", note: newUrl.slice(0, 80) }));
+                            setTimeout(() => handleReassemble(), 500);
+                          } else {
+                            setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "regenerate-failed" }));
+                          }
                         }}>
                           <RefreshCw className="w-3 h-3" />
                         </Button>
                       )}
                     </div>
                   </div>
+                )}
+                {/* Persistent music retry status + post-render audio QA report */}
+                {(musicRetryLog.entries.length > 0 || finalVideoUrl) && (
+                  <MusicRetryStatusCard
+                    log={musicRetryLog}
+                    busy={isGenerating}
+                    onManualRetry={async () => {
+                      if (!finalVideoUrl) return;
+                      setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "manual-retry" }));
+                      await verifyAndRetryMusic(finalVideoUrl);
+                    }}
+                    onClear={() => setMusicRetryLog(resetMusicRetryLog(projectId ?? null))}
+                  />
+                )}
+                {(renderReport || renderReportLoading) && (
+                  <RenderReportCard
+                    report={renderReport}
+                    loading={renderReportLoading}
+                    onRerun={finalVideoUrl ? () => runRenderReport(finalVideoUrl, musicVerification?.audible ?? null) : undefined}
+                  />
                 )}
                 <div className="flex gap-3 flex-wrap">
                   <Button disabled={downloadingId === "final"} onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`, "final")}>
