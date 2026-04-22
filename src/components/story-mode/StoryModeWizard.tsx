@@ -309,6 +309,10 @@ export const StoryModeWizard = () => {
   useEffect(() => {
     void loadLockCharacterDefaultFromSupabase().then(setLockCharacterDefault);
   }, []);
+  // Re-hydrate the per-project music retry log whenever we switch project.
+  useEffect(() => {
+    setMusicRetryLog(loadMusicRetryLog(projectId ?? null));
+  }, [projectId]);
   const downloadFile = useDownloadFile(setDownloadingId);
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
