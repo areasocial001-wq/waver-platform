@@ -98,18 +98,8 @@ const getAspectRatioSize = (aspectRatio: string, resolution: string): { width: n
 };
 
 // Map transition types to Shotstack format.
-// Shotstack uses `fade` on `out` to fade the OUTGOING clip and `fade` on `in`
-// (with overlapping clips) to fade the INCOMING clip. For a true cross-dissolve
-// with no held last frame, BOTH clips need to fade across the overlap window.
-//
-//  - crossfade / dissolve = fade-out prev + fade-in next (true cross-dissolve)
-//  - fade_black / fade    = fade-out prev + fade-in next, NOT overlapped (gap to black)
-//  - wipe variants        = directional wipe in
-//
-// Previous behaviour (`{ in: 'fade' }` only) caused the outgoing clip to keep
-// playing at full opacity under the incoming clip; if the source video file was
-// even slightly shorter than the requested clip length, Shotstack froze the last
-// frame for the duration of the overlap → visible "fermo fotogramma".
+// True cross-dissolve = overlap + fade-out prev + fade-in next.
+// Fade-to-black = no overlap, only fade-in on the next clip.
 const mapTransition = (transition: string): { in?: string; out?: string } | null => {
   switch (transition) {
     case 'fade':
@@ -567,30 +557,32 @@ serve(async (req) => {
           const shotstackTransition = mapTransition(transType);
           
           if (shotstackTransition && i > 0) {
-            // Apply fade-out to previous clip ONLY for fade-to-black variants.
-            // For crossfade/dissolve we skip prev.out so the overlap produces a true cross-dissolve.
+            const isCrossBlend = transType === 'crossfade' || transType === 'dissolve';
+            const isFadeToBlack = transType === 'fade' || transType === 'fade_black';
+
+            // Crossfade/dissolve: fade OUT previous and fade IN current over an overlap window.
+            // Fade-to-black: avoid overlap, otherwise Shotstack blends clips instead of dipping to black.
             if (shotstackTransition.out) {
               const prevClip = videoClips[videoClips.length - 1];
-              if (prevClip && !prevClip.transition?.out) {
+              if (prevClip && !prevClip.transition?.out && isCrossBlend) {
                 prevClip.transition = {
                   ...prevClip.transition,
                   out: shotstackTransition.out,
                 };
               }
             }
-            // Add fade-in to current clip
             if (shotstackTransition.in) {
               clip.transition = {
                 ...effectsResult.transition,
                 in: shotstackTransition.in,
               };
             }
-            // Overlap clips so transitions blend smoothly.
-            // CRITICAL: also overlap for fade-to-black variants — otherwise the prev
-            // clip ends, holds its last frame, then the next clip fades in, producing
-            // a "frozen image" pause. Overlapping makes the fade-out of prev and
-            // fade-in of next happen simultaneously over the transition window.
-            clip.start = Math.max(0, currentStart - transDur);
+
+            if (isCrossBlend) {
+              clip.start = Math.max(0, currentStart - transDur);
+            } else if (isFadeToBlack) {
+              clip.start = currentStart;
+            }
           } else if (effectsResult.transition) {
             clip.transition = effectsResult.transition;
           }
