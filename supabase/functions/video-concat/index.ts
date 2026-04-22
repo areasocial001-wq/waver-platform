@@ -458,9 +458,41 @@ serve(async (req) => {
     const {
       videoUrls, clipDurations, clipEffects, transition, transitionDuration, transitions,
       resolution, aspectRatio, fps, audioUrl, audioVolume, audioUrls, sfxUrls, sfxVolume,
-      backgroundMusicUrl, musicVolume, narrationVolume, intro, outro, dryRun
+      ambienceUrls, ambienceVolume,
+      backgroundMusicUrl, musicVolume, narrationVolume, autoMix, lufsTarget,
+      intro, outro, dryRun,
     } = parseResult.data;
     const SHOTSTACK_API_KEY = Deno.env.get('SHOTSTACK_API_KEY');
+
+    // ─── Auto-mix: keep narration dominant. Approach (Shotstack-friendly, no native loudnorm):
+    //   • voice                     → 1.0× user value (reference)
+    //   • music & ambience          → ducked to ~30% / 35% of their nominal value when voice exists
+    //   • global gain trim          → small offset towards lufsTarget (rough heuristic, ±2 dB)
+    // The numbers below intentionally keep music+ambience BELOW voice but never zero them out.
+    const hasVoiceTrack = !!(audioUrls && audioUrls.some((u) => !!u && !u.startsWith('blob:')));
+    const lufsOffsetDb = Math.max(-3, Math.min(3, (-14 - lufsTarget))); // pull louder targets up
+    const lufsGain = Math.pow(10, lufsOffsetDb / 20);
+
+    const effectiveNarrationVolume = autoMix
+      ? Math.min(1, narrationVolume * 1.0 * lufsGain)
+      : narrationVolume;
+    const effectiveSfxVolume = autoMix
+      ? Math.min(1, sfxVolume * (hasVoiceTrack ? 0.55 : 1.0) * lufsGain)
+      : sfxVolume;
+    const effectiveAmbienceVolume = autoMix
+      ? Math.min(1, (ambienceVolume ?? 0) * (hasVoiceTrack ? 0.4 : 0.85) * lufsGain)
+      : (ambienceVolume ?? 0);
+    const effectiveMusicVolume = autoMix
+      ? Math.min(1, musicVolume * (hasVoiceTrack ? 0.32 : 0.7) * lufsGain)
+      : musicVolume;
+
+    if (autoMix) {
+      console.log('[auto-mix] applied', {
+        hasVoiceTrack, lufsTarget, lufsOffsetDb,
+        in: { narrationVolume, sfxVolume, ambienceVolume, musicVolume },
+        out: { effectiveNarrationVolume, effectiveSfxVolume, effectiveAmbienceVolume, effectiveMusicVolume },
+      });
+    }
 
     // Track skipped audio assets (blob URLs that can't be reached server-side)
     const skippedAssets: { type: string; index?: number; url: string; reason: string }[] = [];
@@ -472,6 +504,11 @@ serve(async (req) => {
     if (sfxUrls) {
       sfxUrls.forEach((u, i) => {
         if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'sfx', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
+      });
+    }
+    if (ambienceUrls) {
+      ambienceUrls.forEach((u, i) => {
+        if (u && u.startsWith('blob:')) skippedAssets.push({ type: 'ambience', index: i, url: u, reason: 'blob URL non raggiungibile dal server' });
       });
     }
     if (backgroundMusicUrl && backgroundMusicUrl.startsWith('blob:')) {
