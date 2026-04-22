@@ -809,7 +809,7 @@ serve(async (req) => {
           if (musicDuration >= effectiveTotalDuration - 0.5) {
             // Single clip covers the whole video.
             musicClips.push({
-              asset: { type: 'audio', src: normalizedMusicUrl, volume: musicVolume },
+              asset: { type: 'audio', src: normalizedMusicUrl, volume: effectiveMusicVolume },
               start: 0,
               length: effectiveTotalDuration,
             });
@@ -826,7 +826,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: normalizedMusicUrl,
-                  volume: musicVolume,
+                  volume: effectiveMusicVolume,
                   // Fade in/out on each loop seam so repetitions blend instead of clicking.
                   effect: loopIdx === 0 ? 'fadeOut' : (clipLen >= remaining - 0.05 ? 'fadeIn' : 'fadeInFadeOut'),
                 },
@@ -871,8 +871,10 @@ serve(async (req) => {
           // Count actual clips placed (after filtering blob: URLs out)
           const placedNarrationClips = (audioUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
           const placedSfxClips = (sfxUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
+          const placedAmbienceClips = (ambienceUrls || []).filter(u => !!u && !u.startsWith('blob:')).length;
           const requestedNarration = (audioUrls || []).filter(u => !!u).length;
           const requestedSfx = (sfxUrls || []).filter(u => !!u).length;
+          const requestedAmbience = (ambienceUrls || []).filter(u => !!u).length;
           const placedMusic = !!backgroundMusicUrl && !backgroundMusicUrl.startsWith('blob:');
           const tracksSummary = timeline.tracks.map((t: any, idx: number) => ({
             track: idx + 1,
@@ -893,16 +895,19 @@ serve(async (req) => {
                 // Backwards-compat fields
                 narrationScenes: placedNarrationClips,
                 sfxScenes: placedSfxClips,
+                ambienceScenes: placedAmbienceClips,
                 // Detailed breakdown — surfaced in RenderPreviewDialog
                 placedClips: {
                   video: videoClips.filter((c: any) => c.asset?.type === 'video').length,
                   narration: placedNarrationClips,
                   sfx: placedSfxClips,
+                  ambience: placedAmbienceClips,
                   music: placedMusic ? 1 : 0,
                 },
                 requestedClips: {
                   narration: requestedNarration,
                   sfx: requestedSfx,
+                  ambience: requestedAmbience,
                   music: backgroundMusicUrl ? 1 : 0,
                 },
                 skippedAssets: skippedAssets.length > 0 ? skippedAssets : [],
@@ -912,9 +917,20 @@ serve(async (req) => {
                 hasOutro: outro?.enabled || false,
                 transitionType: transitions?.[0]?.type || transition,
                 tracks: tracksSummary,
+                // Volumes the user requested
                 narrationVolume,
                 sfxVolume,
+                ambienceVolume,
                 musicVolume,
+                // Effective volumes after auto-mix (so the UI can show what actually got applied)
+                autoMix,
+                lufsTarget,
+                effectiveVolumes: {
+                  narration: effectiveNarrationVolume,
+                  sfx: effectiveSfxVolume,
+                  ambience: effectiveAmbienceVolume,
+                  music: effectiveMusicVolume,
+                },
               },
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
