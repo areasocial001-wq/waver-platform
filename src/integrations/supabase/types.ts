@@ -849,6 +849,7 @@ export type Database = {
         Row: {
           created_at: string
           preferences: Json
+          story_mode_audio_mix: Json
           story_mode_auto_recovery: boolean
           story_mode_lock_character_default: boolean
           updated_at: string
@@ -857,6 +858,7 @@ export type Database = {
         Insert: {
           created_at?: string
           preferences?: Json
+          story_mode_audio_mix?: Json
           story_mode_auto_recovery?: boolean
           story_mode_lock_character_default?: boolean
           updated_at?: string
@@ -865,6 +867,7 @@ export type Database = {
         Update: {
           created_at?: string
           preferences?: Json
+          story_mode_audio_mix?: Json
           story_mode_auto_recovery?: boolean
           story_mode_lock_character_default?: boolean
           updated_at?: string
