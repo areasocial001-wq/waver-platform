@@ -1770,6 +1770,22 @@ export const StoryModeWizard = () => {
           if (realIdx < 0) continue;
           await regenerateSceneAsset(realIdx, item.type === "narration" ? "audio" : "sfx");
           recovered++;
+        } else if (item.type === "ambience" && typeof item.index === "number") {
+          // Ambience isn't yet wired through regenerateSceneAsset — regenerate inline.
+          const targetVid = vids[item.index];
+          if (!targetVid) continue;
+          const realIdx = script.scenes.findIndex(s => s.sceneNumber === targetVid.sceneNumber);
+          if (realIdx < 0) continue;
+          const newUrl = await generateSceneAmbience(script.scenes[realIdx]);
+          if (newUrl) {
+            setScript(prev => {
+              if (!prev) return prev;
+              const updatedScenes = [...prev.scenes];
+              updatedScenes[realIdx] = { ...updatedScenes[realIdx], ambienceUrl: newUrl, ambienceStatus: "completed" };
+              return { ...prev, scenes: updatedScenes };
+            });
+            recovered++;
+          }
         } else if (item.type === "music") {
           const newUrl = await generateBackgroundMusic();
           if (newUrl) recovered++;
