@@ -5,15 +5,23 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Wind, Sparkles, Music, Sliders, RotateCcw, Loader2, Info } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  Mic, Wind, Sparkles, Music, Sliders, RotateCcw, Loader2, Info,
+  Gauge, Save, Trash2, Plus,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   AUDIO_MIX_PRESETS,
   DEFAULT_AUDIO_MIX,
+  DEFAULT_HEADROOM,
   getAudioMix,
   loadAudioMixFromSupabase,
   setAudioMix,
+  newPresetId,
+  type AudioHeadroom,
   type AudioMixPreset,
+  type CustomAudioPreset,
   type StoryModeAudioMix,
 } from "@/lib/storyModeAudioMix";
 
@@ -25,6 +33,7 @@ import {
 export const AudioMixSettingsCard: React.FC = () => {
   const [mix, setMix] = useState<StoryModeAudioMix>(DEFAULT_AUDIO_MIX);
   const [loading, setLoading] = useState(true);
+  const [newPresetName, setNewPresetName] = useState("");
 
   useEffect(() => {
     setMix(getAudioMix());
@@ -45,16 +54,86 @@ export const AudioMixSettingsCard: React.FC = () => {
     setAudioMix(next);
   };
 
+  const updateHeadroom = (patch: Partial<AudioHeadroom>) => {
+    const next: StoryModeAudioMix = {
+      ...mix,
+      headroom: { ...mix.headroom, ...patch },
+      preset: "custom",
+    };
+    setMix(next);
+    setAudioMix(next);
+  };
+
   const applyPreset = (key: keyof typeof AUDIO_MIX_PRESETS) => {
     const preset = AUDIO_MIX_PRESETS[key];
     update(preset, key);
     toast.success(`Preset "${key}" applicato — sincronizzato su tutti i tuoi dispositivi.`);
   };
 
+  const applyCustomPreset = (preset: CustomAudioPreset) => {
+    const next: StoryModeAudioMix = {
+      ...mix,
+      ...preset.values,
+      preset: "custom",
+    };
+    setMix(next);
+    setAudioMix(next);
+    toast.success(`Preset "${preset.name}" applicato.`);
+  };
+
+  const saveCustomPreset = () => {
+    const name = newPresetName.trim();
+    if (!name) {
+      toast.error("Dai un nome al preset prima di salvarlo.");
+      return;
+    }
+    if (mix.customPresets.length >= 20) {
+      toast.error("Limite di 20 preset personalizzati raggiunto. Eliminane qualcuno prima.");
+      return;
+    }
+    const preset: CustomAudioPreset = {
+      id: newPresetId(),
+      name,
+      createdAt: Date.now(),
+      values: {
+        narrationVolume: mix.narrationVolume,
+        ambienceVolume: mix.ambienceVolume,
+        sfxVolume: mix.sfxVolume,
+        musicVolume: mix.musicVolume,
+        autoMix: mix.autoMix,
+        lufsTarget: mix.lufsTarget,
+        headroom: { ...mix.headroom },
+      },
+    };
+    const next: StoryModeAudioMix = {
+      ...mix,
+      customPresets: [...mix.customPresets, preset],
+    };
+    setMix(next);
+    setAudioMix(next);
+    setNewPresetName("");
+    toast.success(`Preset "${name}" salvato.`);
+  };
+
+  const deleteCustomPreset = (id: string) => {
+    const next: StoryModeAudioMix = {
+      ...mix,
+      customPresets: mix.customPresets.filter((p) => p.id !== id),
+    };
+    setMix(next);
+    setAudioMix(next);
+    toast.success("Preset eliminato.");
+  };
+
   const reset = () => {
     setMix(DEFAULT_AUDIO_MIX);
     setAudioMix(DEFAULT_AUDIO_MIX);
     toast.success("Mix audio ripristinato ai valori di default.");
+  };
+
+  const resetHeadroom = () => {
+    updateHeadroom({ ...DEFAULT_HEADROOM });
+    toast.success("Headroom ripristinato.");
   };
 
   return (
@@ -76,7 +155,7 @@ export const AudioMixSettingsCard: React.FC = () => {
           </div>
         )}
 
-        {/* Presets */}
+        {/* Built-in presets */}
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">Preset rapidi</Label>
           <div className="flex gap-2 flex-wrap">
@@ -102,6 +181,52 @@ export const AudioMixSettingsCard: React.FC = () => {
           {mix.preset === "custom" && (
             <Badge variant="outline" className="text-[10px]">Custom — modificato manualmente</Badge>
           )}
+        </div>
+
+        {/* Custom presets */}
+        <div className="space-y-2 p-3 rounded-lg border bg-muted/20">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Save className="w-3.5 h-3.5" /> Preset personalizzati ({mix.customPresets.length}/20)
+          </Label>
+          {mix.customPresets.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {mix.customPresets.map((p) => (
+                <div key={p.id} className="flex items-center gap-1 rounded-md border bg-card px-1.5 py-0.5">
+                  <button
+                    type="button"
+                    className="text-xs hover:text-primary"
+                    onClick={() => applyCustomPreset(p)}
+                    title={`V:${p.values.narrationVolume} A:${p.values.ambienceVolume} S:${p.values.sfxVolume} M:${p.values.musicVolume} • LUFS ${p.values.lufsTarget}`}
+                  >
+                    {p.name}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Elimina preset ${p.name}`}
+                    onClick={() => deleteCustomPreset(p.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="Nome preset (es. 'Doc voce-forte')"
+              className="h-8 text-xs"
+              maxLength={60}
+            />
+            <Button size="sm" variant="outline" onClick={saveCustomPreset} disabled={loading || !newPresetName.trim()}>
+              <Plus className="w-3.5 h-3.5 mr-1" /> Salva attuali
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">
+            Salva la combinazione corrente di volumi, headroom e LUFS come preset riutilizzabile.
+          </p>
         </div>
 
         <SliderRow
@@ -182,6 +307,46 @@ export const AudioMixSettingsCard: React.FC = () => {
             </p>
           </div>
         )}
+
+        {/* Headroom limits */}
+        <div className="space-y-3 p-3 rounded-lg border bg-card">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Gauge className="w-4 h-4" /> Limiti di headroom (RMS dBFS)
+            </Label>
+            <Button variant="ghost" size="sm" onClick={resetHeadroom} disabled={loading} className="text-xs h-7">
+              <RotateCcw className="w-3 h-3 mr-1" /> Reset
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Soglie per il <strong>test automatico post-render</strong>: se l'RMS misurato di un canale
+            supera il limite, il report segnala una warning. Più negativo = più severo.
+          </p>
+          <HeadroomRow
+            icon={<Mic className="w-3.5 h-3.5 text-primary" />}
+            label="Voce max"
+            value={mix.headroom.voiceMaxDb}
+            onChange={(v) => updateHeadroom({ voiceMaxDb: v })}
+          />
+          <HeadroomRow
+            icon={<Wind className="w-3.5 h-3.5 text-blue-400" />}
+            label="Ambience max"
+            value={mix.headroom.ambienceMaxDb}
+            onChange={(v) => updateHeadroom({ ambienceMaxDb: v })}
+          />
+          <HeadroomRow
+            icon={<Sparkles className="w-3.5 h-3.5 text-yellow-400" />}
+            label="SFX max"
+            value={mix.headroom.sfxMaxDb}
+            onChange={(v) => updateHeadroom({ sfxMaxDb: v })}
+          />
+          <HeadroomRow
+            icon={<Music className="w-3.5 h-3.5 text-green-400" />}
+            label="Musica max"
+            value={mix.headroom.musicMaxDb}
+            onChange={(v) => updateHeadroom({ musicMaxDb: v })}
+          />
+        </div>
       </CardContent>
     </Card>
   );
@@ -204,5 +369,20 @@ const SliderRow: React.FC<{
     </div>
     <Slider value={[value]} min={0} max={max} step={1} onValueChange={(v) => onChange(v[0])} />
     {hint && <p className="text-[10px] text-muted-foreground">{hint}</p>}
+  </div>
+);
+
+const HeadroomRow: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+}> = ({ icon, label, value, onChange }) => (
+  <div className="space-y-1">
+    <div className="flex items-center justify-between">
+      <Label className="text-[11px] flex items-center gap-1.5">{icon} {label}</Label>
+      <span className="text-[11px] font-mono tabular-nums">{value} dBFS</span>
+    </div>
+    <Slider value={[value]} min={-40} max={0} step={1} onValueChange={(v) => onChange(v[0])} />
   </div>
 );
