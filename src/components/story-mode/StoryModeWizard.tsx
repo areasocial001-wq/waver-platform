@@ -1495,68 +1495,76 @@ export const StoryModeWizard = () => {
     });
   };
 
-  // Infer a subtle ambient SFX bed from the actual scene content.
-  // Priority: explicit scene prompt > narration/image context > generic mood.
-  const inferAmbientSfxPrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "sfxPrompt">): string => {
-    const explicit = scene.sfxPrompt?.trim();
+  // Infer a CONTINUOUS ambience bed (wind, sea, forest, rain) from scene content.
+  // This is meant to play softly under the entire scene — never punctual hits.
+  const inferAmbiencePrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "ambiencePrompt">): string => {
+    const explicit = scene.ambiencePrompt?.trim();
     if (explicit) return explicit;
 
     const combined = `${scene.narration || ""} ${scene.imagePrompt || ""} ${scene.mood || ""}`.toLowerCase();
 
-    if (/(mare|sea|ocean|beach|spiaggia|shore|coast|waves?|onde?|surf|seagull|gabbian|vento|wind|breeze|scogliera)/i.test(combined)) {
-      return "subtle seaside ambience with gentle sea waves and coastal wind, light shore wash, distant seabirds, no horror stingers, no impacts, no music, soft background only";
+    if (/(mare|sea|ocean|beach|spiaggia|shore|coast|waves?|onde?|surf|seagull|gabbian|scogliera)/i.test(combined)) {
+      return "continuous gentle seaside ambience: soft sea waves and coastal wind, distant seabirds, no horror stingers, no impacts, no music, smooth uninterrupted bed";
     }
     if (/(forest|woods|bosco|foresta|leaves|foglie|river|stream|creek|ruscello)/i.test(combined)) {
-      return "subtle natural ambience with soft wind through leaves, distant birds and light water movement, no music, no cinematic hits, background only";
+      return "continuous natural ambience: soft wind through leaves, distant birds, light water movement, no music, no cinematic hits, smooth uninterrupted bed";
     }
     if (/(rain|pioggia|storm|tempesta|thunder|tuono)/i.test(combined)) {
-      return "subtle weather ambience with soft rain, distant thunder and controlled wind bed, no jump scares, no music, background only";
+      return "continuous weather ambience: soft steady rain and controlled wind bed, far thunder, no jump scares, no music, smooth uninterrupted bed";
+    }
+    if (/(vento|wind|breeze|aria)/i.test(combined)) {
+      return "continuous gentle wind ambience: light breeze through open space, no impacts, no music, smooth uninterrupted bed";
     }
 
     const m = (scene.mood || "").toLowerCase();
-    const map: Record<string, string> = {
-      outdoor: "gentle wind blowing through trees, birds chirping",
-      nature: "forest ambiance, gentle stream, birds singing",
-      city: "city ambiance, distant traffic, crowd murmur",
-      urban: "urban street sounds, footsteps, distant cars",
-      rain: "rain falling on a roof, gentle thunder in the distance",
-      storm: "heavy rain, thunder, wind howling",
-      night: "crickets chirping, gentle night breeze, owl hooting",
-      horror: "creepy atmosphere, eerie whispers, creaking wood",
-      suspense: "tense atmosphere, low rumble, heartbeat",
-      tension: "tense atmosphere, low rumble, rising suspense",
-      war: "distant explosions, gunfire, helicopters",
-      battle: "sword clashing, battle cries, shields hitting",
-      space: "deep space ambiance, electronic hum, cosmic whoosh",
-      ocean: "ocean waves crashing, seagulls, wind",
-      beach: "waves on beach, seagulls, gentle wind",
-      forest: "forest ambiance, rustling leaves, bird calls",
-      desert: "desert wind, sand blowing, distant eagle cry",
-      celebration: "crowd cheering, applause, festive sounds",
-      romantic: "soft piano notes, gentle breeze, heartbeat",
-      sad: "gentle rain, melancholic wind, distant church bell",
-      happy: "cheerful atmosphere, birds singing, children laughing",
-      mysterious: "mysterious ambiance, echoing footsteps, distant whispers",
-      epic: "epic whoosh, rising tension, powerful rumble",
-      calm: "gentle stream, soft breeze, birds in the distance",
-      peaceful: "peaceful meadow, gentle wind, soft birdsong",
+    const ambienceMap: Record<string, string> = {
+      outdoor: "gentle wind through trees, soft birds in the distance, no music, continuous bed",
+      nature: "soft forest ambience, gentle stream, birds singing, continuous bed",
+      city: "low city ambience, distant traffic, light crowd murmur, continuous bed",
+      urban: "low urban ambience, distant cars, faint city hum, continuous bed",
+      night: "soft night ambience: crickets, gentle breeze, very low and steady",
+      ocean: "soft ocean waves and wind, continuous bed, no impacts",
+      beach: "soft beach waves and gentle wind, continuous bed",
+      forest: "soft forest ambience: rustling leaves, distant birds, continuous bed",
+      desert: "soft desert wind, very steady, continuous bed",
+      space: "deep low space ambience, soft electronic hum, continuous bed",
+      calm: "soft natural ambience: gentle breeze, distant birds, continuous bed",
+      peaceful: "soft meadow ambience: gentle wind, soft birdsong, continuous bed",
     };
-    for (const [key, prompt] of Object.entries(map)) {
+    for (const [key, prompt] of Object.entries(ambienceMap)) {
       if (m.includes(key)) return prompt;
     }
-    // Fallback: use the mood itself as a prompt
-    return `subtle environmental ambience for a ${scene.mood} scene, soft background only, no music, no stingers, no loud cinematic effects`;
+    // Generic safe fallback — never horror/dramatic.
+    return `subtle environmental ambience matching a ${scene.mood || "neutral"} scene, soft continuous background bed, no music, no stingers, no loud cinematic hits`;
   };
 
-  // Generate SFX for a scene
+  // Infer PUNCTUAL sound effects only when the scene clearly has discrete events
+  // (footsteps, doors, impacts). Returns null when nothing punctual is needed —
+  // in that case we skip SFX generation entirely so it never fights with voice.
+  const inferSfxPrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "sfxPrompt">): string | null => {
+    const explicit = scene.sfxPrompt?.trim();
+    if (explicit) return explicit;
+
+    const combined = `${scene.narration || ""} ${scene.imagePrompt || ""}`.toLowerCase();
+    if (/(footstep|passi|porta\b|door|bussare|knock|spada|sword|shot|sparo|explosion|esplosione|crash|schianto|campana|bell|telefono|phone|clock|orologio|gun|fire|fuoco)/i.test(combined)) {
+      return "subtle punctual sound effects matching the scene actions, low volume, no music, no continuous bed, just discrete hits";
+    }
+    return null;
+  };
+
+  /** @deprecated kept for backward compatibility — alias to ambience prompt. */
+  const inferAmbientSfxPrompt = inferAmbiencePrompt;
+
+  // Generate punctual SFX for a scene (returns null if no SFX is needed)
   const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
-    const sfxPrompt = inferAmbientSfxPrompt(scene);
+    const sfxPrompt = inferSfxPrompt(scene);
+    if (!sfxPrompt) return null;
     try {
       const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
       });
       if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
       const blob = await response.blob();
@@ -1564,6 +1572,26 @@ export const StoryModeWizard = () => {
       return storageUrl;
     } catch (err) {
       console.error("SFX generation error:", err);
+      return null;
+    }
+  };
+
+  // Generate continuous ambience bed for a scene (always returns a prompt).
+  const generateSceneAmbience = async (scene: StoryScene): Promise<string | null> => {
+    const ambiencePrompt = inferAmbiencePrompt(scene);
+    try {
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+        method: "POST",
+        headers: authHeaders,
+        body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
+      });
+      if (!response.ok) throw new Error(`Ambience failed: ${response.status}`);
+      const blob = await response.blob();
+      const storageUrl = await uploadBlobToStorage(blob, "story-ambience", "mp3", `Ambience Scena`);
+      return storageUrl;
+    } catch (err) {
+      console.error("Ambience generation error:", err);
       return null;
     }
   };
