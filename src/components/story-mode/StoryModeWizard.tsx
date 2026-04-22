@@ -2413,6 +2413,8 @@ export const StoryModeWizard = () => {
       toast.error("Ricarica l'immagine di riferimento prima di generare.");
       return;
     }
+    musicRetryRef.current = 0;
+    setMusicVerification(null);
 
     // Warn if this is the last available project
     if (!isStoryModeUnlimited && remainingStoryMode <= 1 && remainingStoryMode > 0) {
