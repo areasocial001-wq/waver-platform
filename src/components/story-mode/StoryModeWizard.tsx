@@ -38,6 +38,10 @@ import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { getAudioMix } from "@/lib/storyModeAudioMix";
+import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
+import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
+import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
+import { RenderReportCard } from "./RenderReportCard";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
@@ -321,6 +325,12 @@ export const StoryModeWizard = () => {
     sizeBytes?: number;
     contentType?: string;
   } | null>(null);
+  // Persistent log of every verifyMusic / regenerate / reassemble attempt for the
+  // current project. Survives reloads via localStorage (see lib/musicRetryLog.ts).
+  const [musicRetryLog, setMusicRetryLog] = useState<MusicRetryLog>(() => loadMusicRetryLog(null));
+  // Post-render audio QA report — built automatically once the render completes.
+  const [renderReport, setRenderReport] = useState<RenderReport | null>(null);
+  const [renderReportLoading, setRenderReportLoading] = useState(false);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
@@ -560,6 +570,11 @@ export const StoryModeWizard = () => {
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
+
+  // Re-hydrate per-project music retry log whenever we switch project.
+  useEffect(() => {
+    setMusicRetryLog(loadMusicRetryLog(projectId ?? null));
+  }, [projectId]);
 
   // Persist pendingRenderId to DB so polling can resume after page reload
   useEffect(() => {
@@ -1707,12 +1722,17 @@ export const StoryModeWizard = () => {
    */
   const verifyAndRetryMusic = async (renderedVideoUrl: string): Promise<void> => {
     if (!renderedVideoUrl) return;
+    const pid = projectId ?? null;
+    setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "verify-start", note: renderedVideoUrl.slice(0, 80) }));
     try {
       const { data, error } = await supabase.functions.invoke("video-concat", {
         body: { verifyMusic: { renderedVideoUrl } },
       });
       if (error) {
         console.warn("[music-verify] probe error:", error);
+        setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "verify-error", note: String(error.message || error) }));
+        // Still trigger an audio report so the user has SOMETHING to inspect.
+        void runRenderReport(renderedVideoUrl, null);
         return;
       }
       const audible = !!data?.audible;
@@ -1723,6 +1743,15 @@ export const StoryModeWizard = () => {
         sizeBytes: data?.sizeBytes,
         contentType: data?.contentType,
       });
+      setMusicRetryLog(appendMusicRetryEntry(pid, {
+        stage: audible ? "verify-ok" : "verify-missing",
+        audible,
+        sizeBytes: data?.sizeBytes,
+        contentType: data?.contentType,
+      }));
+      // Always run the audio QA report after a verify pass.
+      void runRenderReport(renderedVideoUrl, audible);
+
       // Only attempt a retry when we asked for music in the first place
       // and the verification says the audio track is missing.
       if (audible || !backgroundMusicUrl || !script?.suggestedMusic) {
@@ -1733,22 +1762,56 @@ export const StoryModeWizard = () => {
       }
       if (musicRetryRef.current >= MAX_MUSIC_RETRIES) {
         toast.warning("⚠️ La colonna sonora risulta ancora mancante nel video finale dopo il retry. Puoi rigenerare manualmente la musica.", { duration: 8000 });
+        setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "max-retries", attempt: musicRetryRef.current }));
         return;
       }
       musicRetryRef.current += 1;
       toast.info(`🎵 Colonna sonora non rilevata nel render — rigenerazione e nuovo montaggio (tentativo ${musicRetryRef.current}/${MAX_MUSIC_RETRIES})…`, { duration: 6000 });
+      setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "regenerate-start", attempt: musicRetryRef.current - 1 }));
       const newMusicUrl = await generateBackgroundMusic();
       if (!newMusicUrl) {
         toast.error("Impossibile rigenerare la colonna sonora. Riprova manualmente più tardi.");
+        setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "regenerate-failed", attempt: musicRetryRef.current - 1 }));
         return;
       }
+      setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "regenerate-ok", attempt: musicRetryRef.current - 1, note: newMusicUrl.slice(0, 80) }));
+      setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "reassemble-start", attempt: musicRetryRef.current - 1 }));
       // Reassemble — handleReassemble reads the latest backgroundMusicUrl from state,
       // which generateBackgroundMusic just updated via setBackgroundMusicUrl.
       setTimeout(() => handleReassemble(), 500);
     } catch (err) {
       console.warn("[music-verify] unexpected error:", err);
+      setMusicRetryLog(appendMusicRetryEntry(pid, { stage: "verify-error", note: String((err as Error)?.message || err) }));
     }
   };
+
+  /** Build the post-render audio QA report for the current project. Safe to call
+   *  multiple times — the latest report replaces the previous one. */
+  const runRenderReport = async (videoUrl: string, musicAudible: boolean | null): Promise<void> => {
+    if (!script) return;
+    setRenderReportLoading(true);
+    try {
+      const mix = getAudioMix();
+      const report = await buildRenderReport({
+        videoUrl,
+        scenes: script.scenes.map((s) => ({
+          sceneNumber: s.sceneNumber,
+          audioUrl: s.audioUrl,
+          ambienceUrl: s.ambienceUrl,
+          sfxUrl: s.sfxUrl,
+        })),
+        backgroundMusicUrl,
+        headroom: mix.headroom,
+        musicAudible,
+      });
+      setRenderReport(report);
+    } catch (err) {
+      console.warn("[render-report] failed:", err);
+    } finally {
+      setRenderReportLoading(false);
+    }
+  };
+
 
   const recoverSkippedAudioAssets = async (
     skipped: { type: string; index?: number; url: string }[],
@@ -2415,6 +2478,8 @@ export const StoryModeWizard = () => {
     }
     musicRetryRef.current = 0;
     setMusicVerification(null);
+    setMusicRetryLog(resetMusicRetryLog(projectId ?? null));
+    setRenderReport(null);
 
     // Warn if this is the last available project
     if (!isStoryModeUnlimited && remainingStoryMode <= 1 && remainingStoryMode > 0) {
@@ -3947,14 +4012,40 @@ export const StoryModeWizard = () => {
                         <Button variant="outline" size="sm" onClick={async () => {
                           musicRetryRef.current = 0;
                           setMusicVerification(null);
+                          setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "manual-retry" }));
                           const newUrl = await generateBackgroundMusic();
-                          if (newUrl) setTimeout(() => handleReassemble(), 500);
+                          if (newUrl) {
+                            setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "regenerate-ok", note: newUrl.slice(0, 80) }));
+                            setTimeout(() => handleReassemble(), 500);
+                          } else {
+                            setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "regenerate-failed" }));
+                          }
                         }}>
                           <RefreshCw className="w-3 h-3" />
                         </Button>
                       )}
                     </div>
                   </div>
+                )}
+                {/* Persistent music retry status + post-render audio QA report */}
+                {(musicRetryLog.entries.length > 0 || finalVideoUrl) && (
+                  <MusicRetryStatusCard
+                    log={musicRetryLog}
+                    busy={isGenerating}
+                    onManualRetry={async () => {
+                      if (!finalVideoUrl) return;
+                      setMusicRetryLog(appendMusicRetryEntry(projectId ?? null, { stage: "manual-retry" }));
+                      await verifyAndRetryMusic(finalVideoUrl);
+                    }}
+                    onClear={() => setMusicRetryLog(resetMusicRetryLog(projectId ?? null))}
+                  />
+                )}
+                {(renderReport || renderReportLoading) && (
+                  <RenderReportCard
+                    report={renderReport}
+                    loading={renderReportLoading}
+                    onRerun={finalVideoUrl ? () => runRenderReport(finalVideoUrl, musicVerification?.audible ?? null) : undefined}
+                  />
                 )}
                 <div className="flex gap-3 flex-wrap">
                   <Button disabled={downloadingId === "final"} onClick={() => downloadFile(finalVideoUrl, `${script.title}.mp4`, "final")}>

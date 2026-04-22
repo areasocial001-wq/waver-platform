@@ -13,6 +13,7 @@ import { ApiThresholdSettings } from "@/components/ApiThresholdSettings";
 import { AudioDebugPanel } from "@/components/story-mode/AudioDebugPanel";
 import { AudioLevelsPanel } from "@/components/story-mode/AudioLevelsPanel";
 import { AudioMixSettingsCard } from "@/components/story-mode/AudioMixSettingsCard";
+import { AudioSceneTimelinePanel } from "@/components/story-mode/AudioSceneTimelinePanel";
 import { useApiMonitoring, ThresholdSettings } from "@/hooks/useApiMonitoring";
 import {
   isAutoRecoveryEnabled, setAutoRecoveryEnabled, loadAutoRecoveryFromSupabase,
@@ -181,6 +182,7 @@ export default function SettingsPage() {
             <TabsContent value="audio-debug">
               <div className="space-y-6">
                 <AudioDebugPanel />
+                <AudioSceneTimelinePanel />
                 <AudioLevelsPanel />
               </div>
             </TabsContent>
