@@ -509,6 +509,10 @@ export const StoryModeWizard = () => {
               new Notification("Video pronto! 🎬", { body: "Il tuo video finale è stato renderizzato con successo.", icon: "/favicon.ico" });
             }
             setTimeout(() => saveProject(), 500);
+            // Fire-and-forget post-render music verification (does not block UI).
+            // If the rendered MP4 has no audible track and we did request music,
+            // regenerate music + reassemble once.
+            void verifyAndRetryMusic(data.videoUrl);
             break;
           } else if (data?.status === "failed") {
             setRenderStatus("failed");
