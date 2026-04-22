@@ -325,6 +325,12 @@ export const StoryModeWizard = () => {
     sizeBytes?: number;
     contentType?: string;
   } | null>(null);
+  // Persistent log of every verifyMusic / regenerate / reassemble attempt for the
+  // current project. Survives reloads via localStorage (see lib/musicRetryLog.ts).
+  const [musicRetryLog, setMusicRetryLog] = useState<MusicRetryLog>(() => loadMusicRetryLog(null));
+  // Post-render audio QA report — built automatically once the render completes.
+  const [renderReport, setRenderReport] = useState<RenderReport | null>(null);
+  const [renderReportLoading, setRenderReportLoading] = useState(false);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
