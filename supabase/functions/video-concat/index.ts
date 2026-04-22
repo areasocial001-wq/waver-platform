@@ -714,7 +714,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: narrationSrc,
-                  volume: narrationVolume,
+                  volume: effectiveNarrationVolume,
                 },
                 start: sceneStart,
                 length: clipLen,
@@ -726,8 +726,7 @@ serve(async (req) => {
           }
         }
 
-        // Add per-scene SFX audio tracks — anchored to sceneStarts[i] so e.g. wave
-        // sound stays glued to the beach scene even with overlapping transitions.
+        // Add per-scene SFX audio tracks (punctual effects) — ducked under voice when autoMix=true.
         if (sfxUrls && sfxUrls.length > 0) {
           const sfxClips: any[] = [];
           for (let i = 0; i < sfxUrls.length; i++) {
@@ -740,7 +739,7 @@ serve(async (req) => {
                 asset: {
                   type: 'audio',
                   src: sfxSrc,
-                  volume: sfxVolume,
+                  volume: effectiveSfxVolume,
                 },
                 start: sceneStart,
                 length: clipLen,
@@ -749,6 +748,34 @@ serve(async (req) => {
           }
           if (sfxClips.length > 0) {
             timeline.tracks.push({ clips: sfxClips });
+          }
+        }
+
+        // Add per-scene AMBIENCE audio tracks (continuous wind/sea/forest beds) —
+        // separate from SFX so the user can keep ambience audible while taming punctual hits.
+        if (ambienceUrls && ambienceUrls.length > 0 && effectiveAmbienceVolume > 0) {
+          const ambClips: any[] = [];
+          for (let i = 0; i < ambienceUrls.length; i++) {
+            const clipLen = clipDurations?.[i] || 5;
+            const rawUrl = ambienceUrls[i];
+            const sceneStart = sceneStarts[i] ?? (introDuration + i * clipLen);
+            if (rawUrl && !rawUrl.startsWith('blob:')) {
+              const ambSrc = await normalizeAssetUrl(rawUrl, supabase, supabaseUrl);
+              ambClips.push({
+                asset: {
+                  type: 'audio',
+                  src: ambSrc,
+                  volume: effectiveAmbienceVolume,
+                  // soft fade-in/out so ambience doesn't pop between scenes
+                  effect: 'fadeInFadeOut',
+                },
+                start: sceneStart,
+                length: clipLen,
+              });
+            }
+          }
+          if (ambClips.length > 0) {
+            timeline.tracks.push({ clips: ambClips });
           }
         }
 
