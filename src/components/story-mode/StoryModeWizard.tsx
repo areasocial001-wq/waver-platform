@@ -2610,9 +2610,10 @@ export const StoryModeWizard = () => {
           type: s.transition || "crossfade",
           duration: s.transitionDuration || 0.5,
         }));
-        // Build positional narration/sfx arrays aligned with video clips
+        // Build positional narration/sfx/ambience arrays aligned with video clips
         const narrationUrls = vids.map(s => s.audioUrl || "");
         const sfxUrls = vids.map(s => s.sfxUrl || "");
+        const ambienceUrls = vids.map(s => s.ambienceUrl || "");
 
         const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
         if (invalidSceneNumbers.length > 0) {
@@ -2632,8 +2633,10 @@ export const StoryModeWizard = () => {
         const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
         const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
         const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+        const alignedAmbience = validIndexes.map(i => ambienceUrls[i] || "");
         const alignedTransitions = validIndexes.map(i => transitions[i]);
 
+        const globalMix = getAudioMix();
         const { data, error } = await supabase.functions.invoke("video-concat", {
           body: {
             videoUrls: validVideoUrls,
@@ -2646,9 +2649,9 @@ export const StoryModeWizard = () => {
             fps: input.videoFps || "24",
             audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
             sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            sfxVolume: 0.22,
-            ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            ambienceVolume: 0.18,
+            sfxVolume: globalMix.sfxVolume / 100,
+            ambienceUrls: alignedAmbience.some(u => !!u) ? alignedAmbience : undefined,
+            ambienceVolume: globalMix.ambienceVolume / 100,
             backgroundMusicUrl: resolvedBackgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
