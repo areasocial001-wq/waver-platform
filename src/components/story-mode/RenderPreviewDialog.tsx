@@ -44,6 +44,7 @@ interface PreviewSummary {
   fps: string;
   narrationScenes: number;
   sfxScenes: number;
+  ambienceScenes?: number;
   hasBackgroundMusic: boolean;
   hasIntro: boolean;
   hasOutro: boolean;
@@ -51,9 +52,13 @@ interface PreviewSummary {
   tracks: { track: number; clips: number; type: string }[];
   narrationVolume: number;
   sfxVolume: number;
+  ambienceVolume?: number;
   musicVolume: number;
-  placedClips?: { video: number; narration: number; sfx: number; music: number };
-  requestedClips?: { narration: number; sfx: number; music: number };
+  autoMix?: boolean;
+  lufsTarget?: number;
+  effectiveVolumes?: { narration: number; sfx: number; ambience: number; music: number };
+  placedClips?: { video: number; narration: number; sfx: number; ambience?: number; music: number };
+  requestedClips?: { narration: number; sfx: number; ambience?: number; music: number };
   skippedAssets?: { type: string; index?: number; url: string; reason: string }[];
   sceneStarts?: number[];
 }
