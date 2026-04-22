@@ -2440,16 +2440,35 @@ export const StoryModeWizard = () => {
       tick(); setScript(p => p ? { ...p, scenes: [...scenes] } : p);
     }
 
-    // SFX per scene (based on mood)
+    // Ambience bed (continuous wind/sea/forest) — always generated, low volume.
+    // Punctual SFX is generated only when the scene clearly has discrete events;
+    // otherwise we skip it so it never overlaps with the voice.
     for (let i = 0; i < scenes.length && !checkCancelled(); i++) {
       await waitForResume();
       if (checkCancelled()) break;
       try {
-        const sfxPrompt = inferAmbientSfxPrompt(scenes[i]);
-        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt };
+        const ambiencePrompt = inferAmbiencePrompt(scenes[i]);
+        scenes[i] = { ...scenes[i], ambienceStatus: "generating", ambiencePrompt };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
-        const sfxUrl = await generateSceneSfx(scenes[i]);
-        scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+        const ambienceUrl = await generateSceneAmbience(scenes[i]);
+        scenes[i] = { ...scenes[i], ambienceUrl: ambienceUrl || undefined, ambienceStatus: ambienceUrl ? "completed" : "error" };
+      } catch (err: any) {
+        toast.error(`Scena ${i + 1}: errore ambience – ${err?.message || "sconosciuto"}`);
+        scenes[i] = { ...scenes[i], ambienceStatus: "error" };
+      }
+
+      // Punctual SFX (only if needed)
+      try {
+        const sfxPrompt = inferSfxPrompt(scenes[i]);
+        if (sfxPrompt) {
+          scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt };
+          setScript(p => p ? { ...p, scenes: [...scenes] } : p);
+          const sfxUrl = await generateSceneSfx(scenes[i]);
+          scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
+        } else {
+          // Mark as completed-but-empty so the UI doesn't show an error pill
+          scenes[i] = { ...scenes[i], sfxStatus: "idle", sfxUrl: undefined };
+        }
       } catch (err: any) {
         toast.error(`Scena ${i + 1}: errore SFX – ${err?.message || "sconosciuto"}`);
         scenes[i] = { ...scenes[i], sfxStatus: "error" };
