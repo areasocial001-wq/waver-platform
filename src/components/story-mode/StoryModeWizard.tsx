@@ -309,6 +309,18 @@ export const StoryModeWizard = () => {
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
   const recoveryAttemptsRef = useRef(0);
+  // Tracks how many times we already retried regenerating background music after
+  // the post-render verification failed. Capped at 1 — if it still fails, we
+  // surface a warning to the user instead of looping forever.
+  const musicRetryRef = useRef(0);
+  const MAX_MUSIC_RETRIES = 1;
+  const [musicVerification, setMusicVerification] = useState<{
+    audible: boolean | null;
+    checkedAt: number | null;
+    retried: boolean;
+    sizeBytes?: number;
+    contentType?: string;
+  } | null>(null);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
