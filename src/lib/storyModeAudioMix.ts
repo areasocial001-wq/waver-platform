@@ -128,7 +128,7 @@ export const saveAudioMixToSupabase = async (mix: StoryModeAudioMix): Promise<vo
     await supabase
       .from("user_preferences")
       .upsert(
-        { user_id: user.id, story_mode_audio_mix: sanitize(mix) as unknown as Record<string, unknown> },
+        [{ user_id: user.id, story_mode_audio_mix: sanitize(mix) as unknown as Record<string, unknown> }],
         { onConflict: "user_id" },
       );
   } catch {
