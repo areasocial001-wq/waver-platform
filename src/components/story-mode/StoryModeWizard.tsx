@@ -2597,10 +2597,14 @@ export const StoryModeWizard = () => {
             fps: input.videoFps || "24",
             audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
             sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            sfxVolume: 0.18,
+            sfxVolume: 0.22,
+            ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
+            ambienceVolume: 0.18,
             backgroundMusicUrl: resolvedBackgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
+            autoMix: true,
+            lufsTarget: -14,
           },
         });
         if (error) throw error;
