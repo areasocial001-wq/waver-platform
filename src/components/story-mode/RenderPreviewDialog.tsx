@@ -66,7 +66,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
 
   // Editable volumes
   const [narrationVol, setNarrationVol] = useState(script.narrationVolume ?? 100);
-  const [sfxVol, setSfxVol] = useState(70);
+  const [sfxVol, setSfxVol] = useState(18);
   const [musicVol, setMusicVol] = useState(script.musicVolume ?? 25);
 
   // Identify scenes whose generated assets don't match the requested aspect ratio
@@ -144,7 +144,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
     if (open && !summary && !loading) {
       setNarrationVol(script.narrationVolume ?? 100);
       setMusicVol(script.musicVolume ?? 25);
-      setSfxVol(70);
+      setSfxVol(18);
       fetchPreview();
     }
     if (!open) {
@@ -270,10 +270,10 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
               {/* Presets */}
               <div className="flex gap-1.5 flex-wrap">
                 {[
-                  { label: "🎙️ Voce forte", narration: 100, sfx: 30, music: 15 },
+                  { label: "🎙️ Voce forte", narration: 100, sfx: 15, music: 18 },
                   { label: "🎵 Solo musica", narration: 0, sfx: 0, music: 100 },
-                  { label: "⚖️ Bilanciato", narration: 80, sfx: 50, music: 35 },
-                  { label: "🎬 Cinematico", narration: 70, sfx: 80, music: 50 },
+                  { label: "⚖️ Bilanciato", narration: 85, sfx: 18, music: 28 },
+                  { label: "🎬 Cinematico", narration: 78, sfx: 22, music: 32 },
                 ].map(p => (
                   <Button
                     key={p.label}
