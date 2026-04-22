@@ -37,6 +37,7 @@ import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
+import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
