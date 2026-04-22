@@ -698,7 +698,7 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
           <Button
             onClick={() => {
               onOpenChange(false);
-              onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, musicVolume: musicVol });
+              onConfirmRender({ narrationVolume: narrationVol, sfxVolume: sfxVol, ambienceVolume: ambienceVol, musicVolume: musicVol, autoMix, lufsTarget });
             }}
             disabled={loading || !!error || hasNonCompliantBlocking || (hasBlobAssetsBlocking && !ignoreBlobAssets)}
             title={
