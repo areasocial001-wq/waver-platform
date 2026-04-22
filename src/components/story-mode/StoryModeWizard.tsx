@@ -2217,6 +2217,7 @@ export const StoryModeWizard = () => {
       // Build positional narration array aligned with video clips
       const narrationUrls = vids.map(s => s.audioUrl || "");
       const sfxUrls = vids.map(s => s.sfxUrl || "");
+      const ambienceUrls = vids.map(s => s.ambienceUrl || "");
 
       const { validVideoUrls, validIndexes, invalidSceneNumbers } = await prepareRenderVideoSources(vids);
       if (invalidSceneNumbers.length > 0) {
@@ -2235,6 +2236,7 @@ export const StoryModeWizard = () => {
       const alignedDurations = validIndexes.map(i => Math.min(vids[i].duration, 10));
       const alignedNarration = validIndexes.map(i => narrationUrls[i] || "");
       const alignedSfx = validIndexes.map(i => sfxUrls[i] || "");
+      const alignedAmbience = validIndexes.map(i => ambienceUrls[i] || "");
       const alignedTransitions = validIndexes.map(i => transitions[i]);
       const { data, error } = await supabase.functions.invoke("video-concat", {
         body: {
@@ -2249,7 +2251,7 @@ export const StoryModeWizard = () => {
           audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
           sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
           sfxVolume: (volumeOverrides?.sfxVolume ?? 22) / 100,
-          ambienceUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
+          ambienceUrls: alignedAmbience.some(u => !!u) ? alignedAmbience : undefined,
           ambienceVolume: (volumeOverrides?.ambienceVolume ?? 18) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
