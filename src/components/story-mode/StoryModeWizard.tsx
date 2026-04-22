@@ -571,6 +571,11 @@ export const StoryModeWizard = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showProjectList, setShowProjectList] = useState(false);
 
+  // Re-hydrate per-project music retry log whenever we switch project.
+  useEffect(() => {
+    setMusicRetryLog(loadMusicRetryLog(projectId ?? null));
+  }, [projectId]);
+
   // Persist pendingRenderId to DB so polling can resume after page reload
   useEffect(() => {
     if (!projectId) return;
