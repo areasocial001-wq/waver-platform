@@ -445,7 +445,41 @@ serve(async (req) => {
         );
       }
     }
-    
+
+    // Music-presence verification: probe the rendered MP4 over a Range request and
+    // look for the AAC audio track marker. Cheap heuristic — true ffprobe would be
+    // overkill for an edge function. Returns { audible: boolean, sizeBytes, contentType }.
+    if (body.verifyMusic?.renderedVideoUrl) {
+      const url = body.verifyMusic.renderedVideoUrl;
+      try {
+        const head = await fetch(url, { method: 'HEAD' });
+        const contentType = head.headers.get('content-type');
+        const sizeBytes = parseInt(head.headers.get('content-length') || '0', 10);
+        // Range fetch first 256KB — enough to inspect MP4 'moov' box for soun track.
+        const range = await fetch(url, { headers: { Range: 'bytes=0-262143' } });
+        const buf = new Uint8Array(await range.arrayBuffer());
+        // Crude audio-track detector: look for 'soun' (audio handler) or 'mp4a' (AAC) markers.
+        // MP4 files always include these in the 'moov' atom when audio is present.
+        const text = new TextDecoder('latin1').decode(buf);
+        const audible = text.includes('soun') || text.includes('mp4a');
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            audible,
+            contentType,
+            sizeBytes,
+            inspectedBytes: buf.length,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ ok: false, error: err instanceof Error ? err.message : String(err) }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Validate input
     const parseResult = requestSchema.safeParse(body);
     if (!parseResult.success) {
