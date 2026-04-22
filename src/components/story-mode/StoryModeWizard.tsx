@@ -38,6 +38,10 @@ import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { getAudioMix } from "@/lib/storyModeAudioMix";
+import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
+import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
+import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
+import { RenderReportCard } from "./RenderReportCard";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
