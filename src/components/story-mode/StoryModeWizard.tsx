@@ -1700,11 +1700,56 @@ export const StoryModeWizard = () => {
   };
 
   /**
-   * Auto-recover audio assets that the backend skipped because they were blob: URLs
-   * (browser-only, unreachable from Shotstack). Regenerates narration/sfx via the
-   * same TTS / SFX pipeline and refreshes background music if it was a blob URL.
-   * Returns true if at least one asset was recovered (caller should re-trigger concat).
+   * Post-render music verification: probes the rendered MP4 server-side for an
+   * audible audio track, and — when we DID send a backgroundMusicUrl but the
+   * track ends up missing/silent — regenerates only the music and triggers a
+   * single reassemble retry. Capped by MAX_MUSIC_RETRIES to avoid infinite loops.
    */
+  const verifyAndRetryMusic = async (renderedVideoUrl: string): Promise<void> => {
+    if (!renderedVideoUrl) return;
+    try {
+      const { data, error } = await supabase.functions.invoke("video-concat", {
+        body: { verifyMusic: { renderedVideoUrl } },
+      });
+      if (error) {
+        console.warn("[music-verify] probe error:", error);
+        return;
+      }
+      const audible = !!data?.audible;
+      setMusicVerification({
+        audible,
+        checkedAt: Date.now(),
+        retried: musicRetryRef.current > 0,
+        sizeBytes: data?.sizeBytes,
+        contentType: data?.contentType,
+      });
+      // Only attempt a retry when we asked for music in the first place
+      // and the verification says the audio track is missing.
+      if (audible || !backgroundMusicUrl || !script?.suggestedMusic) {
+        if (audible) {
+          console.log("[music-verify] OK — audio track detected in final render.");
+        }
+        return;
+      }
+      if (musicRetryRef.current >= MAX_MUSIC_RETRIES) {
+        toast.warning("⚠️ La colonna sonora risulta ancora mancante nel video finale dopo il retry. Puoi rigenerare manualmente la musica.", { duration: 8000 });
+        return;
+      }
+      musicRetryRef.current += 1;
+      toast.info(`🎵 Colonna sonora non rilevata nel render — rigenerazione e nuovo montaggio (tentativo ${musicRetryRef.current}/${MAX_MUSIC_RETRIES})…`, { duration: 6000 });
+      const newMusicUrl = await generateBackgroundMusic();
+      if (!newMusicUrl) {
+        toast.error("Impossibile rigenerare la colonna sonora. Riprova manualmente più tardi.");
+        return;
+      }
+      // Reassemble — handleReassemble reads the latest backgroundMusicUrl from state,
+      // which generateBackgroundMusic just updated via setBackgroundMusicUrl.
+      setTimeout(() => handleReassemble(), 500);
+    } catch (err) {
+      console.warn("[music-verify] unexpected error:", err);
+    }
+  };
+
   const recoverSkippedAudioAssets = async (
     skipped: { type: string; index?: number; url: string }[],
   ): Promise<boolean> => {
