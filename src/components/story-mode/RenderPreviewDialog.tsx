@@ -3,17 +3,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw } from "lucide-react";
+import { Loader2, Film, Music, Mic, Volume2, Sparkles, AlertTriangle, Check, Layers, RefreshCw, Wind, Sliders } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import type { StoryScene, StoryScript, StoryModeInput } from "./types";
 import { TransitionTimelinePreview } from "./TransitionTimelinePreview";
+import { getAudioMix } from "@/lib/storyModeAudioMix";
 
 export interface RenderVolumes {
   narrationVolume: number; // 0-100
   sfxVolume: number;       // 0-100
+  ambienceVolume: number;  // 0-100 — wind/sea/forest beds, separate from punctual SFX
   musicVolume: number;     // 0-100
+  autoMix: boolean;
+  lufsTarget: number;      // negative dB
 }
 
 interface RenderPreviewDialogProps {
