@@ -1495,9 +1495,25 @@ export const StoryModeWizard = () => {
     });
   };
 
-  // Map scene mood to SFX prompt
-  const moodToSfxPrompt = (mood: string): string => {
-    const m = mood.toLowerCase();
+  // Infer a subtle ambient SFX bed from the actual scene content.
+  // Priority: explicit scene prompt > narration/image context > generic mood.
+  const inferAmbientSfxPrompt = (scene: Pick<StoryScene, "mood" | "narration" | "imagePrompt" | "sfxPrompt">): string => {
+    const explicit = scene.sfxPrompt?.trim();
+    if (explicit) return explicit;
+
+    const combined = `${scene.narration || ""} ${scene.imagePrompt || ""} ${scene.mood || ""}`.toLowerCase();
+
+    if (/(mare|sea|ocean|beach|spiaggia|shore|coast|waves?|onde?|surf|seagull|gabbian|vento|wind|breeze|scogliera)/i.test(combined)) {
+      return "subtle seaside ambience with gentle sea waves and coastal wind, light shore wash, distant seabirds, no horror stingers, no impacts, no music, soft background only";
+    }
+    if (/(forest|woods|bosco|foresta|leaves|foglie|river|stream|creek|ruscello)/i.test(combined)) {
+      return "subtle natural ambience with soft wind through leaves, distant birds and light water movement, no music, no cinematic hits, background only";
+    }
+    if (/(rain|pioggia|storm|tempesta|thunder|tuono)/i.test(combined)) {
+      return "subtle weather ambience with soft rain, distant thunder and controlled wind bed, no jump scares, no music, background only";
+    }
+
+    const m = (scene.mood || "").toLowerCase();
     const map: Record<string, string> = {
       outdoor: "gentle wind blowing through trees, birds chirping",
       nature: "forest ambiance, gentle stream, birds singing",
@@ -1529,12 +1545,12 @@ export const StoryModeWizard = () => {
       if (m.includes(key)) return prompt;
     }
     // Fallback: use the mood itself as a prompt
-    return `ambient sound for a ${mood} scene, subtle background atmosphere`;
+    return `subtle environmental ambience for a ${scene.mood} scene, soft background only, no music, no stingers, no loud cinematic effects`;
   };
 
   // Generate SFX for a scene
   const generateSceneSfx = async (scene: StoryScene): Promise<string | null> => {
-    const sfxPrompt = moodToSfxPrompt(scene.mood);
+    const sfxPrompt = inferAmbientSfxPrompt(scene);
     try {
       const authHeaders = await getAuthHeaders();
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
@@ -2204,7 +2220,7 @@ export const StoryModeWizard = () => {
           fps: input.videoFps || "24",
           audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
           sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-          sfxVolume: (volumeOverrides?.sfxVolume ?? 70) / 100,
+          sfxVolume: (volumeOverrides?.sfxVolume ?? 18) / 100,
           backgroundMusicUrl: backgroundMusicUrl || undefined,
           musicVolume: (volumeOverrides?.musicVolume ?? script.musicVolume ?? 25) / 100,
           narrationVolume: (volumeOverrides?.narrationVolume ?? script.narrationVolume ?? 100) / 100,
@@ -2304,7 +2320,10 @@ export const StoryModeWizard = () => {
     const tick = () => { completed++; setGenerationProgress(Math.round((completed / totalSteps) * 100)); };
     const scenes = [...script.scenes];
     const referenceImageUrl = input.imageUrl || undefined;
-    const musicP = generateBackgroundMusic().then(tick);
+    const musicP = generateBackgroundMusic().then((url) => {
+      tick();
+      return url;
+    });
 
     // Images
     for (let i = 0; i < scenes.length; i++) {
@@ -2394,7 +2413,8 @@ export const StoryModeWizard = () => {
       await waitForResume();
       if (checkCancelled()) break;
       try {
-        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt: moodToSfxPrompt(scenes[i].mood) };
+        const sfxPrompt = inferAmbientSfxPrompt(scenes[i]);
+        scenes[i] = { ...scenes[i], sfxStatus: "generating", sfxPrompt };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const sfxUrl = await generateSceneSfx(scenes[i]);
         scenes[i] = { ...scenes[i], sfxUrl: sfxUrl || undefined, sfxStatus: sfxUrl ? "completed" : "error" };
@@ -2523,7 +2543,7 @@ export const StoryModeWizard = () => {
       return;
     }
 
-    await musicP;
+    const resolvedBackgroundMusicUrl = (await musicP) || backgroundMusicUrl;
     const vids = scenes.filter(s => s.videoStatus === "completed" && s.videoUrl);
     
     if (vids.length === 1) {
@@ -2573,8 +2593,8 @@ export const StoryModeWizard = () => {
             fps: input.videoFps || "24",
             audioUrls: alignedNarration.some(u => !!u) ? alignedNarration : undefined,
             sfxUrls: alignedSfx.some(u => !!u) ? alignedSfx : undefined,
-            sfxVolume: 0.7,
-            backgroundMusicUrl: backgroundMusicUrl || undefined,
+            sfxVolume: 0.18,
+            backgroundMusicUrl: resolvedBackgroundMusicUrl || undefined,
             musicVolume: (script.musicVolume ?? 25) / 100,
             narrationVolume: (script.narrationVolume ?? 100) / 100,
           },
