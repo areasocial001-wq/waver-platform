@@ -329,11 +329,11 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                 />
               </div>
 
-              {/* SFX volume */}
+              {/* SFX volume (punctual hits) */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3 text-yellow-400" /> Effetti Sonori
+                    <Sparkles className="w-3 h-3 text-yellow-400" /> Effetti Sonori (puntuali)
                   </Label>
                   <span className="text-xs font-medium tabular-nums">{sfxVol}%</span>
                 </div>
@@ -342,6 +342,21 @@ export const RenderPreviewDialog: React.FC<RenderPreviewDialogProps> = ({
                   min={0} max={100} step={5}
                   onValueChange={v => setSfxVol(v[0])}
                   disabled={summary.sfxScenes === 0}
+                />
+              </div>
+
+              {/* Ambience volume (continuous wind/sea/forest beds) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs flex items-center gap-1.5">
+                    <Wind className="w-3 h-3 text-blue-400" /> Ambience (vento/mare)
+                  </Label>
+                  <span className="text-xs font-medium tabular-nums">{ambienceVol}%</span>
+                </div>
+                <Slider
+                  value={[ambienceVol]}
+                  min={0} max={100} step={5}
+                  onValueChange={v => setAmbienceVol(v[0])}
                 />
               </div>
 
