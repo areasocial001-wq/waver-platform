@@ -13,6 +13,10 @@ export interface StoryScene {
   sfxPrompt?: string;
   sfxUrl?: string;
   sfxStatus?: "idle" | "generating" | "completed" | "error";
+  /** Continuous ambience bed (wind, sea, forest…) — separate from punctual SFX so it can stay audible without overpowering voice. */
+  ambiencePrompt?: string;
+  ambienceUrl?: string;
+  ambienceStatus?: "idle" | "generating" | "completed" | "error";
   // Generation state
   imageUrl?: string;
   videoUrl?: string;
