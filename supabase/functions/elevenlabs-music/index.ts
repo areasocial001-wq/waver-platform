@@ -7,27 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Input validation schema
-// NOTE: Story Mode needs ONE music track that covers the WHOLE final video,
-// so we no longer cap to 30s. Hard upper bound 300s (5 min) keeps abuse limited
-// while giving enough headroom for typical Story Mode outputs (8 scenes × 10s = 80s).
 const requestSchema = z.object({
   prompt: z.string().min(1, 'Prompt obbligatorio').max(1000, 'Prompt troppo lungo'),
   category: z.enum(['music', 'sfx', 'ambient']).default('music'),
   duration: z.number().min(1).default(30).transform(v => Math.min(Math.max(v, 1), 300)),
 });
 
-// Verify the response bytes look like a real MP3 (magic bytes: ID3 tag or MPEG sync 0xFF Ex).
-// ElevenLabs occasionally returns truncated/corrupted bodies under load → we want to fail
-// FAST so the client retries instead of uploading a broken file to storage.
 const isLikelyMp3 = (bytes: Uint8Array): boolean => {
   if (bytes.length < 4) return false;
-  // ID3v2 header
   if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
-  // MPEG frame sync: 11 bits set → first byte 0xFF, second byte 0xE? or 0xF?
   if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true;
   return false;
 };
+
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -36,29 +33,31 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    
-    // Validate input
+
     const parseResult = requestSchema.safeParse(body);
     if (!parseResult.success) {
-      return new Response(
-        JSON.stringify({ error: parseResult.error.errors[0].message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ error: parseResult.error.errors[0].message }, 400);
     }
-    
+
     const { prompt, category, duration } = parseResult.data;
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 
     if (!ELEVENLABS_API_KEY) {
-      throw new Error('ELEVENLABS_API_KEY is not configured');
+      return jsonResponse({
+        error: 'ELEVENLABS_API_KEY is not configured',
+        reason: 'elevenlabs_missing_key',
+        fallback: true,
+      }, 200);
     }
 
     console.log('Generating audio:', { category, prompt: prompt.substring(0, 100), duration });
 
-    // Server-side retry: ElevenLabs music endpoint occasionally returns 5xx or truncated
-    // payloads. We retry up to 3 times with linear backoff before giving up.
-    const MAX_ATTEMPTS = 3;
-    let lastError: string = "Unknown error";
+    // Retry budget. For 429 (concurrent_limit_exceeded) we wait significantly
+    // longer because the user's plan caps at 2 concurrent ElevenLabs calls and
+    // music gen is by far the slowest one — a quick retry is guaranteed to fail.
+    const MAX_ATTEMPTS = 4;
+    let lastStatus = 0;
+    let lastError = "Unknown error";
     let audioBuffer: ArrayBuffer | null = null;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -69,10 +68,7 @@ serve(async (req) => {
             'https://api.elevenlabs.io/v1/sound-generation',
             {
               method: 'POST',
-              headers: {
-                'xi-api-key': ELEVENLABS_API_KEY,
-                'Content-Type': 'application/json',
-              },
+              headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 text: prompt,
                 duration_seconds: Math.min(duration, 22),
@@ -83,43 +79,44 @@ serve(async (req) => {
         } else {
           const enhancedPrompt = category === 'ambient'
             ? `Ambient soundscape: ${prompt}. Seamless, loopable, atmospheric, no abrupt changes, consistent texture throughout.`
-            // For music we explicitly ask for a SINGLE consistent track so it works as a unified
-            // bed under multiple scenes — no genre changes, no intros/outros that would clash
-            // with crossfades between scenes.
             : `Background music: ${prompt}. Single consistent track from start to end, instrumental only, no vocals, no genre changes, no abrupt intro or outro, smooth and even dynamics suitable for video underscore.`;
 
           response = await fetch(
             'https://api.elevenlabs.io/v1/music',
             {
               method: 'POST',
-              headers: {
-                'xi-api-key': ELEVENLABS_API_KEY,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                prompt: enhancedPrompt,
-                duration_seconds: duration,
-              }),
+              headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ prompt: enhancedPrompt, duration_seconds: duration }),
             }
           );
         }
 
         if (!response.ok) {
+          lastStatus = response.status;
           const errorText = await response.text();
           lastError = `ElevenLabs ${response.status}: ${errorText.slice(0, 200)}`;
           console.error(`Attempt ${attempt}/${MAX_ATTEMPTS} failed:`, lastError);
+
+          // Non-retryable: insufficient credits / unauthorized → fail fast with fallback flag.
+          if (response.status === 401 || response.status === 402) {
+            break;
+          }
+
           if (attempt < MAX_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, 1000 * attempt));
+            // 429 → much longer wait (concurrent slot needs to free up).
+            // Others → linear backoff.
+            const waitMs = response.status === 429
+              ? 5000 + attempt * 3000   // 8s, 11s, 14s
+              : 1000 * attempt;
+            await new Promise(r => setTimeout(r, waitMs));
             continue;
           }
-          throw new Error(lastError);
+          break;
         }
 
         const buffer = await response.arrayBuffer();
         const bytes = new Uint8Array(buffer);
 
-        // Validate MP3 magic bytes — only meaningful for music/ambient (mp3) responses,
-        // SFX endpoint also returns mp3 by default.
         if (!isLikelyMp3(bytes)) {
           lastError = `Risposta audio corrotta (${bytes.length} bytes, no MP3 header)`;
           console.error(`Attempt ${attempt}/${MAX_ATTEMPTS} failed:`, lastError);
@@ -127,7 +124,7 @@ serve(async (req) => {
             await new Promise(r => setTimeout(r, 1000 * attempt));
             continue;
           }
-          throw new Error(lastError);
+          break;
         }
 
         audioBuffer = buffer;
@@ -135,36 +132,43 @@ serve(async (req) => {
         break;
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
-        if (attempt >= MAX_ATTEMPTS) throw err;
+        if (attempt >= MAX_ATTEMPTS) break;
         await new Promise(r => setTimeout(r, 1000 * attempt));
       }
     }
 
-    if (!audioBuffer) throw new Error(lastError);
+    if (!audioBuffer) {
+      // Translate ElevenLabs failure into a graceful fallback so the client
+      // doesn't crash with a 500 — Story Mode can proceed without music.
+      const reason =
+        lastStatus === 429 ? "elevenlabs_rate_limited" :
+        lastStatus === 401 ? "elevenlabs_unauthorized" :
+        lastStatus === 402 ? "elevenlabs_insufficient_credits" :
+        "elevenlabs_error";
+      return jsonResponse({
+        error: lastError,
+        reason,
+        status: lastStatus,
+        fallback: true,
+      }, 200);
+    }
 
     const base64Audio = base64Encode(audioBuffer);
 
-    return new Response(
-      JSON.stringify({
-        audioContent: base64Audio,
-        format: 'mp3',
-        category,
-        duration,
-        bytes: audioBuffer.byteLength,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return jsonResponse({
+      audioContent: base64Audio,
+      format: 'mp3',
+      category,
+      duration,
+      bytes: audioBuffer.byteLength,
+    }, 200);
   } catch (error) {
     console.error('Error in elevenlabs-music function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return jsonResponse({
+      error: errorMessage,
+      reason: "internal_error",
+      fallback: true,
+    }, 200);
   }
 });

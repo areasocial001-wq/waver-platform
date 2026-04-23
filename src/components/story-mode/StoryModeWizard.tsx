@@ -154,10 +154,34 @@ const isLikelyMp3Bytes = (bytes: Uint8Array): boolean => {
  * THROWS if the decoded bytes are not a valid MP3 — letting the retry wrapper
  * try again instead of uploading garbage.
  */
+/**
+ * Sentinel error: edge function returned a graceful fallback (e.g. ElevenLabs
+ * rate limit / insufficient credits). Caller should swallow it and continue
+ * the render WITHOUT that audio track instead of failing the whole story.
+ */
+class AudioFallbackError extends Error {
+  reason: string;
+  status?: number;
+  constructor(reason: string, message: string, status?: number) {
+    super(message);
+    this.name = "AudioFallbackError";
+    this.reason = reason;
+    this.status = status;
+  }
+}
+
 const audioResponseToBlob = async (response: Response): Promise<Blob> => {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const data = await response.json();
+    // Edge function signaled a graceful fallback (rate limit, no credits, etc.)
+    if (data?.fallback === true) {
+      throw new AudioFallbackError(
+        data?.reason || "audio_fallback",
+        data?.error || "Audio non disponibile",
+        data?.status,
+      );
+    }
     const base64: string | undefined = data?.audioContent;
     if (!base64 || typeof base64 !== "string") {
       throw new Error("Risposta audio non valida: campo audioContent mancante");
@@ -178,6 +202,7 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
  * Fetch an audio endpoint and decode the response with up to N retries.
  * Logs every attempt to apiLogger so the user sees the trail in the logs panel.
  * Retries on network errors, non-2xx status, or invalid MP3 payload.
+ * Does NOT retry on AudioFallbackError — that's already a "give up gracefully" signal.
  */
 const fetchAudioWithRetry = async (
   url: string,
@@ -202,6 +227,11 @@ const fetchAudioWithRetry = async (
       return blob;
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      // Fallback responses are deterministic — retrying won't help.
+      if (lastError instanceof AudioFallbackError) {
+        apiLogger.warning(apiName, operation, `Fallback: ${lastError.reason} (${lastError.message})`, { reason: lastError.reason, status: lastError.status }).catch(() => {});
+        throw lastError;
+      }
       apiLogger.warning(apiName, operation, `Tentativo ${attempt}/${maxAttempts} fallito: ${lastError.message}`, { attempt, error: lastError.message, duration_ms: Date.now() - startedAt }).catch(() => {});
       if (attempt < maxAttempts) {
         await new Promise(r => setTimeout(r, baseDelay * attempt));
@@ -1734,6 +1764,17 @@ export const StoryModeWizard = () => {
       return storageUrl;
     } catch (err: any) {
       console.error("Music error:", err);
+      if (err?.name === "AudioFallbackError") {
+        const reason = err.reason as string;
+        const friendly =
+          reason === "elevenlabs_rate_limited"
+            ? "ElevenLabs ha rifiutato la richiesta musica per limite di richieste concorrenti (max 2 sul tuo piano). Story Mode procede senza colonna sonora."
+            : reason === "elevenlabs_insufficient_credits" || reason === "elevenlabs_unauthorized"
+              ? "Crediti ElevenLabs insufficienti per generare la musica. Story Mode procede senza colonna sonora."
+              : `Musica non disponibile (${reason}). Story Mode procede senza colonna sonora.`;
+        toast.warning(friendly);
+        return null;
+      }
       toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
       return null;
     }
