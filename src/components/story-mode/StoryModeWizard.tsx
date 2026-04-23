@@ -902,10 +902,10 @@ export const StoryModeWizard = () => {
           for (const i of scenesNeedingAudio) {
             try {
               const sc = migrated[i];
-              const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+              const r = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
                 method: "POST", headers: authHeaders,
                 body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
-              });
+              }));
               if (!r.ok) continue;
               const blob = await audioResponseToBlob(r);
               const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
