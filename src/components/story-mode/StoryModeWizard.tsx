@@ -43,6 +43,7 @@ import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderRepor
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
 import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
+import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
@@ -172,6 +173,19 @@ class AudioFallbackError extends Error {
   }
 }
 
+/**
+ * WeakMap that lets `audioResponseToBlob` attach the provider/fallback metadata
+ * (parsed from the edge-function JSON envelope) to the produced Blob so callers
+ * upstream can read it without changing the function signature.
+ */
+const audioBlobProviderInfo = new WeakMap<Blob, {
+  provider: "elevenlabs" | "aiml";
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+}>();
+
+export const getAudioBlobProvider = (b: Blob) => audioBlobProviderInfo.get(b);
+
 const audioResponseToBlob = async (response: Response): Promise<Blob> => {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
@@ -210,7 +224,13 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
       throw new Error(`MP3 non valido (${bytes.length} bytes, header non riconosciuto)`);
     }
     const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
-    return new Blob([bytes], { type: mime });
+    const blob = new Blob([bytes], { type: mime });
+    audioBlobProviderInfo.set(blob, {
+      provider: data?.provider === "aiml" ? "aiml" : "elevenlabs",
+      fallbackUsed: data?.fallbackUsed === true,
+      fallbackReason: typeof data?.fallbackReason === "string" ? data.fallbackReason : undefined,
+    });
+    return blob;
   }
   return response.blob();
 };
@@ -392,6 +412,13 @@ export const StoryModeWizard = () => {
   // (rate limit / no credits / etc.). Cleared after a successful retry.
   const [musicSkip, setMusicSkip] = useState<MusicSkipState | null>(null);
   const [retryingMusicOnly, setRetryingMusicOnly] = useState(false);
+  // Tracks which provider produced the most recent audio per op (TTS / music / SFX),
+  // so we can surface a small badge in the UI when the AIML fallback kicks in.
+  const [audioProviders, setAudioProviders] = useState<{
+    tts: AudioProviderState | null;
+    music: AudioProviderState | null;
+    sfx: AudioProviderState | null;
+  }>({ tts: null, music: null, sfx: null });
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
@@ -1782,6 +1809,17 @@ export const StoryModeWizard = () => {
         { maxAttempts: 3 },
       ));
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
+      const provInfo = getAudioBlobProvider(blob);
+      setAudioProviders(prev => ({
+        ...prev,
+        music: {
+          op: "music",
+          provider: provInfo?.provider ?? "elevenlabs",
+          fallbackUsed: provInfo?.fallbackUsed === true,
+          reason: provInfo?.fallbackReason,
+          at: Date.now(),
+        },
+      }));
       setBackgroundMusicUrl(storageUrl);
       setMusicSkip(null); // success → clear any previous skip banner
       toast.success("Colonna sonora generata! 🎵");
@@ -2680,6 +2718,19 @@ export const StoryModeWizard = () => {
         ));
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
+        const ttsProv = getAudioBlobProvider(blob);
+        if (ttsProv) {
+          setAudioProviders(prev => ({
+            ...prev,
+            tts: {
+              op: "tts",
+              provider: ttsProv.provider,
+              fallbackUsed: ttsProv.fallbackUsed,
+              reason: ttsProv.fallbackReason,
+              at: Date.now(),
+            },
+          }));
+        }
 
         // Measure the real audio duration and adapt scene.duration if the voice is
         // significantly longer/shorter than the originally planned scene length.
@@ -4107,6 +4158,7 @@ export const StoryModeWizard = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium">Colonna Sonora</p>
+                        <AudioProviderBadge state={audioProviders.music} />
                         {musicVerification?.audible === true && (
                           <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px]">
                             <Check className="w-3 h-3 mr-1" />Inclusa nel render
@@ -4142,6 +4194,26 @@ export const StoryModeWizard = () => {
                         </Button>
                       )}
                     </div>
+                  </div>
+                )}
+                {/* Active audio providers summary — shows ElevenLabs vs AIML fallback at a glance */}
+                {(audioProviders.tts || audioProviders.music || audioProviders.sfx) && (
+                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-muted/20">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Provider audio attivi
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <AudioProviderBadge state={audioProviders.tts} />
+                        <AudioProviderBadge state={audioProviders.music} />
+                        <AudioProviderBadge state={audioProviders.sfx} />
+                      </div>
+                    </div>
+                    {(audioProviders.tts?.fallbackUsed || audioProviders.music?.fallbackUsed || audioProviders.sfx?.fallbackUsed) && (
+                      <p className="text-xs text-amber-400 leading-relaxed">
+                        ⚠️ Fallback attivo: ElevenLabs non disponibile, parte dell'audio è stata generata da AI/ML API come backup.
+                      </p>
+                    )}
                   </div>
                 )}
                 {/* Music skipped (rate limit / no credits) — manual retry button */}
