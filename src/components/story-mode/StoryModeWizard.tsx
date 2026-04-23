@@ -43,6 +43,7 @@ import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderRepor
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
 import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
+import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
