@@ -155,6 +155,11 @@ serve(async (req) => {
       // route TTS through AIML's OpenAI TTS-1-HD so Story Mode keeps
       // producing voice-overs.
       const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+      const primaryFallbackReason = response.status === 429
+        ? 'elevenlabs_rate_limited'
+        : response.status === 401 || response.status === 402
+          ? 'elevenlabs_insufficient_credits'
+          : 'elevenlabs_unavailable';
       const fallbackEligible =
         OPENAI_API_KEY &&
         (response.status === 401 || response.status === 402 || response.status === 429);
@@ -188,21 +193,58 @@ serve(async (req) => {
                 format: 'mp3',
                 provider: 'openai',
                 fallbackUsed: true,
-                fallbackReason: response.status === 429
-                  ? 'elevenlabs_rate_limited'
-                  : response.status === 401 || response.status === 402
-                    ? 'elevenlabs_insufficient_credits'
-                    : 'elevenlabs_unavailable',
+                fallbackReason: primaryFallbackReason,
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           } else {
             const openAiErr = await openAiRes.text();
             console.error(`[fallback] OpenAI TTS failed: ${openAiRes.status} ${openAiErr.slice(0, 200)}`);
+            return new Response(
+              JSON.stringify({
+                fallback: true,
+                reason: primaryFallbackReason,
+                status: response.status,
+                error: response.status === 429
+                  ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+                  : 'Crediti ElevenLabs esauriti e provider di backup non disponibile.',
+                provider: 'openai',
+                providerMessage: `openai_tts_failed_${openAiRes.status}`,
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
         } catch (fbErr) {
           console.error('[fallback] OpenAI TTS error:', fbErr);
+          return new Response(
+            JSON.stringify({
+              fallback: true,
+              reason: primaryFallbackReason,
+              status: response.status,
+              error: response.status === 429
+                ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+                : 'Crediti ElevenLabs esauriti e provider di backup non disponibile.',
+              provider: 'openai',
+              providerMessage: 'openai_tts_exception',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+      }
+
+      if (response.status === 401 || response.status === 402 || response.status === 429) {
+        return new Response(
+          JSON.stringify({
+            fallback: true,
+            reason: primaryFallbackReason,
+            status: response.status,
+            error: response.status === 429
+              ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+              : 'Crediti ElevenLabs esauriti e nessun provider di backup è configurato correttamente.',
+            providerMessage: OPENAI_API_KEY ? 'backup_provider_failed' : 'backup_provider_missing',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
