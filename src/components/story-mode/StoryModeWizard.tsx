@@ -42,6 +42,8 @@ import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type Musi
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
+import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
+import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
@@ -371,6 +373,10 @@ export const StoryModeWizard = () => {
   // Post-render audio QA report — built automatically once the render completes.
   const [renderReport, setRenderReport] = useState<RenderReport | null>(null);
   const [renderReportLoading, setRenderReportLoading] = useState(false);
+  // Set when generateBackgroundMusic gives up because of an ElevenLabs fallback
+  // (rate limit / no credits / etc.). Cleared after a successful retry.
+  const [musicSkip, setMusicSkip] = useState<MusicSkipState | null>(null);
+  const [retryingMusicOnly, setRetryingMusicOnly] = useState(false);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
@@ -484,11 +490,11 @@ export const StoryModeWizard = () => {
         input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
         "Hello, this is a preview of my voice.";
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
-      });
+      }));
       if (!response.ok) throw new Error("Preview failed");
       const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
@@ -896,10 +902,10 @@ export const StoryModeWizard = () => {
           for (const i of scenesNeedingAudio) {
             try {
               const sc = migrated[i];
-              const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+              const r = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
                 method: "POST", headers: authHeaders,
                 body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
-              });
+              }));
               if (!r.ok) continue;
               const blob = await audioResponseToBlob(r);
               const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${sc.sceneNumber}`);
@@ -1024,11 +1030,11 @@ export const StoryModeWizard = () => {
     setPreviewLoadingIndex(index);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
-      });
+      }));
       if (!response.ok) throw new Error("TTS preview failed");
       const blob = await audioResponseToBlob(response);
       const url = URL.createObjectURL(blob);
@@ -1153,11 +1159,11 @@ export const StoryModeWizard = () => {
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
         const authHeaders = await getAuthHeaders();
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST",
           headers: authHeaders,
           body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
-        });
+        }));
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
@@ -1638,11 +1644,11 @@ export const StoryModeWizard = () => {
     if (!sfxPrompt) return null;
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
-      });
+      }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
         const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
@@ -1663,11 +1669,11 @@ export const StoryModeWizard = () => {
     const ambiencePrompt = inferAmbiencePrompt(scene);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
-      });
+      }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
         const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
@@ -1747,7 +1753,9 @@ export const StoryModeWizard = () => {
       );
       toast.info(`Generazione colonna sonora unica (${totalDuration}s)…`);
       const authHeaders = await getAuthHeaders();
-      const blob = await fetchAudioWithRetry(
+      // Funnel through the global ElevenLabs concurrency limiter (max 2 in-flight)
+      // so this music call never collides with parallel TTS/SFX/ambience calls.
+      const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
         {
           method: "POST",
@@ -1757,9 +1765,10 @@ export const StoryModeWizard = () => {
         "ElevenLabs Music",
         "story-mode/background",
         { maxAttempts: 3 },
-      );
+      ));
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
+      setMusicSkip(null); // success → clear any previous skip banner
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
     } catch (err: any) {
@@ -1773,10 +1782,37 @@ export const StoryModeWizard = () => {
               ? "Crediti ElevenLabs insufficienti per generare la musica. Story Mode procede senza colonna sonora."
               : `Musica non disponibile (${reason}). Story Mode procede senza colonna sonora.`;
         toast.warning(friendly);
+        setMusicSkip({ reason, message: friendly, at: Date.now() });
         return null;
       }
       toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
+      setMusicSkip({
+        reason: "generic_error",
+        message: `Errore colonna sonora: ${err?.message || "sconosciuto"}`,
+        at: Date.now(),
+      });
       return null;
+    }
+  };
+
+  /**
+   * Manual retry triggered from the MusicSkippedCard. Regenerates only the
+   * background music and, if a final video already exists, re-runs the
+   * post-render verify+retry flow so the new track gets remixed in.
+   */
+  const retryMusicOnly = async () => {
+    if (retryingMusicOnly) return;
+    setRetryingMusicOnly(true);
+    try {
+      const newUrl = await generateBackgroundMusic();
+      if (newUrl && finalVideoUrl) {
+        // Reset the verify-retry counter so the manual retry isn't blocked by
+        // the cap from a previous automatic attempt.
+        musicRetryRef.current = 0;
+        await verifyAndRetryMusic(finalVideoUrl);
+      }
+    } finally {
+      setRetryingMusicOnly(false);
     }
   };
 
@@ -2617,7 +2653,7 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
-        const blob = await fetchAudioWithRetry(
+        const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
           {
             method: "POST", headers: authHeaders,
@@ -2626,7 +2662,7 @@ export const StoryModeWizard = () => {
           "ElevenLabs TTS",
           `story-mode/scene-${i + 1}`,
           { maxAttempts: 3 },
-        );
+        ));
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
 
@@ -4093,6 +4129,12 @@ export const StoryModeWizard = () => {
                     </div>
                   </div>
                 )}
+                {/* Music skipped (rate limit / no credits) — manual retry button */}
+                <MusicSkippedCard
+                  state={musicSkip}
+                  retrying={retryingMusicOnly}
+                  onRetry={retryMusicOnly}
+                />
                 {/* Persistent music retry status + post-render audio QA report */}
                 {(musicRetryLog.entries.length > 0 || finalVideoUrl) && (
                   <MusicRetryStatusCard
@@ -4120,7 +4162,7 @@ export const StoryModeWizard = () => {
                   <Button variant="outline" onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); setMusicSkip(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
                 {videoSegments.length > 1 && (
                   <div className="pt-3 border-t border-border/50">
@@ -4187,7 +4229,7 @@ export const StoryModeWizard = () => {
                       Rimonta Video Finale
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); setMusicSkip(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
               </CardContent>
             </Card>
