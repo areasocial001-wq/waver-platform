@@ -412,6 +412,13 @@ export const StoryModeWizard = () => {
   // (rate limit / no credits / etc.). Cleared after a successful retry.
   const [musicSkip, setMusicSkip] = useState<MusicSkipState | null>(null);
   const [retryingMusicOnly, setRetryingMusicOnly] = useState(false);
+  // Tracks which provider produced the most recent audio per op (TTS / music / SFX),
+  // so we can surface a small badge in the UI when the AIML fallback kicks in.
+  const [audioProviders, setAudioProviders] = useState<{
+    tts: AudioProviderState | null;
+    music: AudioProviderState | null;
+    sfx: AudioProviderState | null;
+  }>({ tts: null, music: null, sfx: null });
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
