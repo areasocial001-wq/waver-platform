@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -161,32 +162,23 @@ serve(async (req) => {
       if (fallbackEligible) {
         try {
           console.log(`[fallback] ElevenLabs TTS ${response.status} → trying AIML OpenAI TTS-1-HD`);
-          const aimlVoice = 'nova';
-          const aimlRes = await fetch('https://api.aimlapi.com/v1/audio/speech', {
+          const aimlVoice = 'alloy';
+          const aimlRes = await fetch('https://api.aimlapi.com/generate/audio/speech', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${AIML_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              model: 'tts-1-hd',
-              input: text,
+              model: 'openai/tts-1-hd',
+              text,
               voice: aimlVoice,
-              response_format: 'mp3',
-              speed: clampedSpeed,
             }),
           });
 
           if (aimlRes.ok) {
             const fallbackBuffer = await aimlRes.arrayBuffer();
-            const fallbackBytes = new Uint8Array(fallbackBuffer);
-            let fbBinary = '';
-            const fbChunk = 0x8000;
-            for (let i = 0; i < fallbackBytes.length; i += fbChunk) {
-              const chunk = fallbackBytes.subarray(i, Math.min(i + fbChunk, fallbackBytes.length));
-              fbBinary += String.fromCharCode.apply(null, [...chunk]);
-            }
-            const fbBase64 = btoa(fbBinary);
+            const fbBase64 = base64Encode(fallbackBuffer);
             console.log(`[fallback] AIML TTS success: ${fallbackBuffer.byteLength} bytes`);
             return new Response(
               JSON.stringify({
@@ -196,7 +188,9 @@ serve(async (req) => {
                 fallbackUsed: true,
                 fallbackReason: response.status === 429
                   ? 'elevenlabs_rate_limited'
-                  : 'elevenlabs_credits_exhausted',
+                  : response.status === 401 || response.status === 402
+                    ? 'elevenlabs_insufficient_credits'
+                    : 'elevenlabs_unavailable',
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
