@@ -98,7 +98,10 @@ const MAX_RECOVERY_ATTEMPTS = 3;
 // Helper to get auth headers with user's JWT token
 const getAuthHeaders = async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const token = session?.access_token;
+  if (!token) {
+    throw new Error("AUTH_REQUIRED");
+  }
   return {
     "Content-Type": "application/json",
     apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -207,6 +210,13 @@ const fetchAudioWithRetry = async (
   }
   apiLogger.error(apiName, operation, `Audio non recuperabile dopo ${maxAttempts} tentativi: ${lastError?.message}`, { attempts: maxAttempts }).catch(() => {});
   throw lastError || new Error("Audio fetch failed");
+};
+
+const getReadableAuthError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === "AUTH_REQUIRED"
+    ? "Devi accedere per generare audio con Story Mode."
+    : message;
 };
 
 /** Measure real duration (s) of an audio Blob via hidden <audio> metadata load. */
