@@ -4162,7 +4162,7 @@ export const StoryModeWizard = () => {
                   <Button variant="outline" onClick={() => setStep("script")}>
                     <Pencil className="w-4 h-4 mr-2" />Modifica & Rigenera
                   </Button>
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setGenerationProgress(0); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); setMusicSkip(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
                 {videoSegments.length > 1 && (
                   <div className="pt-3 border-t border-border/50">
