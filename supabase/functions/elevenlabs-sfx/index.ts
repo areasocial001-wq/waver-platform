@@ -112,6 +112,75 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── AIML FALLBACK ──────────────────────────────────────────────
+    // When ElevenLabs is rate-limited / out of credits / unauthorized,
+    // try AIML's stable-audio for short SFX so Story Mode keeps a sound.
+    const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+    const fallbackEligible =
+      AIML_API_KEY &&
+      (lastStatus === 401 || lastStatus === 402 || lastStatus === 429);
+
+    if (fallbackEligible) {
+      try {
+        console.log(`[fallback] ElevenLabs SFX ${lastStatus} → trying AIML stable-audio`);
+        const submitRes = await fetch("https://api.aimlapi.com/v2/generate/audio", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${AIML_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "stable-audio",
+            prompt: `Sound effect: ${text}`,
+            seconds_total: Math.min(Math.max(duration_seconds, 1), 22),
+            steps: 75,
+          }),
+        });
+
+        if (submitRes.ok) {
+          const submitData = await submitRes.json();
+          const generationId = submitData.id || submitData.generation_id;
+          if (generationId) {
+            let aimlAudioUrl: string | null = null;
+            for (let i = 0; i < 20; i++) {
+              await new Promise(r => setTimeout(r, 2500));
+              const statusRes = await fetch(
+                `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+                { headers: { "Authorization": `Bearer ${AIML_API_KEY}` } }
+              );
+              if (!statusRes.ok) continue;
+              const statusData = await statusRes.json();
+              if (statusData.status === "completed" || statusData.audio_file?.url) {
+                aimlAudioUrl = statusData.audio_file?.url || statusData.url;
+                break;
+              }
+              if (statusData.status === "failed" || statusData.status === "error") break;
+            }
+            if (aimlAudioUrl) {
+              const audioRes = await fetch(aimlAudioUrl);
+              if (audioRes.ok) {
+                const fallbackBuffer = await audioRes.arrayBuffer();
+                console.log(`[fallback] AIML SFX success: ${fallbackBuffer.byteLength} bytes`);
+                return new Response(fallbackBuffer, {
+                  headers: {
+                    ...corsHeaders,
+                    "Content-Type": "audio/mpeg",
+                    "X-Provider": "aiml",
+                    "X-Fallback-Used": "true",
+                  },
+                });
+              }
+            }
+          }
+        } else {
+          const errTxt = await submitRes.text();
+          console.error(`[fallback] AIML SFX submit failed: ${submitRes.status} ${errTxt.slice(0, 200)}`);
+        }
+      } catch (fbErr) {
+        console.error("[fallback] AIML SFX error:", fbErr);
+      }
+    }
+
     // Graceful failure: return 200 with structured error so the frontend can degrade instead of crashing
     const reason =
       lastStatus === 401 ? "elevenlabs_unauthorized"
