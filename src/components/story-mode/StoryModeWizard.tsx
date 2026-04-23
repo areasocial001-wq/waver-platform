@@ -1809,6 +1809,17 @@ export const StoryModeWizard = () => {
         { maxAttempts: 3 },
       ));
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
+      const provInfo = getAudioBlobProvider(blob);
+      setAudioProviders(prev => ({
+        ...prev,
+        music: {
+          op: "music",
+          provider: provInfo?.provider ?? "elevenlabs",
+          fallbackUsed: provInfo?.fallbackUsed === true,
+          reason: provInfo?.fallbackReason,
+          at: Date.now(),
+        },
+      }));
       setBackgroundMusicUrl(storageUrl);
       setMusicSkip(null); // success → clear any previous skip banner
       toast.success("Colonna sonora generata! 🎵");
