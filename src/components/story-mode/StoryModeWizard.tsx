@@ -188,6 +188,21 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
     if (!base64 || typeof base64 !== "string") {
       throw new Error("Risposta audio non valida: campo audioContent mancante");
     }
+    // One-shot toast when AIML kicked in as fallback (ElevenLabs out of credits/rate-limited).
+    if (data?.fallbackUsed === true && data?.provider === "aiml" && typeof window !== "undefined") {
+      const w = window as unknown as { __aimlFallbackToastShown?: boolean };
+      if (!w.__aimlFallbackToastShown) {
+        w.__aimlFallbackToastShown = true;
+        import("sonner").then(({ toast }) => {
+          toast.info("🔄 Audio generato via AI/ML API (ElevenLabs non disponibile)", {
+            description: data?.fallbackReason === "elevenlabs_rate_limited"
+              ? "ElevenLabs ha raggiunto il limite di richieste. Provider alternativo attivo."
+              : "Crediti ElevenLabs esauriti. Audio prodotto con il provider di backup.",
+            duration: 7000,
+          });
+        }).catch(() => { /* ignore */ });
+      }
+    }
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
