@@ -1253,7 +1253,12 @@ export const StoryModeWizard = () => {
           headers: authHeaders,
           body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
         });
-        if (!response.ok) throw new Error("SFX generation failed");
+        const ct = response.headers.get("content-type") || "";
+        if (!response.ok || ct.includes("application/json")) {
+          const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
+          const reason = (info as any)?.reason || `http_${response.status}`;
+          throw new Error(`SFX non disponibile (${reason})`);
+        }
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
         const scenes = [...script.scenes];
