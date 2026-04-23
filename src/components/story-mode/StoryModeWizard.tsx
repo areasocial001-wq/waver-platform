@@ -1030,11 +1030,11 @@ export const StoryModeWizard = () => {
     setPreviewLoadingIndex(index);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
-      });
+      }));
       if (!response.ok) throw new Error("TTS preview failed");
       const blob = await audioResponseToBlob(response);
       const url = URL.createObjectURL(blob);
@@ -1159,11 +1159,11 @@ export const StoryModeWizard = () => {
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
         const authHeaders = await getAuthHeaders();
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
           method: "POST",
           headers: authHeaders,
           body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
-        });
+        }));
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
@@ -1644,11 +1644,11 @@ export const StoryModeWizard = () => {
     if (!sfxPrompt) return null;
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
-      });
+      }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
         const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
@@ -1669,11 +1669,11 @@ export const StoryModeWizard = () => {
     const ambiencePrompt = inferAmbiencePrompt(scene);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
-      });
+      }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
         const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
@@ -2653,7 +2653,7 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
-        const blob = await fetchAudioWithRetry(
+        const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
           {
             method: "POST", headers: authHeaders,
@@ -2662,7 +2662,7 @@ export const StoryModeWizard = () => {
           "ElevenLabs TTS",
           `story-mode/scene-${i + 1}`,
           { maxAttempts: 3 },
-        );
+        ));
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
 
