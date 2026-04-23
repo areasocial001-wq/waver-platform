@@ -138,6 +138,90 @@ serve(async (req) => {
     }
 
     if (!audioBuffer) {
+      // ── AIML FALLBACK ──────────────────────────────────────────────
+      // Before giving up, try AIML API (Suno) for music/ambient. SFX
+      // generation isn't supported by Suno so we skip the fallback there.
+      const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+      const fallbackEligible =
+        AIML_API_KEY &&
+        category !== "sfx" &&
+        (lastStatus === 401 || lastStatus === 402 || lastStatus === 429);
+
+      if (fallbackEligible) {
+        try {
+          console.log(`[fallback] ElevenLabs ${lastStatus} → trying AIML Suno (category=${category})`);
+          const aimlPrompt = category === "ambient"
+            ? `Ambient soundscape, instrumental only, seamless and atmospheric: ${prompt}`
+            : `Background instrumental music, no vocals, smooth and even dynamics suitable for video underscore: ${prompt}`;
+
+          // 1) Submit generation task
+          const submitRes = await fetch("https://api.aimlapi.com/v2/generate/audio", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${AIML_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "stable-audio",
+              prompt: aimlPrompt,
+              seconds_total: Math.min(Math.max(duration, 1), 47),
+              steps: 100,
+            }),
+          });
+
+          if (submitRes.ok) {
+            const submitData = await submitRes.json();
+            const generationId = submitData.id || submitData.generation_id;
+
+            if (generationId) {
+              // 2) Poll for completion (max 90s)
+              let aimlAudioUrl: string | null = null;
+              for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 3000));
+                const statusRes = await fetch(
+                  `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+                  { headers: { "Authorization": `Bearer ${AIML_API_KEY}` } }
+                );
+                if (!statusRes.ok) continue;
+                const statusData = await statusRes.json();
+                if (statusData.status === "completed" || statusData.audio_file?.url) {
+                  aimlAudioUrl = statusData.audio_file?.url || statusData.url;
+                  break;
+                }
+                if (statusData.status === "failed" || statusData.status === "error") {
+                  throw new Error(`AIML generation failed: ${statusData.error || "unknown"}`);
+                }
+              }
+
+              // 3) Download the audio
+              if (aimlAudioUrl) {
+                const audioRes = await fetch(aimlAudioUrl);
+                if (audioRes.ok) {
+                  const fallbackBuffer = await audioRes.arrayBuffer();
+                  const fallbackBase64 = base64Encode(fallbackBuffer);
+                  console.log(`[fallback] AIML Suno success: ${fallbackBuffer.byteLength} bytes`);
+                  return jsonResponse({
+                    audioContent: fallbackBase64,
+                    format: "mp3",
+                    category,
+                    duration,
+                    bytes: fallbackBuffer.byteLength,
+                    provider: "aiml",
+                    fallbackUsed: true,
+                    fallbackReason: lastStatus === 429 ? "elevenlabs_rate_limited" : "elevenlabs_credits_exhausted",
+                  }, 200);
+                }
+              }
+            }
+          } else {
+            const errTxt = await submitRes.text();
+            console.error(`[fallback] AIML submit failed: ${submitRes.status} ${errTxt.slice(0, 200)}`);
+          }
+        } catch (fallbackErr) {
+          console.error("[fallback] AIML music fallback error:", fallbackErr);
+        }
+      }
+
       // Translate ElevenLabs failure into a graceful fallback so the client
       // doesn't crash with a 500 — Story Mode can proceed without music.
       const reason =
