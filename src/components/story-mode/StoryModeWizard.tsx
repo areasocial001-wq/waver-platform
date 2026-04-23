@@ -1603,7 +1603,12 @@ export const StoryModeWizard = () => {
         headers: authHeaders,
         body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
       });
-      if (!response.ok) throw new Error(`SFX failed: ${response.status}`);
+      const ct = response.headers.get("content-type") || "";
+      if (!response.ok || ct.includes("application/json")) {
+        const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
+        console.warn("SFX skipped:", (info as any)?.reason || response.status, (info as any)?.providerMessage);
+        return null;
+      }
       const blob = await response.blob();
       const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena`);
       return storageUrl;
@@ -1623,7 +1628,12 @@ export const StoryModeWizard = () => {
         headers: authHeaders,
         body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
       });
-      if (!response.ok) throw new Error(`Ambience failed: ${response.status}`);
+      const ct = response.headers.get("content-type") || "";
+      if (!response.ok || ct.includes("application/json")) {
+        const info = ct.includes("application/json") ? await response.json().catch(() => ({})) : {};
+        console.warn("Ambience skipped:", (info as any)?.reason || response.status, (info as any)?.providerMessage);
+        return null;
+      }
       const blob = await response.blob();
       const storageUrl = await uploadBlobToStorage(blob, "story-ambience", "mp3", `Ambience Scena`);
       return storageUrl;
