@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Mic, Music, Volume2, Sparkles, Zap } from "lucide-react";
 
 export type AudioOp = "tts" | "music" | "sfx";
-export type AudioProvider = "elevenlabs" | "aiml";
+export type AudioProvider = "elevenlabs" | "aiml" | "openai";
 
 export interface AudioProviderState {
   /** Operation that produced the audio. */
@@ -41,6 +41,12 @@ const PROVIDER_META: Record<AudioProvider, {
     short: "AI/ML",
     icon: <Zap className="h-3 w-3" />,
     classes: "border-amber-500/40 bg-amber-500/10 text-amber-300",
+  },
+  openai: {
+    name: "OpenAI (fallback)",
+    short: "OpenAI",
+    icon: <Zap className="h-3 w-3" />,
+    classes: "border-sky-500/40 bg-sky-500/10 text-sky-300",
   },
 };
 

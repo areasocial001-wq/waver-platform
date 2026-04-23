@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -153,60 +154,97 @@ serve(async (req) => {
       // When ElevenLabs is out of credits / rate-limited / unauthorized,
       // route TTS through AIML's OpenAI TTS-1-HD so Story Mode keeps
       // producing voice-overs.
-      const AIML_API_KEY = Deno.env.get('AIML_API_KEY');
+      const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+      const primaryFallbackReason = response.status === 429
+        ? 'elevenlabs_rate_limited'
+        : response.status === 401 || response.status === 402
+          ? 'elevenlabs_insufficient_credits'
+          : 'elevenlabs_unavailable';
       const fallbackEligible =
-        AIML_API_KEY &&
+        OPENAI_API_KEY &&
         (response.status === 401 || response.status === 402 || response.status === 429);
 
       if (fallbackEligible) {
         try {
-          console.log(`[fallback] ElevenLabs TTS ${response.status} → trying AIML OpenAI TTS-1-HD`);
-          const aimlVoice = 'nova';
-          const aimlRes = await fetch('https://api.aimlapi.com/v1/audio/speech', {
+          console.log(`[fallback] ElevenLabs TTS ${response.status} → trying OpenAI TTS-1-HD`);
+          const openAiVoice = selectedLanguage === 'it' ? 'nova' : 'alloy';
+          const openAiRes = await fetch('https://api.openai.com/v1/audio/speech', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${AIML_API_KEY}`,
+              'Authorization': `Bearer ${OPENAI_API_KEY}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
               model: 'tts-1-hd',
               input: text,
-              voice: aimlVoice,
+              voice: openAiVoice,
               response_format: 'mp3',
               speed: clampedSpeed,
             }),
           });
 
-          if (aimlRes.ok) {
-            const fallbackBuffer = await aimlRes.arrayBuffer();
-            const fallbackBytes = new Uint8Array(fallbackBuffer);
-            let fbBinary = '';
-            const fbChunk = 0x8000;
-            for (let i = 0; i < fallbackBytes.length; i += fbChunk) {
-              const chunk = fallbackBytes.subarray(i, Math.min(i + fbChunk, fallbackBytes.length));
-              fbBinary += String.fromCharCode.apply(null, [...chunk]);
-            }
-            const fbBase64 = btoa(fbBinary);
-            console.log(`[fallback] AIML TTS success: ${fallbackBuffer.byteLength} bytes`);
+          if (openAiRes.ok) {
+            const fallbackBuffer = await openAiRes.arrayBuffer();
+            const fbBase64 = base64Encode(fallbackBuffer);
+            console.log(`[fallback] OpenAI TTS success: ${fallbackBuffer.byteLength} bytes`);
             return new Response(
               JSON.stringify({
                 audioContent: fbBase64,
                 format: 'mp3',
-                provider: 'aiml',
+                provider: 'openai',
                 fallbackUsed: true,
-                fallbackReason: response.status === 429
-                  ? 'elevenlabs_rate_limited'
-                  : 'elevenlabs_credits_exhausted',
+                fallbackReason: primaryFallbackReason,
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           } else {
-            const aimlErr = await aimlRes.text();
-            console.error(`[fallback] AIML TTS failed: ${aimlRes.status} ${aimlErr.slice(0, 200)}`);
+            const openAiErr = await openAiRes.text();
+            console.error(`[fallback] OpenAI TTS failed: ${openAiRes.status} ${openAiErr.slice(0, 200)}`);
+            return new Response(
+              JSON.stringify({
+                fallback: true,
+                reason: primaryFallbackReason,
+                status: response.status,
+                error: response.status === 429
+                  ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+                  : 'Crediti ElevenLabs esauriti e provider di backup non disponibile.',
+                provider: 'openai',
+                providerMessage: `openai_tts_failed_${openAiRes.status}`,
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
           }
         } catch (fbErr) {
-          console.error('[fallback] AIML TTS error:', fbErr);
+          console.error('[fallback] OpenAI TTS error:', fbErr);
+          return new Response(
+            JSON.stringify({
+              fallback: true,
+              reason: primaryFallbackReason,
+              status: response.status,
+              error: response.status === 429
+                ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+                : 'Crediti ElevenLabs esauriti e provider di backup non disponibile.',
+              provider: 'openai',
+              providerMessage: 'openai_tts_exception',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+      }
+
+      if (response.status === 401 || response.status === 402 || response.status === 429) {
+        return new Response(
+          JSON.stringify({
+            fallback: true,
+            reason: primaryFallbackReason,
+            status: response.status,
+            error: response.status === 429
+              ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
+              : 'Crediti ElevenLabs esauriti e nessun provider di backup è configurato correttamente.',
+            providerMessage: OPENAI_API_KEY ? 'backup_provider_failed' : 'backup_provider_missing',
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
