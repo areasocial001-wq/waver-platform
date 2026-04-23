@@ -173,6 +173,19 @@ class AudioFallbackError extends Error {
   }
 }
 
+/**
+ * WeakMap that lets `audioResponseToBlob` attach the provider/fallback metadata
+ * (parsed from the edge-function JSON envelope) to the produced Blob so callers
+ * upstream can read it without changing the function signature.
+ */
+const audioBlobProviderInfo = new WeakMap<Blob, {
+  provider: "elevenlabs" | "aiml";
+  fallbackUsed: boolean;
+  fallbackReason?: string;
+}>();
+
+export const getAudioBlobProvider = (b: Blob) => audioBlobProviderInfo.get(b);
+
 const audioResponseToBlob = async (response: Response): Promise<Blob> => {
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
