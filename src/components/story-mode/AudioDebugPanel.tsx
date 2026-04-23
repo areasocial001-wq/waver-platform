@@ -85,6 +85,13 @@ const isBlob = (u?: string | null) => !!u && u.startsWith("blob:");
 const isStorage = (u?: string | null) =>
   !!u && /supabase\.co\/storage\/v1\/object/i.test(u);
 
+const getReadableAuthError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === "AUTH_REQUIRED"
+    ? "Devi accedere per rigenerare gli asset audio."
+    : message;
+};
+
 const formatBytes = (n?: number | null) => {
   if (n == null || isNaN(n)) return "—";
   if (n < 1024) return `${n} B`;
@@ -309,7 +316,8 @@ export const AudioDebugPanel: React.FC = () => {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const token = session?.access_token;
+      if (!token) throw new Error("AUTH_REQUIRED");
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
         apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -333,7 +341,7 @@ export const AudioDebugPanel: React.FC = () => {
         const sc = project.scenes[target.sceneIndex ?? -1];
         const prompt = sc?.sfxPrompt || sc?.mood || "ambient background";
         endpoint = "elevenlabs-sfx";
-        body = { prompt, duration: Math.min(sc?.duration ?? 5, 10) };
+        body = { text: prompt, duration_seconds: Math.min(sc?.duration ?? 5, 10) };
       } else if (target.type === "music") {
         endpoint = "elevenlabs-music";
         const totalDuration = project.scenes.reduce((acc, s) => acc + Math.min(s.duration ?? 5, 10), 0);
@@ -449,7 +457,7 @@ export const AudioDebugPanel: React.FC = () => {
         });
       }
     } catch (e) {
-      const msg = (e as Error).message;
+      const msg = getReadableAuthError(e);
       pushLog({ step: "error", ok: false, message: msg });
       toast.error(`Rigenerazione fallita: ${msg}`);
       setChecks((prev) => prev.map((c) => (c.key === key ? { ...c, retrying: false } : c)));
