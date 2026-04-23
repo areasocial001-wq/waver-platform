@@ -163,7 +163,7 @@ serve(async (req) => {
         try {
           console.log(`[fallback] ElevenLabs TTS ${response.status} → trying AIML OpenAI TTS-1-HD`);
           const aimlVoice = 'alloy';
-          const aimlRes = await fetch('https://api.aimlapi.com/generate/audio/speech', {
+          const aimlRes = await fetch('https://api.aimlapi.com/v2/generate/audio/speech', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${AIML_API_KEY}`,
