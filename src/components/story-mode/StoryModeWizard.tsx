@@ -4196,6 +4196,26 @@ export const StoryModeWizard = () => {
                     </div>
                   </div>
                 )}
+                {/* Active audio providers summary — shows ElevenLabs vs AIML fallback at a glance */}
+                {(audioProviders.tts || audioProviders.music || audioProviders.sfx) && (
+                  <div className="flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-muted/20">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Provider audio attivi
+                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <AudioProviderBadge state={audioProviders.tts} />
+                        <AudioProviderBadge state={audioProviders.music} />
+                        <AudioProviderBadge state={audioProviders.sfx} />
+                      </div>
+                    </div>
+                    {(audioProviders.tts?.fallbackUsed || audioProviders.music?.fallbackUsed || audioProviders.sfx?.fallbackUsed) && (
+                      <p className="text-xs text-amber-400 leading-relaxed">
+                        ⚠️ Fallback attivo: ElevenLabs non disponibile, parte dell'audio è stata generata da AI/ML API come backup.
+                      </p>
+                    )}
+                  </div>
+                )}
                 {/* Music skipped (rate limit / no credits) — manual retry button */}
                 <MusicSkippedCard
                   state={musicSkip}
