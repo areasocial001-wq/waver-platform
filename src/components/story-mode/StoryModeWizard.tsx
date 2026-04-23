@@ -2718,6 +2718,19 @@ export const StoryModeWizard = () => {
         ));
         const sceneLabel = `Narrazione Scena ${i + 1}`;
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", sceneLabel);
+        const ttsProv = getAudioBlobProvider(blob);
+        if (ttsProv) {
+          setAudioProviders(prev => ({
+            ...prev,
+            tts: {
+              op: "tts",
+              provider: ttsProv.provider,
+              fallbackUsed: ttsProv.fallbackUsed,
+              reason: ttsProv.fallbackReason,
+              at: Date.now(),
+            },
+          }));
+        }
 
         // Measure the real audio duration and adapt scene.duration if the voice is
         // significantly longer/shorter than the originally planned scene length.
