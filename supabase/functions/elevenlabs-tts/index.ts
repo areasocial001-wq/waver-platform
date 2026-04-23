@@ -148,6 +148,67 @@ serve(async (req) => {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('ElevenLabs API error:', response.status, errorText);
+
+      // ── AIML FALLBACK ──────────────────────────────────────────────
+      // When ElevenLabs is out of credits / rate-limited / unauthorized,
+      // route TTS through AIML's OpenAI TTS-1-HD so Story Mode keeps
+      // producing voice-overs.
+      const AIML_API_KEY = Deno.env.get('AIML_API_KEY');
+      const fallbackEligible =
+        AIML_API_KEY &&
+        (response.status === 401 || response.status === 402 || response.status === 429);
+
+      if (fallbackEligible) {
+        try {
+          console.log(`[fallback] ElevenLabs TTS ${response.status} → trying AIML OpenAI TTS-1-HD`);
+          const aimlVoice = 'nova';
+          const aimlRes = await fetch('https://api.aimlapi.com/v1/audio/speech', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${AIML_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'tts-1-hd',
+              input: text,
+              voice: aimlVoice,
+              response_format: 'mp3',
+              speed: clampedSpeed,
+            }),
+          });
+
+          if (aimlRes.ok) {
+            const fallbackBuffer = await aimlRes.arrayBuffer();
+            const fallbackBytes = new Uint8Array(fallbackBuffer);
+            let fbBinary = '';
+            const fbChunk = 0x8000;
+            for (let i = 0; i < fallbackBytes.length; i += fbChunk) {
+              const chunk = fallbackBytes.subarray(i, Math.min(i + fbChunk, fallbackBytes.length));
+              fbBinary += String.fromCharCode.apply(null, [...chunk]);
+            }
+            const fbBase64 = btoa(fbBinary);
+            console.log(`[fallback] AIML TTS success: ${fallbackBuffer.byteLength} bytes`);
+            return new Response(
+              JSON.stringify({
+                audioContent: fbBase64,
+                format: 'mp3',
+                provider: 'aiml',
+                fallbackUsed: true,
+                fallbackReason: response.status === 429
+                  ? 'elevenlabs_rate_limited'
+                  : 'elevenlabs_credits_exhausted',
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          } else {
+            const aimlErr = await aimlRes.text();
+            console.error(`[fallback] AIML TTS failed: ${aimlRes.status} ${aimlErr.slice(0, 200)}`);
+          }
+        } catch (fbErr) {
+          console.error('[fallback] AIML TTS error:', fbErr);
+        }
+      }
+
       throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
     }
 
