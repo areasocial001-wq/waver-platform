@@ -5,6 +5,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const jsonResponse = (body: Record<string, unknown>, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+
+async function callElevenLabsSfx(apiKey: string, text: string, duration_seconds: number, prompt_influence: number) {
+  const response = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
+    method: "POST",
+    headers: {
+      "xi-api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      text,
+      duration_seconds: Math.min(duration_seconds, 22),
+      prompt_influence,
+    }),
+  });
+  return response;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -14,9 +36,7 @@ Deno.serve(async (req) => {
     // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, 401);
     }
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
@@ -35,61 +55,84 @@ Deno.serve(async (req) => {
       const { data: userData, error: userError } = await supabase.auth.getUser(token);
       if (userError || !userData?.user) {
         console.error("JWT validation failed:", userError);
-        return new Response(
-          JSON.stringify({ error: "Invalid authentication token" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return jsonResponse({ error: "Invalid authentication token" }, 401);
       }
       userId = userData.user.id;
     }
-    const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
-    if (!ELEVENLABS_API_KEY) {
-      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    // Try multiple ElevenLabs keys (primary + connector-managed fallback)
+    const candidateKeys = [
+      { name: "ELEVENLABS_API_KEY", value: Deno.env.get("ELEVENLABS_API_KEY") },
+      { name: "ELEVENLABS_API_KEY_1", value: Deno.env.get("ELEVENLABS_API_KEY_1") },
+    ].filter(k => !!k.value) as { name: string; value: string }[];
+
+    if (candidateKeys.length === 0) {
+      console.error("No ElevenLabs API key configured");
+      return jsonResponse({
+        error: "ELEVENLABS_API_KEY not configured",
+        reason: "missing_api_key",
+        fallback: true,
+      }, 200);
     }
 
-    const { text, duration_seconds = 5, prompt_influence = 0.3 } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { text, duration_seconds = 5, prompt_influence = 0.3 } = body as {
+      text?: string; duration_seconds?: number; prompt_influence?: number;
+    };
 
     if (!text || typeof text !== "string" || text.length === 0) {
-      return new Response(JSON.stringify({ error: "text parameter is required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "text parameter is required" }, 400);
     }
 
-    console.log(`Generating SFX: "${text.slice(0, 80)}..." duration=${duration_seconds}s`);
+    console.log(`Generating SFX: "${text.slice(0, 80)}..." duration=${duration_seconds}s, candidate keys: ${candidateKeys.map(k => `${k.name}(len=${k.value.length}, prefix=${k.value.slice(0, 4)})`).join(", ")}`);
 
-    const response = await fetch("https://api.elevenlabs.io/v1/sound-generation", {
-      method: "POST",
-      headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        duration_seconds: Math.min(duration_seconds, 22),
-        prompt_influence,
-      }),
-    });
+    let lastStatus = 0;
+    let lastErrText = "";
+    let lastKeyName = "";
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("ElevenLabs SFX error:", errText);
-      return new Response(JSON.stringify({ error: `SFX generation failed: ${response.status}` }), {
-        status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    for (const { name, value } of candidateKeys) {
+      const response = await callElevenLabsSfx(value, text, duration_seconds, prompt_influence);
+      lastKeyName = name;
+
+      if (response.ok) {
+        const audioBuffer = await response.arrayBuffer();
+        console.log(`SFX generated with ${name}: ${audioBuffer.byteLength} bytes`);
+        return new Response(audioBuffer, {
+          headers: { ...corsHeaders, "Content-Type": "audio/mpeg" },
+        });
+      }
+
+      lastStatus = response.status;
+      lastErrText = await response.text().catch(() => "");
+      console.error(`ElevenLabs SFX error with key ${name}: ${response.status} ${lastErrText.slice(0, 200)}`);
+
+      // If it's not an auth issue, stop trying other keys (e.g. quota, validation)
+      if (response.status !== 401 && response.status !== 403) {
+        break;
+      }
     }
 
-    const audioBuffer = await response.arrayBuffer();
-    console.log(`SFX generated: ${audioBuffer.byteLength} bytes`);
+    // Graceful failure: return 200 with structured error so the frontend can degrade instead of crashing
+    const reason =
+      lastStatus === 401 ? "elevenlabs_unauthorized"
+      : lastStatus === 403 ? "elevenlabs_forbidden"
+      : lastStatus === 429 ? "elevenlabs_rate_limited"
+      : lastStatus >= 500 ? "elevenlabs_service_unavailable"
+      : "elevenlabs_error";
 
-    return new Response(audioBuffer, {
-      headers: { ...corsHeaders, "Content-Type": "audio/mpeg" },
-    });
+    return jsonResponse({
+      error: `SFX generation failed: ${lastStatus}`,
+      reason,
+      keyTried: lastKeyName,
+      providerMessage: lastErrText.slice(0, 300),
+      fallback: true,
+    }, 200);
   } catch (error) {
     console.error("SFX function error:", error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({
+      error: (error as Error).message,
+      reason: "function_exception",
+      fallback: true,
+    }, 200);
   }
 });
