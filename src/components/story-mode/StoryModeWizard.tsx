@@ -490,11 +490,11 @@ export const StoryModeWizard = () => {
         input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
         "Hello, this is a preview of my voice.";
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
-      });
+      }));
       if (!response.ok) throw new Error("Preview failed");
       const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
