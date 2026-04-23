@@ -4129,6 +4129,12 @@ export const StoryModeWizard = () => {
                     </div>
                   </div>
                 )}
+                {/* Music skipped (rate limit / no credits) — manual retry button */}
+                <MusicSkippedCard
+                  state={musicSkip}
+                  retrying={retryingMusicOnly}
+                  onRetry={retryMusicOnly}
+                />
                 {/* Persistent music retry status + post-render audio QA report */}
                 {(musicRetryLog.entries.length > 0 || finalVideoUrl) && (
                   <MusicRetryStatusCard
