@@ -4158,6 +4158,7 @@ export const StoryModeWizard = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium">Colonna Sonora</p>
+                        <AudioProviderBadge state={audioProviders.music} />
                         {musicVerification?.audible === true && (
                           <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-600 border-emerald-500/30 text-[10px]">
                             <Check className="w-3 h-3 mr-1" />Inclusa nel render
