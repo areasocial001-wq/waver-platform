@@ -42,6 +42,8 @@ import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type Musi
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
+import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
+import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
 
 // Style preview images
