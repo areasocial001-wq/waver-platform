@@ -1764,6 +1764,17 @@ export const StoryModeWizard = () => {
       return storageUrl;
     } catch (err: any) {
       console.error("Music error:", err);
+      if (err?.name === "AudioFallbackError") {
+        const reason = err.reason as string;
+        const friendly =
+          reason === "elevenlabs_rate_limited"
+            ? "ElevenLabs ha rifiutato la richiesta musica per limite di richieste concorrenti (max 2 sul tuo piano). Story Mode procede senza colonna sonora."
+            : reason === "elevenlabs_insufficient_credits" || reason === "elevenlabs_unauthorized"
+              ? "Crediti ElevenLabs insufficienti per generare la musica. Story Mode procede senza colonna sonora."
+              : `Musica non disponibile (${reason}). Story Mode procede senza colonna sonora.`;
+        toast.warning(friendly);
+        return null;
+      }
       toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
       return null;
     }
