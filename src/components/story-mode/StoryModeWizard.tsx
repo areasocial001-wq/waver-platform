@@ -4229,7 +4229,7 @@ export const StoryModeWizard = () => {
                       Rimonta Video Finale
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
+                  <Button variant="outline" onClick={() => { setStep("input"); setScript(null); setFinalVideoUrl(null); setVideoSegments([]); setBackgroundMusicUrl(null); setProjectId(null); setRenderStatus("idle"); setPendingRenderId(null); setMusicSkip(null); }}><RotateCcw className="w-4 h-4 mr-2" />Nuova Storia</Button>
                 </div>
               </CardContent>
             </Card>
