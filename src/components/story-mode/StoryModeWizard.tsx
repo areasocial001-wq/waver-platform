@@ -224,7 +224,13 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
       throw new Error(`MP3 non valido (${bytes.length} bytes, header non riconosciuto)`);
     }
     const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
-    return new Blob([bytes], { type: mime });
+    const blob = new Blob([bytes], { type: mime });
+    audioBlobProviderInfo.set(blob, {
+      provider: data?.provider === "aiml" ? "aiml" : "elevenlabs",
+      fallbackUsed: data?.fallbackUsed === true,
+      fallbackReason: typeof data?.fallbackReason === "string" ? data.fallbackReason : undefined,
+    });
+    return blob;
   }
   return response.blob();
 };
