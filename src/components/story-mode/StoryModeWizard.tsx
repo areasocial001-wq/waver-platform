@@ -373,6 +373,10 @@ export const StoryModeWizard = () => {
   // Post-render audio QA report — built automatically once the render completes.
   const [renderReport, setRenderReport] = useState<RenderReport | null>(null);
   const [renderReportLoading, setRenderReportLoading] = useState(false);
+  // Set when generateBackgroundMusic gives up because of an ElevenLabs fallback
+  // (rate limit / no credits / etc.). Cleared after a successful retry.
+  const [musicSkip, setMusicSkip] = useState<MusicSkipState | null>(null);
+  const [retryingMusicOnly, setRetryingMusicOnly] = useState(false);
 
   const resolveRenderVideoSource = useCallback(async (url: string) => {
     if (!url) return null;
