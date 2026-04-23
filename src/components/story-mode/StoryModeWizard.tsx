@@ -1753,7 +1753,9 @@ export const StoryModeWizard = () => {
       );
       toast.info(`Generazione colonna sonora unica (${totalDuration}s)…`);
       const authHeaders = await getAuthHeaders();
-      const blob = await fetchAudioWithRetry(
+      // Funnel through the global ElevenLabs concurrency limiter (max 2 in-flight)
+      // so this music call never collides with parallel TTS/SFX/ambience calls.
+      const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-music`,
         {
           method: "POST",
@@ -1763,9 +1765,10 @@ export const StoryModeWizard = () => {
         "ElevenLabs Music",
         "story-mode/background",
         { maxAttempts: 3 },
-      );
+      ));
       const storageUrl = await uploadBlobToStorage(blob, "story-music", "mp3", "Colonna sonora");
       setBackgroundMusicUrl(storageUrl);
+      setMusicSkip(null); // success → clear any previous skip banner
       toast.success("Colonna sonora generata! 🎵");
       return storageUrl;
     } catch (err: any) {
@@ -1779,10 +1782,37 @@ export const StoryModeWizard = () => {
               ? "Crediti ElevenLabs insufficienti per generare la musica. Story Mode procede senza colonna sonora."
               : `Musica non disponibile (${reason}). Story Mode procede senza colonna sonora.`;
         toast.warning(friendly);
+        setMusicSkip({ reason, message: friendly, at: Date.now() });
         return null;
       }
       toast.error(`Errore colonna sonora: ${err?.message || "sconosciuto"}`);
+      setMusicSkip({
+        reason: "generic_error",
+        message: `Errore colonna sonora: ${err?.message || "sconosciuto"}`,
+        at: Date.now(),
+      });
       return null;
+    }
+  };
+
+  /**
+   * Manual retry triggered from the MusicSkippedCard. Regenerates only the
+   * background music and, if a final video already exists, re-runs the
+   * post-render verify+retry flow so the new track gets remixed in.
+   */
+  const retryMusicOnly = async () => {
+    if (retryingMusicOnly) return;
+    setRetryingMusicOnly(true);
+    try {
+      const newUrl = await generateBackgroundMusic();
+      if (newUrl && finalVideoUrl) {
+        // Reset the verify-retry counter so the manual retry isn't blocked by
+        // the cap from a previous automatic attempt.
+        musicRetryRef.current = 0;
+        await verifyAndRetryMusic(finalVideoUrl);
+      }
+    } finally {
+      setRetryingMusicOnly(false);
     }
   };
 
