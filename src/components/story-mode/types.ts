@@ -99,6 +99,10 @@ export type VideoFps = "24" | "30" | "60";
 
 export type CharacterFidelity = "low" | "medium" | "high";
 
+/** TTS provider preference at the project level. `auto` keeps the existing
+ *  ElevenLabs-with-fallback-to-Inworld behavior; explicit values force one. */
+export type TtsProviderChoice = "auto" | "elevenlabs" | "inworld";
+
 export interface StoryModeInput {
   imageUrl: string;
   imageFile: File | null;
@@ -108,9 +112,12 @@ export interface StoryModeInput {
   description: string;
   language: string;
   voiceId: string;
+  /** Optional: provider preference for TTS narration. Defaults to "auto". */
+  ttsProvider?: TtsProviderChoice;
   numScenes: number;
   videoAspectRatio: VideoAspectRatio;
   videoQuality: VideoQuality;
   videoFps: VideoFps;
   characterFidelity: CharacterFidelity;
 }
+
