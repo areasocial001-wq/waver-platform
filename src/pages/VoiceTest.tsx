@@ -141,6 +141,7 @@ function VoiceTestContent() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [lastEndpoint, setLastEndpoint] = useState<TestRoute["endpoint"] | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [previewLang, setPreviewLang] = useState<"auto" | "IT" | "EN" | "ES" | "FR" | "DE" | "PT">("auto");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewBlobRef = useRef<string | null>(null);
@@ -192,9 +193,12 @@ function VoiceTestContent() {
         previewBlobRef.current = null;
       }
       const voice = allVoices.find(v => v.id === id);
-      // Use the voice's own language so IVC voices preview in their cloned
-      // accent/language (e.g. Marina Official → IT_IT) instead of English.
-      const lang = voice?.langCode?.split("_")[0] ?? "IT";
+      // Use the explicit selector when set; otherwise fall back to the voice's
+      // own language so IVC voices (e.g. Marina Official → IT_IT) preview in
+      // their cloned accent instead of the server-side English default.
+      const lang = previewLang !== "auto"
+        ? previewLang
+        : voice?.langCode?.split("_")[0] ?? "IT";
       const url = await fetchInworldVoicePreview(id, { langCode: lang });
       previewBlobRef.current = url;
       const audio = new Audio(url);
@@ -404,19 +408,37 @@ function VoiceTestContent() {
 
             {/* Preview button (Inworld voices only) */}
             {selectedVoice?.provider === "inworld" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePreview(selectedVoice.id)}
-                disabled={previewLoadingId === selectedVoice.id}
-                className="mt-1"
-              >
-                {previewLoadingId === selectedVoice.id ? (
-                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carico anteprima…</>
-                ) : (
-                  <><Play className="mr-2 h-3 w-3" /> Ascolta anteprima Inworld</>
-                )}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePreview(selectedVoice.id)}
+                  disabled={previewLoadingId === selectedVoice.id}
+                >
+                  {previewLoadingId === selectedVoice.id ? (
+                    <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carico anteprima…</>
+                  ) : (
+                    <><Play className="mr-2 h-3 w-3" /> Ascolta anteprima Inworld</>
+                  )}
+                </Button>
+                <Select
+                  value={previewLang}
+                  onValueChange={(v) => setPreviewLang(v as typeof previewLang)}
+                >
+                  <SelectTrigger className="h-8 w-[170px] text-xs">
+                    <SelectValue placeholder="Lingua anteprima" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (lingua voce)</SelectItem>
+                    <SelectItem value="IT">🇮🇹 Italiano</SelectItem>
+                    <SelectItem value="EN">🇬🇧 English</SelectItem>
+                    <SelectItem value="ES">🇪🇸 Español</SelectItem>
+                    <SelectItem value="FR">🇫🇷 Français</SelectItem>
+                    <SelectItem value="DE">🇩🇪 Deutsch</SelectItem>
+                    <SelectItem value="PT">🇵🇹 Português</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
 
