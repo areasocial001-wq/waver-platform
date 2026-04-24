@@ -1042,6 +1042,36 @@ export type Database = {
           },
         ]
       }
+      voice_mappings: {
+        Row: {
+          created_at: string
+          elevenlabs_voice_id: string
+          elevenlabs_voice_name: string
+          id: string
+          inworld_voice_name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          elevenlabs_voice_id: string
+          elevenlabs_voice_name: string
+          id?: string
+          inworld_voice_name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          elevenlabs_voice_id?: string
+          elevenlabs_voice_name?: string
+          id?: string
+          inworld_voice_name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       waitlist: {
         Row: {
           created_at: string
