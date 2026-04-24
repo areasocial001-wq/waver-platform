@@ -6,6 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Default sample text per language (used when caller does not provide one).
+// IVC voices (e.g. Marina Official) clone the speaker's accent, so we want to
+// preview them with a sentence in the matching language instead of the
+// server-side English default returned by /tts/v1/voice:preview.
+const DEFAULT_SAMPLES: Record<string, string> = {
+  IT: "Ciao, questa è un'anteprima della mia voce. Spero ti piaccia.",
+  EN: "Hi, this is a short preview of my voice. I hope you like it.",
+  ES: "Hola, esta es una breve muestra de mi voz. Espero que te guste.",
+  FR: "Bonjour, ceci est un court aperçu de ma voix. J'espère qu'elle vous plaira.",
+  DE: "Hallo, das ist eine kurze Hörprobe meiner Stimme. Ich hoffe, sie gefällt dir.",
+  PT: "Olá, esta é uma breve amostra da minha voz. Espero que goste.",
+};
+
+function pickDefaultSample(langCode?: string | null): string {
+  if (!langCode) return DEFAULT_SAMPLES.IT;
+  const key = langCode.toUpperCase().split("_")[0];
+  return DEFAULT_SAMPLES[key] ?? DEFAULT_SAMPLES.IT;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -40,16 +59,32 @@ serve(async (req) => {
     const url = new URL(req.url);
     const voiceId = url.searchParams.get("voiceId");
     const modelId = url.searchParams.get("modelId") ?? "inworld-tts-1";
+    const langCode = url.searchParams.get("langCode"); // e.g. "IT" or "IT_IT"
+    const customText = url.searchParams.get("text");
     if (!voiceId) return jsonError(400, "voiceId is required");
 
-    const inworldUrl = new URL("https://api.inworld.ai/tts/v1/voice:preview");
-    inworldUrl.searchParams.set("voice_id", voiceId);
-    inworldUrl.searchParams.set("model_id", modelId);
+    const sampleText = (customText && customText.trim().length > 0)
+      ? customText.slice(0, 300)
+      : pickDefaultSample(langCode);
 
-    const callInworld = async (scheme: "Basic" | "Bearer") => fetch(inworldUrl.toString(), {
-      method: "GET",
-      headers: { Authorization: `${scheme} ${INWORLD_API_KEY}` },
-    });
+    // Use the regular TTS endpoint so we control language/accent of the sample.
+    // /tts/v1/voice:preview returns a fixed English sentence which doesn't
+    // showcase IVC voices cloned from non-English speakers.
+    const callInworld = async (scheme: "Basic" | "Bearer") => fetch(
+      "https://api.inworld.ai/tts/v1/voice",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `${scheme} ${INWORLD_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: sampleText,
+          voiceId,
+          modelId,
+        }),
+      },
+    );
 
     let resp = await callInworld("Basic");
     if (resp.status === 401 || resp.status === 403) {
@@ -62,10 +97,11 @@ serve(async (req) => {
     }
 
     const json = await resp.json();
-    if (!json?.audioContent) return jsonError(502, "Risposta senza audio");
+    const audioContent = json?.audioContent ?? json?.audio;
+    if (!audioContent) return jsonError(502, "Risposta senza audio");
 
     return new Response(
-      JSON.stringify({ audioContent: json.audioContent, format: "mp3" }),
+      JSON.stringify({ audioContent, format: "mp3", sampleText, langCode: langCode ?? "IT" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err: unknown) {

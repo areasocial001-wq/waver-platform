@@ -98,7 +98,17 @@ serve(async (req) => {
     }
 
     const json = await resp.json();
-    const voices: InworldVoice[] = Array.isArray(json?.voices) ? json.voices : [];
+    const rawVoices: InworldVoice[] = Array.isArray(json?.voices) ? json.voices : [];
+    // For IVC voices the Inworld TTS API expects the full resource path
+    // (e.g. "workspaces/<ws>/voices/<id>") in `voiceId`, not the short
+    // "default-<ws>__<id>" form returned in the `voiceId` field. Normalize
+    // here so every caller (preview + TTS) can use a single value.
+    const voices: InworldVoice[] = rawVoices.map((v) => {
+      if (v.source === "IVC" && v.name && v.name.startsWith("workspaces/")) {
+        return { ...v, voiceId: v.name };
+      }
+      return v;
+    });
     cache = { ts: now, voices };
 
     const filtered = filterByLang(voices, language);

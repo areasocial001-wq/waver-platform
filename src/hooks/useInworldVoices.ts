@@ -93,11 +93,19 @@ export function useInworldVoices(opts: { autoload?: boolean } = { autoload: true
  * Fetch a base64-encoded preview MP3 for an Inworld voice. Returns the blob URL
  * (caller is responsible for revoking it).
  */
-export async function fetchInworldVoicePreview(voiceId: string): Promise<string> {
+export async function fetchInworldVoicePreview(
+  voiceId: string,
+  opts: { langCode?: string; text?: string } = {},
+): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error("Sessione non valida");
 
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/inworld-voice-preview?voiceId=${encodeURIComponent(voiceId)}`;
+  const params = new URLSearchParams({ voiceId });
+  // Default to Italian so cloned voices (IVC) like "Marina Official" preview
+  // in their native language/accent instead of the server-side English default.
+  params.set("langCode", opts.langCode ?? "IT");
+  if (opts.text) params.set("text", opts.text);
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/inworld-voice-preview?${params.toString()}`;
   const resp = await fetch(url, {
     method: "GET",
     headers: {

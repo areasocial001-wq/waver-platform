@@ -48,6 +48,7 @@ interface UnifiedVoice {
   name: string;
   provider: "elevenlabs" | "inworld";
   source: "default" | "cloned" | "system" | "ivc";
+  langCode?: string;
 }
 
 function decideRoute(
@@ -118,12 +119,14 @@ function VoiceTestContent() {
         name: v.displayName,
         provider: "inworld" as const,
         source: "ivc" as const,
+        langCode: v.langCode,
       })),
       ...inworldSystem.map(v => ({
         id: v.voiceId,
         name: v.displayName,
         provider: "inworld" as const,
         source: "system" as const,
+        langCode: v.langCode,
       })),
     ];
     return [...eleven, ...inworld];
@@ -188,7 +191,11 @@ function VoiceTestContent() {
         URL.revokeObjectURL(previewBlobRef.current);
         previewBlobRef.current = null;
       }
-      const url = await fetchInworldVoicePreview(id);
+      const voice = allVoices.find(v => v.id === id);
+      // Use the voice's own language so IVC voices preview in their cloned
+      // accent/language (e.g. Marina Official → IT_IT) instead of English.
+      const lang = voice?.langCode?.split("_")[0] ?? "IT";
+      const url = await fetchInworldVoicePreview(id, { langCode: lang });
       previewBlobRef.current = url;
       const audio = new Audio(url);
       previewAudioRef.current = audio;
