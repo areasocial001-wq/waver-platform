@@ -1187,22 +1187,26 @@ export const StoryModeWizard = () => {
         }
         const newImageUrl = data.imageUrl || data.url;
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
-        const scenes = [...script.scenes];
-        const prev = scenes[index];
-        const newHistory = pushVersionHistory(prev, "image", prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : undefined, prev.lastImageCorrectionNote);
-        scenes[index] = {
-          ...prev,
-          // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
-          previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
-          imageUrl: newImageUrl,
-          imageStatus: "completed",
-          imageWidth: aspectCheck?.width,
-          imageHeight: aspectCheck?.height,
-          imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
-          lastImageCorrectionNote: effectiveCorrectionNote || prev.lastImageCorrectionNote,
-          versionHistory: newHistory,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const p = scenes[index];
+          if (!p) return prev;
+          const newHistory = pushVersionHistory(p, "image", p.imageUrl && p.imageUrl !== newImageUrl ? p.imageUrl : undefined, p.lastImageCorrectionNote);
+          scenes[index] = {
+            ...p,
+            // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
+            previousImageUrl: p.imageUrl && p.imageUrl !== newImageUrl ? p.imageUrl : p.previousImageUrl,
+            imageUrl: newImageUrl,
+            imageStatus: "completed",
+            imageWidth: aspectCheck?.width,
+            imageHeight: aspectCheck?.height,
+            imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+            lastImageCorrectionNote: effectiveCorrectionNote || p.lastImageCorrectionNote,
+            versionHistory: newHistory,
+          };
+          return { ...prev, scenes };
+        });
         if (aspectCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
         } else {
