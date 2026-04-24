@@ -3521,7 +3521,12 @@ export const StoryModeWizard = () => {
                           const provider = v as "auto" | "elevenlabs" | "inworld";
                           setInput(p => {
                             // If switching provider invalidates the current voice, reset to a safe default.
-                            const isInworldVoice = INWORLD_VOICE_OPTIONS.some(x => x.id === p.voiceId);
+                            // Consider both hardcoded SYSTEM voices and dynamically-loaded IVC voices
+                            // (otherwise selecting a cloned voice like Marina Official gets reset
+                            // when toggling provider).
+                            const isInworldVoice =
+                              INWORLD_VOICE_OPTIONS.some(x => x.id === p.voiceId) ||
+                              allInworldVoiceIds.has(p.voiceId);
                             let nextVoiceId = p.voiceId;
                             if (provider === "inworld" && !isInworldVoice) nextVoiceId = "Sarah";
                             if (provider !== "inworld" && isInworldVoice) nextVoiceId = "EXAVITQu4vr4xnSDxMaL";
