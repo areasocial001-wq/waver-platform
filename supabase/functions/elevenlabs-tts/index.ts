@@ -153,8 +153,6 @@ serve(async (req) => {
       // ── NO DIRECT OPENAI FALLBACK ──────────────────────────────────
       // Direct calls to api.openai.com are FORBIDDEN in this project to
       // avoid uncontrolled costs on the user's OpenAI account.
-      // If a TTS fallback is needed in the future, route it through the
-      // Lovable AI Gateway (LOVABLE_API_KEY) or AIML, NEVER OPENAI_API_KEY.
       const primaryFallbackReason = response.status === 429
         ? 'elevenlabs_rate_limited'
         : response.status === 401 || response.status === 402
@@ -162,6 +160,67 @@ serve(async (req) => {
           : 'elevenlabs_unavailable';
 
       if (response.status === 401 || response.status === 402 || response.status === 429) {
+        // ── INWORLD FALLBACK ────────────────────────────────────────
+        // For DEFAULT voices we transparently retry on Inworld TTS.
+        // For CLONED voices we keep returning a structured `fallback`
+        // signal so the client can prompt the user (timbres are not
+        // interchangeable across providers).
+        const INWORLD_API_KEY = Deno.env.get('INWORLD_API_KEY');
+        if (!isClonedVoice && INWORLD_API_KEY) {
+          console.log('[elevenlabs-tts] falling back to Inworld for default voice', selectedVoiceId);
+          try {
+            const inworldVoice = mapElevenLabsToInworld(selectedVoiceId);
+            const inworldResp = await fetch('https://api.inworld.ai/tts/v1/voice', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Basic ${INWORLD_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                text,
+                voiceId: inworldVoice,
+                modelId: 'inworld-tts-1.5',
+              }),
+            });
+
+            if (inworldResp.ok) {
+              const ct = inworldResp.headers.get('content-type') || '';
+              let base64: string;
+              if (ct.includes('application/json')) {
+                const j = await inworldResp.json();
+                base64 = j.audioContent || j.audio;
+                if (!base64) throw new Error('Inworld response missing audioContent');
+              } else {
+                const buf = await inworldResp.arrayBuffer();
+                const u8 = new Uint8Array(buf);
+                let binary = '';
+                const chunkSize = 0x8000;
+                for (let i = 0; i < u8.length; i += chunkSize) {
+                  const chunk = u8.subarray(i, Math.min(i + chunkSize, u8.length));
+                  binary += String.fromCharCode.apply(null, [...chunk]);
+                }
+                base64 = btoa(binary);
+              }
+              console.log('[elevenlabs-tts] Inworld fallback success, base64 length:', base64.length);
+              return new Response(
+                JSON.stringify({
+                  audioContent: base64,
+                  format: 'wav',
+                  provider: 'inworld',
+                  fellBackFrom: 'elevenlabs',
+                  reason: primaryFallbackReason,
+                }),
+                { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            } else {
+              const inworldErr = await inworldResp.text();
+              console.error('[elevenlabs-tts] Inworld fallback also failed:', inworldResp.status, inworldErr);
+            }
+          } catch (fbErr) {
+            console.error('[elevenlabs-tts] Inworld fallback exception:', fbErr);
+          }
+        }
+
         return new Response(
           JSON.stringify({
             fallback: true,
@@ -169,8 +228,10 @@ serve(async (req) => {
             status: response.status,
             error: response.status === 429
               ? 'Provider audio momentaneamente occupato. Riprova tra poco.'
-              : 'Crediti ElevenLabs esauriti. Ricarica i crediti ElevenLabs per continuare a generare voci.',
-            providerMessage: 'elevenlabs_only_no_backup',
+              : isClonedVoice
+                ? 'Crediti ElevenLabs esauriti. La voce clonata non può essere sostituita con un altro provider — ricarica i crediti ElevenLabs.'
+                : 'Crediti ElevenLabs esauriti e fallback Inworld non disponibile.',
+            providerMessage: isClonedVoice ? 'cloned_voice_no_fallback' : 'elevenlabs_no_backup',
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
