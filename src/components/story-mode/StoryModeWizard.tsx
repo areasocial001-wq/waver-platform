@@ -532,6 +532,31 @@ export const StoryModeWizard = () => {
     setIsPaused(false);
   };
 
+  /**
+   * Resolve which TTS edge function to call based on the project provider
+   * preference and the voice ID. Inworld voices and Inworld preference go
+   * to "inworld-tts"; cloned ElevenLabs voices always stay on ElevenLabs.
+   */
+  const getTtsEndpointFor = useCallback((voiceId: string) => {
+    const isInworldVoice = INWORLD_VOICE_OPTIONS.some(v => v.id === voiceId);
+    const pref = input.ttsProvider ?? "auto";
+    if (isInworldVoice) return "inworld-tts";
+    if (pref === "inworld") {
+      // Picked Inworld but voice is ElevenLabs → mapping handled server-side
+      return "inworld-tts";
+    }
+    const { endpoint } = resolveTtsEndpoint({
+      preference: pref === "auto" ? "elevenlabs" : pref,
+      voiceId,
+    });
+    return endpoint;
+  }, [input.ttsProvider]);
+
+  const ttsUrl = useCallback((voiceId: string) =>
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${getTtsEndpointFor(voiceId)}`,
+    [getTtsEndpointFor],
+  );
+
   const previewVoice = async (voiceId: string) => {
     if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
     if (isPreviewingVoice) { setIsPreviewingVoice(false); return; }
@@ -543,18 +568,25 @@ export const StoryModeWizard = () => {
         input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
         "Hello, this is a preview of my voice.";
       const authHeaders = await getAuthHeaders();
-      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(ttsUrl(voiceId), {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
+        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language, languageCode: input.language }),
       }));
-      if (!response.ok) throw new Error("Preview failed");
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        console.error("[previewVoice] HTTP", response.status, errBody);
+        throw new Error(`Preview failed (${response.status})`);
+      }
       const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
       setVoicePreviewAudio(audio);
       audio.play();
-    } catch { toast.error("Errore anteprima voce"); }
+    } catch (e) {
+      console.error("[previewVoice] error:", e);
+      toast.error("Errore anteprima voce");
+    }
     finally { setIsPreviewingVoice(false); }
   };
 
