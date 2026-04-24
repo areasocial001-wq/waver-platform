@@ -193,9 +193,12 @@ function VoiceTestContent() {
         previewBlobRef.current = null;
       }
       const voice = allVoices.find(v => v.id === id);
-      // Use the voice's own language so IVC voices preview in their cloned
-      // accent/language (e.g. Marina Official → IT_IT) instead of English.
-      const lang = voice?.langCode?.split("_")[0] ?? "IT";
+      // Use the explicit selector when set; otherwise fall back to the voice's
+      // own language so IVC voices (e.g. Marina Official → IT_IT) preview in
+      // their cloned accent instead of the server-side English default.
+      const lang = previewLang !== "auto"
+        ? previewLang
+        : voice?.langCode?.split("_")[0] ?? "IT";
       const url = await fetchInworldVoicePreview(id, { langCode: lang });
       previewBlobRef.current = url;
       const audio = new Audio(url);
