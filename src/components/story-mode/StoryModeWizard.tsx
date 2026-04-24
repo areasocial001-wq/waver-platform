@@ -1028,10 +1028,16 @@ export const StoryModeWizard = () => {
   }, []);
 
   const updateScene = (index: number, field: keyof StoryScene, value: any) => {
-    if (!script) return;
-    const s = [...script.scenes];
-    s[index] = { ...s[index], [field]: value };
-    setScript({ ...script, scenes: s });
+    // Use functional updater to avoid stale-state overwrites: long-running
+    // async flows (regen image/video/audio) must NOT clobber edits the user
+    // makes on other scenes (e.g. changing a transition) while they wait.
+    setScript((prev) => {
+      if (!prev) return prev;
+      const s = [...prev.scenes];
+      if (!s[index]) return prev;
+      s[index] = { ...s[index], [field]: value };
+      return { ...prev, scenes: s };
+    });
   };
 
   // Scene management
@@ -1181,22 +1187,26 @@ export const StoryModeWizard = () => {
         }
         const newImageUrl = data.imageUrl || data.url;
         const aspectCheck = await measureAndValidateAspect(newImageUrl, input.videoAspectRatio);
-        const scenes = [...script.scenes];
-        const prev = scenes[index];
-        const newHistory = pushVersionHistory(prev, "image", prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : undefined, prev.lastImageCorrectionNote);
-        scenes[index] = {
-          ...prev,
-          // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
-          previousImageUrl: prev.imageUrl && prev.imageUrl !== newImageUrl ? prev.imageUrl : prev.previousImageUrl,
-          imageUrl: newImageUrl,
-          imageStatus: "completed",
-          imageWidth: aspectCheck?.width,
-          imageHeight: aspectCheck?.height,
-          imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
-          lastImageCorrectionNote: effectiveCorrectionNote || prev.lastImageCorrectionNote,
-          versionHistory: newHistory,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const p = scenes[index];
+          if (!p) return prev;
+          const newHistory = pushVersionHistory(p, "image", p.imageUrl && p.imageUrl !== newImageUrl ? p.imageUrl : undefined, p.lastImageCorrectionNote);
+          scenes[index] = {
+            ...p,
+            // Keep previous image as backup so the user can compare or rollback (legacy single-slot).
+            previousImageUrl: p.imageUrl && p.imageUrl !== newImageUrl ? p.imageUrl : p.previousImageUrl,
+            imageUrl: newImageUrl,
+            imageStatus: "completed",
+            imageWidth: aspectCheck?.width,
+            imageHeight: aspectCheck?.height,
+            imageAspectWarning: aspectCheck?.mismatch ? aspectCheck.warning : undefined,
+            lastImageCorrectionNote: effectiveCorrectionNote || p.lastImageCorrectionNote,
+            versionHistory: newHistory,
+          };
+          return { ...prev, scenes };
+        });
         if (aspectCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${aspectCheck.warning}`, { duration: 6000 });
         } else {
@@ -1213,24 +1223,32 @@ export const StoryModeWizard = () => {
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
-        const scenes = [...script.scenes];
-        const prevA = scenes[index];
-        const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
-        scenes[index] = {
-          ...prevA,
-          previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
-          audioUrl: storageUrl,
-          audioStatus: "completed",
-          versionHistory: newHistoryA,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevA = scenes[index];
+          if (!prevA) return prev;
+          const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
+          scenes[index] = {
+            ...prevA,
+            previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
+            audioUrl: storageUrl,
+            audioStatus: "completed",
+            versionHistory: newHistoryA,
+          };
+          return { ...prev, scenes };
+        });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
         const startedAt = Date.now();
-        const scenes0 = [...script.scenes];
-        scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
-        setScript({ ...script, scenes: scenes0 });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes0 = [...prev.scenes];
+          if (!scenes0[index]) return prev;
+          scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
+          return { ...prev, scenes: scenes0 };
+        });
         const { prompt: guidedVideoPrompt, effectiveCorrectionNote: effectiveVideoCorrection } = buildVideoRegenerationPrompt({
           scene,
           stylePrompt: input.stylePromptModifier,
@@ -1315,22 +1333,26 @@ export const StoryModeWizard = () => {
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
-        const scenes = [...script.scenes];
-        const prevV = scenes[index];
-        const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
-        scenes[index] = {
-          ...prevV,
-          previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
-          videoUrl,
-          videoStatus: "completed",
-          videoGeneratingStartedAt: undefined,
-          videoWidth: videoCheck?.width,
-          videoHeight: videoCheck?.height,
-          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
-          lastVideoCorrectionNote: effectiveVideoCorrection || prevV.lastVideoCorrectionNote,
-          versionHistory: newHistoryV,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevV = scenes[index];
+          if (!prevV) return prev;
+          const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
+          scenes[index] = {
+            ...prevV,
+            previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
+            videoUrl,
+            videoStatus: "completed",
+            videoGeneratingStartedAt: undefined,
+            videoWidth: videoCheck?.width,
+            videoHeight: videoCheck?.height,
+            videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+            lastVideoCorrectionNote: effectiveVideoCorrection || prevV.lastVideoCorrectionNote,
+            versionHistory: newHistoryV,
+          };
+          return { ...prev, scenes };
+        });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
@@ -1353,17 +1375,21 @@ export const StoryModeWizard = () => {
         }
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
-        const scenes = [...script.scenes];
-        const prevS = scenes[index];
-        const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
-        scenes[index] = {
-          ...prevS,
-          previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
-          sfxUrl: storageUrl,
-          sfxStatus: "completed",
-          versionHistory: newHistoryS,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevS = scenes[index];
+          if (!prevS) return prev;
+          const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
+          scenes[index] = {
+            ...prevS,
+            previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
+            sfxUrl: storageUrl,
+            sfxStatus: "completed",
+            versionHistory: newHistoryS,
+          };
+          return { ...prev, scenes };
+        });
         toast.success(`SFX scena ${index + 1} rigenerato`);
       }
     } catch (err: any) {
@@ -3592,14 +3618,16 @@ export const StoryModeWizard = () => {
           <BulkTransitionPanel
             sceneCount={script.scenes.length}
             onApply={(type, duration) => {
-              if (!script) return;
-              const updated = script.scenes.map((s) => ({
-                ...s,
-                transition: type,
-                transitionDuration: duration,
-              }));
-              setScript({ ...script, scenes: updated });
-              toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
+              setScript((prev) => {
+                if (!prev) return prev;
+                const updated = prev.scenes.map((s) => ({
+                  ...s,
+                  transition: type,
+                  transitionDuration: duration,
+                }));
+                toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
+                return { ...prev, scenes: updated };
+              });
             }}
           />
 
