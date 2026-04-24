@@ -39,7 +39,7 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const voiceId = url.searchParams.get("voiceId");
-    const modelId = url.searchParams.get("modelId") ?? "inworld-tts-1.5";
+    const modelId = url.searchParams.get("modelId") ?? "inworld-tts-1";
     if (!voiceId) return jsonError(400, "voiceId is required");
 
     const inworldUrl = new URL("https://api.inworld.ai/tts/v1/voice:preview");

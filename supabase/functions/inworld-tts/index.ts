@@ -143,7 +143,7 @@ serve(async (req) => {
     }
 
     const selectedVoice = mapToInworldVoice(voiceId, dbMap);
-    const selectedModel = modelId || "inworld-tts-1.5";
+    const selectedModel = modelId || "inworld-tts-1";
 
     console.log(
       "[inworld-tts] text:",
