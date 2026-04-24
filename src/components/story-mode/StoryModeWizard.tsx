@@ -337,6 +337,29 @@ export const StoryModeWizard = () => {
     inworldIvcVoices.forEach(v => ids.add(v.voiceId));
     return ids;
   }, [inworldSystemVoices, inworldIvcVoices]);
+  // Unified per-scene voice list: ElevenLabs (default + cloned) + Inworld IVC + Inworld system.
+  // Used by every SceneCard so the user can pick a cloned IVC voice (e.g. Marina Official)
+  // for an individual scene during the Generation phase, not only as global narrator.
+  const sceneVoiceOptions = useMemo(() => {
+    const eleven = voiceOptions.map(v => ({
+      id: v.id,
+      name: v.isCloned ? `🎤 ${v.name}` : v.name,
+    }));
+    const ivc = inworldIvcVoices.map(v => ({
+      id: v.voiceId,
+      name: `🎤 ${v.displayName} (Inworld IVC)`,
+    }));
+    const system = (inworldSystemVoices.length > 0
+      ? inworldSystemVoices.map(v => ({ id: v.voiceId, name: `${v.displayName} (Inworld)` }))
+      : INWORLD_VOICE_OPTIONS.map(v => ({ id: v.id, name: `${v.name} (Inworld)` })));
+    // De-duplicate by id (an Inworld voice could in theory share an ID with another entry)
+    const seen = new Set<string>();
+    return [...eleven, ...ivc, ...system].filter(v => {
+      if (seen.has(v.id)) return false;
+      seen.add(v.id);
+      return true;
+    });
+  }, [voiceOptions, inworldIvcVoices, inworldSystemVoices]);
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>(() => {
