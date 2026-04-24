@@ -143,7 +143,15 @@ serve(async (req) => {
     }
 
     const selectedVoice = mapToInworldVoice(voiceId, dbMap);
-    const selectedModel = modelId || "inworld-tts-1";
+    const normalizedLang = parseResult.data.languageCode?.toUpperCase();
+    const isLikelyIvcVoice = selectedVoice.startsWith("workspaces/");
+    const selectedModel = modelId || (
+      normalizedLang && normalizedLang !== "EN"
+        ? "inworld-tts-1.5-max"
+        : isLikelyIvcVoice
+          ? "inworld-tts-1.5-max"
+          : "inworld-tts-1"
+    );
 
     console.log(
       "[inworld-tts] text:",

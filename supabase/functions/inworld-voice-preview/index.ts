@@ -58,10 +58,14 @@ serve(async (req) => {
 
     const url = new URL(req.url);
     const voiceId = url.searchParams.get("voiceId");
-    const modelId = url.searchParams.get("modelId") ?? "inworld-tts-1";
+    const requestedModelId = url.searchParams.get("modelId");
     const langCode = url.searchParams.get("langCode"); // e.g. "IT" or "IT_IT"
     const customText = url.searchParams.get("text");
     if (!voiceId) return jsonError(400, "voiceId is required");
+
+    const normalizedLang = langCode?.toUpperCase().split("_")[0] ?? "IT";
+    const modelId = requestedModelId
+      ?? (normalizedLang === "EN" ? "inworld-tts-1" : "inworld-tts-1.5-max");
 
     const sampleText = (customText && customText.trim().length > 0)
       ? customText.slice(0, 300)
