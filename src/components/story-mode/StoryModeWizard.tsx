@@ -1242,9 +1242,13 @@ export const StoryModeWizard = () => {
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
         const startedAt = Date.now();
-        const scenes0 = [...script.scenes];
-        scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
-        setScript({ ...script, scenes: scenes0 });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes0 = [...prev.scenes];
+          if (!scenes0[index]) return prev;
+          scenes0[index] = { ...scenes0[index], videoStatus: "generating", videoGeneratingStartedAt: startedAt };
+          return { ...prev, scenes: scenes0 };
+        });
         const { prompt: guidedVideoPrompt, effectiveCorrectionNote: effectiveVideoCorrection } = buildVideoRegenerationPrompt({
           scene,
           stylePrompt: input.stylePromptModifier,
