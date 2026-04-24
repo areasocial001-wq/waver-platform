@@ -46,6 +46,7 @@ import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
 import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
+import { applySceneFieldUpdate, applySceneAssetCommit, applyBulkTransition } from "@/lib/storyModeSceneUpdate";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
@@ -677,6 +678,51 @@ export const StoryModeWizard = () => {
     } as any).eq("id", projectId).then(() => {});
   }, [pendingRenderId, renderStartTime, projectId]);
 
+  // ── Auto-save transition/duration edits to backend (debounced 1.5s) ─────
+  // Only fires when the per-scene transition fingerprint changes — so editing
+  // a transition or scene duration on the review/generation step is persisted
+  // silently within ~1.5s, even if the user never clicks "Salva progetto".
+  // Skips: no project loaded yet, or no script.
+  const transitionFingerprint = script
+    ? JSON.stringify(
+        script.scenes.map((s) => [
+          s.transition ?? null,
+          s.transitionDuration ?? null,
+          s.duration,
+          s.voiceId ?? null,
+        ]),
+      )
+    : "";
+  const lastSavedFingerprintRef = useRef<string>("");
+  // Seed the ref when a project is loaded so the first edit triggers save,
+  // but the initial hydrate doesn't.
+  useEffect(() => {
+    if (projectId && script && lastSavedFingerprintRef.current === "") {
+      lastSavedFingerprintRef.current = transitionFingerprint;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, script]);
+  useEffect(() => {
+    if (!projectId || !script) return;
+    if (transitionFingerprint === lastSavedFingerprintRef.current) return;
+    const handle = window.setTimeout(async () => {
+      // Re-check inside the timer in case state changed.
+      if (transitionFingerprint === lastSavedFingerprintRef.current) return;
+      try {
+        const { error } = await supabase
+          .from("story_mode_projects")
+          .update({ scenes: script.scenes as any })
+          .eq("id", projectId);
+        if (!error) {
+          lastSavedFingerprintRef.current = transitionFingerprint;
+        }
+      } catch (_) {
+        // Silent — auto-save shouldn't interrupt the user.
+      }
+    }, 1500);
+    return () => window.clearTimeout(handle);
+  }, [transitionFingerprint, projectId, script]);
+
   useEffect(() => { loadProjectList(); }, []);
 
   const loadProjectList = async () => {
@@ -1031,13 +1077,7 @@ export const StoryModeWizard = () => {
     // Use functional updater to avoid stale-state overwrites: long-running
     // async flows (regen image/video/audio) must NOT clobber edits the user
     // makes on other scenes (e.g. changing a transition) while they wait.
-    setScript((prev) => {
-      if (!prev) return prev;
-      const s = [...prev.scenes];
-      if (!s[index]) return prev;
-      s[index] = { ...s[index], [field]: value };
-      return { ...prev, scenes: s };
-    });
+    setScript((prev) => applySceneFieldUpdate(prev, index, field, value));
   };
 
   // Scene management
@@ -3619,14 +3659,11 @@ export const StoryModeWizard = () => {
             sceneCount={script.scenes.length}
             onApply={(type, duration) => {
               setScript((prev) => {
-                if (!prev) return prev;
-                const updated = prev.scenes.map((s) => ({
-                  ...s,
-                  transition: type,
-                  transitionDuration: duration,
-                }));
-                toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
-                return { ...prev, scenes: updated };
+                const next = applyBulkTransition(prev, type, duration);
+                if (next) {
+                  toast.success(`Transizione "${type}" applicata a ${next.scenes.length} scene`);
+                }
+                return next;
               });
             }}
           />
