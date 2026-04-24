@@ -48,6 +48,7 @@ interface UnifiedVoice {
   name: string;
   provider: "elevenlabs" | "inworld";
   source: "default" | "cloned" | "system" | "ivc";
+  langCode?: string;
 }
 
 function decideRoute(
