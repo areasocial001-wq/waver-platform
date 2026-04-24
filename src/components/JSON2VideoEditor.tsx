@@ -653,6 +653,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
           prompt,
           category: "music",
           duration: Math.min(duration, 30),
+          provider: getStoredAudioProvider("music_generation"),
         },
       });
 
@@ -700,6 +701,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
           prompt: sfxPrompt,
           category: "sfx",
           duration: category === "ambient" ? 10 : 5,
+          provider: getStoredAudioProvider("sound_effects"),
         },
       });
 

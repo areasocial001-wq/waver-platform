@@ -597,6 +597,7 @@ export function TalkingAvatarGenerator() {
             prompt: musicPrompt,
             category: 'music',
             duration: musicDuration,
+            provider: getStoredAudioProvider("music_generation"),
           }),
         }
       );

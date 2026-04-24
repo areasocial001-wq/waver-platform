@@ -484,6 +484,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
             prompt: preset.prompt,
             category: preset.category,
             duration: preset.duration,
+            provider: getStoredAudioProvider(preset.category === "music" ? "music_generation" : "sound_effects"),
           }),
         }
       );
@@ -529,6 +530,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
             prompt: sfxPrompt,
             category: sfxCategory,
             duration: sfxDuration,
+            provider: getStoredAudioProvider(sfxCategory === "music" ? "music_generation" : "sound_effects"),
           }),
         }
       );
