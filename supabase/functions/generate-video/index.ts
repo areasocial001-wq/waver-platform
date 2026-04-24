@@ -1175,7 +1175,7 @@ serve(async (req) => {
         prompt: normalizedPrompt,
         model: lumaModel,
         aspect_ratio: aspect_ratio || '16:9',
-        loop: !!loop,
+        loop: false,
         duration: `${sanitizeDuration(lumaModel, duration || 5)}s`,
         resolution: resolution || '720p',
       };
