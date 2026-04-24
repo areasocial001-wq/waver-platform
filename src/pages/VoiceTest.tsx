@@ -141,6 +141,7 @@ function VoiceTestContent() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [lastEndpoint, setLastEndpoint] = useState<TestRoute["endpoint"] | null>(null);
   const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+  const [previewLang, setPreviewLang] = useState<"auto" | "IT" | "EN" | "ES" | "FR" | "DE" | "PT">("auto");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewBlobRef = useRef<string | null>(null);
