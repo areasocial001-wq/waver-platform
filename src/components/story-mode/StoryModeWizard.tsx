@@ -1032,9 +1032,10 @@ export const StoryModeWizard = () => {
           for (const i of scenesNeedingAudio) {
             try {
               const sc = migrated[i];
-              const r = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+              const _voiceId = sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL";
+              const r = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
                 method: "POST", headers: authHeaders,
-                body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
+                body: JSON.stringify({ text: sc.narration, voiceId: _voiceId, language_code: config.language || "it", languageCode: config.language || "it" }),
               }));
               if (!r.ok) continue;
               const blob = await audioResponseToBlob(r);
@@ -1160,10 +1161,11 @@ export const StoryModeWizard = () => {
     setPreviewLoadingIndex(index);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const _voiceId = scene.voiceId || input.voiceId;
+      const response = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
+        body: JSON.stringify({ text: scene.narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
       }));
       if (!response.ok) throw new Error("TTS preview failed");
       const blob = await audioResponseToBlob(response);
@@ -1293,10 +1295,11 @@ export const StoryModeWizard = () => {
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
         const authHeaders = await getAuthHeaders();
-        const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        const _voiceId = scene.voiceId || input.voiceId;
+        const response = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
           method: "POST",
           headers: authHeaders,
-          body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
+          body: JSON.stringify({ text: scene.narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
         }));
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
@@ -2814,11 +2817,12 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
+        const _voiceId = scenes[i].voiceId || input.voiceId;
         const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          ttsUrl(_voiceId),
           {
             method: "POST", headers: authHeaders,
-            body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
+            body: JSON.stringify({ text: scenes[i].narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
           },
           "ElevenLabs TTS",
           `story-mode/scene-${i + 1}`,
