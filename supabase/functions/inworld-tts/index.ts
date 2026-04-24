@@ -50,6 +50,11 @@ const VOICE_MAP: Record<string, string> = {
 
 function mapToInworldVoice(voiceId?: string, dbMap?: Record<string, string>): string {
   if (!voiceId) return "Sarah";
+  // IVC voice path returned by /voices/v1/voices (e.g.
+  // "workspaces/<ws>/voices/<id>") — Inworld TTS accepts this as voiceId.
+  if (voiceId.startsWith("workspaces/")) return voiceId;
+  // Some legacy clients send the short IVC form "default-<ws>__<id>".
+  if (/^default-[a-z0-9]+__[a-z0-9_-]+$/i.test(voiceId)) return voiceId;
   // If it's already an Inworld voice name (capitalized, no hyphens), pass through
   if (/^[A-Z][a-zA-Z]{2,30}$/.test(voiceId)) return voiceId;
   // DB mapping wins over the hardcoded fallback
