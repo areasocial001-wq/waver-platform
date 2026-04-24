@@ -76,12 +76,41 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { text, duration_seconds = 5, prompt_influence = 0.3 } = body as {
+    const { text, duration_seconds = 5, prompt_influence = 0.3, provider = 'auto' } = body as {
       text?: string; duration_seconds?: number; prompt_influence?: number;
+      provider?: 'auto' | 'aiml' | 'elevenlabs';
     };
 
     if (!text || typeof text !== "string" || text.length === 0) {
       return jsonResponse({ error: "text parameter is required" }, 400);
+    }
+
+    const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+
+    // ── Direct AIML route when user explicitly chose AIML ──
+    if (provider === 'aiml') {
+      if (!AIML_API_KEY) {
+        return jsonResponse({
+          error: 'AIML_API_KEY not configured',
+          reason: 'missing_api_key',
+          fallback: true,
+        }, 200);
+      }
+      const buf = await tryAimlSfx(AIML_API_KEY, text, duration_seconds);
+      if (buf) {
+        return new Response(buf, {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'audio/mpeg',
+            'X-Provider': 'aiml',
+          },
+        });
+      }
+      return jsonResponse({
+        error: 'AIML SFX generation failed',
+        reason: 'aiml_error',
+        fallback: true,
+      }, 200);
     }
 
     console.log(`Generating SFX: "${text.slice(0, 80)}..." duration=${duration_seconds}s, candidate keys: ${candidateKeys.map(k => `${k.name}(len=${k.value.length}, prefix=${k.value.slice(0, 4)})`).join(", ")}`);
