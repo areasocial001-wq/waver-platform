@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,7 @@ import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type Expired
 import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions, INWORLD_VOICE_OPTIONS, DEFAULT_VOICE_OPTIONS } from "@/hooks/useVoiceOptions";
+import { useInworldVoices } from "@/hooks/useInworldVoices";
 import { resolveTtsEndpoint } from "@/lib/ttsRouting";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
@@ -326,6 +327,16 @@ const adaptDurationToVoice = (measuredSeconds: number, currentSceneDuration: num
 
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
+  const { systemVoices: inworldSystemVoices, ivcVoices: inworldIvcVoices, isLoading: isLoadingInworldVoices, refresh: refreshInworldVoices } = useInworldVoices();
+  // Combined set of all Inworld voice IDs (SYSTEM + IVC + legacy hardcoded)
+  // used everywhere we need to know "is this an Inworld voice?".
+  const allInworldVoiceIds = useMemo(() => {
+    const ids = new Set<string>();
+    INWORLD_VOICE_OPTIONS.forEach(v => ids.add(v.id));
+    inworldSystemVoices.forEach(v => ids.add(v.voiceId));
+    inworldIvcVoices.forEach(v => ids.add(v.voiceId));
+    return ids;
+  }, [inworldSystemVoices, inworldIvcVoices]);
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>(() => {
@@ -546,9 +557,9 @@ export const StoryModeWizard = () => {
    * to "inworld-tts"; cloned ElevenLabs voices always stay on ElevenLabs.
    */
   const getTtsEndpointFor = useCallback((voiceId: string) => {
-    const isInworldVoice = INWORLD_VOICE_OPTIONS.some(v => v.id === voiceId);
+    const isInworldVoice = allInworldVoiceIds.has(voiceId);
     const pref = input.ttsProvider ?? "auto";
-    // Inworld native voices always go to Inworld
+    // Inworld voices (SYSTEM or IVC) always go to Inworld
     if (isInworldVoice) return "inworld-tts";
     // For ElevenLabs voice IDs: defer to resolveTtsEndpoint which correctly
     // forces ElevenLabs for cloned voices (like "Marina") even when the user
@@ -558,7 +569,7 @@ export const StoryModeWizard = () => {
       voiceId,
     });
     return endpoint;
-  }, [input.ttsProvider]);
+  }, [input.ttsProvider, allInworldVoiceIds]);
 
   const ttsUrl = useCallback((voiceId: string) =>
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${getTtsEndpointFor(voiceId)}`,
@@ -3535,9 +3546,17 @@ export const StoryModeWizard = () => {
                         <SelectContent>
                           {input.ttsProvider === "inworld" ? (
                             <>
-                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Inworld</div>
-                              {INWORLD_VOICE_OPTIONS.map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name} — <span className="text-muted-foreground">{v.description}</span></SelectItem>
+                              {inworldIvcVoices.length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-primary uppercase tracking-wider">🎤 Voci clonate Inworld (IVC)</div>
+                                  {inworldIvcVoices.map(v => (
+                                    <SelectItem key={`ivc-${v.voiceId}`} value={v.voiceId}>{v.displayName}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">Voci Inworld (system)</div>
+                              {(inworldSystemVoices.length > 0 ? inworldSystemVoices.map(v => ({ id: v.voiceId, name: v.displayName, description: v.description ?? "" })) : INWORLD_VOICE_OPTIONS).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}{v.description ? <> — <span className="text-muted-foreground">{v.description}</span></> : null}</SelectItem>
                               ))}
                             </>
                           ) : (
@@ -3552,9 +3571,17 @@ export const StoryModeWizard = () => {
                               )}
                               {voiceOptions.filter(v => v.isCloned).length > 0 && (
                                 <>
-                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate ElevenLabs</div>
                                   {voiceOptions.filter(v => v.isCloned).map(v => (
                                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              {inworldIvcVoices.length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-primary uppercase tracking-wider border-t border-border pt-2">🎤 Voci clonate Inworld (IVC) — useranno Inworld</div>
+                                  {inworldIvcVoices.map(v => (
+                                    <SelectItem key={`ivc-mix-${v.voiceId}`} value={v.voiceId}>{v.displayName}</SelectItem>
                                   ))}
                                 </>
                               )}
