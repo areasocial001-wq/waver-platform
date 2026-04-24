@@ -1333,22 +1333,26 @@ export const StoryModeWizard = () => {
 
         if (!videoUrl) throw new Error("Nessun URL video ricevuto dopo la generazione");
         const videoCheck = await measureAndValidateVideoAspect(videoUrl, input.videoAspectRatio).catch(() => null);
-        const scenes = [...script.scenes];
-        const prevV = scenes[index];
-        const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
-        scenes[index] = {
-          ...prevV,
-          previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
-          videoUrl,
-          videoStatus: "completed",
-          videoGeneratingStartedAt: undefined,
-          videoWidth: videoCheck?.width,
-          videoHeight: videoCheck?.height,
-          videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
-          lastVideoCorrectionNote: effectiveVideoCorrection || prevV.lastVideoCorrectionNote,
-          versionHistory: newHistoryV,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevV = scenes[index];
+          if (!prevV) return prev;
+          const newHistoryV = pushVersionHistory(prevV, "video", prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : undefined, prevV.lastVideoCorrectionNote);
+          scenes[index] = {
+            ...prevV,
+            previousVideoUrl: prevV.videoUrl && prevV.videoUrl !== videoUrl ? prevV.videoUrl : prevV.previousVideoUrl,
+            videoUrl,
+            videoStatus: "completed",
+            videoGeneratingStartedAt: undefined,
+            videoWidth: videoCheck?.width,
+            videoHeight: videoCheck?.height,
+            videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
+            lastVideoCorrectionNote: effectiveVideoCorrection || prevV.lastVideoCorrectionNote,
+            versionHistory: newHistoryV,
+          };
+          return { ...prev, scenes };
+        });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
