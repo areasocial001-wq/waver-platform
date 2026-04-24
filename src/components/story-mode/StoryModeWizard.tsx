@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { getStoredAudioProvider } from "@/lib/audioProviderRouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -1488,7 +1489,7 @@ export const StoryModeWizard = () => {
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
           method: "POST",
           headers: authHeaders,
-          body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22) }),
+          body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 22), provider: getStoredAudioProvider("sound_effects") }),
         });
         const ct = response.headers.get("content-type") || "";
         if (!response.ok || ct.includes("application/json")) {
@@ -1842,7 +1843,7 @@ export const StoryModeWizard = () => {
       const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12) }),
+        body: JSON.stringify({ text: sfxPrompt, duration_seconds: Math.min(scene.duration, 12), provider: getStoredAudioProvider("sound_effects") }),
       }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
@@ -1867,7 +1868,7 @@ export const StoryModeWizard = () => {
       const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-sfx`, {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22) }),
+        body: JSON.stringify({ text: ambiencePrompt, duration_seconds: Math.min(scene.duration, 22), provider: getStoredAudioProvider("sound_effects") }),
       }));
       const ct = response.headers.get("content-type") || "";
       if (!response.ok || ct.includes("application/json")) {
@@ -1955,7 +1956,7 @@ export const StoryModeWizard = () => {
         {
           method: "POST",
           headers: authHeaders,
-          body: JSON.stringify({ prompt: script.suggestedMusic, category: "music", duration: totalDuration }),
+          body: JSON.stringify({ prompt: script.suggestedMusic, category: "music", duration: totalDuration, provider: getStoredAudioProvider("music_generation") }),
         },
         "ElevenLabs Music",
         "story-mode/background",

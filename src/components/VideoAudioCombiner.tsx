@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { getStoredAudioProvider } from "@/lib/audioProviderRouter";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
@@ -484,6 +485,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
             prompt: preset.prompt,
             category: preset.category,
             duration: preset.duration,
+            provider: getStoredAudioProvider(preset.category === "music" ? "music_generation" : "sound_effects"),
           }),
         }
       );
@@ -529,6 +531,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
             prompt: sfxPrompt,
             category: sfxCategory,
             duration: sfxDuration,
+            provider: getStoredAudioProvider(sfxCategory === "music" ? "music_generation" : "sound_effects"),
           }),
         }
       );

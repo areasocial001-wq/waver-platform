@@ -100,7 +100,7 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
 
 export const DEFAULT_PREFERENCES: ProviderPreferences = {
   music_generation: 'auto',
-  sound_effects: 'elevenlabs',
+  sound_effects: 'auto',
   text_to_speech: 'elevenlabs',
   speech_to_text: 'aiml',
   image_generation: 'auto',

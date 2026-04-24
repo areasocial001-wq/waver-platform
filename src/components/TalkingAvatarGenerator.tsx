@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { getStoredAudioProvider } from "@/lib/audioProviderRouter";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -597,6 +598,7 @@ export function TalkingAvatarGenerator() {
             prompt: musicPrompt,
             category: 'music',
             duration: musicDuration,
+            provider: getStoredAudioProvider("music_generation"),
           }),
         }
       );

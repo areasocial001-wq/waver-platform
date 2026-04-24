@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { getStoredAudioProvider } from "@/lib/audioProviderRouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -653,6 +654,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
           prompt,
           category: "music",
           duration: Math.min(duration, 30),
+          provider: getStoredAudioProvider("music_generation"),
         },
       });
 
@@ -700,6 +702,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
           prompt: sfxPrompt,
           category: "sfx",
           duration: category === "ambient" ? 10 : 5,
+          provider: getStoredAudioProvider("sound_effects"),
         },
       });
 
