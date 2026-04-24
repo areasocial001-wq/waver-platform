@@ -40,6 +40,33 @@ export const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
   { id: "CwhRBWXzGAHq8TQ4Fs17", name: "Roger", description: "Voce maschile calda e avvolgente" },
 ];
 
+/**
+ * Inworld TTS voice catalog. The `id` matches the Inworld voice name (the API
+ * accepts a name like "Sarah" directly), and is what we send when the user
+ * picks the Inworld provider for narration.
+ */
+export const INWORLD_VOICE_OPTIONS: VoiceOption[] = [
+  { id: "Sarah",    name: "Sarah",    description: "Femminile naturale" },
+  { id: "Olivia",   name: "Olivia",   description: "Femminile giovane" },
+  { id: "Ashley",   name: "Ashley",   description: "Femminile matura" },
+  { id: "Wendy",    name: "Wendy",    description: "Femminile calda" },
+  { id: "Julia",    name: "Julia",    description: "Femminile espressiva" },
+  { id: "Pixie",    name: "Pixie",    description: "Femminile vivace" },
+  { id: "Deborah",  name: "Deborah",  description: "Femminile rassicurante" },
+  { id: "Priya",    name: "Priya",    description: "Femminile internazionale" },
+  { id: "Liam",     name: "Liam",     description: "Maschile chiaro" },
+  { id: "Mark",     name: "Mark",     description: "Maschile narrativo" },
+  { id: "Edward",   name: "Edward",   description: "Maschile profondo" },
+  { id: "Roger",    name: "Roger",    description: "Maschile caldo" },
+  { id: "Alex",     name: "Alex",     description: "Maschile professionale" },
+  { id: "Dennis",   name: "Dennis",   description: "Maschile autorevole" },
+  { id: "Theodore", name: "Theodore", description: "Maschile neutro" },
+  { id: "Ronald",   name: "Ronald",   description: "Maschile maturo" },
+  { id: "Craig",    name: "Craig",    description: "Maschile colloquiale" },
+  { id: "Hades",    name: "Hades",    description: "Maschile drammatico" },
+];
+
+
 export interface ClonedVoice {
   id: string;
   elevenlabs_voice_id: string;
