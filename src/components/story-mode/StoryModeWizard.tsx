@@ -32,7 +32,8 @@ import { SceneDiagnosticsCard } from "./SceneDiagnosticsCard";
 import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type ExpiredAudioItem, type MeasuredAudioDuration } from "./PreFlightAudioPanel";
 import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
-import { useVoiceOptions } from "@/hooks/useVoiceOptions";
+import { useVoiceOptions, INWORLD_VOICE_OPTIONS, DEFAULT_VOICE_OPTIONS } from "@/hooks/useVoiceOptions";
+import { resolveTtsEndpoint } from "@/lib/ttsRouting";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
 import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/aspectRatioCheck";
@@ -180,7 +181,7 @@ class AudioFallbackError extends Error {
  * upstream can read it without changing the function signature.
  */
 const audioBlobProviderInfo = new WeakMap<Blob, {
-  provider: "elevenlabs" | "aiml" | "openai";
+  provider: "elevenlabs" | "aiml" | "openai" | "inworld";
   fallbackUsed: boolean;
   fallbackReason?: string;
 }>();
@@ -225,13 +226,18 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    if (!isLikelyMp3Bytes(bytes)) {
+    if (!isLikelyMp3Bytes(bytes) && data?.format !== "wav") {
       throw new Error(`MP3 non valido (${bytes.length} bytes, header non riconosciuto)`);
     }
     const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
     const blob = new Blob([bytes], { type: mime });
+    const provider: "elevenlabs" | "aiml" | "openai" | "inworld" =
+      data?.provider === "aiml" ? "aiml" :
+      data?.provider === "openai" ? "openai" :
+      data?.provider === "inworld" ? "inworld" :
+      "elevenlabs";
     audioBlobProviderInfo.set(blob, {
-      provider: data?.provider === "aiml" ? "aiml" : data?.provider === "openai" ? "openai" : "elevenlabs",
+      provider,
       fallbackUsed: data?.fallbackUsed === true,
       fallbackReason: typeof data?.fallbackReason === "string" ? data.fallbackReason : undefined,
     });
@@ -325,7 +331,7 @@ export const StoryModeWizard = () => {
   const [input, setInput] = useState<StoryModeInput>({
     imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
     stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
-    description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", numScenes: 8,
+    description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", ttsProvider: "auto", numScenes: 8,
     videoAspectRatio: "16:9", videoQuality: "hd", videoFps: "24", characterFidelity: "medium",
   });
   const [script, setScript] = useState<StoryScript | null>(null);
@@ -526,6 +532,31 @@ export const StoryModeWizard = () => {
     setIsPaused(false);
   };
 
+  /**
+   * Resolve which TTS edge function to call based on the project provider
+   * preference and the voice ID. Inworld voices and Inworld preference go
+   * to "inworld-tts"; cloned ElevenLabs voices always stay on ElevenLabs.
+   */
+  const getTtsEndpointFor = useCallback((voiceId: string) => {
+    const isInworldVoice = INWORLD_VOICE_OPTIONS.some(v => v.id === voiceId);
+    const pref = input.ttsProvider ?? "auto";
+    if (isInworldVoice) return "inworld-tts";
+    if (pref === "inworld") {
+      // Picked Inworld but voice is ElevenLabs → mapping handled server-side
+      return "inworld-tts";
+    }
+    const { endpoint } = resolveTtsEndpoint({
+      preference: pref === "auto" ? "elevenlabs" : pref,
+      voiceId,
+    });
+    return endpoint;
+  }, [input.ttsProvider]);
+
+  const ttsUrl = useCallback((voiceId: string) =>
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${getTtsEndpointFor(voiceId)}`,
+    [getTtsEndpointFor],
+  );
+
   const previewVoice = async (voiceId: string) => {
     if (voicePreviewAudio) { voicePreviewAudio.pause(); setVoicePreviewAudio(null); }
     if (isPreviewingVoice) { setIsPreviewingVoice(false); return; }
@@ -537,18 +568,25 @@ export const StoryModeWizard = () => {
         input.language === "de" ? "Hallo, dies ist eine Vorschau meiner Stimme." :
         "Hello, this is a preview of my voice.";
       const authHeaders = await getAuthHeaders();
-      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const response = await withElevenlabsSlot(() => fetch(ttsUrl(voiceId), {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language }),
+        body: JSON.stringify({ text: sampleText, voiceId, language_code: input.language, languageCode: input.language }),
       }));
-      if (!response.ok) throw new Error("Preview failed");
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => "");
+        console.error("[previewVoice] HTTP", response.status, errBody);
+        throw new Error(`Preview failed (${response.status})`);
+      }
       const blob = await audioResponseToBlob(response);
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => { setIsPreviewingVoice(false); setVoicePreviewAudio(null); };
       setVoicePreviewAudio(audio);
       audio.play();
-    } catch { toast.error("Errore anteprima voce"); }
+    } catch (e) {
+      console.error("[previewVoice] error:", e);
+      toast.error("Errore anteprima voce");
+    }
     finally { setIsPreviewingVoice(false); }
   };
 
@@ -994,9 +1032,10 @@ export const StoryModeWizard = () => {
           for (const i of scenesNeedingAudio) {
             try {
               const sc = migrated[i];
-              const r = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+              const _voiceId = sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL";
+              const r = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
                 method: "POST", headers: authHeaders,
-                body: JSON.stringify({ text: sc.narration, voiceId: sc.voiceId || config.voiceId || "EXAVITQu4vr4xnSDxMaL", language_code: config.language || "it" }),
+                body: JSON.stringify({ text: sc.narration, voiceId: _voiceId, language_code: config.language || "it", languageCode: config.language || "it" }),
               }));
               if (!r.ok) continue;
               const blob = await audioResponseToBlob(r);
@@ -1122,10 +1161,11 @@ export const StoryModeWizard = () => {
     setPreviewLoadingIndex(index);
     try {
       const authHeaders = await getAuthHeaders();
-      const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+      const _voiceId = scene.voiceId || input.voiceId;
+      const response = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
         method: "POST",
         headers: authHeaders,
-        body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
+        body: JSON.stringify({ text: scene.narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
       }));
       if (!response.ok) throw new Error("TTS preview failed");
       const blob = await audioResponseToBlob(response);
@@ -1255,10 +1295,11 @@ export const StoryModeWizard = () => {
       } else if (type === "audio") {
         updateScene(index, "audioStatus", "generating");
         const authHeaders = await getAuthHeaders();
-        const response = await withElevenlabsSlot(() => fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`, {
+        const _voiceId = scene.voiceId || input.voiceId;
+        const response = await withElevenlabsSlot(() => fetch(ttsUrl(_voiceId), {
           method: "POST",
           headers: authHeaders,
-          body: JSON.stringify({ text: scene.narration, voiceId: scene.voiceId || input.voiceId, language_code: input.language }),
+          body: JSON.stringify({ text: scene.narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
         }));
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
@@ -2776,11 +2817,12 @@ export const StoryModeWizard = () => {
         scenes[i] = { ...scenes[i], audioStatus: "generating" };
         setScript(p => p ? { ...p, scenes: [...scenes] } : p);
         const authHeaders = await getAuthHeaders();
+        const _voiceId = scenes[i].voiceId || input.voiceId;
         const blob = await withElevenlabsSlot(() => fetchAudioWithRetry(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          ttsUrl(_voiceId),
           {
             method: "POST", headers: authHeaders,
-            body: JSON.stringify({ text: scenes[i].narration, voiceId: scenes[i].voiceId || input.voiceId, language_code: input.language }),
+            body: JSON.stringify({ text: scenes[i].narration, voiceId: _voiceId, language_code: input.language, languageCode: input.language }),
           },
           "ElevenLabs TTS",
           `story-mode/scene-${i + 1}`,
@@ -3453,24 +3495,58 @@ export const StoryModeWizard = () => {
                   </div>
                   <div>
                     <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
+                    <div className="flex gap-1.5 mb-1.5">
+                      <Select
+                        value={input.ttsProvider ?? "auto"}
+                        onValueChange={(v) => {
+                          const provider = v as "auto" | "elevenlabs" | "inworld";
+                          setInput(p => {
+                            // If switching provider invalidates the current voice, reset to a safe default.
+                            const isInworldVoice = INWORLD_VOICE_OPTIONS.some(x => x.id === p.voiceId);
+                            let nextVoiceId = p.voiceId;
+                            if (provider === "inworld" && !isInworldVoice) nextVoiceId = "Sarah";
+                            if (provider !== "inworld" && isInworldVoice) nextVoiceId = "EXAVITQu4vr4xnSDxMaL";
+                            return { ...p, ttsProvider: provider, voiceId: nextVoiceId };
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">⚡ Auto (ElevenLabs + fallback Inworld)</SelectItem>
+                          <SelectItem value="elevenlabs">🎙️ ElevenLabs</SelectItem>
+                          <SelectItem value="inworld">🤖 Inworld TTS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex gap-1.5">
                       <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
                         <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                          {input.ttsProvider === "inworld" ? (
                             <>
-                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
-                              {voiceOptions.filter(v => !v.isCloned).map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Inworld</div>
+                              {INWORLD_VOICE_OPTIONS.map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name} — <span className="text-muted-foreground">{v.description}</span></SelectItem>
                               ))}
                             </>
-                          )}
-                          {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                          ) : (
                             <>
-                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
-                              {voiceOptions.filter(v => v.isCloned).map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                              ))}
+                              {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci ElevenLabs</div>
+                                  {voiceOptions.filter(v => !v.isCloned).map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                                  {voiceOptions.filter(v => v.isCloned).map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
                             </>
                           )}
                         </SelectContent>
