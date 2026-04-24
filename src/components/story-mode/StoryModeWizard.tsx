@@ -328,11 +328,19 @@ export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
-  const [input, setInput] = useState<StoryModeInput>({
-    imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
-    stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
-    description: "", language: "it", voiceId: "EXAVITQu4vr4xnSDxMaL", ttsProvider: "auto", numScenes: 8,
-    videoAspectRatio: "16:9", videoQuality: "hd", videoFps: "24", characterFidelity: "medium",
+  const [input, setInput] = useState<StoryModeInput>(() => {
+    // Restore the user's preferred voice from localStorage if available
+    let initialVoiceId = "EXAVITQu4vr4xnSDxMaL";
+    try {
+      const saved = localStorage.getItem("storyMode.preferredVoiceId");
+      if (saved) initialVoiceId = saved;
+    } catch { /* ignore */ }
+    return {
+      imageUrl: "", imageFile: null, styleId: "cinema", styleName: "Cinema",
+      stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
+      description: "", language: "it", voiceId: initialVoiceId, ttsProvider: "auto", numScenes: 8,
+      videoAspectRatio: "16:9", videoQuality: "hd", videoFps: "24", characterFidelity: "medium",
+    };
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
