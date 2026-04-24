@@ -1223,17 +1223,21 @@ export const StoryModeWizard = () => {
         if (!response.ok) throw new Error("TTS failed");
         const blob = await audioResponseToBlob(response);
         const storageUrl = await uploadBlobToStorage(blob, "story-narration", "mp3", `Narrazione Scena ${index + 1}`);
-        const scenes = [...script.scenes];
-        const prevA = scenes[index];
-        const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
-        scenes[index] = {
-          ...prevA,
-          previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
-          audioUrl: storageUrl,
-          audioStatus: "completed",
-          versionHistory: newHistoryA,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevA = scenes[index];
+          if (!prevA) return prev;
+          const newHistoryA = pushVersionHistory(prevA, "audio", prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : undefined);
+          scenes[index] = {
+            ...prevA,
+            previousAudioUrl: prevA.audioUrl && prevA.audioUrl !== storageUrl ? prevA.audioUrl : prevA.previousAudioUrl,
+            audioUrl: storageUrl,
+            audioStatus: "completed",
+            versionHistory: newHistoryA,
+          };
+          return { ...prev, scenes };
+        });
         toast.success(`Audio scena ${index + 1} rigenerato`);
       } else if (type === "video") {
         if (!scene.imageUrl) { toast.error("Genera prima l'immagine"); return; }
