@@ -269,12 +269,12 @@ export function VoiceMappingsManager() {
                       <p className="text-xs flex items-center gap-1 text-muted-foreground">
                         {inworldKnown(form.inworld_voice_name) ? (
                           <>
-                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                            <CheckCircle2 className="h-3 w-3 text-primary" />
                             Voce Inworld riconosciuta
                           </>
                         ) : (
                           <>
-                            <AlertCircle className="h-3 w-3 text-yellow-500" />
+                            <AlertCircle className="h-3 w-3 text-muted-foreground" />
                             Voce non standard — verifica il nome su platform.inworld.ai
                           </>
                         )}
