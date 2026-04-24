@@ -95,3 +95,12 @@ verify_jwt = false
 
 [functions.cleanup-orphan-assets]
 verify_jwt = false
+
+[functions.inworld-tts]
+verify_jwt = false
+
+[functions.inworld-list-voices]
+verify_jwt = false
+
+[functions.inworld-voice-preview]
+verify_jwt = false
