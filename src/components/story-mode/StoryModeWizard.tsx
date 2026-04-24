@@ -3527,7 +3527,10 @@ export const StoryModeWizard = () => {
                       </Select>
                     </div>
                     <div className="flex gap-1.5">
-                      <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
+                      <Select value={input.voiceId} onValueChange={v => {
+                        setInput(p => ({ ...p, voiceId: v }));
+                        try { localStorage.setItem("storyMode.preferredVoiceId", v); } catch { /* ignore */ }
+                      }}>
                         <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {input.ttsProvider === "inworld" ? (
