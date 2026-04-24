@@ -3546,9 +3546,17 @@ export const StoryModeWizard = () => {
                         <SelectContent>
                           {input.ttsProvider === "inworld" ? (
                             <>
-                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Inworld</div>
-                              {INWORLD_VOICE_OPTIONS.map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name} — <span className="text-muted-foreground">{v.description}</span></SelectItem>
+                              {inworldIvcVoices.length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-primary uppercase tracking-wider">🎤 Voci clonate Inworld (IVC)</div>
+                                  {inworldIvcVoices.map(v => (
+                                    <SelectItem key={`ivc-${v.voiceId}`} value={v.voiceId}>{v.displayName}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">Voci Inworld (system)</div>
+                              {(inworldSystemVoices.length > 0 ? inworldSystemVoices.map(v => ({ id: v.voiceId, name: v.displayName, description: v.description ?? "" })) : INWORLD_VOICE_OPTIONS).map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name}{v.description ? <> — <span className="text-muted-foreground">{v.description}</span></> : null}</SelectItem>
                               ))}
                             </>
                           ) : (
@@ -3563,9 +3571,17 @@ export const StoryModeWizard = () => {
                               )}
                               {voiceOptions.filter(v => v.isCloned).length > 0 && (
                                 <>
-                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate ElevenLabs</div>
                                   {voiceOptions.filter(v => v.isCloned).map(v => (
                                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              {inworldIvcVoices.length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-primary uppercase tracking-wider border-t border-border pt-2">🎤 Voci clonate Inworld (IVC) — useranno Inworld</div>
+                                  {inworldIvcVoices.map(v => (
+                                    <SelectItem key={`ivc-mix-${v.voiceId}`} value={v.voiceId}>{v.displayName}</SelectItem>
                                   ))}
                                 </>
                               )}
