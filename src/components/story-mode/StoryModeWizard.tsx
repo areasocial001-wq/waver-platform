@@ -327,6 +327,16 @@ const adaptDurationToVoice = (measuredSeconds: number, currentSceneDuration: num
 
 export const StoryModeWizard = () => {
   const { voiceOptions } = useVoiceOptions();
+  const { systemVoices: inworldSystemVoices, ivcVoices: inworldIvcVoices, isLoading: isLoadingInworldVoices, refresh: refreshInworldVoices } = useInworldVoices();
+  // Combined set of all Inworld voice IDs (SYSTEM + IVC + legacy hardcoded)
+  // used everywhere we need to know "is this an Inworld voice?".
+  const allInworldVoiceIds = useMemo(() => {
+    const ids = new Set<string>();
+    INWORLD_VOICE_OPTIONS.forEach(v => ids.add(v.id));
+    inworldSystemVoices.forEach(v => ids.add(v.voiceId));
+    inworldIvcVoices.forEach(v => ids.add(v.voiceId));
+    return ids;
+  }, [inworldSystemVoices, inworldIvcVoices]);
   const { remainingStoryMode, isStoryModeUnlimited, quota, usedStoryMode } = useQuotas();
   const [step, setStep] = useState<StoryStep>("input");
   const [input, setInput] = useState<StoryModeInput>(() => {
