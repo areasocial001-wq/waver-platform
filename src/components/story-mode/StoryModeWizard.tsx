@@ -1375,17 +1375,21 @@ export const StoryModeWizard = () => {
         }
         const blob = await response.blob();
         const storageUrl = await uploadBlobToStorage(blob, "story-sfx", "mp3", `SFX Scena ${index + 1}`);
-        const scenes = [...script.scenes];
-        const prevS = scenes[index];
-        const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
-        scenes[index] = {
-          ...prevS,
-          previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
-          sfxUrl: storageUrl,
-          sfxStatus: "completed",
-          versionHistory: newHistoryS,
-        };
-        setScript({ ...script, scenes });
+        setScript((prev) => {
+          if (!prev) return prev;
+          const scenes = [...prev.scenes];
+          const prevS = scenes[index];
+          if (!prevS) return prev;
+          const newHistoryS = pushVersionHistory(prevS, "sfx", prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : undefined);
+          scenes[index] = {
+            ...prevS,
+            previousSfxUrl: prevS.sfxUrl && prevS.sfxUrl !== storageUrl ? prevS.sfxUrl : prevS.previousSfxUrl,
+            sfxUrl: storageUrl,
+            sfxStatus: "completed",
+            versionHistory: newHistoryS,
+          };
+          return { ...prev, scenes };
+        });
         toast.success(`SFX scena ${index + 1} rigenerato`);
       }
     } catch (err: any) {
