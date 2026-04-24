@@ -343,7 +343,7 @@ async function signVideoProxyUrl(proxyUrl: string): Promise<string> {
 
 const normalizeAssetUrl = async (
   url: string,
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   supabaseUrl: string
 ): Promise<string> => {
   if (!url) return url;
