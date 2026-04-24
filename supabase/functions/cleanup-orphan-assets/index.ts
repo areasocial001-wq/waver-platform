@@ -67,7 +67,7 @@ serve(async (req) => {
       if (!files || files.length === 0) continue;
 
       // Build the set of all public URLs referenced by this user across all relevant tables
-      const referencedUrls = await collectReferencedUrls(admin, userId);
+      const referencedUrls = await collectReferencedUrls(admin as any, userId);
 
       const toDelete: string[] = [];
       let bytesForUser = 0;
