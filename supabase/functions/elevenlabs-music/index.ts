@@ -290,138 +290,32 @@ serve(async (req) => {
 
     if (!audioBuffer) {
       // ── AIML FALLBACK ──────────────────────────────────────────────
-      // Before giving up, try AIML API (Suno) for music/ambient. SFX
-      // generation isn't supported by Suno so we skip the fallback there.
-      const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+      // Triggered for music/ambient when ElevenLabs returns 401/402/429.
       const fallbackEligible =
         AIML_API_KEY &&
-        category !== "sfx" &&
+        category !== 'sfx' &&
         (lastStatus === 401 || lastStatus === 402 || lastStatus === 429);
 
       if (fallbackEligible) {
-        const aimlPrompt = category === "ambient"
-          ? `Ambient soundscape, instrumental only, seamless and atmospheric: ${prompt}`
-          : `Background instrumental music, no vocals, smooth and even dynamics suitable for video underscore: ${prompt}`;
-
-        // Try a sequence of AIML models. eleven_music is the most reliable
-        // (~30s) — stable-audio sometimes stays queued >60s.
-        const aimlAttempts: Array<{ model: string; body: Record<string, unknown> }> = [
-          {
-            model: "elevenlabs/eleven_music",
-            body: {
-              model: "elevenlabs/eleven_music",
-              prompt: aimlPrompt,
-              seconds_total: Math.min(Math.max(duration, 10), 120),
-            },
-          },
-          {
-            model: "stable-audio",
-            body: {
-              model: "stable-audio",
-              prompt: aimlPrompt,
-              seconds_total: Math.min(Math.max(duration, 1), 47),
-              steps: 80,
-            },
-          },
-        ];
-
-        for (const attempt of aimlAttempts) {
-          try {
-            console.log(`[fallback] ElevenLabs ${lastStatus} → trying AIML ${attempt.model} (category=${category}, duration=${duration})`);
-
-            const submitRes = await fetch("https://api.aimlapi.com/v2/generate/audio", {
-              method: "POST",
-              headers: {
-                "Authorization": `Bearer ${AIML_API_KEY}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(attempt.body),
-            });
-
-            if (!submitRes.ok) {
-              const errTxt = await submitRes.text();
-              console.error(`[fallback] AIML ${attempt.model} submit failed: ${submitRes.status} ${errTxt.slice(0, 300)}`);
-              continue;
-            }
-
-            const submitData = await submitRes.json();
-            const generationId = submitData.id || submitData.generation_id;
-            console.log(`[fallback] AIML ${attempt.model} submitted, generation_id=${generationId}`);
-
-            if (!generationId) {
-              console.error(`[fallback] AIML ${attempt.model} returned no id:`, JSON.stringify(submitData).slice(0, 300));
-              continue;
-            }
-
-            // Poll up to ~120s (40 * 3s). eleven_music typically completes in 30–60s.
-            let aimlAudioUrl: string | null = null;
-            let lastPollStatus = "unknown";
-            for (let i = 0; i < 40; i++) {
-              await new Promise(r => setTimeout(r, 3000));
-              const statusRes = await fetch(
-                `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
-                { headers: { "Authorization": `Bearer ${AIML_API_KEY}` } }
-              );
-              if (!statusRes.ok) {
-                console.warn(`[fallback] AIML ${attempt.model} poll #${i + 1} HTTP ${statusRes.status}`);
-                continue;
-              }
-              const statusData = await statusRes.json();
-              lastPollStatus = statusData.status || "unknown";
-              if (statusData.audio_file?.url || statusData.status === "completed") {
-                aimlAudioUrl = statusData.audio_file?.url || statusData.url || null;
-                console.log(`[fallback] AIML ${attempt.model} completed after ${(i + 1) * 3}s`);
-                break;
-              }
-              if (statusData.status === "failed" || statusData.status === "error") {
-                console.error(`[fallback] AIML ${attempt.model} reported failure:`, JSON.stringify(statusData.error || statusData).slice(0, 300));
-                aimlAudioUrl = null;
-                break;
-              }
-            }
-
-            if (!aimlAudioUrl) {
-              console.error(`[fallback] AIML ${attempt.model} timed out (lastStatus=${lastPollStatus})`);
-              continue;
-            }
-
-            // Download the audio
-            const audioRes = await fetch(aimlAudioUrl);
-            if (!audioRes.ok) {
-              console.error(`[fallback] AIML ${attempt.model} download failed: HTTP ${audioRes.status}`);
-              continue;
-            }
-            const fallbackBuffer = await audioRes.arrayBuffer();
-            const fallbackBase64 = base64Encode(fallbackBuffer);
-            console.log(`[fallback] AIML ${attempt.model} success: ${fallbackBuffer.byteLength} bytes`);
-            return jsonResponse({
-              audioContent: fallbackBase64,
-              format: "mp3",
-              category,
-              duration,
-              bytes: fallbackBuffer.byteLength,
-              provider: "aiml",
-              providerModel: attempt.model,
-              fallbackUsed: true,
-              fallbackReason: lastStatus === 429 ? "elevenlabs_rate_limited" : "elevenlabs_credits_exhausted",
-            }, 200);
-          } catch (fallbackErr) {
-            console.error(`[fallback] AIML ${attempt.model} error:`, fallbackErr);
-          }
-        }
+        const fallbackReason =
+          lastStatus === 429 ? 'elevenlabs_rate_limited' :
+          lastStatus === 401 ? 'elevenlabs_unauthorized' :
+          'elevenlabs_credits_exhausted';
+        const aimlResult = await generateViaAiml({
+          prompt, category, duration, AIML_API_KEY, reason: fallbackReason,
+        });
+        if (aimlResult) return jsonResponse(aimlResult, 200);
       } else if (!AIML_API_KEY) {
-        console.warn("[fallback] AIML_API_KEY missing — cannot attempt fallback");
-      } else if (category === "sfx") {
-        console.warn("[fallback] AIML fallback skipped: SFX not supported by Suno/Stable-Audio");
+        console.warn('[fallback] AIML_API_KEY missing — cannot attempt fallback');
+      } else if (category === 'sfx') {
+        console.warn('[fallback] AIML fallback skipped: SFX not supported by Suno/Stable-Audio');
       }
 
-      // Translate ElevenLabs failure into a graceful fallback so the client
-      // doesn't crash with a 500 — Story Mode can proceed without music.
       const reason =
-        lastStatus === 429 ? "elevenlabs_rate_limited" :
-        lastStatus === 401 ? "elevenlabs_unauthorized" :
-        lastStatus === 402 ? "elevenlabs_insufficient_credits" :
-        "elevenlabs_error";
+        lastStatus === 429 ? 'elevenlabs_rate_limited' :
+        lastStatus === 401 ? 'elevenlabs_unauthorized' :
+        lastStatus === 402 ? 'elevenlabs_insufficient_credits' :
+        'elevenlabs_error';
       return jsonResponse({
         error: lastError,
         reason,
