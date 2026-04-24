@@ -557,9 +557,9 @@ export const StoryModeWizard = () => {
    * to "inworld-tts"; cloned ElevenLabs voices always stay on ElevenLabs.
    */
   const getTtsEndpointFor = useCallback((voiceId: string) => {
-    const isInworldVoice = INWORLD_VOICE_OPTIONS.some(v => v.id === voiceId);
+    const isInworldVoice = allInworldVoiceIds.has(voiceId);
     const pref = input.ttsProvider ?? "auto";
-    // Inworld native voices always go to Inworld
+    // Inworld voices (SYSTEM or IVC) always go to Inworld
     if (isInworldVoice) return "inworld-tts";
     // For ElevenLabs voice IDs: defer to resolveTtsEndpoint which correctly
     // forces ElevenLabs for cloned voices (like "Marina") even when the user
@@ -569,7 +569,7 @@ export const StoryModeWizard = () => {
       voiceId,
     });
     return endpoint;
-  }, [input.ttsProvider]);
+  }, [input.ttsProvider, allInworldVoiceIds]);
 
   const ttsUrl = useCallback((voiceId: string) =>
     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${getTtsEndpointFor(voiceId)}`,
