@@ -8,6 +8,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ElevenLabs default voice IDs → Inworld voice names (used by the fallback path)
+const ELEVENLABS_TO_INWORLD_VOICE: Record<string, string> = {
+  'EXAVITQu4vr4xnSDxMaL': 'Sarah',
+  'JBFqnCBsd6RMkjVDRZzb': 'Edward',
+  'onwK4e9ZLuTAKqWW03F9': 'Mark',
+  'pFZP5JQG7iQjIQuC4Bku': 'Olivia',
+  'TX3LPaxmHKxFdv7VOQHJ': 'Liam',
+  'XrExE9yKIg1WjnnlVkGX': 'Ashley',
+  '9BWtsMINqrJLrRacOk9x': 'Julia',
+  'CwhRBWXzGAHq8TQ4Fs17': 'Roger',
+};
+function mapElevenLabsToInworld(voiceId: string): string {
+  return ELEVENLABS_TO_INWORLD_VOICE[voiceId] || 'Sarah';
+}
+
 // Input validation schema
 const requestSchema = z.object({
   text: z.string().min(1, 'Testo obbligatorio').max(5000, 'Testo troppo lungo'),
