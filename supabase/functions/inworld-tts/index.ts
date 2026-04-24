@@ -155,43 +155,68 @@ serve(async (req) => {
     );
 
     // Inworld TTS API
-    // Auth header accepts both `Basic <key>` and `Bearer <key>` styles depending
-    // on the key type. Inworld API keys (from platform.inworld.ai) work with Basic.
-    const inworldResponse = await fetch("https://api.inworld.ai/tts/v1/voice", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${INWORLD_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        voiceId: selectedVoice,
-        modelId: selectedModel,
-      }),
-    });
+    // The `Authorization` header format depends on the key type:
+    //   - Inworld Studio "API key" (base64 user:pass)  → `Basic <key>`
+    //   - Inworld platform "Bearer token" / OAuth key  → `Bearer <key>`
+    // We try Basic first (most common for platform.inworld.ai keys), and on
+    // 401/403 we transparently retry with Bearer before giving up.
+    const callInworld = async (scheme: "Basic" | "Bearer") =>
+      fetch("https://api.inworld.ai/tts/v1/voice", {
+        method: "POST",
+        headers: {
+          "Authorization": `${scheme} ${INWORLD_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text,
+          voiceId: selectedVoice,
+          modelId: selectedModel,
+        }),
+      });
+
+    let inworldResponse = await callInworld("Basic");
+    if (inworldResponse.status === 401 || inworldResponse.status === 403) {
+      const firstErr = await inworldResponse.text();
+      console.warn(
+        "[inworld-tts] Basic auth rejected (",
+        inworldResponse.status,
+        firstErr.slice(0, 120),
+        ") — retrying with Bearer",
+      );
+      inworldResponse = await callInworld("Bearer");
+    }
 
     if (!inworldResponse.ok) {
       const errorText = await inworldResponse.text();
       console.error("[inworld-tts] API error:", inworldResponse.status, errorText);
 
-      // Surface a structured fallback signal (mirrors elevenlabs-tts shape)
+      // Surface a structured fallback signal (mirrors elevenlabs-tts shape).
+      // 403 = invalid credentials → treat as auth failure, NOT a 500, so the
+      // client can show a clean message and (optionally) fall back to ElevenLabs.
       if (
         inworldResponse.status === 401 ||
         inworldResponse.status === 402 ||
+        inworldResponse.status === 403 ||
         inworldResponse.status === 429
       ) {
+        const reason =
+          inworldResponse.status === 429
+            ? "inworld_rate_limited"
+            : inworldResponse.status === 403 || inworldResponse.status === 401
+              ? "inworld_invalid_credentials"
+              : "inworld_insufficient_credits";
+        const message =
+          inworldResponse.status === 429
+            ? "Inworld momentaneamente occupato. Riprova tra poco."
+            : inworldResponse.status === 403 || inworldResponse.status === 401
+              ? "API key Inworld non valida. Controlla la chiave su platform.inworld.ai (deve essere una TTS API key attiva)."
+              : "Crediti Inworld esauriti.";
         return new Response(
           JSON.stringify({
             fallback: true,
-            reason:
-              inworldResponse.status === 429
-                ? "inworld_rate_limited"
-                : "inworld_insufficient_credits",
+            reason,
             status: inworldResponse.status,
-            error:
-              inworldResponse.status === 429
-                ? "Inworld momentaneamente occupato. Riprova tra poco."
-                : "Crediti Inworld esauriti o API key non valida.",
+            error: message,
           }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
