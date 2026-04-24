@@ -15,11 +15,12 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign, Database } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign, Database, Mic2 } from "lucide-react";
 import { WaitlistManager } from "@/components/admin/WaitlistManager";
 import { CostMarginDashboard } from "@/components/admin/CostMarginDashboard";
 import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
 import { KlingTimeoutsCard } from "@/components/admin/KlingTimeoutsCard";
+import { VoiceMappingsManager } from "@/components/admin/VoiceMappingsManager";
 
 interface AdminUser {
   id: string;
@@ -165,6 +166,10 @@ export default function AdminDashboard() {
               <TabsTrigger value="db" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
                 Database
+              </TabsTrigger>
+              <TabsTrigger value="voices" className="flex items-center gap-2">
+                <Mic2 className="h-4 w-4" />
+                Voci TTS
               </TabsTrigger>
             </TabsList>
 
@@ -372,6 +377,10 @@ export default function AdminDashboard() {
 
             <TabsContent value="db">
               <DbHealthDashboard />
+            </TabsContent>
+
+            <TabsContent value="voices">
+              <VoiceMappingsManager />
             </TabsContent>
           </Tabs>
         </div>

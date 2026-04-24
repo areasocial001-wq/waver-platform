@@ -48,11 +48,12 @@ const VOICE_MAP: Record<string, string> = {
   "nPczCjzI2devNBz1zQrb": "Hades",        // Brian → Hades
 };
 
-function mapToInworldVoice(voiceId?: string): string {
+function mapToInworldVoice(voiceId?: string, dbMap?: Record<string, string>): string {
   if (!voiceId) return "Sarah";
-  // If it's already an Inworld voice name (no hyphens, capitalized), pass through
+  // If it's already an Inworld voice name (capitalized, no hyphens), pass through
   if (/^[A-Z][a-zA-Z]{2,30}$/.test(voiceId)) return voiceId;
-  // If we have a mapping, use it
+  // DB mapping wins over the hardcoded fallback
+  if (dbMap && dbMap[voiceId]) return dbMap[voiceId];
   if (VOICE_MAP[voiceId]) return VOICE_MAP[voiceId];
   // Unknown → safe default
   return "Sarah";
@@ -125,7 +126,23 @@ serve(async (req) => {
       throw new Error("INWORLD_API_KEY is not configured");
     }
 
-    const selectedVoice = mapToInworldVoice(voiceId);
+    // Try to load admin-managed mappings from DB (best effort; falls back to hardcoded map)
+    let dbMap: Record<string, string> | undefined;
+    try {
+      const { data: rows } = await supabaseClient
+        .from("voice_mappings")
+        .select("elevenlabs_voice_id, inworld_voice_name");
+      if (rows) {
+        dbMap = {};
+        for (const r of rows as Array<{ elevenlabs_voice_id: string; inworld_voice_name: string }>) {
+          dbMap[r.elevenlabs_voice_id] = r.inworld_voice_name;
+        }
+      }
+    } catch (e) {
+      console.warn("[inworld-tts] could not load voice_mappings, using hardcoded map", e);
+    }
+
+    const selectedVoice = mapToInworldVoice(voiceId, dbMap);
     const selectedModel = modelId || "inworld-tts-1.5";
 
     console.log(
