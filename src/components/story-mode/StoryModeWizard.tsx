@@ -33,6 +33,7 @@ import { PreFlightAudioPanel, computePreFlight, type BatchProgress, type Expired
 import { PreFlightVideoPanel, type ProblematicVideoItem, type MeasuredDuration } from "./PreFlightVideoPanel";
 import { apiLogger } from "@/lib/apiLogger";
 import { useVoiceOptions, INWORLD_VOICE_OPTIONS, DEFAULT_VOICE_OPTIONS } from "@/hooks/useVoiceOptions";
+import { useInworldVoices } from "@/hooks/useInworldVoices";
 import { resolveTtsEndpoint } from "@/lib/ttsRouting";
 import { useQuotas } from "@/hooks/useQuotas";
 import { RenderPreviewDialog, type RenderVolumes } from "./RenderPreviewDialog";
