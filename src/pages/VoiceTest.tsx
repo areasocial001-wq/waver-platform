@@ -408,19 +408,37 @@ function VoiceTestContent() {
 
             {/* Preview button (Inworld voices only) */}
             {selectedVoice?.provider === "inworld" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePreview(selectedVoice.id)}
-                disabled={previewLoadingId === selectedVoice.id}
-                className="mt-1"
-              >
-                {previewLoadingId === selectedVoice.id ? (
-                  <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carico anteprima…</>
-                ) : (
-                  <><Play className="mr-2 h-3 w-3" /> Ascolta anteprima Inworld</>
-                )}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePreview(selectedVoice.id)}
+                  disabled={previewLoadingId === selectedVoice.id}
+                >
+                  {previewLoadingId === selectedVoice.id ? (
+                    <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Carico anteprima…</>
+                  ) : (
+                    <><Play className="mr-2 h-3 w-3" /> Ascolta anteprima Inworld</>
+                  )}
+                </Button>
+                <Select
+                  value={previewLang}
+                  onValueChange={(v) => setPreviewLang(v as typeof previewLang)}
+                >
+                  <SelectTrigger className="h-8 w-[170px] text-xs">
+                    <SelectValue placeholder="Lingua anteprima" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto (lingua voce)</SelectItem>
+                    <SelectItem value="IT">🇮🇹 Italiano</SelectItem>
+                    <SelectItem value="EN">🇬🇧 English</SelectItem>
+                    <SelectItem value="ES">🇪🇸 Español</SelectItem>
+                    <SelectItem value="FR">🇫🇷 Français</SelectItem>
+                    <SelectItem value="DE">🇩🇪 Deutsch</SelectItem>
+                    <SelectItem value="PT">🇵🇹 Português</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             )}
           </div>
 
