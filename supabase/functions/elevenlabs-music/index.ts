@@ -11,6 +11,10 @@ const requestSchema = z.object({
   prompt: z.string().min(1, 'Prompt obbligatorio').max(1000, 'Prompt troppo lungo'),
   category: z.enum(['music', 'sfx', 'ambient']).default('music'),
   duration: z.number().min(1).default(30).transform(v => Math.min(Math.max(v, 1), 300)),
+  // 'auto' = try ElevenLabs first then fall back to AIML.
+  // 'aiml' = skip ElevenLabs entirely (user preference / EL credits exhausted).
+  // 'elevenlabs' = force ElevenLabs only.
+  provider: z.enum(['auto', 'aiml', 'elevenlabs']).default('auto'),
 });
 
 const isLikelyMp3 = (bytes: Uint8Array): boolean => {
