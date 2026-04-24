@@ -28,7 +28,140 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+type AimlResult = {
+  audioContent: string;
+  format: 'mp3';
+  category: 'music' | 'sfx' | 'ambient';
+  duration: number;
+  bytes: number;
+  provider: 'aiml';
+  providerModel: string;
+  fallbackUsed: boolean;
+  fallbackReason: string;
+};
+
+async function generateViaAiml(opts: {
+  prompt: string;
+  category: 'music' | 'sfx' | 'ambient';
+  duration: number;
+  AIML_API_KEY: string;
+  reason: string;
+}): Promise<AimlResult | null> {
+  const { prompt, category, duration, AIML_API_KEY, reason } = opts;
+
+  if (category === 'sfx') {
+    // Suno/stable-audio aren't great for short SFX – the elevenlabs-sfx
+    // function already has its own AIML fallback, so we don't duplicate it here.
+    console.warn('[aiml] SFX not supported via this route – use elevenlabs-sfx instead');
+    return null;
+  }
+
+  const aimlPrompt = category === 'ambient'
+    ? `Ambient soundscape, instrumental only, seamless and atmospheric: ${prompt}`
+    : `Background instrumental music, no vocals, smooth and even dynamics suitable for video underscore: ${prompt}`;
+
+  const aimlAttempts: Array<{ model: string; body: Record<string, unknown> }> = [
+    {
+      model: 'elevenlabs/eleven_music',
+      body: {
+        model: 'elevenlabs/eleven_music',
+        prompt: aimlPrompt,
+        seconds_total: Math.min(Math.max(duration, 10), 120),
+      },
+    },
+    {
+      model: 'stable-audio',
+      body: {
+        model: 'stable-audio',
+        prompt: aimlPrompt,
+        seconds_total: Math.min(Math.max(duration, 1), 47),
+        steps: 80,
+      },
+    },
+  ];
+
+  for (const attempt of aimlAttempts) {
+    try {
+      console.log(`[aiml] trying ${attempt.model} (category=${category}, duration=${duration}, reason=${reason})`);
+      const submitRes = await fetch('https://api.aimlapi.com/v2/generate/audio', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${AIML_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(attempt.body),
+      });
+
+      if (!submitRes.ok) {
+        const errTxt = await submitRes.text();
+        console.error(`[aiml] ${attempt.model} submit failed: ${submitRes.status} ${errTxt.slice(0, 300)}`);
+        continue;
+      }
+
+      const submitData = await submitRes.json();
+      const generationId = submitData.id || submitData.generation_id;
+      console.log(`[aiml] ${attempt.model} submitted, generation_id=${generationId}`);
+      if (!generationId) {
+        console.error(`[aiml] ${attempt.model} returned no id:`, JSON.stringify(submitData).slice(0, 300));
+        continue;
+      }
+
+      let aimlAudioUrl: string | null = null;
+      let lastPollStatus = 'unknown';
+      for (let i = 0; i < 40; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const statusRes = await fetch(
+          `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+          { headers: { 'Authorization': `Bearer ${AIML_API_KEY}` } }
+        );
+        if (!statusRes.ok) {
+          console.warn(`[aiml] ${attempt.model} poll #${i + 1} HTTP ${statusRes.status}`);
+          continue;
+        }
+        const statusData = await statusRes.json();
+        lastPollStatus = statusData.status || 'unknown';
+        if (statusData.audio_file?.url || statusData.status === 'completed') {
+          aimlAudioUrl = statusData.audio_file?.url || statusData.url || null;
+          console.log(`[aiml] ${attempt.model} completed after ${(i + 1) * 3}s`);
+          break;
+        }
+        if (statusData.status === 'failed' || statusData.status === 'error') {
+          console.error(`[aiml] ${attempt.model} reported failure:`, JSON.stringify(statusData.error || statusData).slice(0, 300));
+          aimlAudioUrl = null;
+          break;
+        }
+      }
+
+      if (!aimlAudioUrl) {
+        console.error(`[aiml] ${attempt.model} timed out (lastStatus=${lastPollStatus})`);
+        continue;
+      }
+
+      const audioRes = await fetch(aimlAudioUrl);
+      if (!audioRes.ok) {
+        console.error(`[aiml] ${attempt.model} download failed: HTTP ${audioRes.status}`);
+        continue;
+      }
+      const buffer = await audioRes.arrayBuffer();
+      const b64 = base64Encode(buffer);
+      console.log(`[aiml] ${attempt.model} success: ${buffer.byteLength} bytes`);
+      return {
+        audioContent: b64,
+        format: 'mp3',
+        category,
+        duration,
+        bytes: buffer.byteLength,
+        provider: 'aiml',
+        providerModel: attempt.model,
+        fallbackUsed: reason !== 'user_selected_aiml',
+        fallbackReason: reason,
+      };
+    } catch (err) {
+      console.error(`[aiml] ${attempt.model} error:`, err);
+    }
+  }
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
