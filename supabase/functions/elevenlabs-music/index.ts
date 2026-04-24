@@ -28,6 +28,8 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 type AimlResult = {
   audioContent: string;
   format: 'mp3';
