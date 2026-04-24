@@ -1,6 +1,6 @@
 // Provider configuration for AI services
 
-export type ProviderType = 'aiml' | 'piapi' | 'elevenlabs' | 'auto';
+export type ProviderType = 'aiml' | 'piapi' | 'elevenlabs' | 'inworld' | 'auto';
 
 export type OperationType = 
   | 'music_generation'
@@ -85,6 +85,16 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
       'text_to_speech'
     ],
     pricing: 'Basato su caratteri/secondi',
+  },
+  inworld: {
+    id: 'inworld',
+    name: 'Inworld',
+    description: 'TTS #1 per qualità su Artificial Analysis, latenza <120ms',
+    logo: '🗣️',
+    supportedOperations: [
+      'text_to_speech',
+    ],
+    pricing: 'Pay-per-character, molto competitivo',
   },
 };
 
