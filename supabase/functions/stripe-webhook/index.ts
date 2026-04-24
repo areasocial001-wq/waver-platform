@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   }
 
   const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-  const supabase = createClient(
+  const supabase: any = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     { auth: { persistSession: false } }
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
   });
 });
 
-async function upgradeUserRole(supabase: ReturnType<typeof createClient>, email: string, role: string) {
+async function upgradeUserRole(supabase: any, email: string, role: string) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
@@ -153,7 +153,7 @@ async function upgradeUserRole(supabase: ReturnType<typeof createClient>, email:
   }
 }
 
-async function downgradeUserRole(supabase: ReturnType<typeof createClient>, email: string) {
+async function downgradeUserRole(supabase: any, email: string) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id")
