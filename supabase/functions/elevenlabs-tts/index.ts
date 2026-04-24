@@ -194,7 +194,7 @@ serve(async (req) => {
               body: JSON.stringify({
                 text,
                 voiceId: inworldVoice,
-                modelId: 'inworld-tts-1.5',
+                modelId: 'inworld-tts-1',
               }),
             });
 
