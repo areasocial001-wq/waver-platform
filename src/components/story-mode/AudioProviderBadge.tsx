@@ -1,9 +1,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Mic, Music, Volume2, Sparkles, Zap } from "lucide-react";
+import { Mic, Music, Volume2, Sparkles, Zap, Bot } from "lucide-react";
 
 export type AudioOp = "tts" | "music" | "sfx";
-export type AudioProvider = "elevenlabs" | "aiml" | "openai";
+export type AudioProvider = "elevenlabs" | "aiml" | "openai" | "inworld";
 
 export interface AudioProviderState {
   /** Operation that produced the audio. */
@@ -47,6 +47,12 @@ const PROVIDER_META: Record<AudioProvider, {
     short: "OpenAI",
     icon: <Zap className="h-3 w-3" />,
     classes: "border-sky-500/40 bg-sky-500/10 text-sky-300",
+  },
+  inworld: {
+    name: "Inworld TTS",
+    short: "Inworld",
+    icon: <Bot className="h-3 w-3" />,
+    classes: "border-violet-500/40 bg-violet-500/10 text-violet-300",
   },
 };
 
