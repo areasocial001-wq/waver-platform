@@ -540,11 +540,11 @@ export const StoryModeWizard = () => {
   const getTtsEndpointFor = useCallback((voiceId: string) => {
     const isInworldVoice = INWORLD_VOICE_OPTIONS.some(v => v.id === voiceId);
     const pref = input.ttsProvider ?? "auto";
+    // Inworld native voices always go to Inworld
     if (isInworldVoice) return "inworld-tts";
-    if (pref === "inworld") {
-      // Picked Inworld but voice is ElevenLabs → mapping handled server-side
-      return "inworld-tts";
-    }
+    // For ElevenLabs voice IDs: defer to resolveTtsEndpoint which correctly
+    // forces ElevenLabs for cloned voices (like "Marina") even when the user
+    // picked Inworld — cloned timbres cannot be reproduced by another provider.
     const { endpoint } = resolveTtsEndpoint({
       preference: pref === "auto" ? "elevenlabs" : pref,
       voiceId,
