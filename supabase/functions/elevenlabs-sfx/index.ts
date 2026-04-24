@@ -27,6 +27,61 @@ async function callElevenLabsSfx(apiKey: string, text: string, duration_seconds:
   return response;
 }
 
+/**
+ * Generate a short SFX via AIML stable-audio. Returns the raw mp3 buffer or
+ * null on failure. Used both as a fallback (when ElevenLabs fails) and as the
+ * primary route when the user explicitly chooses AIML.
+ */
+async function tryAimlSfx(AIML_API_KEY: string, text: string, duration_seconds: number): Promise<ArrayBuffer | null> {
+  try {
+    const submitRes = await fetch("https://api.aimlapi.com/v2/generate/audio", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${AIML_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "stable-audio",
+        prompt: `Sound effect: ${text}`,
+        seconds_total: Math.min(Math.max(duration_seconds, 1), 22),
+        steps: 75,
+      }),
+    });
+    if (!submitRes.ok) {
+      const errTxt = await submitRes.text();
+      console.error(`[aiml-sfx] submit failed: ${submitRes.status} ${errTxt.slice(0, 200)}`);
+      return null;
+    }
+    const submitData = await submitRes.json();
+    const generationId = submitData.id || submitData.generation_id;
+    if (!generationId) return null;
+    let aimlAudioUrl: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      await new Promise(r => setTimeout(r, 2500));
+      const statusRes = await fetch(
+        `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+        { headers: { "Authorization": `Bearer ${AIML_API_KEY}` } }
+      );
+      if (!statusRes.ok) continue;
+      const statusData = await statusRes.json();
+      if (statusData.status === "completed" || statusData.audio_file?.url) {
+        aimlAudioUrl = statusData.audio_file?.url || statusData.url;
+        break;
+      }
+      if (statusData.status === "failed" || statusData.status === "error") break;
+    }
+    if (!aimlAudioUrl) return null;
+    const audioRes = await fetch(aimlAudioUrl);
+    if (!audioRes.ok) return null;
+    const buf = await audioRes.arrayBuffer();
+    console.log(`[aiml-sfx] success: ${buf.byteLength} bytes`);
+    return buf;
+  } catch (err) {
+    console.error("[aiml-sfx] error:", err);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
