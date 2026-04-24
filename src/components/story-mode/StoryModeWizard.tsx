@@ -3618,14 +3618,16 @@ export const StoryModeWizard = () => {
           <BulkTransitionPanel
             sceneCount={script.scenes.length}
             onApply={(type, duration) => {
-              if (!script) return;
-              const updated = script.scenes.map((s) => ({
-                ...s,
-                transition: type,
-                transitionDuration: duration,
-              }));
-              setScript({ ...script, scenes: updated });
-              toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
+              setScript((prev) => {
+                if (!prev) return prev;
+                const updated = prev.scenes.map((s) => ({
+                  ...s,
+                  transition: type,
+                  transitionDuration: duration,
+                }));
+                toast.success(`Transizione "${type}" applicata a ${updated.length} scene`);
+                return { ...prev, scenes: updated };
+              });
             }}
           />
 
