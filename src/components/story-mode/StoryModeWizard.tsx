@@ -3818,7 +3818,7 @@ export const StoryModeWizard = () => {
                 index={idx}
                 mode="review"
                 aspectRatio={input.videoAspectRatio}
-                voices={voiceOptions}
+                voices={sceneVoiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={editingSceneIndex === idx}
                 isPreviewLoading={previewLoadingIndex === idx}
@@ -4270,7 +4270,7 @@ export const StoryModeWizard = () => {
                 index={idx}
                 mode="generation"
                 aspectRatio={input.videoAspectRatio}
-                voices={voiceOptions}
+                voices={sceneVoiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={false}
                 isPreviewLoading={false}
@@ -4542,7 +4542,7 @@ export const StoryModeWizard = () => {
                 index={idx}
                 mode="complete"
                 aspectRatio={input.videoAspectRatio}
-                voices={voiceOptions}
+                voices={sceneVoiceOptions}
                 defaultVoiceId={input.voiceId}
                 isEditing={false}
                 isPreviewLoading={false}
