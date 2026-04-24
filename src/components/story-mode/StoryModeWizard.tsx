@@ -180,7 +180,7 @@ class AudioFallbackError extends Error {
  * upstream can read it without changing the function signature.
  */
 const audioBlobProviderInfo = new WeakMap<Blob, {
-  provider: "elevenlabs" | "aiml" | "openai";
+  provider: "elevenlabs" | "aiml" | "openai" | "inworld";
   fallbackUsed: boolean;
   fallbackReason?: string;
 }>();
@@ -225,13 +225,18 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    if (!isLikelyMp3Bytes(bytes)) {
+    if (!isLikelyMp3Bytes(bytes) && data?.format !== "wav") {
       throw new Error(`MP3 non valido (${bytes.length} bytes, header non riconosciuto)`);
     }
     const mime = data?.format === "wav" ? "audio/wav" : "audio/mpeg";
     const blob = new Blob([bytes], { type: mime });
+    const provider: "elevenlabs" | "aiml" | "openai" | "inworld" =
+      data?.provider === "aiml" ? "aiml" :
+      data?.provider === "openai" ? "openai" :
+      data?.provider === "inworld" ? "inworld" :
+      "elevenlabs";
     audioBlobProviderInfo.set(blob, {
-      provider: data?.provider === "aiml" ? "aiml" : data?.provider === "openai" ? "openai" : "elevenlabs",
+      provider,
       fallbackUsed: data?.fallbackUsed === true,
       fallbackReason: typeof data?.fallbackReason === "string" ? data.fallbackReason : undefined,
     });
