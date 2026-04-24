@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
 import { StoryModeWizard } from "@/components/story-mode/StoryModeWizard";
-import { Film, Lock, Sparkles, AlertTriangle, HardDrive, Loader2 } from "lucide-react";
+import { Film, Lock, Sparkles, AlertTriangle, HardDrive, Loader2, Volume2 } from "lucide-react";
 import { useQuotas } from "@/hooks/useQuotas";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -68,7 +68,7 @@ const StoryMode = () => {
               Da una semplice descrizione a un video professionale di ~60-80 secondi con narrazione,<br />
               scene generate e montaggio automatico
             </p>
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex flex-wrap gap-2 justify-center">
               <Button
                 variant="outline"
                 size="sm"
@@ -78,6 +78,15 @@ const StoryMode = () => {
               >
                 {optimizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
                 {optimizing ? "Ottimizzazione in corso..." : "Ottimizza spazio progetti"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/story-mode/voice-test")}
+                className="gap-2"
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                Voice Test
               </Button>
             </div>
           </div>

@@ -30,6 +30,7 @@ import TrailerGeneratorPage from "./pages/TrailerGenerator";
 import GuidePage from "./pages/Guide";
 import GuidePDF from "./pages/GuidePDF";
 import StoryMode from "./pages/StoryMode";
+import VoiceTest from "./pages/VoiceTest";
 
 import NotFound from "./pages/NotFound";
 
@@ -70,6 +71,7 @@ const App = () => (
             <Route path="/faceless-video" element={<FacelessVideoPage />} />
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/story-mode" element={<StoryMode />} />
+            <Route path="/story-mode/voice-test" element={<VoiceTest />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/recovery-analytics" element={<AdminRecoveryAnalytics />} />
             
