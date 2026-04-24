@@ -119,12 +119,14 @@ function VoiceTestContent() {
         name: v.displayName,
         provider: "inworld" as const,
         source: "ivc" as const,
+        langCode: v.langCode,
       })),
       ...inworldSystem.map(v => ({
         id: v.voiceId,
         name: v.displayName,
         provider: "inworld" as const,
         source: "system" as const,
+        langCode: v.langCode,
       })),
     ];
     return [...eleven, ...inworld];
