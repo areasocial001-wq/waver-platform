@@ -46,6 +46,7 @@ import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
 import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
+import { applySceneFieldUpdate, applySceneAssetCommit, applyBulkTransition } from "@/lib/storyModeSceneUpdate";
 
 // Style preview images
 import animationImg from "@/assets/styles/animation.jpg";
