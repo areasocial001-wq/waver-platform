@@ -43,18 +43,30 @@ serve(async (req) => {
       return jsonResponse({ error: parseResult.error.errors[0].message }, 400);
     }
 
-    const { prompt, category, duration } = parseResult.data;
+    const { prompt, category, duration, provider } = parseResult.data;
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+    const AIML_API_KEY = Deno.env.get('AIML_API_KEY');
 
-    if (!ELEVENLABS_API_KEY) {
+    console.log('Generating audio:', { category, provider, prompt: prompt.substring(0, 100), duration });
+
+    // ── Direct AIML route (user explicitly chose AIML, or EL key missing) ──
+    if (provider === 'aiml' || !ELEVENLABS_API_KEY) {
+      if (!AIML_API_KEY) {
+        return jsonResponse({
+          error: 'No audio provider configured (ELEVENLABS_API_KEY and AIML_API_KEY both missing)',
+          reason: 'no_provider_configured',
+          fallback: true,
+        }, 200);
+      }
+      const aimlResult = await generateViaAiml({ prompt, category, duration, AIML_API_KEY, reason: 'user_selected_aiml' });
+      if (aimlResult) return jsonResponse(aimlResult, 200);
       return jsonResponse({
-        error: 'ELEVENLABS_API_KEY is not configured',
-        reason: 'elevenlabs_missing_key',
+        error: 'AIML audio generation failed',
+        reason: 'aiml_error',
         fallback: true,
       }, 200);
     }
 
-    console.log('Generating audio:', { category, prompt: prompt.substring(0, 100), duration });
 
     // Retry budget. For 429 (concurrent_limit_exceeded) we wait significantly
     // longer because the user's plan caps at 2 concurrent ElevenLabs calls and
