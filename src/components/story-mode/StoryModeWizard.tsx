@@ -3495,24 +3495,58 @@ export const StoryModeWizard = () => {
                   </div>
                   <div>
                     <Label className="text-xs flex items-center gap-1"><Mic className="w-3 h-3" />Voce Narrante</Label>
+                    <div className="flex gap-1.5 mb-1.5">
+                      <Select
+                        value={input.ttsProvider ?? "auto"}
+                        onValueChange={(v) => {
+                          const provider = v as "auto" | "elevenlabs" | "inworld";
+                          setInput(p => {
+                            // If switching provider invalidates the current voice, reset to a safe default.
+                            const isInworldVoice = INWORLD_VOICE_OPTIONS.some(x => x.id === p.voiceId);
+                            let nextVoiceId = p.voiceId;
+                            if (provider === "inworld" && !isInworldVoice) nextVoiceId = "Sarah";
+                            if (provider !== "inworld" && isInworldVoice) nextVoiceId = "EXAVITQu4vr4xnSDxMaL";
+                            return { ...p, ttsProvider: provider, voiceId: nextVoiceId };
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="auto">⚡ Auto (ElevenLabs + fallback Inworld)</SelectItem>
+                          <SelectItem value="elevenlabs">🎙️ ElevenLabs</SelectItem>
+                          <SelectItem value="inworld">🤖 Inworld TTS</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="flex gap-1.5">
                       <Select value={input.voiceId} onValueChange={v => setInput(p => ({ ...p, voiceId: v }))}>
                         <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                          {input.ttsProvider === "inworld" ? (
                             <>
-                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Standard</div>
-                              {voiceOptions.filter(v => !v.isCloned).map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                              <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci Inworld</div>
+                              {INWORLD_VOICE_OPTIONS.map(v => (
+                                <SelectItem key={v.id} value={v.id}>{v.name} — <span className="text-muted-foreground">{v.description}</span></SelectItem>
                               ))}
                             </>
-                          )}
-                          {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                          ) : (
                             <>
-                              <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
-                              {voiceOptions.filter(v => v.isCloned).map(v => (
-                                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-                              ))}
+                              {voiceOptions.filter(v => !v.isCloned).length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci ElevenLabs</div>
+                                  {voiceOptions.filter(v => !v.isCloned).map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
+                              {voiceOptions.filter(v => v.isCloned).length > 0 && (
+                                <>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate</div>
+                                  {voiceOptions.filter(v => v.isCloned).map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                  ))}
+                                </>
+                              )}
                             </>
                           )}
                         </SelectContent>
