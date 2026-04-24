@@ -678,6 +678,51 @@ export const StoryModeWizard = () => {
     } as any).eq("id", projectId).then(() => {});
   }, [pendingRenderId, renderStartTime, projectId]);
 
+  // ── Auto-save transition/duration edits to backend (debounced 1.5s) ─────
+  // Only fires when the per-scene transition fingerprint changes — so editing
+  // a transition or scene duration on the review/generation step is persisted
+  // silently within ~1.5s, even if the user never clicks "Salva progetto".
+  // Skips: no project loaded yet, or no script.
+  const transitionFingerprint = script
+    ? JSON.stringify(
+        script.scenes.map((s) => [
+          s.transition ?? null,
+          s.transitionDuration ?? null,
+          s.duration,
+          s.voiceId ?? null,
+        ]),
+      )
+    : "";
+  const lastSavedFingerprintRef = useRef<string>("");
+  // Seed the ref when a project is loaded so the first edit triggers save,
+  // but the initial hydrate doesn't.
+  useEffect(() => {
+    if (projectId && script && lastSavedFingerprintRef.current === "") {
+      lastSavedFingerprintRef.current = transitionFingerprint;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, script]);
+  useEffect(() => {
+    if (!projectId || !script) return;
+    if (transitionFingerprint === lastSavedFingerprintRef.current) return;
+    const handle = window.setTimeout(async () => {
+      // Re-check inside the timer in case state changed.
+      if (transitionFingerprint === lastSavedFingerprintRef.current) return;
+      try {
+        const { error } = await supabase
+          .from("story_mode_projects")
+          .update({ scenes: script.scenes as any })
+          .eq("id", projectId);
+        if (!error) {
+          lastSavedFingerprintRef.current = transitionFingerprint;
+        }
+      } catch (_) {
+        // Silent — auto-save shouldn't interrupt the user.
+      }
+    }, 1500);
+    return () => window.clearTimeout(handle);
+  }, [transitionFingerprint, projectId, script]);
+
   useEffect(() => { loadProjectList(); }, []);
 
   const loadProjectList = async () => {
