@@ -1028,10 +1028,16 @@ export const StoryModeWizard = () => {
   }, []);
 
   const updateScene = (index: number, field: keyof StoryScene, value: any) => {
-    if (!script) return;
-    const s = [...script.scenes];
-    s[index] = { ...s[index], [field]: value };
-    setScript({ ...script, scenes: s });
+    // Use functional updater to avoid stale-state overwrites: long-running
+    // async flows (regen image/video/audio) must NOT clobber edits the user
+    // makes on other scenes (e.g. changing a transition) while they wait.
+    setScript((prev) => {
+      if (!prev) return prev;
+      const s = [...prev.scenes];
+      if (!s[index]) return prev;
+      s[index] = { ...s[index], [field]: value };
+      return { ...prev, scenes: s };
+    });
   };
 
   // Scene management
