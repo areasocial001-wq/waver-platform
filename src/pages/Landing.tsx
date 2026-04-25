@@ -66,7 +66,7 @@ const staggerContainer = {
 const aiModels = [
   "Ray 2", "Luma Photon", "Runway Gen-4", "Kling V2.6", "Google Veo 3.1",
   "Hailuo 2.3", "Sora 2 Pro", "MiniMax", "PixVerse V5.5", "Wan 2.5",
-  "ElevenLabs", "Flux Pro", "LTX Video", "Vidu Q1", "Seedance",
+  "Inworld TTS", "Flux Pro", "LTX Video", "Vidu Q1", "Seedance",
 ];
 
 const highlights = [

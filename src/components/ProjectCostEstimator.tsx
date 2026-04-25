@@ -47,10 +47,10 @@ const PROVIDER_PRICES: Record<string, Record<OperationType, number>> = {
     video_generation: 1.0,
     chat_completion: 0.008,
   },
-  elevenlabs: {
-    music_generation: 0.30, // per minute
-    sound_effects: 0.10,
-    text_to_speech: 0.0003, // per character
+  inworld: {
+    music_generation: 0.0,
+    sound_effects: 0.0,
+    text_to_speech: 0.000005, // per character — Inworld pricing
     speech_to_text: 0.0,
     image_generation: 0.0,
     video_generation: 0.0,
@@ -97,18 +97,16 @@ export function ProjectCostEstimator({
     );
     const cheapestMusicPrice = Math.min(
       PROVIDER_PRICES.aiml.music_generation,
-      PROVIDER_PRICES.piapi.music_generation,
-      PROVIDER_PRICES.elevenlabs.music_generation
+      PROVIDER_PRICES.piapi.music_generation
     );
     const cheapestSfxPrice = Math.min(
       PROVIDER_PRICES.aiml.sound_effects,
-      PROVIDER_PRICES.piapi.sound_effects,
-      PROVIDER_PRICES.elevenlabs.sound_effects
+      PROVIDER_PRICES.piapi.sound_effects
     );
     const cheapestTtsPrice = Math.min(
       PROVIDER_PRICES.aiml.text_to_speech,
       PROVIDER_PRICES.piapi.text_to_speech,
-      PROVIDER_PRICES.elevenlabs.text_to_speech
+      PROVIDER_PRICES.inworld.text_to_speech
     );
 
     const cheapestTotal =

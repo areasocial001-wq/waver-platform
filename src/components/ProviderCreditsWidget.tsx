@@ -41,7 +41,7 @@ export const ProviderCreditsWidget = () => {
   const [providers, setProviders] = useState<ProviderStatus[]>([
     { name: "AIML API", hasKey: false, status: "loading" },
     { name: "PiAPI", hasKey: false, status: "loading" },
-    { name: "ElevenLabs", hasKey: false, status: "loading" },
+    { name: "Inworld TTS", hasKey: false, status: "loading" },
     { name: "Freepik", hasKey: false, status: "loading" },
     { name: "Google AI", hasKey: false, status: "loading" },
     { name: "Vidu", hasKey: false, status: "loading" },
@@ -121,19 +121,7 @@ export const ProviderCreditsWidget = () => {
         }
       }
 
-      // ElevenLabs high usage alert
-      if (provider.name === "ElevenLabs" && provider.usagePercent !== undefined) {
-        if (provider.usagePercent >= thresholds.elevenlabsPercent) {
-          const key = "elevenlabs-high";
-          if (!alertsSent.current.has(key)) {
-            showNotification(
-              "🎙️ ElevenLabs - Utilizzo Elevato",
-              `Hai utilizzato il ${provider.usagePercent}% della quota mensile ElevenLabs.`
-            );
-            alertsSent.current.add(key);
-          }
-        }
-      }
+      // (ElevenLabs alerts removed — provider deprecated)
     });
   }, [thresholds, notificationsEnabled, showNotification]);
 
@@ -180,22 +168,14 @@ export const ProviderCreditsWidget = () => {
         results.push({ name: "PiAPI", hasKey: healthData?.hasPiAPIKey || false, status: "error", supportedModels: ["Wan", "Kling", "Luma", "SkyReels", "Framepack"] });
       }
 
-      // ElevenLabs Balance
-      try {
-        const { data: elevenData } = await supabase.functions.invoke('elevenlabs-balance');
-        results.push({
-          name: "ElevenLabs",
-          hasKey: elevenData?.hasKey || false,
-          status: elevenData?.status === "active" ? "active" : "error",
-          usagePercent: elevenData?.usage_percentage,
-          details: elevenData?.characters_remaining 
-            ? `${elevenData.characters_remaining.toLocaleString()} caratteri rimanenti`
-            : undefined,
-          supportedModels: ["TTS", "Voice Clone", "Music"]
-        });
-      } catch {
-        results.push({ name: "ElevenLabs", hasKey: false, status: "error", supportedModels: ["TTS", "Voice Clone", "Music"] });
-      }
+      // Inworld TTS — no public balance endpoint, just report key presence.
+      results.push({
+        name: "Inworld TTS",
+        hasKey: healthData?.hasInworldKey || false,
+        status: healthData?.hasInworldKey ? "active" : "unknown",
+        details: healthData?.hasInworldKey ? "Chiave configurata" : "Non configurato",
+        supportedModels: ["TTS", "Voice Clone (IVC)"],
+      });
 
       // Freepik
       results.push({
@@ -443,30 +423,7 @@ export const ProviderCreditsWidget = () => {
                           </p>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="elevenlabs-threshold" className="text-sm">
-                            ElevenLabs - Utilizzo %
-                          </Label>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              id="elevenlabs-threshold"
-                              type="number"
-                              step="5"
-                              min="0"
-                              max="100"
-                              value={thresholds.elevenlabsPercent}
-                              onChange={(e) => saveThresholds({ 
-                                ...thresholds, 
-                                elevenlabsPercent: parseInt(e.target.value) || 0 
-                              })}
-                              className="h-8"
-                            />
-                            <span className="text-muted-foreground">%</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            Notifica quando l'utilizzo supera questa percentuale
-                          </p>
-                        </div>
+                        {/* ElevenLabs threshold removed — provider deprecated */}
                       </div>
 
                       <div className="pt-2 text-xs text-muted-foreground">

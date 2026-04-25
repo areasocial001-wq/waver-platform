@@ -147,7 +147,7 @@ export const GenerateSection = () => {
                   Video to Audio (V2A)
                 </CardTitle>
                 <CardDescription>
-                  Rigenera l'audio di un video esistente con TTS professionale ElevenLabs
+                  Rigenera l'audio di un video esistente con TTS professionale Inworld
                 </CardDescription>
               </CardHeader>
               <CardContent>

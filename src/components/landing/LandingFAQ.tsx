@@ -19,7 +19,7 @@ const faqs = [
   {
     question: "Quali modelli AI sono supportati?",
     answer:
-      "AI Production Hub integra oltre 30 modelli, tra cui Luma Ray 2, Luma Photon, Runway Gen-4, Kling V2.6, Google Veo, Sora, MiniMax, PixVerse, Wan 2.5, ElevenLabs per audio e molti altri. Puoi passare da un provider all'altro con un clic.",
+      "AI Production Hub integra oltre 30 modelli, tra cui Luma Ray 2, Luma Photon, Runway Gen-4, Kling V2.6, Google Veo, Sora, MiniMax, PixVerse, Wan 2.5, Inworld TTS e AIML stable-audio per audio e molti altri. Puoi passare da un provider all'altro con un clic.",
   },
   {
     question: "In cosa si differenziano i piani?",
@@ -49,7 +49,7 @@ const faqs = [
   {
     question: "Posso clonare la mia voce?",
     answer:
-      "Sì, con il piano Premium e superiori puoi clonare la tua voce tramite ElevenLabs. Basta caricare un campione audio e la voce clonata sarà disponibile per tutti i tuoi progetti video, incluso Story Mode.",
+      "Sì, con il piano Premium e superiori puoi clonare la tua voce tramite Inworld IVC. Basta caricare un campione audio e la voce clonata sarà disponibile per tutti i tuoi progetti video, incluso Story Mode.",
   },
   {
     question: "I video generati hanno watermark?",

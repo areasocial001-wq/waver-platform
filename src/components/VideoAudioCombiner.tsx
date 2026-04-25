@@ -1194,7 +1194,7 @@ export const VideoAudioCombiner: React.FC<VideoAudioCombinerProps> = ({
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                           <Sparkles className="h-5 w-5 text-purple-500" />
-                          Genera Audio con ElevenLabs
+                          Genera Audio AI
                         </DialogTitle>
                         <DialogDescription>
                           Descrivi l'effetto sonoro, la musica o l'ambiente che vuoi generare

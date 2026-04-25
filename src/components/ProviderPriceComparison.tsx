@@ -32,14 +32,14 @@ const PRICING_DATA: OperationPricing[] = [
     label: 'Generazione Musica',
     providers: [
       { 
-        provider: 'ElevenLabs', 
-        logo: '🎤', 
-        price: '$0.30',
-        unit: '/minuto',
+        provider: 'AI/ML (Stable Audio)', 
+        logo: '🤖', 
+        price: '$0.10',
+        unit: '/track',
         quality: 'high',
         speed: 'fast',
         isRecommended: true,
-        notes: 'Qualità professionale, bassa latenza'
+        notes: 'Stable Audio 2.0, ottimo rapporto qualità/prezzo'
       },
       { 
         provider: 'AI/ML (Suno)', 
@@ -76,23 +76,14 @@ const PRICING_DATA: OperationPricing[] = [
     label: 'Effetti Sonori',
     providers: [
       { 
-        provider: 'ElevenLabs', 
-        logo: '🎤', 
-        price: '$0.10',
+        provider: 'AI/ML (Stable Audio)', 
+        logo: '🤖', 
+        price: '$0.05',
         unit: '/effetto',
         quality: 'high',
         speed: 'fast',
         isRecommended: true,
-        notes: 'SFX professionale, fino a 22s'
-      },
-      { 
-        provider: 'AI/ML', 
-        logo: '🤖', 
-        price: '$0.05',
-        unit: '/effetto',
-        quality: 'medium',
-        speed: 'medium',
-        notes: 'Vari modelli disponibili'
+        notes: 'Stable Audio, fino a 22s'
       },
     ]
   },
@@ -102,23 +93,14 @@ const PRICING_DATA: OperationPricing[] = [
     label: 'Text-to-Speech',
     providers: [
       { 
-        provider: 'ElevenLabs', 
-        logo: '🎤', 
-        price: '$0.30',
+        provider: 'Inworld TTS', 
+        logo: '🗣️', 
+        price: '$0.005',
         unit: '/1K caratteri',
         quality: 'high',
         speed: 'fast',
         isRecommended: true,
-        notes: 'Voci ultra-realistiche, 30+ lingue'
-      },
-      { 
-        provider: 'AI/ML (ElevenLabs)', 
-        logo: '🤖', 
-        price: '$0.35',
-        unit: '/1K caratteri',
-        quality: 'high',
-        speed: 'fast',
-        notes: 'Stesso modello via gateway'
+        notes: 'Voci multilingua, latenza <120ms, supporto IVC'
       },
       { 
         provider: 'AI/ML (OpenAI)', 

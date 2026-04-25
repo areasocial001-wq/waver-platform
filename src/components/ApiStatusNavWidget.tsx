@@ -25,7 +25,7 @@ interface ApiStatus {
 const API_LIST = [
   { name: "Replicate", endpoint: "generate-video" },
   { name: "Freepik", endpoint: "freepik-image" },
-  { name: "ElevenLabs", endpoint: "elevenlabs-tts" },
+  { name: "Inworld TTS", endpoint: "inworld-tts" },
   { name: "PIAPI", endpoint: "piapi-image" },
 ];
 

@@ -144,7 +144,7 @@ export const DiagnosticsPanel = () => {
     const checks = [
       { name: "generate-video", label: "Video Generation", body: { healthCheck: true } },
       { name: "freepik-image", label: "Freepik", body: { healthCheck: true } },
-      { name: "elevenlabs-tts", label: "ElevenLabs", body: { healthCheck: true } },
+      { name: "inworld-tts", label: "Inworld TTS", body: { healthCheck: true } },
       { name: "piapi-image", label: "PIAPI Image", body: { healthCheck: true } },
       { name: "piapi-audio", label: "PIAPI Audio", body: { healthCheck: true } },
       { name: "aiml-balance", label: "AIML API", body: {} },

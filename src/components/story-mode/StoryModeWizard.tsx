@@ -215,12 +215,12 @@ const audioResponseToBlob = async (response: Response): Promise<Blob> => {
         import("sonner").then(({ toast }) => {
           toast.info(
             data?.provider === "openai"
-              ? "🔄 Audio generato via OpenAI (ElevenLabs non disponibile)"
-              : "🔄 Audio generato via AI/ML API (ElevenLabs non disponibile)",
+              ? "🔄 Audio generato via OpenAI (provider primario non disponibile)"
+              : "🔄 Audio generato via AI/ML API (provider primario non disponibile)",
             {
             description: data?.fallbackReason === "elevenlabs_rate_limited"
-              ? "ElevenLabs ha raggiunto il limite di richieste. Provider alternativo attivo."
-              : "Crediti ElevenLabs esauriti. Audio prodotto con il provider di backup.",
+              ? "Limite di richieste raggiunto. Provider alternativo attivo."
+              : "Crediti del provider primario esauriti. Audio prodotto con il provider di backup.",
             duration: 7000,
           });
         }).catch(() => { /* ignore */ });
@@ -1985,9 +1985,9 @@ export const StoryModeWizard = () => {
         const reason = err.reason as string;
         const friendly =
           reason === "elevenlabs_rate_limited"
-            ? "ElevenLabs ha rifiutato la richiesta musica per limite di richieste concorrenti (max 2 sul tuo piano). Story Mode procede senza colonna sonora."
+            ? "Provider audio ha rifiutato la richiesta musica per limite di richieste concorrenti. Story Mode procede senza colonna sonora."
             : reason === "elevenlabs_insufficient_credits" || reason === "elevenlabs_unauthorized"
-              ? "Crediti ElevenLabs insufficienti per generare la musica. Story Mode procede senza colonna sonora."
+              ? "Crediti del provider audio insufficienti per generare la musica. Story Mode procede senza colonna sonora."
               : `Musica non disponibile (${reason}). Story Mode procede senza colonna sonora.`;
         toast.warning(friendly);
         setMusicSkip({ reason, message: friendly, at: Date.now() });
@@ -3561,8 +3561,7 @@ export const StoryModeWizard = () => {
                       >
                         <SelectTrigger className="flex-1 h-8 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="auto">⚡ Auto (ElevenLabs + fallback Inworld)</SelectItem>
-                          <SelectItem value="elevenlabs">🎙️ ElevenLabs</SelectItem>
+                          <SelectItem value="auto">⚡ Auto (Inworld TTS)</SelectItem>
                           <SelectItem value="inworld">🤖 Inworld TTS</SelectItem>
                         </SelectContent>
                       </Select>
@@ -3593,7 +3592,7 @@ export const StoryModeWizard = () => {
                             <>
                               {voiceOptions.filter(v => !v.isCloned).length > 0 && (
                                 <>
-                                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci ElevenLabs</div>
+                                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Voci default</div>
                                   {voiceOptions.filter(v => !v.isCloned).map(v => (
                                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                                   ))}
@@ -3601,7 +3600,7 @@ export const StoryModeWizard = () => {
                               )}
                               {voiceOptions.filter(v => v.isCloned).length > 0 && (
                                 <>
-                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate ElevenLabs</div>
+                                  <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-accent uppercase tracking-wider border-t border-border pt-2">🎤 Voci Clonate (legacy)</div>
                                   {voiceOptions.filter(v => v.isCloned).map(v => (
                                     <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                                   ))}
@@ -4424,7 +4423,7 @@ export const StoryModeWizard = () => {
                     </div>
                     {(audioProviders.tts?.fallbackUsed || audioProviders.music?.fallbackUsed || audioProviders.sfx?.fallbackUsed) && (
                       <p className="text-xs text-amber-400 leading-relaxed">
-                        ⚠️ Fallback attivo: ElevenLabs non disponibile, parte dell'audio è stata generata da AI/ML API come backup.
+                        ⚠️ Fallback attivo: provider primario non disponibile, parte dell'audio è stata generata da AI/ML API come backup.
                       </p>
                     )}
                   </div>
