@@ -46,7 +46,6 @@ const IMAGE_MODELS = [
 
 const VOICE_MODELS = [
   { value: 'azure', label: 'Microsoft Azure', description: 'Gratuito, 400+ voci' },
-  { value: 'elevenlabs', label: 'ElevenLabs', description: 'Ultra realistico' },
 ];
 
 const AZURE_VOICES = [

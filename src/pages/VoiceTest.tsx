@@ -88,8 +88,8 @@ function decideRoute(
     endpoint,
     reason:
       endpoint === "inworld-tts"
-        ? "Voce ElevenLabs default → mappata a Inworld lato server"
-        : "Voce ElevenLabs default → ElevenLabs",
+        ? "Voce default → mappata a Inworld lato server"
+        : "Voce default → Inworld",
     forced: false,
   };
 }
@@ -267,7 +267,7 @@ function VoiceTestContent() {
 
       setTimeout(() => { audioRef.current?.play().catch(() => undefined); }, 100);
 
-      toast.success(`Audio generato via ${route.endpoint === "inworld-tts" ? "Inworld" : "ElevenLabs"}`);
+      toast.success(`Audio generato via Inworld`);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[voice-test] error:", err);
@@ -359,7 +359,7 @@ function VoiceTestContent() {
                 {clonedEleven.length > 0 && (
                   <>
                     <div className="px-2 py-1 text-[10px] font-semibold text-accent uppercase tracking-wider">
-                      🎤 Voci clonate ElevenLabs
+                      🎤 Voci clonate (legacy)
                     </div>
                     {clonedEleven.map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
@@ -377,7 +377,7 @@ function VoiceTestContent() {
                 {defaultEleven.length > 0 && (
                   <>
                     <div className="px-2 py-1 mt-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border pt-2">
-                      ElevenLabs default
+                      Voci default
                     </div>
                     {defaultEleven.map(v => (
                       <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
@@ -448,8 +448,7 @@ function VoiceTestContent() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto (default ElevenLabs)</SelectItem>
-                <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
+                <SelectItem value="auto">Auto (Inworld)</SelectItem>
                 <SelectItem value="inworld">Inworld</SelectItem>
               </SelectContent>
             </Select>
