@@ -71,16 +71,14 @@ function decideRoute(
   }
 
   const { endpoint, forcedElevenLabs, isClonedVoice } = resolveTtsEndpoint({
-    preference: provider === "auto" ? "elevenlabs" : provider,
+    preference: provider === "auto" ? "inworld" : provider,
     voiceId: voice.id,
   });
 
   if (isClonedVoice) {
     return {
-      endpoint: "elevenlabs-tts",
-      reason: forcedElevenLabs
-        ? "Voce clonata ElevenLabs (forzata su ElevenLabs anche se hai scelto Inworld — i timbri clonati non sono trasferibili)"
-        : "Voce clonata ElevenLabs",
+      endpoint: "inworld-tts",
+      reason: "Voce clonata → Inworld IVC",
       forced: forcedElevenLabs,
     };
   }

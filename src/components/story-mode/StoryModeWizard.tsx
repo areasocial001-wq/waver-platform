@@ -589,7 +589,7 @@ export const StoryModeWizard = () => {
     // forces ElevenLabs for cloned voices (like "Marina") even when the user
     // picked Inworld — cloned timbres cannot be reproduced by another provider.
     const { endpoint } = resolveTtsEndpoint({
-      preference: pref === "auto" ? "elevenlabs" : pref,
+      preference: pref === "auto" ? "inworld" : pref,
       voiceId,
     });
     return endpoint;
