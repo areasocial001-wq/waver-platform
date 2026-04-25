@@ -61,16 +61,16 @@ export function resolveTtsEndpoint(
   if (isClonedVoice) {
     return {
       endpoint: "elevenlabs-tts",
-      forcedElevenLabs: preference === "inworld",
+      forcedElevenLabs: preference !== "elevenlabs",
       isClonedVoice: true,
     };
   }
 
-  if (preference === "inworld") {
-    return { endpoint: "inworld-tts", forcedElevenLabs: false, isClonedVoice: false };
+  // Explicit ElevenLabs preference still goes to ElevenLabs.
+  if (preference === "elevenlabs") {
+    return { endpoint: "elevenlabs-tts", forcedElevenLabs: false, isClonedVoice: false };
   }
 
-  // Default / elevenlabs / auto / aiml / piapi → ElevenLabs (which has its own
-  // server-side Inworld fallback for non-cloned voices on rate-limit/credit errors).
-  return { endpoint: "elevenlabs-tts", forcedElevenLabs: false, isClonedVoice: false };
+  // Default / inworld / auto / aiml / piapi → Inworld (primary TTS provider now).
+  return { endpoint: "inworld-tts", forcedElevenLabs: false, isClonedVoice: false };
 }

@@ -99,9 +99,9 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
 };
 
 export const DEFAULT_PREFERENCES: ProviderPreferences = {
-  music_generation: 'auto',
-  sound_effects: 'auto',
-  text_to_speech: 'elevenlabs',
+  music_generation: 'aiml',
+  sound_effects: 'aiml',
+  text_to_speech: 'inworld',
   speech_to_text: 'aiml',
   image_generation: 'auto',
   video_generation: 'auto',
@@ -118,9 +118,9 @@ export function getProvidersForOperation(operation: OperationType): ProviderInfo
 // Resolve 'auto' to a specific provider based on operation
 export function resolveAutoProvider(operation: OperationType): ProviderType {
   const autoMapping: Record<OperationType, ProviderType> = {
-    music_generation: 'elevenlabs',
-    sound_effects: 'elevenlabs',
-    text_to_speech: 'elevenlabs',
+    music_generation: 'aiml',
+    sound_effects: 'aiml',
+    text_to_speech: 'inworld',
     speech_to_text: 'aiml',
     image_generation: 'aiml',
     video_generation: 'piapi',
