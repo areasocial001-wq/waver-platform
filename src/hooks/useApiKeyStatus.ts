@@ -39,9 +39,20 @@ export function useApiKeyStatus() {
 
     try {
       // Use a health check request to the generate-video function
-      const { data, error: fnError } = await supabase.functions.invoke('generate-video', {
-        body: { healthCheck: true }
-      });
+      // Retry up to 2 times on transient 503 (SUPABASE_EDGE_RUNTIME_ERROR)
+      let data: any = null;
+      let fnError: any = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await supabase.functions.invoke('generate-video', {
+          body: { healthCheck: true },
+        });
+        data = res.data;
+        fnError = res.error;
+        const msg = fnError?.message || '';
+        const isTransient = msg.includes('503') || msg.includes('temporarily unavailable') || msg.includes('SUPABASE_EDGE_RUNTIME_ERROR');
+        if (!fnError || !isTransient) break;
+        await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+      }
 
       if (fnError) {
         throw fnError;
