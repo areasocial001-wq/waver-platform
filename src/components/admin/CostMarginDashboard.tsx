@@ -14,7 +14,6 @@ const PROVIDER_COSTS: Record<string, number> = {
   vidu: 0.10,
   ltx: 0.06,
   freepik: 0.05,
-  dashscope: 0.04,
   replicate: 0.14,
   elevenlabs: 0.03,
   default: 0.10,
