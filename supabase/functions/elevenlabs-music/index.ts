@@ -1,344 +1,150 @@
+/**
+ * Compatibility alias for the removed `elevenlabs-music` function.
+ *
+ * Music generation now goes exclusively through AIML's `stable-audio` model.
+ * Keeping this endpoint name lets every legacy frontend caller (Story Mode,
+ * Talking Avatar, JSON2Video editor, …) keep working unchanged. The body
+ * shape is preserved (`prompt`, `duration_seconds`, `provider`).
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const requestSchema = z.object({
-  prompt: z.string().min(1, 'Prompt obbligatorio').max(1000, 'Prompt troppo lungo'),
-  category: z.enum(['music', 'sfx', 'ambient']).default('music'),
-  duration: z.number().min(1).default(30).transform(v => Math.min(Math.max(v, 1), 300)),
-  // 'auto' = try ElevenLabs first then fall back to AIML.
-  // 'aiml' = skip ElevenLabs entirely (user preference / EL credits exhausted).
-  // 'elevenlabs' = force ElevenLabs only.
-  provider: z.enum(['auto', 'aiml', 'elevenlabs']).default('auto'),
-});
-
-const isLikelyMp3 = (bytes: Uint8Array): boolean => {
-  if (bytes.length < 4) return false;
-  if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return true;
-  if (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return true;
-  return false;
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-type AimlResult = {
-  audioContent: string;
-  format: 'mp3';
-  category: 'music' | 'sfx' | 'ambient';
-  duration: number;
-  bytes: number;
-  provider: 'aiml';
-  providerModel: string;
-  fallbackUsed: boolean;
-  fallbackReason: string;
-};
+async function generateViaAiml(
+  apiKey: string,
+  prompt: string,
+  durationSeconds: number,
+): Promise<ArrayBuffer | null> {
+  try {
+    // AIML stable-audio caps at ~47s per request, so request the desired
+    // duration but never exceed that ceiling.
+    const requested = Math.min(Math.max(Math.round(durationSeconds), 5), 47);
+    const submitRes = await fetch("https://api.aimlapi.com/v2/generate/audio", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "stable-audio",
+        prompt,
+        seconds_total: requested,
+        steps: 75,
+      }),
+    });
+    if (!submitRes.ok) {
+      const txt = await submitRes.text();
+      console.error(`[aiml-music] submit failed: ${submitRes.status} ${txt.slice(0, 200)}`);
+      return null;
+    }
+    const submitData = await submitRes.json();
+    const generationId = submitData.id || submitData.generation_id;
+    if (!generationId) return null;
 
-async function generateViaAiml(opts: {
-  prompt: string;
-  category: 'music' | 'sfx' | 'ambient';
-  duration: number;
-  AIML_API_KEY: string;
-  reason: string;
-}): Promise<AimlResult | null> {
-  const { prompt, category, duration, AIML_API_KEY, reason } = opts;
+    let audioUrl: string | null = null;
+    for (let i = 0; i < 30; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      const statusRes = await fetch(
+        `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } },
+      );
+      if (!statusRes.ok) continue;
+      const statusData = await statusRes.json();
+      if (statusData.status === "completed" || statusData.audio_file?.url) {
+        audioUrl = statusData.audio_file?.url || statusData.url;
+        break;
+      }
+      if (statusData.status === "failed" || statusData.status === "error") break;
+    }
+    if (!audioUrl) return null;
 
-  if (category === 'sfx') {
-    // Suno/stable-audio aren't great for short SFX – the elevenlabs-sfx
-    // function already has its own AIML fallback, so we don't duplicate it here.
-    console.warn('[aiml] SFX not supported via this route – use elevenlabs-sfx instead');
+    const audioRes = await fetch(audioUrl);
+    if (!audioRes.ok) return null;
+    return await audioRes.arrayBuffer();
+  } catch (err) {
+    console.error("[aiml-music] error:", err);
     return null;
   }
-
-  const aimlPrompt = category === 'ambient'
-    ? `Ambient soundscape, instrumental only, seamless and atmospheric: ${prompt}`
-    : `Background instrumental music, no vocals, smooth and even dynamics suitable for video underscore: ${prompt}`;
-
-  const aimlAttempts: Array<{ model: string; body: Record<string, unknown> }> = [
-    {
-      model: 'elevenlabs/eleven_music',
-      body: {
-        model: 'elevenlabs/eleven_music',
-        prompt: aimlPrompt,
-        seconds_total: Math.min(Math.max(duration, 10), 120),
-      },
-    },
-    {
-      model: 'stable-audio',
-      body: {
-        model: 'stable-audio',
-        prompt: aimlPrompt,
-        seconds_total: Math.min(Math.max(duration, 1), 47),
-        steps: 80,
-      },
-    },
-  ];
-
-  for (const attempt of aimlAttempts) {
-    try {
-      console.log(`[aiml] trying ${attempt.model} (category=${category}, duration=${duration}, reason=${reason})`);
-      const submitRes = await fetch('https://api.aimlapi.com/v2/generate/audio', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${AIML_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(attempt.body),
-      });
-
-      if (!submitRes.ok) {
-        const errTxt = await submitRes.text();
-        console.error(`[aiml] ${attempt.model} submit failed: ${submitRes.status} ${errTxt.slice(0, 300)}`);
-        continue;
-      }
-
-      const submitData = await submitRes.json();
-      const generationId = submitData.id || submitData.generation_id;
-      console.log(`[aiml] ${attempt.model} submitted, generation_id=${generationId}`);
-      if (!generationId) {
-        console.error(`[aiml] ${attempt.model} returned no id:`, JSON.stringify(submitData).slice(0, 300));
-        continue;
-      }
-
-      let aimlAudioUrl: string | null = null;
-      let lastPollStatus = 'unknown';
-      for (let i = 0; i < 40; i++) {
-        await new Promise(r => setTimeout(r, 3000));
-        const statusRes = await fetch(
-          `https://api.aimlapi.com/v2/generate/audio?generation_id=${generationId}`,
-          { headers: { 'Authorization': `Bearer ${AIML_API_KEY}` } }
-        );
-        if (!statusRes.ok) {
-          console.warn(`[aiml] ${attempt.model} poll #${i + 1} HTTP ${statusRes.status}`);
-          continue;
-        }
-        const statusData = await statusRes.json();
-        lastPollStatus = statusData.status || 'unknown';
-        if (statusData.audio_file?.url || statusData.status === 'completed') {
-          aimlAudioUrl = statusData.audio_file?.url || statusData.url || null;
-          console.log(`[aiml] ${attempt.model} completed after ${(i + 1) * 3}s`);
-          break;
-        }
-        if (statusData.status === 'failed' || statusData.status === 'error') {
-          console.error(`[aiml] ${attempt.model} reported failure:`, JSON.stringify(statusData.error || statusData).slice(0, 300));
-          aimlAudioUrl = null;
-          break;
-        }
-      }
-
-      if (!aimlAudioUrl) {
-        console.error(`[aiml] ${attempt.model} timed out (lastStatus=${lastPollStatus})`);
-        continue;
-      }
-
-      const audioRes = await fetch(aimlAudioUrl);
-      if (!audioRes.ok) {
-        console.error(`[aiml] ${attempt.model} download failed: HTTP ${audioRes.status}`);
-        continue;
-      }
-      const buffer = await audioRes.arrayBuffer();
-      const b64 = base64Encode(buffer);
-      console.log(`[aiml] ${attempt.model} success: ${buffer.byteLength} bytes`);
-      return {
-        audioContent: b64,
-        format: 'mp3',
-        category,
-        duration,
-        bytes: buffer.byteLength,
-        provider: 'aiml',
-        providerModel: attempt.model,
-        fallbackUsed: reason !== 'user_selected_aiml',
-        fallbackReason: reason,
-      };
-    } catch (err) {
-      console.error(`[aiml] ${attempt.model} error:`, err);
-    }
-  }
-  return null;
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-
-    const parseResult = requestSchema.safeParse(body);
-    if (!parseResult.success) {
-      return jsonResponse({ error: parseResult.error.errors[0].message }, 400);
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized" }, 401);
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const token = authHeader.replace("Bearer ", "");
+    let userId: string | undefined;
+    try {
+      const { data: claimsData } = await supabase.auth.getClaims(token);
+      if (claimsData?.claims) userId = claimsData.claims.sub as string;
+    } catch (_) { /* older SDK */ }
+    if (!userId) {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData?.user) {
+        return jsonResponse({ error: "Invalid authentication token" }, 401);
+      }
+      userId = userData.user.id;
     }
 
-    const { prompt, category, duration, provider } = parseResult.data;
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
-    const AIML_API_KEY = Deno.env.get('AIML_API_KEY');
+    const body = await req.json().catch(() => ({}));
+    const prompt = (body.prompt || body.text) as string | undefined;
+    const duration = Number(body.duration_seconds ?? body.durationSeconds ?? 30);
 
-    console.log('Generating audio:', { category, provider, prompt: prompt.substring(0, 100), duration });
+    if (!prompt || typeof prompt !== "string") {
+      return jsonResponse({ error: "prompt is required" }, 400);
+    }
 
-    // ── Direct AIML route (user explicitly chose AIML, or EL key missing) ──
-    if (provider === 'aiml' || !ELEVENLABS_API_KEY) {
-      if (!AIML_API_KEY) {
-        return jsonResponse({
-          error: 'No audio provider configured (ELEVENLABS_API_KEY and AIML_API_KEY both missing)',
-          reason: 'no_provider_configured',
-          fallback: true,
-        }, 200);
-      }
-      const aimlResult = await generateViaAiml({ prompt, category, duration, AIML_API_KEY, reason: 'user_selected_aiml' });
-      if (aimlResult) return jsonResponse(aimlResult, 200);
+    const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
+    if (!AIML_API_KEY) {
       return jsonResponse({
-        error: 'AIML audio generation failed',
-        reason: 'aiml_error',
+        error: "AIML_API_KEY not configured",
+        reason: "missing_api_key",
         fallback: true,
       }, 200);
     }
 
-
-    // Retry budget. For 429 (concurrent_limit_exceeded) we wait significantly
-    // longer because the user's plan caps at 2 concurrent ElevenLabs calls and
-    // music gen is by far the slowest one — a quick retry is guaranteed to fail.
-    const MAX_ATTEMPTS = 4;
-    let lastStatus = 0;
-    let lastError = "Unknown error";
-    let audioBuffer: ArrayBuffer | null = null;
-
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      try {
-        let response: Response;
-        if (category === 'sfx') {
-          response = await fetch(
-            'https://api.elevenlabs.io/v1/sound-generation',
-            {
-              method: 'POST',
-              headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                text: prompt,
-                duration_seconds: Math.min(duration, 22),
-                prompt_influence: 0.3,
-              }),
-            }
-          );
-        } else {
-          const enhancedPrompt = category === 'ambient'
-            ? `Ambient soundscape: ${prompt}. Seamless, loopable, atmospheric, no abrupt changes, consistent texture throughout.`
-            : `Background music: ${prompt}. Single consistent track from start to end, instrumental only, no vocals, no genre changes, no abrupt intro or outro, smooth and even dynamics suitable for video underscore.`;
-
-          response = await fetch(
-            'https://api.elevenlabs.io/v1/music',
-            {
-              method: 'POST',
-              headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ prompt: enhancedPrompt, duration_seconds: duration }),
-            }
-          );
-        }
-
-        if (!response.ok) {
-          lastStatus = response.status;
-          const errorText = await response.text();
-          lastError = `ElevenLabs ${response.status}: ${errorText.slice(0, 200)}`;
-          console.error(`Attempt ${attempt}/${MAX_ATTEMPTS} failed:`, lastError);
-
-          // Non-retryable: insufficient credits / unauthorized → fail fast with fallback flag.
-          if (response.status === 401 || response.status === 402) {
-            break;
-          }
-
-          if (attempt < MAX_ATTEMPTS) {
-            // 429 → much longer wait (concurrent slot needs to free up).
-            // Others → linear backoff.
-            const waitMs = response.status === 429
-              ? 5000 + attempt * 3000   // 8s, 11s, 14s
-              : 1000 * attempt;
-            await new Promise(r => setTimeout(r, waitMs));
-            continue;
-          }
-          break;
-        }
-
-        const buffer = await response.arrayBuffer();
-        const bytes = new Uint8Array(buffer);
-
-        if (!isLikelyMp3(bytes)) {
-          lastError = `Risposta audio corrotta (${bytes.length} bytes, no MP3 header)`;
-          console.error(`Attempt ${attempt}/${MAX_ATTEMPTS} failed:`, lastError);
-          if (attempt < MAX_ATTEMPTS) {
-            await new Promise(r => setTimeout(r, 1000 * attempt));
-            continue;
-          }
-          break;
-        }
-
-        audioBuffer = buffer;
-        console.log(`Audio generated successfully on attempt ${attempt}, size: ${bytes.length}`);
-        break;
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        if (attempt >= MAX_ATTEMPTS) break;
-        await new Promise(r => setTimeout(r, 1000 * attempt));
-      }
-    }
-
-    if (!audioBuffer) {
-      // ── AIML FALLBACK ──────────────────────────────────────────────
-      // Triggered for music/ambient when ElevenLabs returns 401/402/429.
-      const fallbackEligible =
-        AIML_API_KEY &&
-        category !== 'sfx' &&
-        (lastStatus === 401 || lastStatus === 402 || lastStatus === 429);
-
-      if (fallbackEligible) {
-        const fallbackReason =
-          lastStatus === 429 ? 'elevenlabs_rate_limited' :
-          lastStatus === 401 ? 'elevenlabs_unauthorized' :
-          'elevenlabs_credits_exhausted';
-        const aimlResult = await generateViaAiml({
-          prompt, category, duration, AIML_API_KEY, reason: fallbackReason,
-        });
-        if (aimlResult) return jsonResponse(aimlResult, 200);
-      } else if (!AIML_API_KEY) {
-        console.warn('[fallback] AIML_API_KEY missing — cannot attempt fallback');
-      } else if (category === 'sfx') {
-        console.warn('[fallback] AIML fallback skipped: SFX not supported by Suno/Stable-Audio');
-      }
-
-      const reason =
-        lastStatus === 429 ? 'elevenlabs_rate_limited' :
-        lastStatus === 401 ? 'elevenlabs_unauthorized' :
-        lastStatus === 402 ? 'elevenlabs_insufficient_credits' :
-        'elevenlabs_error';
+    console.log(`[music] generating via AIML stable-audio: "${prompt.slice(0, 80)}..." duration=${duration}s`);
+    const buf = await generateViaAiml(AIML_API_KEY, prompt, duration);
+    if (!buf) {
       return jsonResponse({
-        error: lastError,
-        reason,
-        status: lastStatus,
+        error: "Music generation failed",
+        reason: "aiml_error",
         fallback: true,
       }, 200);
     }
 
-    const base64Audio = base64Encode(audioBuffer);
-
-    return jsonResponse({
-      audioContent: base64Audio,
-      format: 'mp3',
-      category,
-      duration,
-      bytes: audioBuffer.byteLength,
-    }, 200);
+    return new Response(buf, {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "audio/mpeg",
+        "X-Provider": "aiml",
+      },
+    });
   } catch (error) {
-    console.error('Error in elevenlabs-music function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error("[music] function error:", error);
     return jsonResponse({
-      error: errorMessage,
-      reason: "internal_error",
+      error: (error as Error).message,
+      reason: "function_exception",
       fallback: true,
     }, 200);
   }

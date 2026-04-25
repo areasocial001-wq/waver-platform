@@ -1,6 +1,8 @@
 // Provider configuration for AI services
+// ElevenLabs has been removed from the platform — audio is handled by AIML
+// (music + SFX via stable-audio) and Inworld (TTS + IVC voice cloning).
 
-export type ProviderType = 'aiml' | 'piapi' | 'elevenlabs' | 'inworld' | 'auto';
+export type ProviderType = 'aiml' | 'piapi' | 'inworld' | 'auto';
 
 export type OperationType = 
   | 'music_generation'
@@ -49,7 +51,7 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
   aiml: {
     id: 'aiml',
     name: 'AI/ML API',
-    description: 'Gateway unificato per 400+ modelli AI',
+    description: 'Gateway unificato per 400+ modelli AI (musica e SFX via stable-audio)',
     logo: '🤖',
     supportedOperations: [
       'music_generation',
@@ -74,22 +76,10 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
     ],
     pricing: 'Pay-per-task',
   },
-  elevenlabs: {
-    id: 'elevenlabs',
-    name: 'ElevenLabs',
-    description: 'Specializzato in voce e audio AI',
-    logo: '🎤',
-    supportedOperations: [
-      'music_generation',
-      'sound_effects',
-      'text_to_speech'
-    ],
-    pricing: 'Basato su caratteri/secondi',
-  },
   inworld: {
     id: 'inworld',
     name: 'Inworld',
-    description: 'TTS #1 per qualità su Artificial Analysis, latenza <120ms',
+    description: 'TTS #1 per qualità su Artificial Analysis, latenza <120ms, supporta voice cloning IVC',
     logo: '🗣️',
     supportedOperations: [
       'text_to_speech',
@@ -132,11 +122,11 @@ export function resolveAutoProvider(operation: OperationType): ProviderType {
 // AIML API model mappings
 export const AIML_MODELS = {
   music: {
+    stableAudio: 'stable-audio',
     suno: 'suno/suno-v4',
     udio: 'udio/udio-v1.5',
   },
   tts: {
-    elevenlabs: 'elevenlabs/eleven_multilingual_v2',
     openai: 'openai/tts-1-hd',
   },
   stt: {
@@ -158,3 +148,4 @@ export const AIML_MODELS = {
     gemini: 'google/gemini-3-pro',
   }
 };
+

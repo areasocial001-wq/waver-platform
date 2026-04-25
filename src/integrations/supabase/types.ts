@@ -173,33 +173,6 @@ export type Database = {
         }
         Relationships: []
       }
-      cloned_voices: {
-        Row: {
-          created_at: string
-          description: string | null
-          elevenlabs_voice_id: string
-          id: string
-          name: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          elevenlabs_voice_id: string
-          id?: string
-          name: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          elevenlabs_voice_id?: string
-          id?: string
-          name?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       db_health_snapshots: {
         Row: {
           db_size_bytes: number
