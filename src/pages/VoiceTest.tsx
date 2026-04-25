@@ -71,7 +71,7 @@ function decideRoute(
   }
 
   const { endpoint, forcedElevenLabs, isClonedVoice } = resolveTtsEndpoint({
-    preference: provider === "auto" ? "inworld" : provider,
+    preference: (provider === "auto" || (provider as string) === "elevenlabs" ? "inworld" : provider) as ProviderType,
     voiceId: voice.id,
   });
 
