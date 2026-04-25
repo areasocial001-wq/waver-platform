@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface VoiceOption {
   id: string;
@@ -8,7 +7,7 @@ export interface VoiceOption {
   isCloned?: boolean;
 }
 
-// Supported languages for ElevenLabs multilingual_v2
+// Supported languages for Inworld multilingual TTS
 export interface LanguageOption {
   code: string;
   name: string;
@@ -28,7 +27,12 @@ export const SUPPORTED_LANGUAGES: LanguageOption[] = [
   { code: "ko", name: "한국어", flag: "🇰🇷" },
 ];
 
-// Default ElevenLabs voices
+/**
+ * Default voice catalog. We keep the historical ElevenLabs voice IDs as the
+ * `id` values because they are persisted in many existing projects (scenes,
+ * storyboards, talking-avatar configs). The `inworld-tts` edge function maps
+ * each one to an equivalent Inworld voice on the fly, so users see no break.
+ */
 export const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
   { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", description: "Voce femminile naturale, multilingue" },
   { id: "JBFqnCBsd6RMkjVDRZzb", name: "George", description: "Voce maschile profonda e autorevole" },
@@ -41,9 +45,8 @@ export const DEFAULT_VOICE_OPTIONS: VoiceOption[] = [
 ];
 
 /**
- * Inworld TTS voice catalog. The `id` matches the Inworld voice name (the API
- * accepts a name like "Sarah" directly), and is what we send when the user
- * picks the Inworld provider for narration.
+ * Native Inworld TTS voice catalog. The `id` is the Inworld voice name (the
+ * API accepts a name like "Sarah" directly).
  */
 export const INWORLD_VOICE_OPTIONS: VoiceOption[] = [
   { id: "Sarah",    name: "Sarah",    description: "Femminile naturale" },
@@ -67,8 +70,15 @@ export const INWORLD_VOICE_OPTIONS: VoiceOption[] = [
 ];
 
 
+/**
+ * Legacy shape kept for backwards-compatibility with components that still
+ * reference cloned voices. Voice cloning is being migrated to Inworld IVC,
+ * so we no longer keep a local table — this hook always returns an empty
+ * cloned-voice list until the new flow ships.
+ */
 export interface ClonedVoice {
   id: string;
+  /** Kept for backwards-compatibility — no longer populated. */
   elevenlabs_voice_id: string;
   name: string;
   description?: string;
@@ -76,72 +86,24 @@ export interface ClonedVoice {
 }
 
 export function useVoiceOptions() {
-  const [clonedVoices, setClonedVoices] = useState<ClonedVoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [clonedVoices] = useState<ClonedVoice[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const loadClonedVoices = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setClonedVoices([]);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('cloned_voices')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading cloned voices:', error);
-        setClonedVoices([]);
-      } else {
-        setClonedVoices(data || []);
-      }
-    } catch (error) {
-      console.error('Error loading cloned voices:', error);
-      setClonedVoices([]);
-    } finally {
-      setIsLoading(false);
-    }
+  const refresh = useCallback(async () => {
+    // No-op: cloned voices are managed by Inworld IVC now.
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-    loadClonedVoices();
-    
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      loadClonedVoices();
-    });
-
-    // Listen for custom event for updates from VoiceCloneDialog
-    const handleVoicesUpdated = () => loadClonedVoices();
-    window.addEventListener("cloned-voices-updated", handleVoicesUpdated);
-    
-    return () => {
-      subscription.unsubscribe();
-      window.removeEventListener("cloned-voices-updated", handleVoicesUpdated);
-    };
-  }, [loadClonedVoices]);
-
-  const allVoiceOptions: VoiceOption[] = [
-    ...DEFAULT_VOICE_OPTIONS,
-    ...clonedVoices.map(v => ({
-      id: v.elevenlabs_voice_id,
-      name: `${v.name} (Clonata)`,
-      description: v.description || "Voce clonata personalizzata",
-      isCloned: true,
-    })),
-  ];
+    setIsLoading(false);
+  }, []);
 
   return {
-    voiceOptions: allVoiceOptions,
+    voiceOptions: DEFAULT_VOICE_OPTIONS,
     defaultVoices: DEFAULT_VOICE_OPTIONS,
     clonedVoices,
-    hasClonedVoices: clonedVoices.length > 0,
+    hasClonedVoices: false,
     isLoading,
-    refresh: loadClonedVoices,
+    refresh,
   };
 }
