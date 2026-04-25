@@ -458,8 +458,8 @@ function VoiceTestContent() {
             <Alert>
               <AlertTitle className="flex items-center gap-2 flex-wrap">
                 Routing previsto:
-                <Badge variant={route.endpoint === "elevenlabs-tts" ? "default" : "secondary"}>
-                  {route.endpoint === "elevenlabs-tts" ? "ElevenLabs" : "Inworld"}
+                <Badge variant="secondary">
+                  Inworld
                 </Badge>
                 {selectedVoice.source === "ivc" && (
                   <Badge variant="outline" className="border-primary text-primary">IVC</Badge>
@@ -511,7 +511,7 @@ function VoiceTestContent() {
               Risultato
               {lastEndpoint && (
                 <Badge variant="outline">
-                  via {lastEndpoint === "inworld-tts" ? "Inworld" : "ElevenLabs"}
+                  via Inworld
                 </Badge>
               )}
             </CardTitle>

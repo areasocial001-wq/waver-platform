@@ -31,8 +31,8 @@ const PROVIDER_META: Record<AudioProvider, {
   classes: string;
 }> = {
   elevenlabs: {
-    name: "ElevenLabs",
-    short: "ElevenLabs",
+    name: "Provider primario",
+    short: "Primario",
     icon: <Sparkles className="h-3 w-3" />,
     classes: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
   },
@@ -98,7 +98,7 @@ export const AudioProviderBadge = ({ state, className = "" }: Props) => {
             </p>
             {state.fallbackUsed && (
               <p className="text-xs text-amber-400">
-                ElevenLabs non disponibile{state.reason ? ` (${state.reason})` : ""}.
+                Provider primario non disponibile{state.reason ? ` (${state.reason})` : ""}.
                 Audio prodotto dal provider di backup.
               </p>
             )}
