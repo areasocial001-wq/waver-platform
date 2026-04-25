@@ -47,67 +47,19 @@ interface AIServiceResult {
 export function useAIService() {
   const { getEffectiveProvider } = useProviderPreferences();
 
-  // Generate music using the configured provider
+  // Generate music using AIML stable-audio (ElevenLabs removed).
   const generateMusic = useCallback(async (
     params: MusicGenerationParams
   ): Promise<AIServiceResult> => {
-    const provider = getEffectiveProvider('music_generation');
-    
     try {
-      if (provider === 'elevenlabs') {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-music', {
-          body: {
-            prompt: params.prompt,
-            category: 'music',
-            duration: params.duration || 30,
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          audioContent: data.audioContent,
-          data,
-        };
-      }
-      
-      if (provider === 'piapi') {
-        const { data, error } = await supabase.functions.invoke('piapi-audio', {
-          body: {
-            prompt: params.prompt,
-            model: params.model || 'udio',
-            duration: params.duration,
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          taskId: data.taskId,
-          data,
-        };
-      }
-      
-      if (provider === 'aiml') {
-        const { data, error } = await supabase.functions.invoke('aiml-api', {
-          body: {
-            operation: 'music',
-            prompt: params.prompt,
-            model: params.model || 'suno',
-            duration: params.duration,
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          taskId: data.task_id,
-          audioUrl: data.audio_url,
-          data,
-        };
-      }
-      
-      throw new Error(`Unsupported provider: ${provider}`);
+      const { data, error } = await supabase.functions.invoke('elevenlabs-music', {
+        body: {
+          prompt: params.prompt,
+          duration_seconds: params.duration || 30,
+        },
+      });
+      if (error) throw error;
+      return { success: true, audioContent: data?.audioContent, data };
     } catch (error) {
       console.error('Music generation error:', error);
       return {
@@ -115,67 +67,21 @@ export function useAIService() {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }, [getEffectiveProvider]);
+  }, []);
 
-  // Generate sound effects
+  // Generate sound effects via AIML stable-audio.
   const generateSoundEffect = useCallback(async (
     params: SoundEffectParams
   ): Promise<AIServiceResult> => {
-    const provider = getEffectiveProvider('sound_effects');
-    
     try {
-      if (provider === 'elevenlabs') {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-music', {
-          body: {
-            prompt: params.prompt,
-            category: 'sfx',
-            duration: params.duration || 5,
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          audioContent: data.audioContent,
-          data,
-        };
-      }
-      
-      if (provider === 'aiml') {
-        // AIML can use ElevenLabs for SFX through their API
-        const { data, error } = await supabase.functions.invoke('aiml-api', {
-          body: {
-            operation: 'music',
-            prompt: `Sound effect: ${params.prompt}`,
-            model: 'suno',
-            duration: params.duration || 5,
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          taskId: data.task_id,
-          audioUrl: data.audio_url,
-          data,
-        };
-      }
-      
-      // Fallback to ElevenLabs for sound effects
-      const { data, error } = await supabase.functions.invoke('elevenlabs-music', {
+      const { data, error } = await supabase.functions.invoke('elevenlabs-sfx', {
         body: {
-          prompt: params.prompt,
-          category: 'sfx',
-          duration: params.duration || 5,
+          text: params.prompt,
+          duration_seconds: params.duration || 5,
         },
       });
-      
       if (error) throw error;
-      return {
-        success: true,
-        audioContent: data.audioContent,
-        data,
-      };
+      return { success: true, audioContent: data?.audioContent, data };
     } catch (error) {
       console.error('Sound effect generation error:', error);
       return {
@@ -183,51 +89,22 @@ export function useAIService() {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }, [getEffectiveProvider]);
+  }, []);
 
-  // Text to Speech
+  // Text to Speech via Inworld (ElevenLabs removed).
   const textToSpeech = useCallback(async (
     params: TTSParams
   ): Promise<AIServiceResult> => {
-    const provider = getEffectiveProvider('text_to_speech');
-    
     try {
-      if (provider === 'elevenlabs') {
-        const { data, error } = await supabase.functions.invoke('elevenlabs-tts', {
-          body: {
-            text: params.text,
-            voiceId: params.voice,
-            languageCode: params.languageCode || 'it',
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          audioContent: data.audioContent,
-          data,
-        };
-      }
-      
-      if (provider === 'aiml') {
-        const { data, error } = await supabase.functions.invoke('aiml-api', {
-          body: {
-            operation: 'tts',
-            text: params.text,
-            voice: params.voice,
-            model: 'openai',
-          },
-        });
-        
-        if (error) throw error;
-        return {
-          success: true,
-          audioContent: data.audio_content,
-          data,
-        };
-      }
-      
-      throw new Error(`Unsupported TTS provider: ${provider}`);
+      const { data, error } = await supabase.functions.invoke('inworld-tts', {
+        body: {
+          text: params.text,
+          voiceId: params.voice,
+          languageCode: params.languageCode || 'it',
+        },
+      });
+      if (error) throw error;
+      return { success: true, audioContent: data?.audioContent, data };
     } catch (error) {
       console.error('TTS error:', error);
       return {
@@ -235,9 +112,8 @@ export function useAIService() {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }, [getEffectiveProvider]);
+  }, []);
 
-  // Generate image
   const generateImage = useCallback(async (
     params: ImageGenerationParams
   ): Promise<AIServiceResult> => {
