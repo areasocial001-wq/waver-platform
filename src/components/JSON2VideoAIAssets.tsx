@@ -321,7 +321,7 @@ export default function JSON2VideoAIAssets({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {(voice.model === 'azure' ? AZURE_VOICES : ELEVENLABS_VOICES).map(v => (
+                            {AZURE_VOICES.map(v => (
                               <SelectItem key={v.value} value={v.value}>{v.label}</SelectItem>
                             ))}
                           </SelectContent>
