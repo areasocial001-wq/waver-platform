@@ -25,7 +25,6 @@ const DEFAULT_THRESHOLDS: ThresholdSettings = {
   "Google AI": { warning: 1000, critical: 3000 },
   "Luma AI": { warning: 1500, critical: 4000 },
   "OpenAI": { warning: 1000, critical: 3000 },
-  "DashScope": { warning: 1500, critical: 4000 },
 };
 
 export const ApiThresholdSettings = ({ 

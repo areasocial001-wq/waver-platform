@@ -47,7 +47,6 @@ export const ProviderCreditsWidget = () => {
     { name: "Vidu", hasKey: false, status: "loading" },
     { name: "LTX Video", hasKey: false, status: "loading" },
     { name: "Luma AI", hasKey: false, status: "loading" },
-    { name: "DashScope", hasKey: false, status: "loading" },
     { name: "OpenAI", hasKey: false, status: "loading" },
   ]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -247,24 +246,6 @@ export const ProviderCreditsWidget = () => {
         });
       } catch {
         results.push({ name: "Luma AI", hasKey: false, status: "error", supportedModels: ["Ray2", "Ray Flash 2", "Photon"] });
-      }
-
-      // DashScope Balance Check
-      try {
-        const { data: dashData } = await supabase.functions.invoke('dashscope-balance');
-        const hasDashKey = dashData?.hasKey || false;
-        results.push({
-          name: "DashScope",
-          hasKey: hasDashKey,
-          status: dashData?.status === "active" ? "active" : 
-                  dashData?.status === "invalid" ? "error" :
-                  hasDashKey ? "active" : "unknown",
-          details: dashData?.status === "active" ? "Alibaba Cloud attivo" : 
-                   dashData?.message || "Non configurato",
-          supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"]
-        });
-      } catch {
-        results.push({ name: "DashScope", hasKey: false, status: "error", supportedModels: ["Wan2.6", "Wan2.5", "Wan2.1", "Wanx"] });
       }
 
       // OpenAI

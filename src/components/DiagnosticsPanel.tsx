@@ -151,7 +151,6 @@ export const DiagnosticsPanel = () => {
       { name: "ltx-video", label: "LTX Video", body: { healthCheck: true } },
       { name: "luma-video", label: "Luma AI", body: { healthCheck: true } },
       { name: "generate-content", label: "OpenAI", body: { healthCheck: true } },
-      { name: "dashscope-video", label: "DashScope", body: { healthCheck: true } },
     ];
 
     for (const check of checks) {

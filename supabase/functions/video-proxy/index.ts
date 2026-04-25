@@ -21,7 +21,6 @@ const ALLOWED_DOMAINS = [
   "api.freepik.com",
   "img.freepik.com",
   "video-generation.freepik.com",
-  "dashscope-result.oss-cn-beijing.aliyuncs.com",
   "viduai.com",
   "cdn.viduai.com",
   "gqzxlwzcxrokzforwgeu.supabase.co",
