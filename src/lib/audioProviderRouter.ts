@@ -16,10 +16,10 @@ import type { ProviderType } from "./providerConfig";
 export type AudioProviderRoute = "auto" | "aiml" | "elevenlabs";
 
 export function resolveAudioProvider(pref: ProviderType | undefined): AudioProviderRoute {
-  if (pref === "aiml") return "aiml";
   if (pref === "elevenlabs") return "elevenlabs";
-  // 'auto', 'piapi' (handled elsewhere), 'inworld' (n/a) → auto
-  return "auto";
+  if (pref === "aiml") return "aiml";
+  // 'auto' (now defaults to AIML), 'piapi', 'inworld', undefined → aiml
+  return "aiml";
 }
 
 /**
