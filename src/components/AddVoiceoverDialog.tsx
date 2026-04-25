@@ -528,7 +528,7 @@ export const AddVoiceoverDialog = ({ videoId, dialogueText, onVoiceoverAdded }: 
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Genera Voiceover con ElevenLabs</DialogTitle>
+          <DialogTitle>Genera Voiceover</DialogTitle>
           <DialogDescription>
             Aggiungi un audio parlato al tuo video usando la sintesi vocale AI
           </DialogDescription>

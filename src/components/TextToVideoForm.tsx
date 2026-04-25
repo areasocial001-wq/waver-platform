@@ -594,7 +594,7 @@ export const TextToVideoForm = () => {
                 className="min-h-[80px] resize-none"
               />
               <p className="text-xs text-muted-foreground">
-                {audioType === "dialogue" && "Il dialogo verrà generato con la voce ElevenLabs selezionata"}
+                {audioType === "dialogue" && "Il dialogo verrà generato con la voce selezionata"}
                 {audioType === "sfx" && "Descrivi gli effetti sonori che vuoi sentire"}
                 {audioType === "ambient" && "Descrivi l'atmosfera sonora di fondo"}
               </p>

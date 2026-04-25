@@ -1195,7 +1195,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
               Genera Musica AI
             </DialogTitle>
             <DialogDescription>
-              Genera automaticamente una colonna sonora con ElevenLabs AI
+              Genera automaticamente una colonna sonora con AIML stable-audio
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -1859,7 +1859,7 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                     <AccordionContent>
                       <div className="space-y-4 pt-2">
                         <p className="text-sm text-muted-foreground">
-                          Genera automaticamente una colonna sonora con ElevenLabs AI
+                          Genera automaticamente una colonna sonora con AIML stable-audio
                         </p>
                         <Button 
                           onClick={() => setShowMusicDialog(true)}

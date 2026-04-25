@@ -284,7 +284,7 @@ export function VideoToAudioForm() {
             Video to Audio
           </CardTitle>
           <CardDescription>
-            Genera nuovo audio sincronizzato per i tuoi video usando ElevenLabs TTS
+            Genera nuovo audio sincronizzato per i tuoi video usando Inworld TTS
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
