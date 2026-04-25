@@ -20,6 +20,7 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { Navbar } from "@/components/Navbar";
 
 import { supabase } from "@/integrations/supabase/client";
+import type { ProviderType } from "@/lib/providerConfig";
 import {
   useVoiceOptions,
   type VoiceOption,
