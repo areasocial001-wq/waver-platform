@@ -93,23 +93,14 @@ const PRICING_DATA: OperationPricing[] = [
     label: 'Text-to-Speech',
     providers: [
       { 
-        provider: 'ElevenLabs', 
-        logo: '🎤', 
-        price: '$0.30',
+        provider: 'Inworld TTS', 
+        logo: '🗣️', 
+        price: '$0.005',
         unit: '/1K caratteri',
         quality: 'high',
         speed: 'fast',
         isRecommended: true,
-        notes: 'Voci ultra-realistiche, 30+ lingue'
-      },
-      { 
-        provider: 'AI/ML (ElevenLabs)', 
-        logo: '🤖', 
-        price: '$0.35',
-        unit: '/1K caratteri',
-        quality: 'high',
-        speed: 'fast',
-        notes: 'Stesso modello via gateway'
+        notes: 'Voci multilingua, latenza <120ms, supporto IVC'
       },
       { 
         provider: 'AI/ML (OpenAI)', 
