@@ -99,9 +99,9 @@ export const PROVIDERS: Record<ProviderType, ProviderInfo> = {
 };
 
 export const DEFAULT_PREFERENCES: ProviderPreferences = {
-  music_generation: 'auto',
-  sound_effects: 'auto',
-  text_to_speech: 'elevenlabs',
+  music_generation: 'aiml',
+  sound_effects: 'aiml',
+  text_to_speech: 'inworld',
   speech_to_text: 'aiml',
   image_generation: 'auto',
   video_generation: 'auto',
