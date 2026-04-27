@@ -2111,11 +2111,11 @@ serve(async (req) => {
       });
     }
 
-    // ==================== GOOGLE VEO 3.1 DIRECT ====================
-    // Use Google API directly when google-veo is selected
-    if (preferredProvider === 'google-veo' && hasValidGoogleKey) {
-      console.log("Starting video generation with Google Veo 3.1 (direct API, preferred provider)");
-      // Fall through to the main Google Veo 3.1 section below
+    // ==================== GOOGLE VEO 3.1 DIRECT (DISABILITATO) ====================
+    // Reindirizziamo qualsiasi richiesta google-veo verso Luma per evitare costi Google AI Studio.
+    if (preferredProvider === 'google-veo') {
+      console.warn("[google-veo disabled] Routing request to Luma Ray 2 instead");
+      preferredProvider = 'luma-direct-ray2';
     }
     // ==================== PiAPI PROVIDERS ====================
     // Use PiAPI for piapi-kling, piapi-hailuo, piapi-luma, piapi-wan, piapi-hunyuan
