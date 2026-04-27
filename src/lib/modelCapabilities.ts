@@ -114,7 +114,7 @@ const BASIC_RESOLUTIONS: ResolutionOption[] = [
   { value: '720p', label: '720p (HD)' },
 ];
 
-const PREMIUM_RESOLUTIONS: ResolutionOption[] = [
+const HIGH_RESOLUTIONS: ResolutionOption[] = [
   { value: '720p', label: '720p (HD)' },
   { value: '1080p', label: '1080p (Full HD)' },
   { value: '4k', label: '4K (Ultra HD)' },
@@ -404,7 +404,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
 
   'aiml-sora-2-t2v': {
     durations: SORA_DURATIONS,
-    resolutions: PREMIUM_RESOLUTIONS,
+    resolutions: HIGH_RESOLUTIONS,
     aspectRatios: EXTENDED_ASPECT_RATIOS,
     supportsTextToVideo: true,
     supportsImageToVideo: false,
@@ -429,7 +429,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
   },
   'aiml-sora-2-pro-t2v': {
     durations: SORA_DURATIONS,
-    resolutions: PREMIUM_RESOLUTIONS,
+    resolutions: HIGH_RESOLUTIONS,
     aspectRatios: EXTENDED_ASPECT_RATIOS,
     supportsTextToVideo: true,
     supportsImageToVideo: false,
@@ -1012,7 +1012,7 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
   },
   'piapi-sora2': {
     durations: SORA_DURATIONS,
-    resolutions: PREMIUM_RESOLUTIONS,
+    resolutions: HIGH_RESOLUTIONS,
     aspectRatios: EXTENDED_ASPECT_RATIOS,
     supportsTextToVideo: true,
     supportsImageToVideo: true,

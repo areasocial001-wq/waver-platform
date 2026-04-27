@@ -289,7 +289,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Ultima generazione', 'Qualità premium', 'I2V'],
+    features: ['Ultima generazione', 'Qualità top', 'I2V'],
     estimatedTime: '2-4 min',
     fallbackOrder: ['aiml-runway-gen3-turbo', 'aiml-kling-v2.6-pro'],
     durations: [
@@ -602,7 +602,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Master quality', 'Premium'],
+    features: ['Master quality', 'Top'],
     estimatedTime: '3-5 min',
     fallbackOrder: ['aiml-kling-v2.6-pro', 'aiml-kling-v2.5-turbo-pro'],
     durations: [
@@ -658,7 +658,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Ultimo modello', 'Premium quality'],
+    features: ['Ultimo modello', 'Top quality'],
     estimatedTime: '3-5 min',
     fallbackOrder: ['aiml-kling-v2.5-turbo-pro', 'aiml-kling-v2.1-master'],
     durations: [
@@ -736,14 +736,14 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     id: 'aiml-luma-ray-2',
     name: 'AI/ML: Luma Ray 2',
     shortName: 'Ray 2',
-    description: 'Nuova generazione Luma, qualità premium',
+    description: 'Nuova generazione Luma, qualità top',
     color: 'bg-cyan-600',
     badgeColor: 'bg-cyan-600/20',
     textColor: 'text-cyan-600',
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Ray 2', 'Premium quality'],
+    features: ['Ray 2', 'Top quality'],
     estimatedTime: '3-5 min',
     fallbackOrder: ['aiml-luma-ray-1.6', 'aiml-luma-ray-flash-2'],
     durations: [
@@ -864,7 +864,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 1,
     quality: 3,
     cost: 3,
-    features: ['OpenAI Pro', 'Premium', 'Qualità massima'],
+    features: ['OpenAI Pro', 'Top', 'Qualità massima'],
     estimatedTime: '8-15 min',
     fallbackOrder: ['aiml-sora-2-t2v', 'aiml-veo3.1-t2v'],
     durations: [
@@ -898,7 +898,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 1,
     quality: 3,
     cost: 3,
-    features: ['OpenAI Pro', 'I2V Premium'],
+    features: ['OpenAI Pro', 'I2V Top'],
     estimatedTime: '8-15 min',
     fallbackOrder: ['aiml-sora-2-i2v', 'aiml-veo3.1-i2v'],
     durations: [
@@ -1368,7 +1368,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Ultimo modello', 'Audio nativo', 'Premium'],
+    features: ['Ultimo modello', 'Audio nativo', 'Top'],
     estimatedTime: '3-5 min',
     fallbackOrder: ['aiml-veo3', 'aiml-veo3.1-t2v-fast'],
     durations: [
@@ -1402,7 +1402,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     speed: 2,
     quality: 3,
     cost: 3,
-    features: ['Ultimo modello', 'I2V Premium'],
+    features: ['Ultimo modello', 'I2V Top'],
     estimatedTime: '3-5 min',
     fallbackOrder: ['aiml-veo3-i2v', 'aiml-veo3.1-i2v-fast'],
     durations: [
