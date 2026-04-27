@@ -18,6 +18,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { toast } from "sonner";
+import { SceneCostDetailDialog } from "@/components/costs/SceneCostDetailDialog";
 
 interface CostRow {
   id: string;
@@ -28,6 +29,7 @@ interface CostRow {
   scene_index: number | null;
   status: string;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface ProjectOption {
@@ -51,6 +53,8 @@ const Costs = () => {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [threshold, setThresholdState] = useState<number>(getCostAlertThreshold());
+  const [detailRow, setDetailRow] = useState<CostRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
