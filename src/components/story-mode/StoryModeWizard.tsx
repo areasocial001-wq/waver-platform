@@ -3068,6 +3068,15 @@ export const StoryModeWizard = () => {
           videoHeight: videoCheck?.height,
           videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
         };
+        // Logga costo stimato della generazione batch
+        void logVideoCost({
+          provider: input.videoModel ?? "auto",
+          secondsBilled: Math.min(scenes[i].duration, 10),
+          storyProjectId: projectId ?? null,
+          sceneIndex: i,
+          status: "success",
+          metadata: { source: "batch_generate_all" },
+        });
         if (videoCheck?.mismatch) {
           console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
         }
