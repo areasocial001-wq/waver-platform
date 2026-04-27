@@ -25,7 +25,7 @@ import JSON2VideoAIAssets, { AIImage, AIVoice } from "@/components/JSON2VideoAIA
 import { useJSON2VideoNotifications } from "@/hooks/useJSON2VideoNotifications";
 import { ActiveProviderIndicator } from "@/components/ActiveProviderIndicator";
 import { QuickProviderSwitch } from "@/components/QuickProviderSwitch";
-import { ProjectCostEstimator } from "@/components/ProjectCostEstimator";
+
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -1006,18 +1006,6 @@ export default function JSON2VideoEditor({ videoUrls = [], onComplete, projectId
                   Cambia
                 </Button>
               }
-            />
-            <ProjectCostEstimator
-              compact
-              operations={{
-                video_clips: clips.length,
-                music_tracks: audioTrack ? 1 : 0,
-                sound_effects: soundEffects.length,
-                voiceovers: clips.filter(c => c.textOverlays.length > 0).length,
-                voiceover_characters: clips.reduce((acc, c) => 
-                  acc + c.textOverlays.reduce((sum, t) => sum + t.text.length, 0), 0
-                ),
-              }}
             />
           </div>
         </div>

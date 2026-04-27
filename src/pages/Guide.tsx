@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import {
   Download, BookOpen, Video, Image, Mic, Music, Layout, Wand2,
-  Film, FileJson, Gauge, Clapperboard, EyeOff, Settings, CreditCard,
+  Film, FileJson, Gauge, Clapperboard, EyeOff, Settings,
   Shield, Activity, ChevronRight, Sparkles, Layers, Workflow
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -46,8 +46,7 @@ const guideSections: GuideSection[] = [
       "Configura le tue API key nella sezione Impostazioni per sbloccare i provider.",
     ],
     tips: [
-      "Il piano Free include 5 generazioni video al mese e immagini illimitate.",
-      "Puoi passare a Premium o Business in qualsiasi momento dalla pagina Prezzi.",
+      "Tutte le funzionalità della piattaforma sono disponibili gratuitamente in fase di test.",
     ],
   },
   {
@@ -126,7 +125,6 @@ const guideSections: GuideSection[] = [
     id: "talking-avatar",
     icon: Mic,
     title: "Talking Avatar",
-    badge: "Premium",
     description: "Crea avatar parlanti con sincronizzazione labiale e voci personalizzate.",
     steps: [
       "Accedi alla sezione Talking Avatar dalla navigazione.",
@@ -145,7 +143,6 @@ const guideSections: GuideSection[] = [
     id: "voice-cloning",
     icon: Mic,
     title: "Voice Cloning & TTS",
-    badge: "Premium",
     description: "Clona la tua voce o genera speech da testo con voci naturali multi-lingua.",
     steps: [
       "Apri la finestra Voice Clone dalla barra di navigazione.",
@@ -159,7 +156,6 @@ const guideSections: GuideSection[] = [
     id: "timeline-editor",
     icon: Film,
     title: "Timeline Editor",
-    badge: "Premium",
     description: "Monta i tuoi video con un editor timeline professionale con tracce audio e transizioni.",
     steps: [
       "Accedi al Timeline Editor dalla navigazione.",
@@ -196,7 +192,6 @@ const guideSections: GuideSection[] = [
     id: "workflow-ai",
     icon: Workflow,
     title: "Workflow AI (Nodi Visuali)",
-    badge: "Premium",
     description: "Crea pipeline di produzione video con un editor a nodi visuale drag-and-drop.",
     steps: [
       "Accedi alla sezione Freepik Workflow dalla navigazione.",
@@ -215,7 +210,6 @@ const guideSections: GuideSection[] = [
     id: "faceless-video",
     icon: EyeOff,
     title: "Faceless Video",
-    badge: "Premium",
     description: "Genera video automatici per social media senza bisogno di apparire in camera.",
     steps: [
       "Accedi alla sezione Faceless Video.",
@@ -229,7 +223,6 @@ const guideSections: GuideSection[] = [
     id: "trailer-generator",
     icon: Clapperboard,
     title: "Trailer Generator",
-    badge: "Premium",
     description: "Crea trailer cinematografici professionali con template e musica epica.",
     steps: [
       "Accedi al Trailer Generator dalla navigazione.",
@@ -283,23 +276,6 @@ const guideSections: GuideSection[] = [
     tips: [
       "Le API key sono crittografate e salvate in modo sicuro.",
       "Puoi cambiare provider in qualsiasi momento senza perdere i dati.",
-    ],
-  },
-  {
-    id: "pricing",
-    icon: CreditCard,
-    title: "Piani & Abbonamenti",
-    description: "Scopri i piani disponibili e gestisci il tuo abbonamento.",
-    steps: [
-      "Vai alla pagina Prezzi per confrontare i piani.",
-      "Free: 5 video/mese, 720p, 3 storyboard, funzionalità base.",
-      "Premium (€19.90/mese): 50 video/mese, 1080p, workflow AI, talking avatar, voice cloning.",
-      "Business (€79.90/mese): Video illimitati, 4K, tutti i workflow, API access, supporto prioritario.",
-      "Upgrade direttamente dalla pagina Prezzi con pagamento sicuro.",
-    ],
-    tips: [
-      "Risparmia fino al 20% con la fatturazione annuale.",
-      "Il downgrade è possibile in qualsiasi momento.",
     ],
   },
 ];

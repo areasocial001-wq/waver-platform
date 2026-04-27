@@ -1,99 +1,24 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-
-export const STRIPE_TIERS = {
-  premium: {
-    price_id_monthly: "price_1TLlDXF6OSGE0tWONqMn6jHF",
-    price_id_yearly: "price_1TLlE6F6OSGE0tWOHnoP1PHY",
-    product_id: "prod_UKQ3SIkQD1YRRq",
-  },
-  creator: {
-    price_id_monthly: "price_1TLlGSF6OSGE0tWOirsB01wH",
-    price_id_yearly: "price_1TLli0F6OSGE0tWOfvXjmhQV",
-    product_id: "prod_UKQ6uV2WdYYFcC",
-  },
-  business: {
-    price_id_monthly: "price_1TLlhgF6OSGE0tWOOqqHFWd9",
-    price_id_yearly: "price_1TLlvDF6OSGE0tWOrPUuCYjg",
-    product_id: "prod_UKQYpXd3Ztk0Ov",
-  },
-} as const;
+// Commercial features removed: this hook is now a no-op stub that grants
+// full access to every user. Kept to preserve the API surface used across
+// the codebase without forcing a large refactor.
 
 export type SubscriptionTier = "free" | "premium" | "creator" | "business";
 
-interface SubscriptionState {
-  subscribed: boolean;
-  productId: string | null;
-  subscriptionEnd: string | null;
-  loading: boolean;
-  tier: SubscriptionTier;
-}
+export const STRIPE_TIERS = {
+  premium: { price_id_monthly: "", price_id_yearly: "", product_id: "" },
+  creator: { price_id_monthly: "", price_id_yearly: "", product_id: "" },
+  business: { price_id_monthly: "", price_id_yearly: "", product_id: "" },
+} as const;
 
 export const useSubscription = () => {
-  const [state, setState] = useState<SubscriptionState>({
-    subscribed: false,
-    productId: null,
-    subscriptionEnd: null,
-    loading: true,
-    tier: "free",
-  });
-
-  const checkSubscription = useCallback(async () => {
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session?.access_token) {
-        setState((prev) => ({ ...prev, loading: false }));
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("check-subscription");
-      if (error) throw error;
-
-      let tier: SubscriptionTier = "free";
-      if (data?.product_id === STRIPE_TIERS.business.product_id) tier = "business";
-      else if (data?.product_id === STRIPE_TIERS.creator.product_id) tier = "creator";
-      else if (data?.product_id === STRIPE_TIERS.premium.product_id) tier = "premium";
-
-      setState({
-        subscribed: data?.subscribed || false,
-        productId: data?.product_id || null,
-        subscriptionEnd: data?.subscription_end || null,
-        loading: false,
-        tier,
-      });
-    } catch {
-      setState((prev) => ({ ...prev, loading: false }));
-    }
-  }, []);
-
-  useEffect(() => {
-    checkSubscription();
-    const interval = setInterval(checkSubscription, 60000);
-    return () => clearInterval(interval);
-  }, [checkSubscription]);
-
-  const startCheckout = async (priceId: string) => {
-    const { data, error } = await supabase.functions.invoke("create-checkout", {
-      body: { priceId },
-    });
-    if (error) throw error;
-    if (data?.url) {
-      window.open(data.url, "_blank");
-    }
-  };
-
-  const openCustomerPortal = async () => {
-    const { data, error } = await supabase.functions.invoke("customer-portal");
-    if (error) throw error;
-    if (data?.url) {
-      window.open(data.url, "_blank");
-    }
-  };
-
   return {
-    ...state,
-    checkSubscription,
-    startCheckout,
-    openCustomerPortal,
+    subscribed: true,
+    productId: null as string | null,
+    subscriptionEnd: null as string | null,
+    loading: false,
+    tier: "business" as SubscriptionTier,
+    checkSubscription: async () => {},
+    startCheckout: async (_priceId: string) => {},
+    openCustomerPortal: async () => {},
   };
 };
