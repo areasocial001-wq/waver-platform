@@ -382,7 +382,11 @@ const Costs = () => {
                       </TableHeader>
                       <TableBody>
                         {topScenes.map(s => (
-                          <TableRow key={s.id}>
+                          <TableRow
+                            key={s.id}
+                            className="cursor-pointer hover:bg-accent/40"
+                            onClick={() => { setDetailRow(s); setDetailOpen(true); }}
+                          >
                             <TableCell className="text-xs">
                               {new Date(s.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                             </TableCell>
