@@ -31,6 +31,7 @@ import GuidePage from "./pages/Guide";
 import GuidePDF from "./pages/GuidePDF";
 import StoryMode from "./pages/StoryMode";
 import VoiceTest from "./pages/VoiceTest";
+import TextToSpeech from "./pages/TextToSpeech";
 import Costs from "./pages/Costs";
 
 import NotFound from "./pages/NotFound";
