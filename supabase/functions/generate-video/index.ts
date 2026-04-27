@@ -2566,7 +2566,16 @@ serve(async (req) => {
       });
     }
 
-    // ==================== GOOGLE VEO 3.1 (DEFAULT) ====================
+    // ==================== GOOGLE VEO 3.1 (DISABILITATO) ====================
+    // VEO nativo via Google AI Studio è stato disabilitato per controllo costi.
+    // Se siamo arrivati qui significa che nessun provider alternativo è stato selezionato.
+    // Restituiamo un errore chiaro invece di chiamare Google.
+    throw new Error(
+      "Provider video Google VEO disabilitato. Seleziona esplicitamente Luma, Kling, Vidu, LTX o un modello AIML."
+    );
+
+    // --- Codice Google VEO legacy mantenuto come morto per riferimento, mai eseguito ---
+    // eslint-disable-next-line no-unreachable
     console.log("Starting video generation with Google Veo 3.1");
     console.log("Received duration:", duration, "Type:", typeof duration);
 
