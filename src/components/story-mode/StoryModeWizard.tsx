@@ -3677,6 +3677,61 @@ export const StoryModeWizard = () => {
                     ))}
                   </div>
                 </div>
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
+                    <Film className="w-3 h-3" />Modello video
+                    {input.videoModel && input.videoModel !== "auto" && (
+                      <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0 h-4">
+                        {VIDEO_PROVIDERS[input.videoModel as VideoProviderType]?.shortName ?? input.videoModel}
+                      </Badge>
+                    )}
+                  </Label>
+                  <Select
+                    value={input.videoModel ?? "auto"}
+                    onValueChange={(v) => setInput(p => ({ ...p, videoModel: v }))}
+                  >
+                    <SelectTrigger className="mt-1.5 h-9 text-xs">
+                      <SelectValue placeholder="Auto (consigliato)" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[400px]">
+                      {(() => {
+                        // Group providers by category for readable submenu
+                        const groups: Record<string, VideoProviderType[]> = {};
+                        PROVIDER_DISPLAY_ORDER.forEach((id) => {
+                          const info = VIDEO_PROVIDERS[id];
+                          if (!info) return;
+                          const cat = info.category || "Altri";
+                          (groups[cat] ||= []).push(id);
+                        });
+                        const catOrder = ["Auto", "Luma", "Runway", "Kling", "Sora", "Veo", "MiniMax", "PixVerse", "Wan", "Seedance", "PiAPI", "LTX", "Vidu", "Freepik", "Altri"];
+                        const sortedCats = Object.keys(groups).sort(
+                          (a, b) => (catOrder.indexOf(a) === -1 ? 999 : catOrder.indexOf(a)) - (catOrder.indexOf(b) === -1 ? 999 : catOrder.indexOf(b))
+                        );
+                        return sortedCats.map((cat) => (
+                          <div key={cat}>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border first:border-t-0">
+                              {cat}
+                            </div>
+                            {groups[cat].map((id) => {
+                              const info = VIDEO_PROVIDERS[id];
+                              return (
+                                <SelectItem key={id} value={id} className="text-xs">
+                                  <span className="font-medium">{info.shortName ?? info.name}</span>
+                                  {info.description && (
+                                    <span className="text-muted-foreground ml-1.5">— {info.description}</span>
+                                  )}
+                                </SelectItem>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Auto sceglie il provider più adatto per scena. I provider VEO/Sora/Kling Pro hanno costi più elevati.
+                  </p>
+                </div>
               </CardContent>
             </Card>
             <Button onClick={handleGenerateScript} disabled={!input.description.trim() || isGeneratingScript} className="w-full h-12 text-lg" size="lg">
