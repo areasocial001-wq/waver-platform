@@ -50,6 +50,7 @@ import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
 import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
+import { VIDEO_PROVIDERS, PROVIDER_DISPLAY_ORDER, type VideoProviderType } from "@/lib/videoProviderConfig";
 import { applySceneFieldUpdate, applySceneAssetCommit, applyBulkTransition } from "@/lib/storyModeSceneUpdate";
 
 // Style preview images
