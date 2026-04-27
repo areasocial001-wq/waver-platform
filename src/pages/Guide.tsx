@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import {
   Download, BookOpen, Video, Image, Mic, Music, Layout, Wand2,
-  Film, FileJson, Gauge, Clapperboard, EyeOff, Settings, CreditCard,
+  Film, FileJson, Gauge, Clapperboard, EyeOff, Settings,
   Shield, Activity, ChevronRight, Sparkles, Layers, Workflow
 } from "lucide-react";
 import { motion } from "framer-motion";
