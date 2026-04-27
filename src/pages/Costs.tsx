@@ -415,6 +415,12 @@ const Costs = () => {
             </div>
           )}
         </div>
+        <SceneCostDetailDialog
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          row={detailRow}
+          projectTitle={detailRow?.story_project_id ? projectTitleById.get(detailRow.story_project_id) : undefined}
+        />
       </div>
     </AuthGuard>
   );
