@@ -991,6 +991,7 @@ export const StoryModeWizard = () => {
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
       videoAspectRatio: config.videoAspectRatio || "16:9", videoQuality: config.videoQuality || "hd", videoFps: config.videoFps || "24", characterFidelity: config.characterFidelity || "medium",
+      videoModel: config.videoModel || "auto",
     });
     if (isStale) {
       toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
