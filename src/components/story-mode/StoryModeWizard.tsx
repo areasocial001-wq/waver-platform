@@ -50,6 +50,7 @@ import { MusicSkippedCard, type MusicSkipState } from "./MusicSkippedCard";
 import { AudioProviderBadge, type AudioProviderState } from "./AudioProviderBadge";
 import { withElevenlabsSlot } from "@/lib/elevenlabsLimiter";
 import { buildImageRegenerationPrompt, buildVideoRegenerationPrompt } from "@/lib/storyModePromptBuilder";
+import { VIDEO_PROVIDERS, PROVIDER_DISPLAY_ORDER, type VideoProviderType } from "@/lib/videoProviderConfig";
 import { applySceneFieldUpdate, applySceneAssetCommit, applyBulkTransition } from "@/lib/storyModeSceneUpdate";
 
 // Style preview images
@@ -376,6 +377,7 @@ export const StoryModeWizard = () => {
       stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
       description: "", language: "it", voiceId: initialVoiceId, ttsProvider: "auto", numScenes: 8,
       videoAspectRatio: "16:9", videoQuality: "hd", videoFps: "24", characterFidelity: "medium",
+      videoModel: "auto",
     };
   });
   const [script, setScript] = useState<StoryScript | null>(null);
@@ -990,6 +992,7 @@ export const StoryModeWizard = () => {
       description: config.description || "", language: config.language || "it",
       voiceId: config.voiceId || "EXAVITQu4vr4xnSDxMaL", numScenes: config.numScenes || 8,
       videoAspectRatio: config.videoAspectRatio || "16:9", videoQuality: config.videoQuality || "hd", videoFps: config.videoFps || "24", characterFidelity: config.characterFidelity || "medium",
+      videoModel: config.videoModel || "auto",
     });
     if (isStale) {
       toast.warning("L'immagine di riferimento salvata non è più valida. Ricaricala prima di generare.");
@@ -1388,6 +1391,7 @@ export const StoryModeWizard = () => {
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
             aspect_ratio: input.videoAspectRatio,
+            ...(input.videoModel && input.videoModel !== "auto" ? { preferredProvider: input.videoModel } : {}),
           },
         });
         if (error) throw error;
@@ -2961,7 +2965,15 @@ export const StoryModeWizard = () => {
           ? ", horizontal 16:9 cinematic frame"
           : "";
         const { data, error } = await supabase.functions.invoke("generate-video", {
-          body: { prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}${orientationHint}`, image_url: scenes[i].imageUrl, type: "image_to_video", duration: Math.min(scenes[i].duration, 10), model: "kling-2.1", aspect_ratio: input.videoAspectRatio },
+          body: {
+            prompt: `${scenes[i].imagePrompt}, ${scenes[i].cameraMovement.replace(/_/g, " ")}${orientationHint}`,
+            image_url: scenes[i].imageUrl,
+            type: "image_to_video",
+            duration: Math.min(scenes[i].duration, 10),
+            model: "kling-2.1",
+            aspect_ratio: input.videoAspectRatio,
+            ...(input.videoModel && input.videoModel !== "auto" ? { preferredProvider: input.videoModel } : {}),
+          },
         });
         if (error) throw error;
 
@@ -3664,6 +3676,61 @@ export const StoryModeWizard = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <Label className="text-xs flex items-center gap-1">
+                    <Film className="w-3 h-3" />Modello video
+                    {input.videoModel && input.videoModel !== "auto" && (
+                      <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0 h-4">
+                        {VIDEO_PROVIDERS[input.videoModel as VideoProviderType]?.shortName ?? input.videoModel}
+                      </Badge>
+                    )}
+                  </Label>
+                  <Select
+                    value={input.videoModel ?? "auto"}
+                    onValueChange={(v) => setInput(p => ({ ...p, videoModel: v }))}
+                  >
+                    <SelectTrigger className="mt-1.5 h-9 text-xs">
+                      <SelectValue placeholder="Auto (consigliato)" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[400px]">
+                      {(() => {
+                        // Group providers by category for readable submenu
+                        const groups: Record<string, VideoProviderType[]> = {};
+                        PROVIDER_DISPLAY_ORDER.forEach((id) => {
+                          const info = VIDEO_PROVIDERS[id];
+                          if (!info) return;
+                          const cat = info.category || "Altri";
+                          (groups[cat] ||= []).push(id);
+                        });
+                        const catOrder = ["Auto", "Luma", "Runway", "Kling", "Sora", "Veo", "MiniMax", "PixVerse", "Wan", "Seedance", "PiAPI", "LTX", "Vidu", "Freepik", "Altri"];
+                        const sortedCats = Object.keys(groups).sort(
+                          (a, b) => (catOrder.indexOf(a) === -1 ? 999 : catOrder.indexOf(a)) - (catOrder.indexOf(b) === -1 ? 999 : catOrder.indexOf(b))
+                        );
+                        return sortedCats.map((cat) => (
+                          <div key={cat}>
+                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border first:border-t-0">
+                              {cat}
+                            </div>
+                            {groups[cat].map((id) => {
+                              const info = VIDEO_PROVIDERS[id];
+                              return (
+                                <SelectItem key={id} value={id} className="text-xs">
+                                  <span className="font-medium">{info.shortName ?? info.name}</span>
+                                  {info.description && (
+                                    <span className="text-muted-foreground ml-1.5">— {info.description}</span>
+                                  )}
+                                </SelectItem>
+                              );
+                            })}
+                          </div>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Auto sceglie il provider più adatto per scena. I provider VEO/Sora/Kling Pro hanno costi più elevati.
+                  </p>
                 </div>
               </CardContent>
             </Card>

@@ -119,5 +119,12 @@ export interface StoryModeInput {
   videoQuality: VideoQuality;
   videoFps: VideoFps;
   characterFidelity: CharacterFidelity;
+  /**
+   * Preferred video provider/model for scene generation. Defaults to "auto"
+   * which delegates choice to generate-video edge function (Kling 2.1 legacy).
+   * Any value matching VideoProviderType (e.g. "aiml-veo3.1-t2v",
+   * "luma-direct-ray2", "piapi-kling-2.5") is forwarded as `preferredProvider`.
+   */
+  videoModel?: string;
 }
 
