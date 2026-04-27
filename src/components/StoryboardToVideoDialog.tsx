@@ -379,8 +379,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
               <SelectContent>
                 <SelectItem value="auto">🤖 Automatico (migliore disponibile)</SelectItem>
                 
-                {/* Google Veo */}
-                <SelectItem value="google-veo">🌟 Google Veo 3.1 - Alta qualità, incluso</SelectItem>
+                {/* Google Veo nativo RIMOSSO per controllo costi - usa AIML Veo invece */}
                 
                 {/* AI/ML API Models */}
                 <SelectItem value="aiml-runway">🎬 AI/ML: Runway Gen-3 Alpha Turbo</SelectItem>
@@ -402,11 +401,9 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
             <p className="text-xs text-muted-foreground">
               {videoProvider === "auto" 
                 ? "Selezione automatica del miglior provider disponibile."
-                : videoProvider === "google-veo" 
-                  ? "Google Veo 3.1: Alta qualità, incluso con Lovable AI."
-                  : videoProvider.startsWith("aiml-")
-                    ? "AI/ML API: Gateway unificato per modelli video premium. Richiede AIML_API_KEY."
-                    : "PiAPI: Accesso diretto ai modelli video più recenti. Richiede PIAPI_API_KEY."}
+                : videoProvider.startsWith("aiml-")
+                  ? "AI/ML API: Gateway unificato per modelli video premium. Richiede AIML_API_KEY."
+                  : "PiAPI: Accesso diretto ai modelli video più recenti. Richiede PIAPI_API_KEY."}
             </p>
           </div>
 

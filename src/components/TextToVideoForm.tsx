@@ -253,7 +253,7 @@ export const TextToVideoForm = () => {
 
       // Translate prompt to English for better results (keeping dialogue in original language)
       let translatedPrompt = cinematicPrompt;
-      if (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || preferredProvider === "auto") {
+      if (preferredProvider === "piapi-veo3" || preferredProvider === "auto" || preferredProvider === "aiml-veo3.1-t2v") {
         try {
           toast.info("Traduzione prompt in inglese...", { duration: 2000 });
           const { data: translateData, error: translateError } = await supabase.functions.invoke('translate-prompt', {
@@ -355,8 +355,8 @@ export const TextToVideoForm = () => {
             prompt: translatedPrompt,
             duration: duration,
             resolution: resolution,
-            aspect_ratio: (preferredProvider === "google-veo" || preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || isLtxProvider) ? aspectRatio : undefined,
-            generate_audio: (preferredProvider === "google-veo" || preferredProvider === "piapi-veo3" || isLtxProvider) ? generateAudio : undefined,
+            aspect_ratio: (preferredProvider === "piapi-sora2" || preferredProvider === "piapi-veo3" || isLtxProvider) ? aspectRatio : undefined,
+            generate_audio: (preferredProvider === "piapi-veo3" || isLtxProvider) ? generateAudio : undefined,
             camera_motion: ltxCameraMotion,
             generationId: generationData.id,
             preferredProvider: preferredProvider !== "auto" ? preferredProvider : undefined,
