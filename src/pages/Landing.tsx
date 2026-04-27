@@ -176,43 +176,7 @@ const features = [
   { icon: Music, title: "Luma Photon & Ray 2", description: "Generazione immagini e video direttamente via API Luma Labs." },
 ];
 
-const getPlans = (isAnnual: boolean) => [
-  {
-    name: "Free",
-    price: "€0",
-    period: "/mese",
-    features: ["5 generazioni video/mese", "Generazione immagini AI", "Risoluzione 720p", "1 storyboard", "1 progetto Story Mode/mese", "Text-to-Speech base"],
-    cta: "Inizia Gratis",
-    highlighted: false,
-  },
-  {
-    name: "Premium",
-    price: isAnnual ? "€23,90" : "€29,90",
-    period: "/mese",
-    yearlyTotal: isAnnual ? "€286,80/anno" : undefined,
-    features: ["30 generazioni video/mese", "Immagini illimitate", "1080p", "10 storyboard", "5 progetti Story Mode/mese", "Workflow AI (Freepik, Vidu, LTX)", "Faceless Video & Trailer", "Talking Avatar", "Voice cloning & Musica AI", "Timeline editor", "Multi-provider"],
-    cta: "Passa a Premium",
-    highlighted: false,
-  },
-  {
-    name: "Creator",
-    price: isAnnual ? "€39,90" : "€49,90",
-    period: "/mese",
-    yearlyTotal: isAnnual ? "€478,80/anno" : undefined,
-    features: ["100 generazioni video/mese", "Immagini illimitate", "1080p", "Storyboard illimitati", "15 progetti Story Mode/mese", "Tutti i Workflow AI", "Faceless, Trailer & Avatar", "Voice cloning & Musica AI", "Timeline editor", "Accesso API", "Supporto prioritario email"],
-    cta: "Passa a Creator",
-    highlighted: true,
-  },
-  {
-    name: "Business",
-    price: isAnnual ? "€63,90" : "€79,90",
-    period: "/mese",
-    yearlyTotal: isAnnual ? "€766,80/anno" : undefined,
-    features: ["200 generazioni video/mese", "Immagini illimitate", "4K", "Storyboard illimitati", "Story Mode illimitato", "Tutti i Workflow AI", "Faceless, Trailer & Avatar", "Voice cloning & Musica AI", "Timeline avanzato", "API dedicata + priorità", "Supporto prioritario dedicato"],
-    cta: "Passa a Business",
-    highlighted: false,
-  },
-];
+// Pricing/plans removed: commercial features disabled platform-wide.
 
 function HeroReelParallax() {
   const reelRef = useRef<HTMLDivElement>(null);
@@ -276,8 +240,6 @@ export default function Landing() {
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
   const heroScale = useTransform(scrollYProgress, [0, 1], [1, 1.15]);
   const heroOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-  const [isAnnual, setIsAnnual] = useState(false);
-  const plans = getPlans(isAnnual);
 
   return (
     <div className="min-h-screen bg-[hsl(225,25%,5%)] text-[hsl(210,40%,98%)] overflow-hidden">
@@ -316,7 +278,7 @@ export default function Landing() {
             <button onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Funzionalità</button>
             <button onClick={() => document.getElementById("showcase")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Showcase</button>
             <button onClick={() => document.getElementById("story-mode")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Story Mode</button>
-            <button onClick={() => document.getElementById("pricing")?.scrollIntoView({ behavior: "smooth" })} className="hover:text-white transition-colors">Prezzi</button>
+            
             <button onClick={() => navigate("/guide")} className="hover:text-white transition-colors inline-flex items-center gap-1"><BookOpen className="w-3.5 h-3.5" />Guida</button>
           </div>
           <div className="flex items-center gap-3">
