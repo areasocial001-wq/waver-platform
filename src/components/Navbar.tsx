@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { User } from "@supabase/supabase-js";
-import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, CreditCard, Crown, Clapperboard, EyeOff, Wallet } from "lucide-react";
+import { LogOut, History, Sparkles, Home, Layout, FileText, Wand2, Activity, Film, Settings, Mic, Music, MoreHorizontal, ChevronDown, Gauge, UserCircle, FileJson, Shield, Clapperboard, EyeOff, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate, useLocation } from "react-router-dom";
 import { ApiStatusNavWidget } from "./ApiStatusNavWidget";
@@ -10,7 +10,6 @@ import { VoiceCloneDialog } from "./VoiceCloneDialog";
 import logoImg from "@/assets/logo.png";
 import { AudioExtractorDialog } from "./AudioExtractorDialog";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useSubscription } from "@/hooks/useSubscription";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -39,7 +38,6 @@ export const Navbar = () => {
   const [voiceCloneOpen, setVoiceCloneOpen] = useState(false);
   const [audioExtractorOpen, setAudioExtractorOpen] = useState(false);
   const { isAdmin } = useUserRole();
-  const { tier, subscribed } = useSubscription();
   
   const isHistoryPage = location.pathname === "/history";
   const isStoryboardsPage = location.pathname === "/my-storyboards";
@@ -105,17 +103,12 @@ export const Navbar = () => {
           </div>
           
           {/* Role Badge */}
-          {isAdmin ? (
+          {isAdmin && (
             <Badge className="bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30 hidden sm:inline-flex gap-1">
               <Shield className="w-3 h-3" />
               Admin
             </Badge>
-          ) : subscribed && (tier === "premium" || tier === "creator" || tier === "business") ? (
-            <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 hover:bg-amber-500/30 hidden sm:inline-flex gap-1">
-              <Crown className="w-3 h-3" />
-              {tier === "business" ? "Business" : tier === "creator" ? "Creator" : "Premium"}
-            </Badge>
-          ) : null}
+          )}
           
           {/* Email - hidden on small screens */}
           <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
@@ -296,10 +289,6 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/costs")}>
                     <Wallet className="w-4 h-4 mr-2" />
                     Costi generazioni
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("/pricing")}>
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    Prezzi & Upgrade
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/guide")}>
                     <FileText className="w-4 h-4 mr-2" />
