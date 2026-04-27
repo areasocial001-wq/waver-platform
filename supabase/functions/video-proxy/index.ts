@@ -147,6 +147,31 @@ serve(async (req) => {
       });
     }
 
+    // Google AI (Veo nativo) DISABILITATO per controllo costi.
+    // Intercettiamo PRIMA dell'allowlist per restituire una risposta gestibile dal client
+    // (status 200 + VIDEO_EXPIRED) invece di un 403 che genera schermata bianca.
+    let parsedUri: URL;
+    try {
+      parsedUri = new URL(videoUri);
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid URI" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (parsedUri.hostname === "generativelanguage.googleapis.com") {
+      console.warn("Blocked legacy Google Veo URL:", videoUri.slice(0, 120));
+      return new Response(
+        JSON.stringify({
+          error: "VIDEO_EXPIRED",
+          fallback: true,
+          upstreamStatus: 410,
+          message: "Questo video era stato generato con Google Veo (ora disabilitato). Rigeneralo con un altro provider (Luma, Kling, Vidu, LTX).",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Validate URL against allowlist
     if (!isAllowedUrl(videoUri)) {
       return new Response(JSON.stringify({ error: "URL not allowed" }), {
@@ -159,15 +184,6 @@ serve(async (req) => {
 
     // Build fetch headers based on the target URL
     const fetchHeaders: Record<string, string> = {};
-    
-    // Google AI (Veo nativo) DISABILITATO: nessuna autenticazione verso Google.
-    const parsedUri = new URL(videoUri);
-    if (parsedUri.hostname === "generativelanguage.googleapis.com") {
-      return new Response(
-        JSON.stringify({ error: "Google AI Veo disabilitato. Rigenera il video con un altro provider." }),
-        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     // Forward range header for partial content requests
     const rangeHeader = req.headers.get("Range");
