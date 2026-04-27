@@ -82,8 +82,7 @@ const LINE_ALLOWLIST_GENERIC = [
   // Asset Freepik / stock library di terze parti, label esterna
   /licenses\?\.some.*type\s*===\s*["']premium["']/i,
   /item\?\.premium\s*===/i,
-  /asset\s+è?\s*premium/i,
-  /asset\s+premium/i,
+  /asset\s+(è\s+)?premium/i,
   /["']premium["']\s*:/, // chiavi di config tipo {premium: 1}
   /SelectItem\s+value=["']premium["']/i,
   /Badge[^>]*>\s*Premium\s*</i,
