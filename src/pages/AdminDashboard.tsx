@@ -15,9 +15,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, UserPlus, RefreshCw, Crown, Mail, DollarSign, Database, Mic2 } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, RefreshCw, Crown, Mail, Database, Mic2 } from "lucide-react";
 import { WaitlistManager } from "@/components/admin/WaitlistManager";
-import { CostMarginDashboard } from "@/components/admin/CostMarginDashboard";
 import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
 import { KlingTimeoutsCard } from "@/components/admin/KlingTimeoutsCard";
 import { VoiceMappingsManager } from "@/components/admin/VoiceMappingsManager";
@@ -98,7 +97,6 @@ export default function AdminDashboard() {
   if (!isAdmin) return null;
 
   const totalUsers = users.length;
-  const premiumUsers = users.filter((u) => u.roles.includes("premium")).length;
   const blockedUsers = users.filter((u) => u.profile?.is_blocked).length;
 
   return (
@@ -117,17 +115,11 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Utenti Totali</CardDescription>
                 <CardTitle className="text-3xl">{totalUsers}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Utenti Premium</CardDescription>
-                <CardTitle className="text-3xl text-primary">{premiumUsers}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
@@ -158,10 +150,6 @@ export default function AdminDashboard() {
               <TabsTrigger value="waitlist" className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
                 Waitlist
-              </TabsTrigger>
-              <TabsTrigger value="costs" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Costi & Margini
               </TabsTrigger>
               <TabsTrigger value="db" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
@@ -371,10 +359,9 @@ export default function AdminDashboard() {
               <WaitlistManager />
             </TabsContent>
 
-            <TabsContent value="costs">
-              <CostMarginDashboard />
+            <TabsContent value="db">
+              <DbHealthDashboard />
             </TabsContent>
-
             <TabsContent value="db">
               <DbHealthDashboard />
             </TabsContent>

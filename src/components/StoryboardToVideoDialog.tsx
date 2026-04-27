@@ -402,7 +402,7 @@ export const StoryboardToVideoDialog = ({ storyboardId, panels, characters = [],
               {videoProvider === "auto" 
                 ? "Selezione automatica del miglior provider disponibile."
                 : videoProvider.startsWith("aiml-")
-                  ? "AI/ML API: Gateway unificato per modelli video premium. Richiede AIML_API_KEY."
+                  ? "AI/ML API: Gateway unificato per modelli video di alta gamma. Richiede AIML_API_KEY."
                   : "PiAPI: Accesso diretto ai modelli video più recenti. Richiede PIAPI_API_KEY."}
             </p>
           </div>

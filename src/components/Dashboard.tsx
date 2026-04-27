@@ -439,7 +439,7 @@ export const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Premium features section removed */}
+        
 
         {/* System Info */}
         <Card className="bg-card/50 border-border/50">
