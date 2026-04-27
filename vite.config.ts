@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { spawnSync } from "node:child_process";
@@ -7,12 +7,12 @@ import { componentTagger } from "lovable-tagger";
 /**
  * Esegue scripts/check-no-commercial.mjs in fase di build.
  * Se trova residui di pricing/abbonamenti/Stripe → la build fallisce.
- * In dev mode è solo un avviso (non blocca l'HMR).
+ * In dev mode il plugin non viene applicato (apply: "build").
  */
-function noCommercialGuardPlugin() {
+function noCommercialGuardPlugin(): PluginOption {
   return {
     name: "no-commercial-guard",
-    apply: "build" as const,
+    apply: "build",
     buildStart() {
       const res = spawnSync(
         "node",
