@@ -162,18 +162,9 @@ export const MODEL_CAPABILITIES: Partial<Record<VideoProviderType, ModelCapabili
     ...DEFAULT_CAPABILITIES,
   },
 
-  // ============ GOOGLE VEO (Direct) ============
-  'google-veo': {
-    durations: VEO_DURATIONS,
-    resolutions: STANDARD_RESOLUTIONS,
-    aspectRatios: STANDARD_ASPECT_RATIOS,
-    supportsTextToVideo: true,
-    supportsImageToVideo: true,
-    supportsAudio: true,
-    defaultDuration: 6,
-    defaultAspectRatio: '16:9',
-    defaultResolution: '720p',
-  },
+  // ============ GOOGLE VEO (Direct) RIMOSSO ============
+  // Provider 'google-veo' disabilitato: Veo nativo via Google AI Studio non più supportato (controllo costi)
+
 
   // ============ AI/ML API - RUNWAY ============
   'aiml-runway-gen3-turbo': {
