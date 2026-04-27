@@ -385,6 +385,15 @@ export const StoryModeWizard = () => {
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [costGuardrailOpen, setCostGuardrailOpen] = useState(false);
+  const [costGuardrailRecommendation, setCostGuardrailRecommendation] = useState<{
+    currentProvider: string;
+    recommendedId: string;
+    recommendedLabel: string;
+    currentTotal: number;
+    recommendedTotal: number;
+    reason: string;
+  } | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
