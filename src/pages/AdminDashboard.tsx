@@ -98,7 +98,6 @@ export default function AdminDashboard() {
   if (!isAdmin) return null;
 
   const totalUsers = users.length;
-  const premiumUsers = users.filter((u) => u.roles.includes("premium")).length;
   const blockedUsers = users.filter((u) => u.profile?.is_blocked).length;
 
   return (
@@ -117,17 +116,11 @@ export default function AdminDashboard() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Utenti Totali</CardDescription>
                 <CardTitle className="text-3xl">{totalUsers}</CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Utenti Premium</CardDescription>
-                <CardTitle className="text-3xl text-primary">{premiumUsers}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
