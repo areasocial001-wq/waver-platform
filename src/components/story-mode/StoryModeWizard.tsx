@@ -1390,6 +1390,7 @@ export const StoryModeWizard = () => {
             image_url: scene.imageUrl, type: "image_to_video",
             duration: Math.min(scene.duration, 10), model: "kling-2.1",
             aspect_ratio: input.videoAspectRatio,
+            ...(input.videoModel && input.videoModel !== "auto" ? { preferredProvider: input.videoModel } : {}),
           },
         });
         if (error) throw error;
