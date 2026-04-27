@@ -18,6 +18,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { toast } from "sonner";
+import { SceneCostDetailDialog } from "@/components/costs/SceneCostDetailDialog";
 
 interface CostRow {
   id: string;
@@ -28,6 +29,7 @@ interface CostRow {
   scene_index: number | null;
   status: string;
   created_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 interface ProjectOption {
@@ -51,6 +53,8 @@ const Costs = () => {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [threshold, setThresholdState] = useState<number>(getCostAlertThreshold());
+  const [detailRow, setDetailRow] = useState<CostRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -67,7 +71,7 @@ const Costs = () => {
         const [{ data: costs }, { data: projs }] = await Promise.all([
           supabase
             .from("video_cost_log")
-            .select("id, provider, seconds_billed, cost_eur, story_project_id, scene_index, status, created_at")
+            .select("id, provider, seconds_billed, cost_eur, story_project_id, scene_index, status, created_at, metadata")
             .eq("user_id", user.id)
             .gte("created_at", startOfMonth.toISOString())
             .order("created_at", { ascending: false })
@@ -378,7 +382,11 @@ const Costs = () => {
                       </TableHeader>
                       <TableBody>
                         {topScenes.map(s => (
-                          <TableRow key={s.id}>
+                          <TableRow
+                            key={s.id}
+                            className="cursor-pointer hover:bg-accent/40"
+                            onClick={() => { setDetailRow(s); setDetailOpen(true); }}
+                          >
                             <TableCell className="text-xs">
                               {new Date(s.created_at).toLocaleDateString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                             </TableCell>
@@ -407,6 +415,12 @@ const Costs = () => {
             </div>
           )}
         </div>
+        <SceneCostDetailDialog
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          row={detailRow}
+          projectTitle={detailRow?.story_project_id ? projectTitleById.get(detailRow.story_project_id) : undefined}
+        />
       </div>
     </AuthGuard>
   );

@@ -46,6 +46,7 @@ import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type Musi
 import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
 import { logVideoCost } from "@/lib/videoCostLogger";
 import { getCostAlertThreshold } from "@/lib/costAlertThreshold";
+import { getRecommendedCheaperProvider } from "@/lib/providerRecommender";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
@@ -385,6 +386,15 @@ export const StoryModeWizard = () => {
   });
   const [script, setScript] = useState<StoryScript | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [costGuardrailOpen, setCostGuardrailOpen] = useState(false);
+  const [costGuardrailRecommendation, setCostGuardrailRecommendation] = useState<{
+    currentProvider: string;
+    recommendedId: string;
+    recommendedLabel: string;
+    currentTotal: number;
+    recommendedTotal: number;
+    reason: string;
+  } | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [regenProgress, setRegenProgress] = useState<{ current: number; total: number } | null>(null);
@@ -1492,7 +1502,12 @@ export const StoryModeWizard = () => {
           storyProjectId: projectId ?? null,
           sceneIndex: index,
           status: "success",
-          metadata: { source: "regen_single_scene" },
+          metadata: {
+            source: "regen_single_scene",
+            prompt: scene.imagePrompt || scene.narration,
+            requestedDuration: scene.duration,
+            sceneNumber: scene.sceneNumber,
+          },
         });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
@@ -3076,7 +3091,12 @@ export const StoryModeWizard = () => {
           storyProjectId: projectId ?? null,
           sceneIndex: i,
           status: "success",
-          metadata: { source: "batch_generate_all" },
+          metadata: {
+            source: "batch_generate_all",
+            prompt: scenes[i].imagePrompt || scenes[i].narration,
+            requestedDuration: scenes[i].duration,
+            sceneNumber: scenes[i].sceneNumber,
+          },
         });
         if (videoCheck?.mismatch) {
           console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
@@ -3822,7 +3842,34 @@ export const StoryModeWizard = () => {
                 </div>
               </CardContent>
             </Card>
-            <Button onClick={handleGenerateScript} disabled={!input.description.trim() || isGeneratingScript} className="w-full h-12 text-lg" size="lg">
+            <Button
+              onClick={() => {
+                const provider = input.videoModel ?? "auto";
+                const sceneDurations = Array(input.numScenes).fill(8);
+                const est = estimateProjectCost(provider, sceneDurations);
+                const threshold = getCostAlertThreshold();
+                if (est.totalEur > threshold) {
+                  const rec = getRecommendedCheaperProvider(provider);
+                  if (rec) {
+                    const recTotal = +(rec.pricePerSec * input.numScenes * 8).toFixed(2);
+                    setCostGuardrailRecommendation({
+                      currentProvider: provider,
+                      recommendedId: rec.id,
+                      recommendedLabel: rec.label,
+                      currentTotal: est.totalEur,
+                      recommendedTotal: recTotal,
+                      reason: rec.reason,
+                    });
+                    setCostGuardrailOpen(true);
+                    return;
+                  }
+                }
+                handleGenerateScript();
+              }}
+              disabled={!input.description.trim() || isGeneratingScript}
+              className="w-full h-12 text-lg"
+              size="lg"
+            >
               {isGeneratingScript ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generazione Script...</> : <><Sparkles className="w-5 h-5 mr-2" />Genera Script AI</>}
             </Button>
           </div>
@@ -4979,6 +5026,88 @@ export const StoryModeWizard = () => {
             >
               <RefreshCw className="w-4 h-4 mr-2" />
               Rigenera manualmente e rilancia
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cost guardrail: suggerisce un provider economico prima di generare */}
+      <AlertDialog open={costGuardrailOpen} onOpenChange={setCostGuardrailOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Costo stimato sopra la soglia
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  La generazione con il provider attuale supera la tua soglia di avviso
+                  di <strong>{formatEur(getCostAlertThreshold())}</strong>.
+                </p>
+                {costGuardrailRecommendation && (
+                  <>
+                    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Provider attuale</span>
+                        <span className="font-medium">{costGuardrailRecommendation.currentProvider}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Costo stimato</span>
+                        <span className="font-bold text-destructive tabular-nums">
+                          {formatEur(costGuardrailRecommendation.currentTotal)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-200/80">Suggerito</span>
+                        <span className="font-medium text-emerald-100">
+                          {costGuardrailRecommendation.recommendedLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-200/80">Nuovo costo stimato</span>
+                        <span className="font-bold text-emerald-100 tabular-nums">
+                          {formatEur(costGuardrailRecommendation.recommendedTotal)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-200/70">
+                        {costGuardrailRecommendation.reason}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCostGuardrailOpen(false);
+                setCostGuardrailRecommendation(null);
+                handleGenerateScript();
+              }}
+            >
+              Continua comunque
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (costGuardrailRecommendation) {
+                  setInput(prev => ({
+                    ...prev,
+                    videoModel: costGuardrailRecommendation.recommendedId as VideoProviderType,
+                  }));
+                  toast.success(`Provider cambiato in ${costGuardrailRecommendation.recommendedLabel}`);
+                }
+                setCostGuardrailOpen(false);
+                setCostGuardrailRecommendation(null);
+                handleGenerateScript();
+              }}
+            >
+              Cambia e genera
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
