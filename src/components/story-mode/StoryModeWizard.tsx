@@ -44,6 +44,7 @@ import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacter
 import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
 import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
+import { logVideoCost } from "@/lib/videoCostLogger";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
