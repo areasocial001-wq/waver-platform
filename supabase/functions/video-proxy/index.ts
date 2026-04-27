@@ -160,16 +160,13 @@ serve(async (req) => {
     // Build fetch headers based on the target URL
     const fetchHeaders: Record<string, string> = {};
     
-    // Only add Google API key for verified Google-hosted URIs
+    // Google AI (Veo nativo) DISABILITATO: nessuna autenticazione verso Google.
     const parsedUri = new URL(videoUri);
-    if (
-      parsedUri.hostname === "generativelanguage.googleapis.com" ||
-      parsedUri.hostname === "storage.googleapis.com"
-    ) {
-      const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
-      if (GOOGLE_AI_API_KEY) {
-        fetchHeaders["x-goog-api-key"] = GOOGLE_AI_API_KEY;
-      }
+    if (parsedUri.hostname === "generativelanguage.googleapis.com") {
+      return new Response(
+        JSON.stringify({ error: "Google AI Veo disabilitato. Rigenera il video con un altro provider." }),
+        { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Forward range header for partial content requests
