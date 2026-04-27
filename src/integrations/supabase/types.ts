@@ -911,6 +911,45 @@ export type Database = {
         }
         Relationships: []
       }
+      video_cost_log: {
+        Row: {
+          cost_eur: number
+          created_at: string
+          id: string
+          metadata: Json
+          provider: string
+          scene_index: number | null
+          seconds_billed: number
+          status: string
+          story_project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cost_eur?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          provider: string
+          scene_index?: number | null
+          seconds_billed?: number
+          status?: string
+          story_project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cost_eur?: number
+          created_at?: string
+          id?: string
+          metadata?: Json
+          provider?: string
+          scene_index?: number | null
+          seconds_billed?: number
+          status?: string
+          story_project_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       video_generations: {
         Row: {
           audio_url: string | null
