@@ -175,39 +175,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     supportsImageToVideo: true,
     supportsTextToVideo: true,
   },
-  'google-veo': {
-    id: 'google-veo',
-    name: 'Google Veo 3.1 (Diretto)',
-    shortName: 'Veo Diretto',
-    group: 'google',
-    description: 'API Diretta Google, audio nativo integrato',
-    color: 'bg-blue-500',
-    badgeColor: 'bg-blue-500/20',
-    textColor: 'text-blue-500',
-    speed: 2,
-    quality: 3,
-    cost: 2,
-    features: ['API Diretta', 'Audio nativo', 'Alta qualità'],
-    estimatedTime: '2-4 min',
-    fallbackOrder: ['aiml-veo3.1-t2v', 'piapi-kling-2.5'],
-    durations: [
-      { value: '4', label: '4 secondi' },
-      { value: '6', label: '6 secondi' },
-      { value: '8', label: '8 secondi' },
-    ],
-    resolutions: [
-      { value: '720p', label: '720p (HD)' },
-      { value: '1080p', label: '1080p (Full HD)' },
-    ],
-    aspectRatios: [
-      { value: '16:9', label: '16:9 (Orizzontale)' },
-      { value: '9:16', label: '9:16 (Verticale)' },
-    ],
-    supportsAudio: true,
-    supportsImageToVideo: true,
-    supportsTextToVideo: true,
-    requiresApiKey: 'GOOGLE_AI_API_KEY',
-  },
+  // 'google-veo' (Veo nativo via Google AI Studio) RIMOSSO per controllo costi.
+  // Tutte le richieste video VEO ora passano via AIML o vengono reindirizzate a Luma.
 
   // ============ LUMA DIRECT (via LUMA_API_KEY) ============
   'luma-direct-ray2': {
