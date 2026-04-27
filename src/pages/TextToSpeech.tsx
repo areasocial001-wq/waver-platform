@@ -132,6 +132,45 @@ function TextToSpeechContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto language detection (debounced). Updates the language selector when
+  // the detected language differs from the current one with enough confidence.
+  // We skip auto-application when the user has just manually changed the
+  // language, so their choice isn't immediately overridden.
+  useEffect(() => {
+    if (!autoDetectLang) {
+      setDetection(null);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      const result = detectLanguage(text);
+      if (!result) {
+        setDetection(null);
+        return;
+      }
+      setDetection({ lang: result.langCode, confidence: result.confidence });
+      if (
+        !langManuallyChangedRef.current
+        && result.langCode !== langCode
+        && result.confidence >= 0.25
+      ) {
+        setLangCode(result.langCode);
+      }
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [text, autoDetectLang, langCode]);
+
+  // Reset the manual-override flag when the user clears most of the text:
+  // a fresh paste should be detected again from scratch.
+  useEffect(() => {
+    if (text.trim().length < 8) langManuallyChangedRef.current = false;
+  }, [text]);
+
+  const handleLangChange = (next: string) => {
+    langManuallyChangedRef.current = true;
+    setLangCode(next);
+  };
+
+
   const filteredVoices = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return allVoices;
