@@ -807,9 +807,10 @@ serve(async (req) => {
 
     // Start new video generation
     const { 
-      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generate_audio, generationId, preferredProvider,
+      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generate_audio, generationId,
       motion_video, motion_control, character_orientation, keep_original_sound
     } = body;
+    let preferredProvider = body.preferredProvider as string | undefined;
 
     if (!type) {
       return new Response(
