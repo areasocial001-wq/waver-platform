@@ -1492,7 +1492,12 @@ export const StoryModeWizard = () => {
           storyProjectId: projectId ?? null,
           sceneIndex: index,
           status: "success",
-          metadata: { source: "regen_single_scene" },
+          metadata: {
+            source: "regen_single_scene",
+            prompt: scene.videoPrompt || scene.imagePrompt || scene.description,
+            requestedDuration: scene.duration,
+            sceneTitle: scene.title,
+          },
         });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
@@ -3076,7 +3081,12 @@ export const StoryModeWizard = () => {
           storyProjectId: projectId ?? null,
           sceneIndex: i,
           status: "success",
-          metadata: { source: "batch_generate_all" },
+          metadata: {
+            source: "batch_generate_all",
+            prompt: scenes[i].videoPrompt || scenes[i].imagePrompt || scenes[i].description,
+            requestedDuration: scenes[i].duration,
+            sceneTitle: scenes[i].title,
+          },
         });
         if (videoCheck?.mismatch) {
           console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
