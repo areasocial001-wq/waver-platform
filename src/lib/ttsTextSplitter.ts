@@ -77,20 +77,22 @@ function concatWav(buffers: ArrayBuffer[]): Blob {
   // WAV header is 44 bytes. We strip it from chunks 2..N and update sizes
   // in the first chunk's header.
   const HEADER = 44;
-  const dataParts: Uint8Array[] = [new Uint8Array(buffers[0])];
-  let totalDataBytes = buffers[0].byteLength - HEADER;
+  const firstCopy = new ArrayBuffer(buffers[0].byteLength);
+  new Uint8Array(firstCopy).set(new Uint8Array(buffers[0]));
+  const dataParts: ArrayBuffer[] = [firstCopy];
+  let totalDataBytes = firstCopy.byteLength - HEADER;
 
   for (let i = 1; i < buffers.length; i++) {
-    const view = new Uint8Array(buffers[i]);
-    if (view.length <= HEADER) continue;
-    const data = view.slice(HEADER);
-    dataParts.push(data);
-    totalDataBytes += data.length;
+    if (buffers[i].byteLength <= HEADER) continue;
+    const src = new Uint8Array(buffers[i]);
+    const slice = new ArrayBuffer(src.byteLength - HEADER);
+    new Uint8Array(slice).set(src.subarray(HEADER));
+    dataParts.push(slice);
+    totalDataBytes += slice.byteLength;
   }
 
   // Patch sizes in the header (RIFF chunk size at offset 4, data chunk size at 40)
-  const header = dataParts[0];
-  const headerView = new DataView(header.buffer, header.byteOffset, HEADER);
+  const headerView = new DataView(firstCopy, 0, HEADER);
   headerView.setUint32(4, totalDataBytes + 36, true);
   headerView.setUint32(40, totalDataBytes, true);
 
