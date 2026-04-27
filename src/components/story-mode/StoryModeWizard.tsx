@@ -5030,6 +5030,88 @@ export const StoryModeWizard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cost guardrail: suggerisce un provider economico prima di generare */}
+      <AlertDialog open={costGuardrailOpen} onOpenChange={setCostGuardrailOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Costo stimato sopra la soglia
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  La generazione con il provider attuale supera la tua soglia di avviso
+                  di <strong>{formatEur(getCostAlertThreshold())}</strong>.
+                </p>
+                {costGuardrailRecommendation && (
+                  <>
+                    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Provider attuale</span>
+                        <span className="font-medium">{costGuardrailRecommendation.currentProvider}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Costo stimato</span>
+                        <span className="font-bold text-destructive tabular-nums">
+                          {formatEur(costGuardrailRecommendation.currentTotal)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-200/80">Suggerito</span>
+                        <span className="font-medium text-emerald-100">
+                          {costGuardrailRecommendation.recommendedLabel}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-emerald-200/80">Nuovo costo stimato</span>
+                        <span className="font-bold text-emerald-100 tabular-nums">
+                          {formatEur(costGuardrailRecommendation.recommendedTotal)}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-200/70">
+                        {costGuardrailRecommendation.reason}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCostGuardrailOpen(false);
+                setCostGuardrailRecommendation(null);
+                handleGenerateScript();
+              }}
+            >
+              Continua comunque
+            </Button>
+            <AlertDialogAction
+              onClick={() => {
+                if (costGuardrailRecommendation) {
+                  setInput(prev => ({
+                    ...prev,
+                    videoModel: costGuardrailRecommendation.recommendedId as VideoProviderType,
+                  }));
+                  toast.success(`Provider cambiato in ${costGuardrailRecommendation.recommendedLabel}`);
+                }
+                setCostGuardrailOpen(false);
+                setCostGuardrailRecommendation(null);
+                handleGenerateScript();
+              }}
+            >
+              Cambia e genera
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
