@@ -183,7 +183,7 @@ export const SceneCard = ({
                 Generato con Google VEO (ora disabilitato per costi). Rigenera con Luma/Kling.
               </p>
               <button
-                onClick={() => onRegenerate?.(index, "video")}
+                onClick={() => onRegenerate?.("video")}
                 className="text-[11px] font-medium px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 Rigenera video
