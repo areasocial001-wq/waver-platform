@@ -126,7 +126,6 @@ const guideSections: GuideSection[] = [
     id: "talking-avatar",
     icon: Mic,
     title: "Talking Avatar",
-    badge: "Premium",
     description: "Crea avatar parlanti con sincronizzazione labiale e voci personalizzate.",
     steps: [
       "Accedi alla sezione Talking Avatar dalla navigazione.",
@@ -145,7 +144,6 @@ const guideSections: GuideSection[] = [
     id: "voice-cloning",
     icon: Mic,
     title: "Voice Cloning & TTS",
-    badge: "Premium",
     description: "Clona la tua voce o genera speech da testo con voci naturali multi-lingua.",
     steps: [
       "Apri la finestra Voice Clone dalla barra di navigazione.",
@@ -159,7 +157,6 @@ const guideSections: GuideSection[] = [
     id: "timeline-editor",
     icon: Film,
     title: "Timeline Editor",
-    badge: "Premium",
     description: "Monta i tuoi video con un editor timeline professionale con tracce audio e transizioni.",
     steps: [
       "Accedi al Timeline Editor dalla navigazione.",
@@ -196,7 +193,6 @@ const guideSections: GuideSection[] = [
     id: "workflow-ai",
     icon: Workflow,
     title: "Workflow AI (Nodi Visuali)",
-    badge: "Premium",
     description: "Crea pipeline di produzione video con un editor a nodi visuale drag-and-drop.",
     steps: [
       "Accedi alla sezione Freepik Workflow dalla navigazione.",
@@ -215,7 +211,6 @@ const guideSections: GuideSection[] = [
     id: "faceless-video",
     icon: EyeOff,
     title: "Faceless Video",
-    badge: "Premium",
     description: "Genera video automatici per social media senza bisogno di apparire in camera.",
     steps: [
       "Accedi alla sezione Faceless Video.",
@@ -229,7 +224,6 @@ const guideSections: GuideSection[] = [
     id: "trailer-generator",
     icon: Clapperboard,
     title: "Trailer Generator",
-    badge: "Premium",
     description: "Crea trailer cinematografici professionali con template e musica epica.",
     steps: [
       "Accedi al Trailer Generator dalla navigazione.",
