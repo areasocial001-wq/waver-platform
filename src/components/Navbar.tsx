@@ -186,7 +186,6 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => setVoiceCloneOpen(true)}>
                     <Mic className="w-4 h-4 mr-2" />
                     Clona Voce
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setAudioExtractorOpen(true)}>
                     <Music className="w-4 h-4 mr-2" />
@@ -228,7 +227,6 @@ export const Navbar = () => {
                     <DropdownMenuItem onClick={() => navigate("/timeline-editor")}>
                       <Gauge className="w-4 h-4 mr-2" />
                       Timeline Editor
-                      <Crown className="w-3 h-3 ml-auto text-amber-400" />
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate("/talking-avatar")}>
                       <UserCircle className="w-4 h-4 mr-2" />
@@ -240,42 +238,34 @@ export const Navbar = () => {
                   <DropdownMenuItem onClick={() => navigate("/content-generator")}>
                     <FileText className="w-4 h-4 mr-2" />
                     AI Content
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/vidu-tools")}>
                     <Film className="w-4 h-4 mr-2" />
                     Vidu Advanced
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/ltx-tools")}>
                     <Film className="w-4 h-4 mr-2" />
                     LTX Advanced
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/luma-tools")}>
                     <Sparkles className="w-4 h-4 mr-2" />
                     Luma AI Tools
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/faceless-video")}>
                     <EyeOff className="w-4 h-4 mr-2" />
                     Faceless Video
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/trailer-generator")}>
                     <Clapperboard className="w-4 h-4 mr-2" />
                     Trailer Generator
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/story-mode")}>
                     <Film className="w-4 h-4 mr-2" />
                     Story Mode
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Freepik
-                    <Crown className="w-3 h-3 ml-auto text-amber-400" />
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/nl-to-json")}>
                     <FileJson className="w-4 h-4 mr-2" />
