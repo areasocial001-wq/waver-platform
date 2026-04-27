@@ -46,8 +46,7 @@ const guideSections: GuideSection[] = [
       "Configura le tue API key nella sezione Impostazioni per sbloccare i provider.",
     ],
     tips: [
-      "Il piano Free include 5 generazioni video al mese e immagini illimitate.",
-      "Puoi passare a Premium o Business in qualsiasi momento dalla pagina Prezzi.",
+      "Tutte le funzionalità della piattaforma sono disponibili gratuitamente in fase di test.",
     ],
   },
   {
@@ -277,23 +276,6 @@ const guideSections: GuideSection[] = [
     tips: [
       "Le API key sono crittografate e salvate in modo sicuro.",
       "Puoi cambiare provider in qualsiasi momento senza perdere i dati.",
-    ],
-  },
-  {
-    id: "pricing",
-    icon: CreditCard,
-    title: "Piani & Abbonamenti",
-    description: "Scopri i piani disponibili e gestisci il tuo abbonamento.",
-    steps: [
-      "Vai alla pagina Prezzi per confrontare i piani.",
-      "Free: 5 video/mese, 720p, 3 storyboard, funzionalità base.",
-      "Premium (€19.90/mese): 50 video/mese, 1080p, workflow AI, talking avatar, voice cloning.",
-      "Business (€79.90/mese): Video illimitati, 4K, tutti i workflow, API access, supporto prioritario.",
-      "Upgrade direttamente dalla pagina Prezzi con pagamento sicuro.",
-    ],
-    tips: [
-      "Risparmia fino al 20% con la fatturazione annuale.",
-      "Il downgrade è possibile in qualsiasi momento.",
     ],
   },
 ];
