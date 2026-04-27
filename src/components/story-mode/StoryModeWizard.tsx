@@ -43,6 +43,7 @@ import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/a
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
+import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
