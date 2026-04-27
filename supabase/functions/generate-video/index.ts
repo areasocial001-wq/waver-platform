@@ -253,13 +253,15 @@ serve(async (req) => {
       }
       userId = userData.user.id;
     }
-    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+    // Google AI (Veo nativo) DISABILITATO: tutte le richieste vengono instradate
+    // su Luma/PiAPI/AIML/Vidu/LTX. Vedi commit di rimozione VEO nativo.
+    const GOOGLE_AI_API_KEY = "";
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
     const VIDU_API_KEY = Deno.env.get("VIDU_API_KEY");
     const LUMA_API_KEY_CHECK = Deno.env.get("LUMA_API_KEY");
     
-    const hasValidGoogleKey = GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.trim().length > 0;
+    const hasValidGoogleKey = false; // permanently disabled
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
     const hasValidViduKey = VIDU_API_KEY && VIDU_API_KEY.trim().length > 0;
@@ -267,15 +269,16 @@ serve(async (req) => {
     const hasValidLumaKey = !!LUMA_API_KEY_CHECK?.trim();
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey && !hasValidLumaKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, LTX_API_KEY, or LUMA_API_KEY");
+    if (!hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey && !hasValidLumaKey) {
+      throw new Error("No video generation API configured. Please set PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, LTX_API_KEY, or LUMA_API_KEY");
     }
     
     console.log("API credentials check:", {
-      hasGoogleKey: hasValidGoogleKey,
+      hasGoogleKey: false,
       hasPiAPIKey: hasValidPiAPIKey,
       hasAIMLKey: hasValidAIMLKey,
       hasViduKey: hasValidViduKey,
+      hasLumaKey: hasValidLumaKey,
     });
 
     body = await req.json();
