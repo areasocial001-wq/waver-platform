@@ -2,10 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
 import ProviderSettings from "@/components/ProviderSettings";
-import ProviderPriceComparison from "@/components/ProviderPriceComparison";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, Zap, Bell, Shield, DollarSign, Film, FileAudio, Sliders } from "lucide-react";
+import { Settings, Zap, Bell, Shield, Film, FileAudio, Sliders } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { NotificationSettings } from "@/components/NotificationSettings";
@@ -79,14 +78,10 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue="providers" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="providers" className="flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 <span className="hidden sm:inline">Provider</span>
-              </TabsTrigger>
-              <TabsTrigger value="pricing" className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                <span className="hidden sm:inline">Prezzi</span>
               </TabsTrigger>
               <TabsTrigger value="story-mode" className="flex items-center gap-2">
                 <Film className="h-4 w-4" />
@@ -112,10 +107,6 @@ export default function SettingsPage() {
 
             <TabsContent value="providers">
               <ProviderSettings />
-            </TabsContent>
-
-            <TabsContent value="pricing">
-              <ProviderPriceComparison />
             </TabsContent>
 
             <TabsContent value="story-mode">
