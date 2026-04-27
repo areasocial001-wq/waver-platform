@@ -7,8 +7,8 @@ const corsHeaders = {
 };
 
 // Allowed domains for proxying
+// NOTA: generativelanguage.googleapis.com rimosso (Veo nativo disabilitato per costi).
 const ALLOWED_DOMAINS = [
-  "generativelanguage.googleapis.com",
   "storage.googleapis.com",
   "lh3.googleusercontent.com",
   "replicate.delivery",
