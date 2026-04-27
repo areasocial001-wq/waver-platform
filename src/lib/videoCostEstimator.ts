@@ -74,7 +74,7 @@ export function estimateProjectCost(
 
   let warning: string | undefined;
   if (pricePerSec >= 0.20) {
-    warning = `⚠️ Provider premium (€${pricePerSec.toFixed(2)}/sec). Considera Luma Ray 2 o Kling per scene non chiave.`;
+    warning = `⚠️ Provider costoso (€${pricePerSec.toFixed(2)}/sec). Considera Luma Ray 2 o Kling per scene non chiave.`;
   } else if (pricePerSec >= 0.10) {
     warning = `Provider di fascia alta (€${pricePerSec.toFixed(2)}/sec).`;
   }

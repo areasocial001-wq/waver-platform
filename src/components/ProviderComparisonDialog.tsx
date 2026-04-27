@@ -48,7 +48,7 @@ const getQualityLabel = (quality: number) => {
 const getCostLabel = (cost: number) => {
   if (cost === 1) return "Economico";
   if (cost === 2) return "Medio";
-  return "Premium";
+  return "Costoso";
 };
 
 export const ProviderComparisonDialog = ({
