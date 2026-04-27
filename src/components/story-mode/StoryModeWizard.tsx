@@ -3842,7 +3842,34 @@ export const StoryModeWizard = () => {
                 </div>
               </CardContent>
             </Card>
-            <Button onClick={handleGenerateScript} disabled={!input.description.trim() || isGeneratingScript} className="w-full h-12 text-lg" size="lg">
+            <Button
+              onClick={() => {
+                const provider = input.videoModel ?? "auto";
+                const sceneDurations = Array(input.numScenes).fill(8);
+                const est = estimateProjectCost(provider, sceneDurations);
+                const threshold = getCostAlertThreshold();
+                if (est.totalEur > threshold) {
+                  const rec = getRecommendedCheaperProvider(provider);
+                  if (rec) {
+                    const recTotal = +(rec.pricePerSec * input.numScenes * 8).toFixed(2);
+                    setCostGuardrailRecommendation({
+                      currentProvider: provider,
+                      recommendedId: rec.id,
+                      recommendedLabel: rec.label,
+                      currentTotal: est.totalEur,
+                      recommendedTotal: recTotal,
+                      reason: rec.reason,
+                    });
+                    setCostGuardrailOpen(true);
+                    return;
+                  }
+                }
+                handleGenerateScript();
+              }}
+              disabled={!input.description.trim() || isGeneratingScript}
+              className="w-full h-12 text-lg"
+              size="lg"
+            >
               {isGeneratingScript ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Generazione Script...</> : <><Sparkles className="w-5 h-5 mr-2" />Genera Script AI</>}
             </Button>
           </div>
