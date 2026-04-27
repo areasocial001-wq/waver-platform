@@ -1494,9 +1494,9 @@ export const StoryModeWizard = () => {
           status: "success",
           metadata: {
             source: "regen_single_scene",
-            prompt: scene.videoPrompt || scene.imagePrompt || scene.description,
+            prompt: scene.imagePrompt || scene.narration,
             requestedDuration: scene.duration,
-            sceneTitle: scene.title,
+            sceneNumber: scene.sceneNumber,
           },
         });
         if (videoCheck?.mismatch) {
@@ -3083,9 +3083,9 @@ export const StoryModeWizard = () => {
           status: "success",
           metadata: {
             source: "batch_generate_all",
-            prompt: scenes[i].videoPrompt || scenes[i].imagePrompt || scenes[i].description,
+            prompt: scenes[i].imagePrompt || scenes[i].narration,
             requestedDuration: scenes[i].duration,
-            sceneTitle: scenes[i].title,
+            sceneNumber: scenes[i].sceneNumber,
           },
         });
         if (videoCheck?.mismatch) {
