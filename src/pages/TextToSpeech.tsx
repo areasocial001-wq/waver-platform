@@ -391,8 +391,23 @@ function TextToSpeechContent() {
             {/* Voice + language summary */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Lingua di output</Label>
-                <Select value={langCode} onValueChange={setLangCode}>
+                <div className="flex items-center justify-between">
+                  <Label>Lingua di output</Label>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="auto-detect-lang"
+                      checked={autoDetectLang}
+                      onCheckedChange={(v) => {
+                        setAutoDetectLang(v);
+                        if (v) langManuallyChangedRef.current = false;
+                      }}
+                    />
+                    <Label htmlFor="auto-detect-lang" className="text-xs cursor-pointer text-muted-foreground">
+                      Auto
+                    </Label>
+                  </div>
+                </div>
+                <Select value={langCode} onValueChange={handleLangChange}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -404,6 +419,34 @@ function TextToSpeechContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                {autoDetectLang && detection && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Badge
+                      variant="outline"
+                      className={
+                        detection.lang === langCode
+                          ? "border-primary/40 text-primary"
+                          : "border-amber-500/40 text-amber-600"
+                      }
+                    >
+                      Rilevato: {SUPPORTED_LANGUAGES.find(l => l.code === detection.lang)?.flag}{" "}
+                      {SUPPORTED_LANGUAGES.find(l => l.code === detection.lang)?.name ?? detection.lang}
+                    </Badge>
+                    <span>conf. {Math.round(detection.confidence * 100)}%</span>
+                    {detection.lang !== langCode && (
+                      <button
+                        type="button"
+                        className="underline hover:text-foreground"
+                        onClick={() => {
+                          langManuallyChangedRef.current = false;
+                          setLangCode(detection.lang);
+                        }}
+                      >
+                        applica
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Voce selezionata</Label>
