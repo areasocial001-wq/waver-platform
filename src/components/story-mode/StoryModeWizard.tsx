@@ -3777,7 +3777,7 @@ export const StoryModeWizard = () => {
                     const sceneDurations = Array(input.numScenes).fill(8);
                     const est = estimateProjectCost(provider, sceneDurations);
                     const pricePerSec = getPricePerSecond(provider);
-                    const isPremium = pricePerSec >= 0.20;
+                    const isExpensive = pricePerSec >= 0.20;
                     const isMid = pricePerSec >= 0.10 && pricePerSec < 0.20;
                     const threshold = getCostAlertThreshold();
                     const overThreshold = est.totalEur > threshold;
@@ -3791,7 +3791,7 @@ export const StoryModeWizard = () => {
                       <div
                         className={cn(
                           "mt-2 rounded-md border p-2.5 text-xs",
-                          overThreshold || isPremium
+                          overThreshold || isExpensive
                             ? "border-destructive/50 bg-destructive/10 text-destructive-foreground"
                             : isMid
                               ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
@@ -3831,7 +3831,7 @@ export const StoryModeWizard = () => {
                         {!overThreshold && est.warning && (
                           <div className="mt-1.5 text-[11px] font-medium">{est.warning}</div>
                         )}
-                        {!overThreshold && isPremium && (
+                        {!overThreshold && isExpensive && (
                           <div className="mt-1.5 text-[11px] opacity-90">
                             Suggerito: <strong>Luma Ray 2</strong> (~{formatEur(0.05 * input.numScenes * 8)}) o <strong>Kling 2.5</strong> per scene non chiave.
                           </div>
