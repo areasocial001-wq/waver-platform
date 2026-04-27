@@ -47,13 +47,14 @@ interface PiAPIModelConfig {
 }
 
 const PIAPI_MODELS: Record<string, PiAPIModelConfig> = {
-  // Kling models - use video_generation for text-to-video, img2video for image-to-video
-  "kling-2.6": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
-  "kling-2.6-motion": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
-  "kling-2.5": { model: "kling", model_name: "kling-v2-5", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
-  "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
-  "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
-  "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "img2video" },
+  // Kling models - PiAPI uses task_type "video_generation" for BOTH text-to-video and image-to-video
+  // (presence of image_url in input determines mode). "img2video" is rejected as invalid for Kling.
+  "kling-2.6": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
+  "kling-2.6-motion": { model: "kling", model_name: "kling-v2-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
+  "kling-2.5": { model: "kling", model_name: "kling-v2-5", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
+  "kling-2.1": { model: "kling", model_name: "kling-v2-1", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
+  "kling-2.0": { model: "kling", model_name: "kling-v2", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
+  "kling-1.6": { model: "kling", model_name: "kling-v1-6", mode: "std", task_type_txt2video: "video_generation", task_type_img2video: "video_generation" },
   // Other video models - these use txt2video/img2video
   "hailuo": { model: "hailuo", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
   "luma": { model: "luma", task_type_txt2video: "txt2video", task_type_img2video: "img2video" },
