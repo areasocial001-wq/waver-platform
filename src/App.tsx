@@ -74,6 +74,7 @@ const App = () => (
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/story-mode" element={<StoryMode />} />
             <Route path="/story-mode/voice-test" element={<VoiceTest />} />
+            <Route path="/tts" element={<TextToSpeech />} />
             <Route path="/costs" element={<Costs />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/recovery-analytics" element={<AdminRecoveryAnalytics />} />
