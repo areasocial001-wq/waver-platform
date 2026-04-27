@@ -88,6 +88,9 @@ function TextToSpeechContent() {
     "Ciao! Questa è una prova della funzione text-to-speech.",
   );
   const [langCode, setLangCode] = useState<string>("it");
+  const [autoDetectLang, setAutoDetectLang] = useState<boolean>(true);
+  const [detection, setDetection] = useState<{ lang: SupportedLangCode; confidence: number } | null>(null);
+  const langManuallyChangedRef = useRef<boolean>(false);
   const [autoSplit, setAutoSplit] = useState<boolean>(true);
   const [search, setSearch] = useState<string>("");
 
