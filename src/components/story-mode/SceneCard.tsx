@@ -119,8 +119,10 @@ export const SceneCard = ({
   const [videoNoteOpen, setVideoNoteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
-  const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
-  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  // VEO nativo (Google AI Studio) è stato disabilitato: i vecchi URL non sono più accessibili
+  const isVeoExpired = !!scene.videoUrl && scene.videoUrl.includes("generativelanguage.googleapis.com");
+  const needsAuthFetch = isVideoReady && !isVeoExpired && scene.videoUrl?.includes("/functions/v1/video-proxy");
+  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady && !isVeoExpired);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
 
   // Detect "stuck" scenes: videoStatus generating for > 15 minutes.
