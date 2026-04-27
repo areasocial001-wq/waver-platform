@@ -183,6 +183,10 @@ export const Navbar = () => {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>Strumenti Audio</DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate("/tts")}>
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Text to Speech
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setVoiceCloneOpen(true)}>
                     <Mic className="w-4 h-4 mr-2" />
                     Clona Voce
