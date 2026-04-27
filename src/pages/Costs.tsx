@@ -71,7 +71,7 @@ const Costs = () => {
         const [{ data: costs }, { data: projs }] = await Promise.all([
           supabase
             .from("video_cost_log")
-            .select("id, provider, seconds_billed, cost_eur, story_project_id, scene_index, status, created_at")
+            .select("id, provider, seconds_billed, cost_eur, story_project_id, scene_index, status, created_at, metadata")
             .eq("user_id", user.id)
             .gte("created_at", startOfMonth.toISOString())
             .order("created_at", { ascending: false })
