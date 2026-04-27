@@ -359,10 +359,9 @@ export default function AdminDashboard() {
               <WaitlistManager />
             </TabsContent>
 
-            <TabsContent value="costs">
-              <CostMarginDashboard />
+            <TabsContent value="db">
+              <DbHealthDashboard />
             </TabsContent>
-
             <TabsContent value="db">
               <DbHealthDashboard />
             </TabsContent>
