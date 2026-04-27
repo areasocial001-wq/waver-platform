@@ -46,6 +46,7 @@ import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type Musi
 import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
 import { logVideoCost } from "@/lib/videoCostLogger";
 import { getCostAlertThreshold } from "@/lib/costAlertThreshold";
+import { getRecommendedCheaperProvider } from "@/lib/providerRecommender";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
