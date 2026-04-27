@@ -45,6 +45,7 @@ import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
 import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
 import { logVideoCost } from "@/lib/videoCostLogger";
+import { getCostAlertThreshold } from "@/lib/costAlertThreshold";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
@@ -3758,11 +3759,19 @@ export const StoryModeWizard = () => {
                     const pricePerSec = getPricePerSecond(provider);
                     const isPremium = pricePerSec >= 0.20;
                     const isMid = pricePerSec >= 0.10 && pricePerSec < 0.20;
+                    const threshold = getCostAlertThreshold();
+                    const overThreshold = est.totalEur > threshold;
+                    // Suggerimento smart: provider più economico + risparmio stimato
+                    const cheaperPps = 0.05; // Luma Ray 2 / Kling 2.1
+                    const cheaperTotal = +(cheaperPps * input.numScenes * 8).toFixed(2);
+                    const savings = +(est.totalEur - cheaperTotal).toFixed(2);
+                    const reducedDurationTotal = +(pricePerSec * input.numScenes * 5).toFixed(2);
+                    const reducedSavings = +(est.totalEur - reducedDurationTotal).toFixed(2);
                     return (
                       <div
                         className={cn(
                           "mt-2 rounded-md border p-2.5 text-xs",
-                          isPremium
+                          overThreshold || isPremium
                             ? "border-destructive/50 bg-destructive/10 text-destructive-foreground"
                             : isMid
                               ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
@@ -3776,10 +3785,33 @@ export const StoryModeWizard = () => {
                         <div className="mt-1 opacity-80">
                           {input.numScenes} scene × ~8s × {formatEur(pricePerSec)}/sec
                         </div>
-                        {est.warning && (
+                        {overThreshold && (
+                          <div className="mt-2 rounded border border-destructive/40 bg-destructive/20 p-2 space-y-1">
+                            <div className="font-semibold flex items-center gap-1">
+                              <AlertTriangle className="w-3.5 h-3.5" /> Sopra la tua soglia di {formatEur(threshold)}
+                            </div>
+                            <div className="text-[11px] opacity-90">Suggerimenti:</div>
+                            <ul className="text-[11px] opacity-90 list-disc list-inside space-y-0.5">
+                              {savings > 0 && (
+                                <li>
+                                  Cambia provider a <strong>Luma Ray 2</strong> o <strong>Kling 2.1</strong>: ~{formatEur(cheaperTotal)} (risparmi {formatEur(savings)}).
+                                </li>
+                              )}
+                              {reducedSavings > 0 && (
+                                <li>
+                                  Riduci la durata media a 5s: ~{formatEur(reducedDurationTotal)} (risparmi {formatEur(reducedSavings)}).
+                                </li>
+                              )}
+                              <li>
+                                Modifica la soglia in <a href="/costs" className="underline font-medium">Costi generazioni</a>.
+                              </li>
+                            </ul>
+                          </div>
+                        )}
+                        {!overThreshold && est.warning && (
                           <div className="mt-1.5 text-[11px] font-medium">{est.warning}</div>
                         )}
-                        {isPremium && (
+                        {!overThreshold && isPremium && (
                           <div className="mt-1.5 text-[11px] opacity-90">
                             Suggerito: <strong>Luma Ray 2</strong> (~{formatEur(0.05 * input.numScenes * 8)}) o <strong>Kling 2.5</strong> per scene non chiave.
                           </div>
