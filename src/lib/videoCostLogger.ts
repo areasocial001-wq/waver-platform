@@ -22,7 +22,7 @@ export async function logVideoCost(params: LogVideoCostParams): Promise<void> {
     const pricePerSec = getPricePerSecond(params.provider);
     const costEur = +(params.secondsBilled * pricePerSec).toFixed(4);
 
-    await supabase.from("video_cost_log").insert({
+    await supabase.from("video_cost_log").insert([{
       user_id: user.id,
       provider: params.provider,
       seconds_billed: params.secondsBilled,
@@ -30,8 +30,8 @@ export async function logVideoCost(params: LogVideoCostParams): Promise<void> {
       story_project_id: params.storyProjectId ?? null,
       scene_index: params.sceneIndex ?? null,
       status: params.status ?? "success",
-      metadata: params.metadata ?? {},
-    });
+      metadata: (params.metadata ?? {}) as never,
+    }]);
   } catch (err) {
     // Solo log, non blocchiamo la UI
     console.warn("[videoCostLogger] Failed to log cost:", err);
