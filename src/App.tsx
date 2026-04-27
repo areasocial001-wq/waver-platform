@@ -31,6 +31,7 @@ import GuidePage from "./pages/Guide";
 import GuidePDF from "./pages/GuidePDF";
 import StoryMode from "./pages/StoryMode";
 import VoiceTest from "./pages/VoiceTest";
+import Costs from "./pages/Costs";
 
 import NotFound from "./pages/NotFound";
 
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/story-mode" element={<StoryMode />} />
             <Route path="/story-mode/voice-test" element={<VoiceTest />} />
+            <Route path="/costs" element={<Costs />} />
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/recovery-analytics" element={<AdminRecoveryAnalytics />} />
             
