@@ -47,6 +47,7 @@ import {
   loadPreferredVoiceId,
   savePreferredVoiceId,
 } from "@/lib/storyModeVoicePref";
+import { detectLanguage, type SupportedLangCode } from "@/lib/languageDetector";
 
 interface HistoryItem {
   id: string;
