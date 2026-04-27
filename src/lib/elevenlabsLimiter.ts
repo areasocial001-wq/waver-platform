@@ -7,7 +7,7 @@
  * this single semaphore we guarantee at most N in-flight requests no matter
  * how many components/hooks initiate them.
  *
- * Default = 2 (matches the lowest paid plan). Bump only if the user upgrades.
+ * Default = 2 (matches the ElevenLabs entry-tier concurrency cap). Increase only with a higher API tier.
  */
 const MAX_CONCURRENT = 2;
 
