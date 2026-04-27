@@ -43,6 +43,8 @@ import { measureAndValidateAspect, measureAndValidateVideoAspect } from "@/lib/a
 import { isAutoRecoveryEnabled, isLockCharacterDefaultEnabled, loadLockCharacterDefaultFromSupabase } from "@/lib/storyModePreferences";
 import { getAudioMix } from "@/lib/storyModeAudioMix";
 import { appendMusicRetryEntry, loadMusicRetryLog, resetMusicRetryLog, type MusicRetryLog } from "@/lib/musicRetryLog";
+import { estimateProjectCost, formatEur, getPricePerSecond } from "@/lib/videoCostEstimator";
+import { logVideoCost } from "@/lib/videoCostLogger";
 import { buildRenderReport, type RenderReport } from "@/lib/storyModeRenderReport";
 import { MusicRetryStatusCard } from "./MusicRetryStatusCard";
 import { RenderReportCard } from "./RenderReportCard";
@@ -1481,6 +1483,15 @@ export const StoryModeWizard = () => {
             versionHistory: newHistoryV,
           };
           return { ...prev, scenes };
+        });
+        // Logga costo stimato di questa rigenerazione
+        void logVideoCost({
+          provider: input.videoModel ?? "auto",
+          secondsBilled: Math.min(scene.duration, 10),
+          storyProjectId: projectId ?? null,
+          sceneIndex: index,
+          status: "success",
+          metadata: { source: "regen_single_scene" },
         });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
@@ -3057,6 +3068,15 @@ export const StoryModeWizard = () => {
           videoHeight: videoCheck?.height,
           videoAspectWarning: videoCheck?.mismatch ? videoCheck.warning : undefined,
         };
+        // Logga costo stimato della generazione batch
+        void logVideoCost({
+          provider: input.videoModel ?? "auto",
+          secondsBilled: Math.min(scenes[i].duration, 10),
+          storyProjectId: projectId ?? null,
+          sceneIndex: i,
+          status: "success",
+          metadata: { source: "batch_generate_all" },
+        });
         if (videoCheck?.mismatch) {
           console.warn(`[Story Mode] Scene ${i + 1} video aspect mismatch:`, videoCheck.warning);
         }
@@ -3731,6 +3751,42 @@ export const StoryModeWizard = () => {
                   <p className="text-[10px] text-muted-foreground mt-1">
                     Auto sceglie il provider più adatto per scena. I provider VEO/Sora/Kling Pro hanno costi più elevati.
                   </p>
+                  {(() => {
+                    const provider = input.videoModel ?? "auto";
+                    const sceneDurations = Array(input.numScenes).fill(8);
+                    const est = estimateProjectCost(provider, sceneDurations);
+                    const pricePerSec = getPricePerSecond(provider);
+                    const isPremium = pricePerSec >= 0.20;
+                    const isMid = pricePerSec >= 0.10 && pricePerSec < 0.20;
+                    return (
+                      <div
+                        className={cn(
+                          "mt-2 rounded-md border p-2.5 text-xs",
+                          isPremium
+                            ? "border-destructive/50 bg-destructive/10 text-destructive-foreground"
+                            : isMid
+                              ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-200"
+                              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">💰 Costo stimato video</span>
+                          <span className="text-base font-bold tabular-nums">{formatEur(est.totalEur)}</span>
+                        </div>
+                        <div className="mt-1 opacity-80">
+                          {input.numScenes} scene × ~8s × {formatEur(pricePerSec)}/sec
+                        </div>
+                        {est.warning && (
+                          <div className="mt-1.5 text-[11px] font-medium">{est.warning}</div>
+                        )}
+                        {isPremium && (
+                          <div className="mt-1.5 text-[11px] opacity-90">
+                            Suggerito: <strong>Luma Ray 2</strong> (~{formatEur(0.05 * input.numScenes * 8)}) o <strong>Kling 2.5</strong> per scene non chiave.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>

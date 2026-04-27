@@ -119,8 +119,10 @@ export const SceneCard = ({
   const [videoNoteOpen, setVideoNoteOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const isVideoReady = scene.videoStatus === "completed" && !!scene.videoUrl;
-  const needsAuthFetch = isVideoReady && scene.videoUrl?.includes("/functions/v1/video-proxy");
-  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady);
+  // VEO nativo (Google AI Studio) è stato disabilitato: i vecchi URL non sono più accessibili
+  const isVeoExpired = !!scene.videoUrl && scene.videoUrl.includes("generativelanguage.googleapis.com");
+  const needsAuthFetch = isVideoReady && !isVeoExpired && scene.videoUrl?.includes("/functions/v1/video-proxy");
+  const { blobUrl: authBlobUrl, isLoading: isVideoLoading } = useAuthVideo(needsAuthFetch ? scene.videoUrl : undefined, isVideoReady && !isVeoExpired);
   const playableVideoUrl = needsAuthFetch ? authBlobUrl : scene.videoUrl;
 
   // Detect "stuck" scenes: videoStatus generating for > 15 minutes.
@@ -173,7 +175,21 @@ export const SceneCard = ({
     return (
       <Card className="bg-card/50 border-border/50 overflow-hidden">
         <div className={cn(aspectClass, "bg-muted/30 relative")}>
-          {!imageJustRegenerated && isVideoReady && isVideoLoading ? (
+          {isVeoExpired ? (
+            <div className="flex flex-col items-center justify-center h-full p-3 text-center bg-destructive/5 border border-destructive/20">
+              <span className="text-2xl mb-1">⚠️</span>
+              <p className="text-xs font-semibold text-destructive">Video VEO scaduto</p>
+              <p className="text-[10px] text-muted-foreground mt-1 mb-2">
+                Generato con Google VEO (ora disabilitato per costi). Rigenera con Luma/Kling.
+              </p>
+              <button
+                onClick={() => onRegenerate?.("video")}
+                className="text-[11px] font-medium px-2.5 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Rigenera video
+              </button>
+            </div>
+          ) : !imageJustRegenerated && isVideoReady && isVideoLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
               <span className="ml-2 text-xs text-muted-foreground">Caricamento video...</span>
