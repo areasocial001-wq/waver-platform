@@ -34,8 +34,8 @@ interface GenerationResult {
 }
 
 // Providers disponibili per multi-model generation
+// 'google-veo' rimosso: Veo nativo via Google AI Studio disabilitato per costi
 const MULTI_MODEL_PROVIDERS: VideoProviderType[] = [
-  'google-veo',
   'aiml-runway-gen4-turbo',
   'aiml-kling-v2.6-pro',
   'aiml-veo3.1-t2v',
@@ -56,7 +56,7 @@ export const MultiModelGenerator = ({
   onResultsUpdate,
   onOpenReport,
 }: MultiModelGeneratorProps) => {
-  const [selectedProviders, setSelectedProviders] = useState<VideoProviderType[]>(['google-veo', 'piapi-kling-2.5']);
+  const [selectedProviders, setSelectedProviders] = useState<VideoProviderType[]>(['aiml-veo3.1-t2v', 'piapi-kling-2.5']);
   const [prompt, setPrompt] = useState(optimizedPrompt || panelCaption || '');
   const [duration, setDuration] = useState('5');
   const [isGenerating, setIsGenerating] = useState(false);

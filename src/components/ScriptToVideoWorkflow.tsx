@@ -553,7 +553,8 @@ export const ScriptToVideoWorkflow = ({
               <SelectTrigger className="w-48 h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">🤖 Auto</SelectItem>
-                <SelectItem value="google-veo">🌟 Google Veo 3.1</SelectItem>
+                {/* Google Veo nativo rimosso - usa AIML Veo invece */}
+                <SelectItem value="aiml-veo3.1-t2v">🎬 AIML Veo 3.1</SelectItem>
                 <SelectItem value="aiml-kling">🎬 Kling v1.6 Pro</SelectItem>
                 <SelectItem value="piapi-kling-2.6">🎥 Kling 2.6</SelectItem>
               </SelectContent>

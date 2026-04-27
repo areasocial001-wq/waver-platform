@@ -5,7 +5,7 @@ export type VideoProviderType =
   // Luma Direct
   | 'luma-direct-ray2'
   | 'luma-direct-flash2'
-  | 'google-veo'
+  // 'google-veo' rimosso: Veo nativo via Google AI Studio disabilitato per costi
   // AI/ML API - Runway
   | 'aiml-runway-gen3-turbo'
   | 'aiml-runway-gen4-turbo'
@@ -163,7 +163,7 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     cost: 2,
     features: ['Selezione automatica', 'Fallback auto'],
     estimatedTime: '2-5 min',
-    fallbackOrder: ['google-veo', 'aiml-veo3.1-t2v', 'piapi-kling-2.5'],
+    fallbackOrder: ['luma-direct-ray2', 'aiml-veo3.1-t2v', 'piapi-kling-2.5'],
     durations: [
       { value: '5', label: '5 secondi' },
       { value: '10', label: '10 secondi' },
@@ -175,39 +175,8 @@ export const VIDEO_PROVIDERS: Record<VideoProviderType, VideoProviderInfo> = {
     supportsImageToVideo: true,
     supportsTextToVideo: true,
   },
-  'google-veo': {
-    id: 'google-veo',
-    name: 'Google Veo 3.1 (Diretto)',
-    shortName: 'Veo Diretto',
-    group: 'google',
-    description: 'API Diretta Google, audio nativo integrato',
-    color: 'bg-blue-500',
-    badgeColor: 'bg-blue-500/20',
-    textColor: 'text-blue-500',
-    speed: 2,
-    quality: 3,
-    cost: 2,
-    features: ['API Diretta', 'Audio nativo', 'Alta qualità'],
-    estimatedTime: '2-4 min',
-    fallbackOrder: ['aiml-veo3.1-t2v', 'piapi-kling-2.5'],
-    durations: [
-      { value: '4', label: '4 secondi' },
-      { value: '6', label: '6 secondi' },
-      { value: '8', label: '8 secondi' },
-    ],
-    resolutions: [
-      { value: '720p', label: '720p (HD)' },
-      { value: '1080p', label: '1080p (Full HD)' },
-    ],
-    aspectRatios: [
-      { value: '16:9', label: '16:9 (Orizzontale)' },
-      { value: '9:16', label: '9:16 (Verticale)' },
-    ],
-    supportsAudio: true,
-    supportsImageToVideo: true,
-    supportsTextToVideo: true,
-    requiresApiKey: 'GOOGLE_AI_API_KEY',
-  },
+  // 'google-veo' (Veo nativo via Google AI Studio) RIMOSSO per controllo costi.
+  // Tutte le richieste video VEO ora passano via AIML o vengono reindirizzate a Luma.
 
   // ============ LUMA DIRECT (via LUMA_API_KEY) ============
   'luma-direct-ray2': {
@@ -2893,7 +2862,8 @@ export function getProviderGroup(providerId: string): ProviderGroup {
   // Fallback per provider ID non standard
   if (providerId.startsWith('aiml-')) return 'aiml';
   if (providerId.startsWith('piapi-')) return 'piapi';
-  if (providerId === 'google-veo' || providerId === 'veo') return 'google';
+  // 'google-veo' rimosso: redirect verso Luma a livello di edge function
+  if (providerId === 'google-veo' || providerId === 'veo') return 'luma';
   if (providerId === 'freepik') return 'freepik';
   if (providerId.startsWith('vidu-')) return 'vidu';
   if (providerId.startsWith('ltx-')) return 'ltx';
@@ -2909,7 +2879,8 @@ export function getProviderInfo(providerId: string): VideoProviderInfo | null {
   
   // Alias comuni
   const aliases: Record<string, VideoProviderType> = {
-    'veo': 'google-veo',
+    'veo': 'luma-direct-ray2', // 'google-veo' rimosso → Luma
+    'google-veo': 'luma-direct-ray2',
     'kling': 'aiml-kling-v2.6-pro',
     'runway': 'aiml-runway-gen4-turbo',
     'sora': 'aiml-sora-2-t2v',
@@ -2941,7 +2912,7 @@ export function getAimlCategories(): string[] {
 // Costi stimati per provider (in USD)
 export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perGeneration: number }> = {
   auto: { perSecond: 0.05, perGeneration: 0.25 },
-  'google-veo': { perSecond: 0.08, perGeneration: 0.40 },
+  // 'google-veo' rimosso dai costi (provider disabilitato)
   // Runway
   'aiml-runway-gen3-turbo': { perSecond: 0.08, perGeneration: 0.40 },
   'aiml-runway-gen4-turbo': { perSecond: 0.12, perGeneration: 0.60 },
@@ -3052,8 +3023,7 @@ export const PROVIDER_COSTS: Record<VideoProviderType, { perSecond: number; perG
 // Ordine di visualizzazione per provider (raggruppati)
 export const PROVIDER_DISPLAY_ORDER: VideoProviderType[] = [
   'auto',
-  // Google Diretto
-  'google-veo',
+  // Google Diretto rimosso: Veo nativo disabilitato per costi
   // Luma Diretto
   'luma-direct-ray2',
   'luma-direct-flash2',

@@ -96,12 +96,10 @@ serve(async (req) => {
       accept: "video/*,*/*",
     };
     
-    // Add Google API key for Google-hosted URIs
-    if (videoUrl.includes("generativelanguage.googleapis.com") || videoUrl.includes("googleapis.com")) {
-      const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
-      if (GOOGLE_AI_API_KEY) {
-        fetchHeaders["x-goog-api-key"] = GOOGLE_AI_API_KEY;
-      }
+    // Google AI (Veo nativo) DISABILITATO per controllo costi.
+    // Non aggiungiamo più x-goog-api-key: gli URL googleapis.com non saranno scaricabili.
+    if (videoUrl.includes("generativelanguage.googleapis.com")) {
+      throw new Error("Google AI Veo è disabilitato. Rigenera il video con un altro provider (Luma, Kling, Vidu, LTX).");
     }
 
     // Add AIML API key for aiml-hosted URIs

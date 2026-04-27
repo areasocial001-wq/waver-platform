@@ -253,13 +253,15 @@ serve(async (req) => {
       }
       userId = userData.user.id;
     }
-    const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+    // Google AI (Veo nativo) DISABILITATO: tutte le richieste vengono instradate
+    // su Luma/PiAPI/AIML/Vidu/LTX. Vedi commit di rimozione VEO nativo.
+    const GOOGLE_AI_API_KEY = "";
     const PIAPI_API_KEY = Deno.env.get("PIAPI_API_KEY");
     const AIML_API_KEY = Deno.env.get("AIML_API_KEY");
     const VIDU_API_KEY = Deno.env.get("VIDU_API_KEY");
     const LUMA_API_KEY_CHECK = Deno.env.get("LUMA_API_KEY");
     
-    const hasValidGoogleKey = GOOGLE_AI_API_KEY && GOOGLE_AI_API_KEY.trim().length > 0;
+    const hasValidGoogleKey = false; // permanently disabled
     const hasValidPiAPIKey = PIAPI_API_KEY && PIAPI_API_KEY.trim().length > 0;
     const hasValidAIMLKey = AIML_API_KEY && AIML_API_KEY.trim().length > 0;
     const hasValidViduKey = VIDU_API_KEY && VIDU_API_KEY.trim().length > 0;
@@ -267,15 +269,16 @@ serve(async (req) => {
     const hasValidLumaKey = !!LUMA_API_KEY_CHECK?.trim();
     
     // At least one provider must be configured
-    if (!hasValidGoogleKey && !hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey && !hasValidLumaKey) {
-      throw new Error("No video generation API configured. Please set GOOGLE_AI_API_KEY, PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, LTX_API_KEY, or LUMA_API_KEY");
+    if (!hasValidPiAPIKey && !hasValidAIMLKey && !hasValidViduKey && !hasValidLtxKey && !hasValidLumaKey) {
+      throw new Error("No video generation API configured. Please set PIAPI_API_KEY, AIML_API_KEY, VIDU_API_KEY, LTX_API_KEY, or LUMA_API_KEY");
     }
     
     console.log("API credentials check:", {
-      hasGoogleKey: hasValidGoogleKey,
+      hasGoogleKey: false,
       hasPiAPIKey: hasValidPiAPIKey,
       hasAIMLKey: hasValidAIMLKey,
       hasViduKey: hasValidViduKey,
+      hasLumaKey: hasValidLumaKey,
     });
 
     body = await req.json();
@@ -804,9 +807,10 @@ serve(async (req) => {
 
     // Start new video generation
     const { 
-      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generate_audio, generationId, preferredProvider,
+      type, prompt, image_url, image, start_image, end_image, duration, resolution, aspect_ratio, generate_audio, generationId,
       motion_video, motion_control, character_orientation, keep_original_sound
     } = body;
+    let preferredProvider = body.preferredProvider as string | undefined;
 
     if (!type) {
       return new Response(
@@ -2108,11 +2112,11 @@ serve(async (req) => {
       });
     }
 
-    // ==================== GOOGLE VEO 3.1 DIRECT ====================
-    // Use Google API directly when google-veo is selected
-    if (preferredProvider === 'google-veo' && hasValidGoogleKey) {
-      console.log("Starting video generation with Google Veo 3.1 (direct API, preferred provider)");
-      // Fall through to the main Google Veo 3.1 section below
+    // ==================== GOOGLE VEO 3.1 DIRECT (DISABILITATO) ====================
+    // Reindirizziamo qualsiasi richiesta google-veo verso Luma per evitare costi Google AI Studio.
+    if (preferredProvider === 'google-veo') {
+      console.warn("[google-veo disabled] Routing request to Luma Ray 2 instead");
+      preferredProvider = 'luma-direct-ray2';
     }
     // ==================== PiAPI PROVIDERS ====================
     // Use PiAPI for piapi-kling, piapi-hailuo, piapi-luma, piapi-wan, piapi-hunyuan
@@ -2563,7 +2567,16 @@ serve(async (req) => {
       });
     }
 
-    // ==================== GOOGLE VEO 3.1 (DEFAULT) ====================
+    // ==================== GOOGLE VEO 3.1 (DISABILITATO) ====================
+    // VEO nativo via Google AI Studio è stato disabilitato per controllo costi.
+    // Se siamo arrivati qui significa che nessun provider alternativo è stato selezionato.
+    // Restituiamo un errore chiaro invece di chiamare Google.
+    throw new Error(
+      "Provider video Google VEO disabilitato. Seleziona esplicitamente Luma, Kling, Vidu, LTX o un modello AIML."
+    );
+
+    // --- Codice Google VEO legacy mantenuto come morto per riferimento, mai eseguito ---
+    // eslint-disable-next-line no-unreachable
     console.log("Starting video generation with Google Veo 3.1");
     console.log("Received duration:", duration, "Type:", typeof duration);
 
