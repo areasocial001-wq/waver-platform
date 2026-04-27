@@ -376,6 +376,7 @@ export const StoryModeWizard = () => {
       stylePromptModifier: "cinematic style, anamorphic lens, professional color grading, film grain, shallow depth of field",
       description: "", language: "it", voiceId: initialVoiceId, ttsProvider: "auto", numScenes: 8,
       videoAspectRatio: "16:9", videoQuality: "hd", videoFps: "24", characterFidelity: "medium",
+      videoModel: "auto",
     };
   });
   const [script, setScript] = useState<StoryScript | null>(null);
