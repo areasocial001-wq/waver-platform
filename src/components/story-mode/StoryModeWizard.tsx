@@ -1484,6 +1484,15 @@ export const StoryModeWizard = () => {
           };
           return { ...prev, scenes };
         });
+        // Logga costo stimato di questa rigenerazione
+        void logVideoCost({
+          provider: input.videoModel ?? "auto",
+          secondsBilled: Math.min(scene.duration, 10),
+          storyProjectId: projectId ?? null,
+          sceneIndex: index,
+          status: "success",
+          metadata: { source: "regen_single_scene" },
+        });
         if (videoCheck?.mismatch) {
           toast.warning(`Scena ${index + 1}: ${videoCheck.warning}`, { duration: 6000 });
         } else {
