@@ -595,31 +595,82 @@ export default function AgentPage() {
 
                   {/* Storyboard */}
                   <Card className="p-6 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Storyboard shot-by-shot</h3>
-                        <p className="text-xs text-muted-foreground">Rivedi e cambia gli asset di ogni scena, regola le durate</p>
+                        <p className="text-xs text-muted-foreground">Anteprima ritmo, miniature Opus-style e tipo B-roll per scena</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => loadStoryboard(project.id)} disabled={loadingStoryboard} className="gap-2">
-                        {loadingStoryboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Ricarica
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={handleRepaceOpus} disabled={!project.scene_overrides?.length} className="gap-2">
+                          <Zap className="w-3.5 h-3.5" /> Re-pace ~3s (Opus)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => loadStoryboard(project.id)} disabled={loadingStoryboard} className="gap-2">
+                          {loadingStoryboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          Ricarica
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* Rhythm bar: visual proportions of scene durations */}
+                    {project.scene_overrides && project.scene_overrides.length > 0 && (() => {
+                      const total = project.scene_overrides.reduce((a, s) => a + (s.duration || 0), 0);
+                      const avg = total / project.scene_overrides.length;
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Ritmo storyboard ({project.scene_overrides.length} scene · totale {total.toFixed(1)}s · media {avg.toFixed(1)}s)</span>
+                            <span className={avg <= 3.5 ? "text-primary font-medium" : ""}>
+                              {avg <= 3.5 ? "✓ Opus-like" : "Più lento di Opus"}
+                            </span>
+                          </div>
+                          <div className="flex w-full h-3 rounded-full overflow-hidden border border-border bg-muted">
+                            {project.scene_overrides.map((s, i) => (
+                              <div
+                                key={i}
+                                style={{ width: `${((s.duration || 0) / Math.max(total, 0.1)) * 100}%` }}
+                                className={`${s.broll_type === "sketch" ? "bg-accent" : "bg-primary"} ${i > 0 ? "border-l border-background" : ""}`}
+                                title={`Scena ${i + 1}: ${(s.duration || 0).toFixed(1)}s · ${s.broll_type || "talking_head"}`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary" /> Talking-head</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-accent" /> Sketch / Blueprint</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {loadingStoryboard && !project.scene_overrides?.length && (
                       <div className="text-center py-8 text-sm text-muted-foreground">Caricamento suggerimenti...</div>
                     )}
 
                     {(project.scene_overrides || []).map((scene, sIdx) => {
-                      const selected = scene.suggestions?.[scene.selectedIndex];
+                      const isSketch = scene.broll_type === "sketch";
                       return (
                         <div key={sIdx} className="border border-border rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                               <Badge>Scena {sIdx + 1}</Badge>
                               <span className="text-sm font-medium">{scene.keyword}</span>
+                              <Badge variant={isSketch ? "outline" : "secondary"} className="gap-1 text-xs">
+                                {isSketch ? <PenTool className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                {isSketch ? "Sketch" : "Talking-head"}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-2">
+                              <div className="flex rounded-md border border-border overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => handleBrollTypeOverride(sIdx, "talking_head")}
+                                  className={`px-2 py-1 text-xs ${!isSketch ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                                >Real</button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBrollTypeOverride(sIdx, "sketch")}
+                                  className={`px-2 py-1 text-xs ${isSketch ? "bg-accent text-accent-foreground" : "bg-background hover:bg-muted"}`}
+                                >Sketch</button>
+                              </div>
                               <Label className="text-xs text-muted-foreground">Durata</Label>
                               <Input type="number" min={1} max={15} step={0.5} value={scene.duration}
                                 onChange={(e) => handleSceneDuration(sIdx, Number(e.target.value))}
