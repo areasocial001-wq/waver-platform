@@ -360,6 +360,49 @@ serve(async (req) => {
     if (!useVidnoz) {
       await appendLog(adminClient, projectId, "Generating narration voiceover...", 50, "narration");
 
+      const lang = (project.language?.slice(0, 2).toLowerCase() || "en");
+      const isEnglish = lang === "en";
+
+      // Curated Inworld native voices per language. These all run on the
+      // multilingual model `inworld-tts-1.5-max` and produce native pronunciation
+      // (no English accent on Italian/Spanish/etc.). First entry is the default.
+      const NATIVE_VOICES_BY_LANG: Record<string, string[]> = {
+        it: ["Alessandro", "Giulia", "Marco", "Sofia"],
+        es: ["Diego", "Lucia", "Mateo", "Valentina"],
+        fr: ["Lucien", "Camille", "Antoine", "Margaux"],
+        de: ["Friedrich", "Hannah", "Klaus", "Anna"],
+        pt: ["Rafael", "Beatriz", "Tiago", "Mariana"],
+      };
+      const nativeList = NATIVE_VOICES_BY_LANG[lang] ?? [];
+
+      // Decide which voice to send to Inworld:
+      //  - English: respect the user's voice_id (legacy ElevenLabs IDs are mapped server-side).
+      //  - Non-English: if the user picked a native voice (a plain Inworld name like "Giulia"
+      //    or "Alessandro") use it directly. Otherwise force the curated default for that
+      //    language and ignore any English-centric voice_id.
+      const looksLikeInworldName = (v?: string | null) =>
+        !!v && /^[A-Z][a-zA-Z]{2,30}$/.test(v);
+
+      let resolvedVoiceId: string | undefined;
+      if (isEnglish) {
+        resolvedVoiceId = project.voice_id || undefined;
+      } else if (looksLikeInworldName(project.voice_id) && nativeList.includes(project.voice_id!)) {
+        resolvedVoiceId = project.voice_id!;
+      } else {
+        resolvedVoiceId = nativeList[0]; // curated native default for this language
+      }
+
+      // Always force the multilingual high-quality model for non-English narration.
+      const forcedModel = isEnglish ? undefined : "inworld-tts-1.5-max";
+
+      await appendLog(
+        adminClient,
+        projectId,
+        `TTS: lang=${lang} voice=${resolvedVoiceId ?? "auto"} model=${forcedModel ?? "default"}`,
+        52,
+        "narration",
+      );
+
       const ttsResp = await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
         method: "POST",
         headers: {
@@ -369,13 +412,9 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           text: project.plan.transcript,
-          // For non-English projects, ignore voice_id (often an EN-only ElevenLabs ID
-          // that gets mapped to an English Inworld voice -> heavy English accent).
-          // Let inworld-tts pick a multilingual default for the requested language.
-          voiceId: (project.language?.toLowerCase().startsWith("en")
-            ? project.voice_id
-            : undefined) || undefined,
-          languageCode: project.language?.slice(0, 2).toLowerCase() || "en",
+          voiceId: resolvedVoiceId,
+          languageCode: lang,
+          modelId: forcedModel,
         }),
       });
 
