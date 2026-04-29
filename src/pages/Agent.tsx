@@ -712,7 +712,15 @@ export default function AgentPage() {
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Lingua</Label>
-                      <Select value={language} onValueChange={setLanguage}>
+                      <Select
+                        value={language}
+                        onValueChange={(v) => {
+                          setLanguage(v);
+                          // Reset voice when switching language so we re-pick a
+                          // native default (avoids EN voices on IT projects, etc.)
+                          setVoiceId("");
+                        }}
+                      >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>{LANGUAGES.map((l) => (<SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>))}</SelectContent>
                       </Select>
@@ -736,15 +744,43 @@ export default function AgentPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Voce narrante</Label>
-                      <Select value={voiceId} onValueChange={setVoiceId} disabled={voicesLoading}>
-                        <SelectTrigger><SelectValue placeholder="Auto" /></SelectTrigger>
-                        <SelectContent className="max-h-72">
-                          {systemVoices.slice(0, 30).map((v) => (
-                            <SelectItem key={v.voiceId} value={v.voiceId}>{v.displayName}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>
+                        Voce narrante
+                        {language !== "en" && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wide text-primary/80">
+                            nativa {language.toUpperCase()}
+                          </span>
+                        )}
+                      </Label>
+                      {language === "en" ? (
+                        <Select value={voiceId} onValueChange={setVoiceId} disabled={voicesLoading}>
+                          <SelectTrigger><SelectValue placeholder="Auto" /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            <SelectItem value="__auto__">Auto (default)</SelectItem>
+                            {systemVoices.slice(0, 30).map((v) => (
+                              <SelectItem key={v.voiceId} value={v.voiceId}>{v.displayName}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Select
+                          value={voiceId || (NATIVE_VOICES_BY_LANG[language]?.[0]?.id ?? "")}
+                          onValueChange={(v) => setVoiceId(v === "__auto__" ? "" : v)}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent className="max-h-72">
+                            <SelectItem value="__auto__">Auto · pronuncia nativa</SelectItem>
+                            {(NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => (
+                              <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {language !== "en" && (
+                        <p className="text-[11px] text-muted-foreground leading-tight">
+                          Modello forzato: Inworld 1.5 Max multilingue. Pronuncia garantita {language.toUpperCase()}.
+                        </p>
+                      )}
                     </div>
                   </div>
 
