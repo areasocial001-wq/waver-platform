@@ -104,20 +104,44 @@ serve(async (req) => {
     const sceneDuration =
       Math.max(3, Math.round((project.target_duration / Math.max(keywords.length, 1)) * 10) / 10);
 
+    // B-roll mix: deterministic distribution of "talking head" vs "sketch" qualifiers across scenes
+    const mix = (project.broll_mix || { talking_head: 50, sketch: 50 }) as {
+      talking_head: number;
+      sketch: number;
+    };
+    const totalMix = Math.max(1, (mix.talking_head || 0) + (mix.sketch || 0));
+    const sketchTarget = Math.round(((mix.sketch || 0) / totalMix) * keywords.length);
+    // Build per-scene type assignment, evenly interleaved
+    const types: Array<"talking_head" | "sketch"> = [];
+    const step = keywords.length / Math.max(1, sketchTarget || 1);
+    for (let i = 0; i < keywords.length; i++) {
+      const isSketch = sketchTarget > 0 && Math.floor(i % step) === 0 && types.filter((t) => t === "sketch").length < sketchTarget;
+      types.push(isSketch ? "sketch" : "talking_head");
+    }
+    const qualifier = (t: "talking_head" | "sketch") =>
+      t === "sketch" ? "sketch blueprint illustration animation" : "person talking close up portrait real footage";
+
     const overrides: Array<{
       keyword: string;
       duration: number;
+      broll_type: "talking_head" | "sketch";
       suggestions: Suggestion[];
       selectedIndex: number;
     }> = [];
 
-    for (const kw of keywords) {
-      const suggestions = await searchFreepik(FREEPIK_API_KEY, kw, 6);
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const t = types[i];
+      const term = `${kw} ${qualifier(t)}`;
+      const suggestions = await searchFreepik(FREEPIK_API_KEY, term, 6);
+      // Fallback to plain keyword if styled search returns nothing
+      const finalSuggestions = suggestions.length > 0 ? suggestions : await searchFreepik(FREEPIK_API_KEY, kw, 6);
       overrides.push({
         keyword: kw,
         duration: sceneDuration,
-        suggestions,
-        selectedIndex: suggestions.length > 0 ? 0 : -1,
+        broll_type: t,
+        suggestions: finalSuggestions,
+        selectedIndex: finalSuggestions.length > 0 ? 0 : -1,
       });
     }
 

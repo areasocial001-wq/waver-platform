@@ -17,9 +17,11 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Slider } from "@/components/ui/slider";
 import {
   Bot, FileText, Loader2, Sparkles, CheckCircle2, AlertCircle, Play, Download,
   RefreshCw, Image as ImageIcon, Palette, Type as TypeIcon, Wand2, Copy, History,
+  Save, Trash2, Mic, PenTool, Zap,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,7 +31,23 @@ type SceneOverride = {
   keyword: string;
   duration: number;
   selectedIndex: number;
+  broll_type?: "talking_head" | "sketch";
   suggestions: { url: string; thumb: string; source: string; id?: string }[];
+};
+
+type UserPreset = {
+  id: string;
+  name: string;
+  base_preset: string;
+  color_palette: { primary: string; secondary: string; accent: string };
+  typography: string;
+  transition_level: string;
+  subtitle_config: { enabled: boolean; language: string; fontSize: string; position: string };
+  intro_title: any;
+  outro_cta: any;
+  broll_mix: { talking_head: number; sketch: number };
+  aspect_ratio: string;
+  scene_duration_sec: number;
 };
 
 type ProjectRow = {
@@ -60,6 +78,7 @@ type ProjectRow = {
   subtitle_config: { enabled: boolean; language: string; fontSize: string; position: string };
   intro_title: { enabled: boolean; text: string; duration: number } | null;
   outro_cta: { enabled: boolean; text: string; duration: number } | null;
+  broll_mix: { talking_head: number; sketch: number };
   created_at: string;
 };
 
@@ -114,6 +133,8 @@ export default function AgentPage() {
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
+  const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
   const { systemVoices, isLoading: voicesLoading } = useInworldVoices();
@@ -157,6 +178,16 @@ export default function AgentPage() {
       if (data) setHistory(data as unknown as ProjectRow[]);
     })();
   }, [activeTab, project?.id]);
+
+  // Load user-saved style presets
+  const loadUserPresets = async () => {
+    const { data } = await supabase
+      .from("agent_user_presets")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setUserPresets(data as unknown as UserPreset[]);
+  };
+  useEffect(() => { loadUserPresets(); }, []);
 
   const handlePdfUpload = async (file: File) => {
     setPdfFile(file);
@@ -299,6 +330,95 @@ export default function AgentPage() {
     updateProject(patch);
   };
 
+  // Re-pace storyboard scenes to the Opus-style ~3s rhythm
+  const handleRepaceOpus = () => {
+    if (!project?.scene_overrides?.length) return;
+    const overrides = project.scene_overrides.map((s) => ({
+      ...s,
+      duration: OPUS_PRESET_DEFAULTS.scene_duration_sec,
+    }));
+    updateProject({ scene_overrides: overrides });
+    toast.success("Storyboard re-pacciato a ~3s per scena (Opus-style)");
+  };
+
+  // B-roll mix update + reload storyboard so suggestions match the new mix
+  const handleBrollMixChange = async (talkingHead: number) => {
+    if (!project) return;
+    const mix = { talking_head: talkingHead, sketch: 100 - talkingHead };
+    await updateProject({ broll_mix: mix });
+  };
+  const handleBrollTypeOverride = (sceneIdx: number, type: "talking_head" | "sketch") => {
+    if (!project) return;
+    const overrides = [...(project.scene_overrides || [])];
+    overrides[sceneIdx] = { ...overrides[sceneIdx], broll_type: type };
+    updateProject({ scene_overrides: overrides });
+  };
+
+  // Save current style as a personal preset
+  const handleSavePreset = async () => {
+    if (!project) return;
+    const name = newPresetName.trim() || `My ${project.style_preset} preset`;
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+    const avgDuration =
+      project.scene_overrides?.length
+        ? Math.round(
+            (project.scene_overrides.reduce((a, s) => a + (s.duration || 3), 0) /
+              project.scene_overrides.length) * 10
+          ) / 10
+        : 3;
+    const { error } = await supabase.from("agent_user_presets").insert({
+      user_id: uid,
+      name,
+      base_preset: project.style_preset,
+      color_palette: project.color_palette,
+      typography: project.typography,
+      transition_level: project.transition_level,
+      subtitle_config: project.subtitle_config,
+      intro_title: project.intro_title,
+      outro_cta: project.outro_cta,
+      broll_mix: project.broll_mix || { talking_head: 50, sketch: 50 },
+      aspect_ratio: project.aspect_ratio,
+      scene_duration_sec: avgDuration,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Preset "${name}" salvato`);
+    setNewPresetName("");
+    loadUserPresets();
+  };
+
+  const handleApplyUserPreset = async (preset: UserPreset) => {
+    if (!project) return;
+    const patch: any = {
+      color_palette: preset.color_palette,
+      typography: preset.typography,
+      transition_level: preset.transition_level,
+      subtitle_config: preset.subtitle_config,
+      intro_title: preset.intro_title,
+      outro_cta: preset.outro_cta,
+      broll_mix: preset.broll_mix,
+      aspect_ratio: preset.aspect_ratio,
+      style_preset: preset.base_preset,
+    };
+    if (project.scene_overrides?.length) {
+      patch.scene_overrides = project.scene_overrides.map((s) => ({
+        ...s,
+        duration: preset.scene_duration_sec || s.duration,
+      }));
+    }
+    await updateProject(patch);
+    toast.success(`Preset "${preset.name}" applicato`);
+  };
+
+  const handleDeleteUserPreset = async (id: string) => {
+    const { error } = await supabase.from("agent_user_presets").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Preset eliminato");
+    loadUserPresets();
+  };
+
+
   const handleDuplicate = async (p: ProjectRow) => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
@@ -321,6 +441,7 @@ export default function AgentPage() {
         subtitle_config: p.subtitle_config,
         intro_title: p.intro_title,
         outro_cta: p.outro_cta,
+        broll_mix: p.broll_mix || { talking_head: 50, sketch: 50 },
       })
       .select("*").single();
     if (error) { toast.error(error.message); return; }
@@ -474,31 +595,82 @@ export default function AgentPage() {
 
                   {/* Storyboard */}
                   <Card className="p-6 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
                         <h3 className="text-lg font-semibold flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Storyboard shot-by-shot</h3>
-                        <p className="text-xs text-muted-foreground">Rivedi e cambia gli asset di ogni scena, regola le durate</p>
+                        <p className="text-xs text-muted-foreground">Anteprima ritmo, miniature Opus-style e tipo B-roll per scena</p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={() => loadStoryboard(project.id)} disabled={loadingStoryboard} className="gap-2">
-                        {loadingStoryboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                        Ricarica
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={handleRepaceOpus} disabled={!project.scene_overrides?.length} className="gap-2">
+                          <Zap className="w-3.5 h-3.5" /> Re-pace ~3s (Opus)
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => loadStoryboard(project.id)} disabled={loadingStoryboard} className="gap-2">
+                          {loadingStoryboard ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          Ricarica
+                        </Button>
+                      </div>
                     </div>
+
+                    {/* Rhythm bar: visual proportions of scene durations */}
+                    {project.scene_overrides && project.scene_overrides.length > 0 && (() => {
+                      const total = project.scene_overrides.reduce((a, s) => a + (s.duration || 0), 0);
+                      const avg = total / project.scene_overrides.length;
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Ritmo storyboard ({project.scene_overrides.length} scene · totale {total.toFixed(1)}s · media {avg.toFixed(1)}s)</span>
+                            <span className={avg <= 3.5 ? "text-primary font-medium" : ""}>
+                              {avg <= 3.5 ? "✓ Opus-like" : "Più lento di Opus"}
+                            </span>
+                          </div>
+                          <div className="flex w-full h-3 rounded-full overflow-hidden border border-border bg-muted">
+                            {project.scene_overrides.map((s, i) => (
+                              <div
+                                key={i}
+                                style={{ width: `${((s.duration || 0) / Math.max(total, 0.1)) * 100}%` }}
+                                className={`${s.broll_type === "sketch" ? "bg-accent" : "bg-primary"} ${i > 0 ? "border-l border-background" : ""}`}
+                                title={`Scena ${i + 1}: ${(s.duration || 0).toFixed(1)}s · ${s.broll_type || "talking_head"}`}
+                              />
+                            ))}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-primary" /> Talking-head</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-accent" /> Sketch / Blueprint</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {loadingStoryboard && !project.scene_overrides?.length && (
                       <div className="text-center py-8 text-sm text-muted-foreground">Caricamento suggerimenti...</div>
                     )}
 
                     {(project.scene_overrides || []).map((scene, sIdx) => {
-                      const selected = scene.suggestions?.[scene.selectedIndex];
+                      const isSketch = scene.broll_type === "sketch";
                       return (
                         <div key={sIdx} className="border border-border rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                               <Badge>Scena {sIdx + 1}</Badge>
                               <span className="text-sm font-medium">{scene.keyword}</span>
+                              <Badge variant={isSketch ? "outline" : "secondary"} className="gap-1 text-xs">
+                                {isSketch ? <PenTool className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                {isSketch ? "Sketch" : "Talking-head"}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-2">
+                              <div className="flex rounded-md border border-border overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => handleBrollTypeOverride(sIdx, "talking_head")}
+                                  className={`px-2 py-1 text-xs ${!isSketch ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}
+                                >Real</button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleBrollTypeOverride(sIdx, "sketch")}
+                                  className={`px-2 py-1 text-xs ${isSketch ? "bg-accent text-accent-foreground" : "bg-background hover:bg-muted"}`}
+                                >Sketch</button>
+                              </div>
                               <Label className="text-xs text-muted-foreground">Durata</Label>
                               <Input type="number" min={1} max={15} step={0.5} value={scene.duration}
                                 onChange={(e) => handleSceneDuration(sIdx, Number(e.target.value))}
@@ -602,6 +774,95 @@ export default function AgentPage() {
                               </SelectContent>
                             </Select>
                           </div>
+                        </div>
+
+                        {/* B-roll Mix: % talking-head vs sketch */}
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2">
+                              <Mic className="w-3.5 h-3.5" /> Mix B-roll: Talking-head vs Sketch
+                            </Label>
+                            <Badge variant="outline" className="text-xs">
+                              {project.broll_mix?.talking_head ?? 50}% / {project.broll_mix?.sketch ?? 50}%
+                            </Badge>
+                          </div>
+                          <Slider
+                            value={[project.broll_mix?.talking_head ?? 50]}
+                            min={0} max={100} step={10}
+                            onValueChange={([v]) => handleBrollMixChange(v)}
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Mic className="w-3 h-3" /> Più talking-head</span>
+                            <span className="flex items-center gap-1"><PenTool className="w-3 h-3" /> Più sketch / blueprint</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {[
+                              { label: "Solo Talking", th: 100 },
+                              { label: "Opus-like (60/40)", th: 60 },
+                              { label: "Bilanciato", th: 50 },
+                              { label: "Solo Sketch", th: 0 },
+                            ].map((p) => (
+                              <button
+                                key={p.label}
+                                type="button"
+                                onClick={() => handleBrollMixChange(p.th)}
+                                className={`px-2 py-1 rounded text-xs border transition ${
+                                  (project.broll_mix?.talking_head ?? 50) === p.th
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:bg-muted"
+                                }`}
+                              >{p.label}</button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Premi "Ricarica" sullo storyboard per rigenerare le miniature col nuovo mix.
+                          </p>
+                        </div>
+
+                        {/* Custom user presets */}
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2"><Save className="w-3.5 h-3.5" /> Preset personalizzati</Label>
+                            <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Nome preset (es. Brand Opus 9:16)"
+                              value={newPresetName}
+                              onChange={(e) => setNewPresetName(e.target.value)}
+                              className="h-9"
+                            />
+                            <Button size="sm" onClick={handleSavePreset} className="gap-2 shrink-0">
+                              <Save className="w-3.5 h-3.5" /> Salva attuale
+                            </Button>
+                          </div>
+                          {userPresets.length > 0 && (
+                            <div className="space-y-2">
+                              {userPresets.map((up) => (
+                                <div key={up.id} className="flex items-center justify-between gap-2 p-2 border border-border rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="flex gap-0.5 shrink-0">
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.primary }} />
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.secondary }} />
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.accent }} />
+                                    </span>
+                                    <span className="text-sm font-medium truncate">{up.name}</span>
+                                    <Badge variant="outline" className="text-xs shrink-0">{up.aspect_ratio}</Badge>
+                                    <Badge variant="outline" className="text-xs shrink-0">~{up.scene_duration_sec}s</Badge>
+                                    <Badge variant="outline" className="text-xs shrink-0">
+                                      {up.broll_mix?.talking_head ?? 50}/{up.broll_mix?.sketch ?? 50}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button size="sm" variant="outline" onClick={() => handleApplyUserPreset(up)}>Applica</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDeleteUserPreset(up.id)}>
+                                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </TabsContent>
 
