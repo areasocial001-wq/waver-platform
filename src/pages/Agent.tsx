@@ -196,6 +196,22 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
+  const loadVidnozCatalog = async () => {
+    if (vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
+    setVidnozLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {});
+      if (error) throw error;
+      setVidnozAvatars(Array.isArray(data?.avatars) ? data.avatars : []);
+      setVidnozVoices(Array.isArray(data?.voices) ? data.voices : []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Impossibile caricare avatar/voci Vidnoz");
+    } finally {
+      setVidnozLoading(false);
+    }
+  };
+
   const handlePdfUpload = async (file: File) => {
     setPdfFile(file);
     setExtractingPdf(true);
