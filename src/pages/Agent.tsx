@@ -79,6 +79,10 @@ type ProjectRow = {
   intro_title: { enabled: boolean; text: string; duration: number } | null;
   outro_cta: { enabled: boolean; text: string; duration: number } | null;
   broll_mix: { talking_head: number; sketch: number };
+  vidnoz_avatar_id: string | null;
+  vidnoz_avatar_url: string | null;
+  vidnoz_voice_id: string | null;
+  use_vidnoz_for_talking_head: boolean;
   created_at: string;
 };
 
