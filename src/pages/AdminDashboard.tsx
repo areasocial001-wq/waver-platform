@@ -16,7 +16,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Shield, Users, BarChart3, Ban, Trash2, RefreshCw, Crown, Mail, Database, Mic2 } from "lucide-react";
-import { WaitlistManager } from "@/components/admin/WaitlistManager";
+// WaitlistManager removed: project is in closed-test mode with a single operator.
 import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
 import { KlingTimeoutsCard } from "@/components/admin/KlingTimeoutsCard";
 import { VoiceMappingsManager } from "@/components/admin/VoiceMappingsManager";
@@ -130,12 +130,7 @@ export default function AdminDashboard() {
             </Card>
           </div>
 
-          <div className="mb-6">
-            <Button variant="outline" onClick={() => navigate("/admin/recovery-analytics")}>
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Recovery Analytics
-            </Button>
-          </div>
+          {/* Recovery analytics removed: closed-test phase with a single operator. */}
 
           <Tabs defaultValue="users" className="space-y-6">
             <TabsList>
@@ -146,10 +141,6 @@ export default function AdminDashboard() {
               <TabsTrigger value="stats" className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4" />
                 Statistiche
-              </TabsTrigger>
-              <TabsTrigger value="waitlist" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Waitlist
               </TabsTrigger>
               <TabsTrigger value="db" className="flex items-center gap-2">
                 <Database className="h-4 w-4" />
@@ -355,13 +346,6 @@ export default function AdminDashboard() {
               </div>
             </TabsContent>
 
-            <TabsContent value="waitlist">
-              <WaitlistManager />
-            </TabsContent>
-
-            <TabsContent value="db">
-              <DbHealthDashboard />
-            </TabsContent>
             <TabsContent value="db">
               <DbHealthDashboard />
             </TabsContent>
