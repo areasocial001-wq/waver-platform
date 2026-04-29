@@ -26,6 +26,7 @@ export type Database = {
           execution_step: string | null
           final_video_url: string | null
           id: string
+          image_source: string
           intro_title: Json | null
           json2video_project_id: string | null
           language: string
@@ -53,6 +54,7 @@ export type Database = {
           vidnoz_avatar_url: string | null
           vidnoz_voice_id: string | null
           voice_id: string | null
+          voice_quality_strict: boolean
         }
         Insert: {
           aspect_ratio?: string
@@ -65,6 +67,7 @@ export type Database = {
           execution_step?: string | null
           final_video_url?: string | null
           id?: string
+          image_source?: string
           intro_title?: Json | null
           json2video_project_id?: string | null
           language?: string
@@ -92,6 +95,7 @@ export type Database = {
           vidnoz_avatar_url?: string | null
           vidnoz_voice_id?: string | null
           voice_id?: string | null
+          voice_quality_strict?: boolean
         }
         Update: {
           aspect_ratio?: string
@@ -104,6 +108,7 @@ export type Database = {
           execution_step?: string | null
           final_video_url?: string | null
           id?: string
+          image_source?: string
           intro_title?: Json | null
           json2video_project_id?: string | null
           language?: string
@@ -131,6 +136,7 @@ export type Database = {
           vidnoz_avatar_url?: string | null
           vidnoz_voice_id?: string | null
           voice_id?: string | null
+          voice_quality_strict?: boolean
         }
         Relationships: []
       }
