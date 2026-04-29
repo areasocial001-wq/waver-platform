@@ -905,9 +905,35 @@ export default function AgentPage() {
 
                         {/* Custom user presets */}
                         <div className="space-y-3 pt-4 border-t border-border">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
                             <Label className="flex items-center gap-2"><Save className="w-3.5 h-3.5" /> Preset personalizzati</Label>
-                            <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                              <input
+                                type="file"
+                                accept="application/json,.json"
+                                id="agent-preset-import"
+                                className="hidden"
+                                onChange={handleImportPresets}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                                onClick={() => document.getElementById("agent-preset-import")?.click()}
+                              >
+                                <Upload className="w-3.5 h-3.5" /> Importa JSON
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                                onClick={handleExportAllPresets}
+                                disabled={userPresets.length === 0}
+                              >
+                                <FileJson className="w-3.5 h-3.5" /> Esporta tutti
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex gap-2">
                             <Input
