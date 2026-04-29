@@ -173,6 +173,51 @@ export type Database = {
         }
         Relationships: []
       }
+      clip_projects: {
+        Row: {
+          analysis_error: string | null
+          analysis_status: string
+          created_at: string
+          id: string
+          rendered_clips: Json
+          search_prompt: string | null
+          source_video_duration: number | null
+          source_video_url: string
+          suggested_clips: Json
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_error?: string | null
+          analysis_status?: string
+          created_at?: string
+          id?: string
+          rendered_clips?: Json
+          search_prompt?: string | null
+          source_video_duration?: number | null
+          source_video_url: string
+          suggested_clips?: Json
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_error?: string | null
+          analysis_status?: string
+          created_at?: string
+          id?: string
+          rendered_clips?: Json
+          search_prompt?: string | null
+          source_video_duration?: number | null
+          source_video_url?: string
+          suggested_clips?: Json
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       db_health_snapshots: {
         Row: {
           db_size_bytes: number
