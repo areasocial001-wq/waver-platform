@@ -54,8 +54,31 @@ serve(async (req) => {
     const avatarsJson = await avatarsRes.json().catch(() => ({}));
     const voicesJson = await voicesRes.json().catch(() => ({}));
 
-    // Normalize. Vidnoz returns { code, message, data: { avatars/voices: [...] } }
-    const avatars = (avatarsJson?.data?.avatars || avatarsJson?.data || [])
+    // Normalize. Vidnoz can return arrays directly, or { data: { list/avatars/voices/items: [...] } }
+    const pickArray = (root: any, keys: string[]): any[] => {
+      if (Array.isArray(root)) return root;
+      if (!root || typeof root !== "object") return [];
+      for (const k of keys) {
+        if (Array.isArray(root[k])) return root[k];
+      }
+      // Fallback: first array value found in the object
+      for (const v of Object.values(root)) {
+        if (Array.isArray(v)) return v as any[];
+      }
+      return [];
+    };
+
+    const avatarsRoot = avatarsJson?.data ?? avatarsJson;
+    const voicesRoot = voicesJson?.data ?? voicesJson;
+
+    console.log("vidnoz-avatars raw shape:", {
+      avatarsKeys: avatarsRoot && typeof avatarsRoot === "object" ? Object.keys(avatarsRoot) : typeof avatarsRoot,
+      voicesKeys: voicesRoot && typeof voicesRoot === "object" ? Object.keys(voicesRoot) : typeof voicesRoot,
+      avatarsCode: avatarsJson?.code,
+      voicesCode: voicesJson?.code,
+    });
+
+    const avatars = pickArray(avatarsRoot, ["avatars", "list", "items", "data"])
       .filter((a: any) => a && (a.avatar_id || a.id))
       .map((a: any) => ({
         avatar_id: a.avatar_id || a.id,
@@ -66,7 +89,7 @@ serve(async (req) => {
         preview_video_url: a.preview_video_url || "",
       }));
 
-    const voices = (voicesJson?.data?.voices || voicesJson?.data || [])
+    const voices = pickArray(voicesRoot, ["voices", "list", "items", "data"])
       .filter((v: any) => v && v.voice_id)
       .map((v: any) => ({
         voice_id: v.voice_id,
