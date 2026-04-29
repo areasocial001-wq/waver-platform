@@ -79,7 +79,12 @@ export function useInworldVoices(opts: { autoload?: boolean } = { autoload: true
     if (opts.autoload !== false) fetchVoices();
     const listener = (v: InworldVoice[]) => setVoices(v);
     listeners.add(listener);
-    return () => { listeners.delete(listener); };
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (!cache) fetchVoices(true);
+      }
+    });
+    return () => { listeners.delete(listener); sub.subscription.unsubscribe(); };
   }, [fetchVoices, opts.autoload]);
 
   const systemVoices = voices.filter(v => v.source === "SYSTEM");
