@@ -133,6 +133,8 @@ export default function AgentPage() {
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
+  const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
   const { systemVoices, isLoading: voicesLoading } = useInworldVoices();
