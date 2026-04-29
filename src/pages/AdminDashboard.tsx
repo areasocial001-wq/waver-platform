@@ -15,7 +15,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Shield, Users, BarChart3, Ban, Trash2, RefreshCw, Crown, Mail, Database, Mic2 } from "lucide-react";
+import { Shield, Users, BarChart3, Ban, Trash2, RefreshCw, Crown, Database, Mic2 } from "lucide-react";
 // WaitlistManager removed: project is in closed-test mode with a single operator.
 import { DbHealthDashboard } from "@/components/admin/DbHealthDashboard";
 import { KlingTimeoutsCard } from "@/components/admin/KlingTimeoutsCard";
