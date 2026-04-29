@@ -369,8 +369,13 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           text: project.plan.transcript,
-          voiceId: project.voice_id || undefined,
-          languageCode: project.language?.slice(0, 2) || "en",
+          // For non-English projects, ignore voice_id (often an EN-only ElevenLabs ID
+          // that gets mapped to an English Inworld voice -> heavy English accent).
+          // Let inworld-tts pick a multilingual default for the requested language.
+          voiceId: (project.language?.toLowerCase().startsWith("en")
+            ? project.voice_id
+            : undefined) || undefined,
+          languageCode: project.language?.slice(0, 2).toLowerCase() || "en",
         }),
       });
 
