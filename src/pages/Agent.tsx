@@ -21,7 +21,7 @@ import { Slider } from "@/components/ui/slider";
 import {
   Bot, FileText, Loader2, Sparkles, CheckCircle2, AlertCircle, Play, Download,
   RefreshCw, Image as ImageIcon, Palette, Type as TypeIcon, Wand2, Copy, History,
-  Save, Trash2, Mic, PenTool, Zap,
+  Save, Trash2, Mic, PenTool, Zap, Upload, FileJson,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -416,6 +416,90 @@ export default function AgentPage() {
     if (error) { toast.error(error.message); return; }
     toast.success("Preset eliminato");
     loadUserPresets();
+  };
+
+  const presetToExportPayload = (p: UserPreset) => ({
+    name: p.name,
+    base_preset: p.base_preset,
+    color_palette: p.color_palette,
+    typography: p.typography,
+    transition_level: p.transition_level,
+    subtitle_config: p.subtitle_config,
+    intro_title: p.intro_title,
+    outro_cta: p.outro_cta,
+    broll_mix: p.broll_mix,
+    aspect_ratio: p.aspect_ratio,
+    scene_duration_sec: p.scene_duration_sec,
+  });
+
+  const downloadJson = (obj: unknown, filename: string) => {
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPreset = (preset: UserPreset) => {
+    downloadJson(
+      { kind: "agent_user_preset", version: "1.0", exported_at: new Date().toISOString(), preset: presetToExportPayload(preset) },
+      `agent-preset-${preset.name.toLowerCase().replace(/\s+/g, "-")}.json`
+    );
+    toast.success("Preset esportato");
+  };
+
+  const handleExportAllPresets = () => {
+    if (userPresets.length === 0) { toast.error("Nessun preset da esportare"); return; }
+    downloadJson(
+      { kind: "agent_user_presets_bundle", version: "1.0", exported_at: new Date().toISOString(), presets: userPresets.map(presetToExportPayload) },
+      `agent-presets-bundle-${Date.now()}.json`
+    );
+    toast.success(`${userPresets.length} preset esportati`);
+  };
+
+  const handleImportPresets = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const list: any[] = Array.isArray(data?.presets) ? data.presets
+        : data?.preset ? [data.preset]
+        : Array.isArray(data) ? data
+        : [data];
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) { toast.error("Devi effettuare il login"); return; }
+
+      const rows = list
+        .filter((p) => p && p.name && p.color_palette)
+        .map((p) => ({
+          user_id: uid,
+          name: p.name,
+          base_preset: p.base_preset || "modern",
+          color_palette: p.color_palette,
+          typography: p.typography || "Inter",
+          transition_level: p.transition_level || "subtle",
+          subtitle_config: p.subtitle_config || { enabled: true, language: "auto", fontSize: "medium", position: "bottom-center" },
+          intro_title: p.intro_title || null,
+          outro_cta: p.outro_cta || null,
+          broll_mix: p.broll_mix || { talking_head: 50, sketch: 50 },
+          aspect_ratio: p.aspect_ratio || "16:9",
+          scene_duration_sec: p.scene_duration_sec || 3,
+        }));
+
+      if (rows.length === 0) throw new Error("Nessun preset valido nel file");
+      const { error } = await supabase.from("agent_user_presets").insert(rows);
+      if (error) throw error;
+      toast.success(`${rows.length} preset importati`);
+      loadUserPresets();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Errore importazione");
+    } finally {
+      e.target.value = "";
+    }
   };
 
 
@@ -821,9 +905,35 @@ export default function AgentPage() {
 
                         {/* Custom user presets */}
                         <div className="space-y-3 pt-4 border-t border-border">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
                             <Label className="flex items-center gap-2"><Save className="w-3.5 h-3.5" /> Preset personalizzati</Label>
-                            <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                              <input
+                                type="file"
+                                accept="application/json,.json"
+                                id="agent-preset-import"
+                                className="hidden"
+                                onChange={handleImportPresets}
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                                onClick={() => document.getElementById("agent-preset-import")?.click()}
+                              >
+                                <Upload className="w-3.5 h-3.5" /> Importa JSON
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5"
+                                onClick={handleExportAllPresets}
+                                disabled={userPresets.length === 0}
+                              >
+                                <FileJson className="w-3.5 h-3.5" /> Esporta tutti
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex gap-2">
                             <Input
@@ -855,6 +965,9 @@ export default function AgentPage() {
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <Button size="sm" variant="outline" onClick={() => handleApplyUserPreset(up)}>Applica</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleExportPreset(up)} title="Esporta JSON">
+                                      <Download className="w-3.5 h-3.5" />
+                                    </Button>
                                     <Button size="sm" variant="ghost" onClick={() => handleDeleteUserPreset(up.id)}>
                                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                     </Button>
