@@ -789,7 +789,7 @@ export default function AgentPage() {
                       {language !== "en" && (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           Modello forzato: Inworld 1.5 Max multilingue. Pronuncia garantita {language.toUpperCase()}.
-                          Solo voci della lista sono testate; in caso di errore 404 il backend ricade automaticamente su <span className="font-mono">Sarah</span>.
+                          Solo voci native della lista sono testate; in caso di errore 404 il backend ricade su una voce nativa disponibile.
                         </p>
                       )}
                     </div>
