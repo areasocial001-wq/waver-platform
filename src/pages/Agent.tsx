@@ -141,6 +141,8 @@ export default function AgentPage() {
   const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
   const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; gender: string; preview_audio_url?: string }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
+  const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
+  const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
@@ -209,6 +211,58 @@ export default function AgentPage() {
       toast.error("Impossibile caricare avatar/voci Vidnoz");
     } finally {
       setVidnozLoading(false);
+    }
+  };
+
+  // Compute the proportional transcript slice for a given talking-head scene
+  // (mirrors the splitting logic used server-side in agent-execute).
+  const getSceneTranscriptSlice = (sceneIdx: number): string => {
+    if (!project?.plan?.transcript) return "";
+    const overrides = project.scene_overrides || [];
+    const thIdxs = overrides.map((o, i) => (o?.broll_type !== "sketch" ? i : -1)).filter(i => i >= 0);
+    if (!thIdxs.includes(sceneIdx)) return "";
+    const totalDur = thIdxs.reduce((s, i) => s + (Number(overrides[i]?.duration) || 4), 0);
+    const words = String(project.plan.transcript).split(/\s+/).filter(Boolean);
+    let cursor = 0;
+    for (const i of thIdxs) {
+      const share = totalDur > 0 ? (Number(overrides[i]?.duration) || 4) / totalDur : 1 / thIdxs.length;
+      const wc = Math.max(1, Math.round(words.length * share));
+      if (i === sceneIdx) return words.slice(cursor, cursor + wc).join(" ");
+      cursor += wc;
+    }
+    return "";
+  };
+
+  const handlePreviewVidnozScene = async (sceneIdx: number) => {
+    if (!project) return;
+    if (!project.vidnoz_avatar_url || !project.vidnoz_voice_id) {
+      toast.error("Seleziona prima un avatar e una voce Vidnoz nel pannello Stile");
+      return;
+    }
+    const text = getSceneTranscriptSlice(sceneIdx);
+    if (!text) {
+      toast.error("Nessun testo disponibile per questa scena");
+      return;
+    }
+    setVidnozPreviewLoading(sceneIdx);
+    setVidnozPreview(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("vidnoz-talking-avatar", {
+        body: {
+          text,
+          voice_id: project.vidnoz_voice_id,
+          avatar_url: project.vidnoz_avatar_url,
+        },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("Nessun URL video restituito");
+      setVidnozPreview({ sceneIdx, url: data.url });
+      toast.success(`Anteprima Vidnoz scena ${sceneIdx + 1} pronta`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Errore generazione anteprima Vidnoz");
+    } finally {
+      setVidnozPreviewLoading(null);
     }
   };
 
@@ -783,6 +837,31 @@ export default function AgentPage() {
                                 onChange={(e) => handleSceneDuration(sIdx, Number(e.target.value))}
                                 className="w-20 h-8" />
                               <span className="text-xs text-muted-foreground">s</span>
+                              {!isSketch && project.use_vidnoz_for_talking_head && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1"
+                                  disabled={
+                                    vidnozPreviewLoading === sIdx ||
+                                    !project.vidnoz_avatar_url ||
+                                    !project.vidnoz_voice_id
+                                  }
+                                  onClick={() => handlePreviewVidnozScene(sIdx)}
+                                  title={
+                                    !project.vidnoz_avatar_url || !project.vidnoz_voice_id
+                                      ? "Seleziona avatar e voce Vidnoz nello Stile"
+                                      : "Genera anteprima Vidnoz di questa scena"
+                                  }
+                                >
+                                  {vidnozPreviewLoading === sIdx ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Play className="w-3.5 h-3.5" />
+                                  )}
+                                  Anteprima Vidnoz
+                                </Button>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
@@ -803,6 +882,26 @@ export default function AgentPage() {
                               <div className="col-span-full text-xs text-muted-foreground py-2">Nessun risultato Freepik</div>
                             )}
                           </div>
+                          {vidnozPreview?.sceneIdx === sIdx && (
+                            <div className="space-y-1 pt-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs flex items-center gap-1">
+                                  <Mic className="w-3 h-3" /> Anteprima Vidnoz scena {sIdx + 1}
+                                </Label>
+                                <button
+                                  type="button"
+                                  onClick={() => setVidnozPreview(null)}
+                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                >Chiudi</button>
+                              </div>
+                              <video
+                                src={vidnozPreview.url}
+                                controls
+                                className="w-full max-w-md rounded bg-black"
+                                preload="metadata"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -1194,6 +1293,52 @@ export default function AgentPage() {
                       </TabsContent>
                     </Tabs>
                   </Card>
+
+                  {(() => {
+                    if (!project.use_vidnoz_for_talking_head) return null;
+                    const overrides = project.scene_overrides || [];
+                    const thScenes = overrides.filter(o => o?.broll_type !== "sketch");
+                    const thCount = thScenes.length;
+                    const thSeconds = thScenes.reduce((s, o) => s + (Number(o?.duration) || 4), 0);
+                    // Vidnoz pricing approx: ~€0.008 / sec (≈ $0.50/min). Update if plan changes.
+                    const estEur = thSeconds * 0.008;
+                    const ready = !!project.vidnoz_avatar_url && !!project.vidnoz_voice_id;
+                    return (
+                      <div className={`rounded-lg border p-3 text-sm flex items-start gap-2 ${
+                        ready ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
+                      }`}>
+                        {ready ? (
+                          <Mic className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 mt-0.5 text-destructive shrink-0" />
+                        )}
+                        <div className="space-y-0.5">
+                          {ready ? (
+                            <>
+                              <div className="font-medium">
+                                Vidnoz attivo · {thCount} {thCount === 1 ? "scena" : "scene"} talking-head
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Verranno generati {thCount} clip avatar AI per un totale di ~{thSeconds.toFixed(1)}s.
+                                Stima crediti Vidnoz: <strong>~€{estEur.toFixed(2)}</strong> (indicativa, dipende dal piano attivo).
+                                La narrazione globale TTS sarà sostituita dalle voci degli avatar.
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-medium text-destructive">
+                                Vidnoz attivo ma manca la configurazione
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Seleziona un avatar e una voce nel pannello <strong>Stile → Avatar Vidnoz</strong>,
+                                oppure disattiva Vidnoz per usare Freepik. Senza configurazione il sistema userà comunque Freepik.
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute}>
                     <Play className="w-4 h-4" /> Conferma e Produci Video
