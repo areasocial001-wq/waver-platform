@@ -256,16 +256,20 @@ serve(async (req) => {
           }
         }
 
-        // Default: use Freepik suggestion
+        // Default: use selected suggestion, else fallback to live Freepik search
         await appendLog(
           adminClient,
           projectId,
-          `Using selected asset for "${ov.keyword}"...`,
+          `Resolving asset for "${ov.keyword}"...`,
           10 + Math.round((i / overrides.length) * 35),
           "asset-collection"
         );
-        const idx = typeof ov.selectedIndex === "number" ? ov.selectedIndex : 0;
-        const pick = ov.suggestions?.[idx] ?? ov.suggestions?.[0];
+        const idx = typeof ov.selectedIndex === "number" && ov.selectedIndex >= 0 ? ov.selectedIndex : 0;
+        let pick = ov.suggestions?.[idx] ?? ov.suggestions?.[0];
+        if (!pick?.url) {
+          const found = await searchFreepikVideo(FREEPIK_API_KEY, ov.keyword);
+          if (found) pick = { url: found.url, thumb: found.thumb, source: "freepik" };
+        }
         if (pick?.url) {
           assets.push({
             keyword: ov.keyword,
@@ -274,6 +278,8 @@ serve(async (req) => {
             source: pick.source || "freepik",
             duration: dur,
           });
+        } else {
+          console.warn(`No asset found for keyword "${ov.keyword}" (no suggestion + Freepik empty)`);
         }
       }
     } else {
