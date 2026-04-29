@@ -89,7 +89,7 @@ serve(async (req) => {
         preview_video_url: a.preview_video_url || "",
       }));
 
-    const voices = (voicesJson?.data?.voices || voicesJson?.data || [])
+    const voices = pickArray(voicesRoot, ["voices", "list", "items", "data"])
       .filter((v: any) => v && v.voice_id)
       .map((v: any) => ({
         voice_id: v.voice_id,
