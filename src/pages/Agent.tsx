@@ -96,43 +96,15 @@ const LANGUAGES = [
   { code: "pt", label: "Português" },
 ];
 
-// Curated native Inworld voices per language. Used by the Agent wizard so the
-// user picks a voice that matches the project language and the backend forces
-// inworld-tts-1.5-max for native pronunciation (no English accent).
-// Keep in sync with NATIVE_VOICES_BY_LANG in supabase/functions/agent-execute/index.ts
-// Inworld voices are language-agnostic: pronunciation is driven by the
-// multilingual model `inworld-tts-1.5-max` + languageCode. We expose the same
-// curated set of REAL Inworld voice names per language so users get a friendly
-// gendered choice without invalid IDs.
-const MULTILINGUAL_VOICES: Array<{ id: string; gender: "m" | "f"; tone: string }> = [
-  { id: "Edward",   gender: "m", tone: "profondo" },
-  { id: "Mark",     gender: "m", tone: "narrativo" },
-  { id: "Alex",     gender: "m", tone: "professionale" },
-  { id: "Roger",    gender: "m", tone: "caldo" },
-  { id: "Sarah",    gender: "f", tone: "naturale" },
-  { id: "Olivia",   gender: "f", tone: "giovane" },
-  { id: "Ashley",   gender: "f", tone: "matura" },
-  { id: "Julia",    gender: "f", tone: "espressiva" },
-];
+const normalizeVoiceLang = (value?: string | null) =>
+  (value || "").toLowerCase().replace("_", "-").split("-")[0];
 
-const LANG_GENDER_LABELS: Record<string, { m: string; f: string }> = {
-  it: { m: "maschile", f: "femminile" },
-  es: { m: "masculino", f: "femenino" },
-  fr: { m: "masculin", f: "féminin" },
-  de: { m: "männlich", f: "weiblich" },
-  pt: { m: "masculino", f: "feminino" },
-  en: { m: "male", f: "female" },
+const isVoiceNativeForLanguage = (voice: { langCode?: string; tags?: string[] }, lang: string) => {
+  const target = normalizeVoiceLang(lang);
+  const direct = normalizeVoiceLang(voice.langCode);
+  if (direct) return direct === target;
+  return (voice.tags || []).some((tag) => normalizeVoiceLang(tag) === target || tag.toLowerCase().includes(`language:${target}`));
 };
-
-const NATIVE_VOICES_BY_LANG: Record<string, Array<{ id: string; label: string }>> = Object.fromEntries(
-  Object.keys(LANG_GENDER_LABELS).map((lang) => [
-    lang,
-    MULTILINGUAL_VOICES.map((v) => ({
-      id: v.id,
-      label: `${v.id} · ${LANG_GENDER_LABELS[lang][v.gender]} ${v.tone}`,
-    })),
-  ]),
-);
 
 const STYLE_PRESETS = [
   { id: "modern", label: "Modern", palette: { primary: "#3B82F6", secondary: "#0F172A", accent: "#F59E0B" }, font: "Inter" },
