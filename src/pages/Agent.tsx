@@ -141,6 +141,8 @@ export default function AgentPage() {
   const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
   const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; gender: string; preview_audio_url?: string }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
+  const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
+  const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
