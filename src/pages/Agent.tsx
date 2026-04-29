@@ -837,6 +837,31 @@ export default function AgentPage() {
                                 onChange={(e) => handleSceneDuration(sIdx, Number(e.target.value))}
                                 className="w-20 h-8" />
                               <span className="text-xs text-muted-foreground">s</span>
+                              {!isSketch && project.use_vidnoz_for_talking_head && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 gap-1"
+                                  disabled={
+                                    vidnozPreviewLoading === sIdx ||
+                                    !project.vidnoz_avatar_url ||
+                                    !project.vidnoz_voice_id
+                                  }
+                                  onClick={() => handlePreviewVidnozScene(sIdx)}
+                                  title={
+                                    !project.vidnoz_avatar_url || !project.vidnoz_voice_id
+                                      ? "Seleziona avatar e voce Vidnoz nello Stile"
+                                      : "Genera anteprima Vidnoz di questa scena"
+                                  }
+                                >
+                                  {vidnozPreviewLoading === sIdx ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Play className="w-3.5 h-3.5" />
+                                  )}
+                                  Anteprima Vidnoz
+                                </Button>
+                              )}
                             </div>
                           </div>
                           <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
@@ -857,6 +882,26 @@ export default function AgentPage() {
                               <div className="col-span-full text-xs text-muted-foreground py-2">Nessun risultato Freepik</div>
                             )}
                           </div>
+                          {vidnozPreview?.sceneIdx === sIdx && (
+                            <div className="space-y-1 pt-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs flex items-center gap-1">
+                                  <Mic className="w-3 h-3" /> Anteprima Vidnoz scena {sIdx + 1}
+                                </Label>
+                                <button
+                                  type="button"
+                                  onClick={() => setVidnozPreview(null)}
+                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                >Chiudi</button>
+                              </div>
+                              <video
+                                src={vidnozPreview.url}
+                                controls
+                                className="w-full max-w-md rounded bg-black"
+                                preload="metadata"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
