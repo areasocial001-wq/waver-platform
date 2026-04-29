@@ -27,15 +27,18 @@ async function searchFreepik(apiKey: string, term: string, limit = 6): Promise<S
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
     const out: Suggestion[] = [];
     for (const it of items) {
+      const previews: any[] = Array.isArray(it?.previews) ? it.previews : [];
       const previewUrl =
+        previews[previews.length - 1]?.url ||
+        previews[0]?.url ||
         it?.image?.source?.url ||
         it?.video?.preview?.url ||
-        it?.preview?.url ||
-        it?.url;
+        it?.preview?.url;
+      const thumbs: any[] = Array.isArray(it?.thumbnails) ? it.thumbnails : [];
       const thumb =
-        it?.thumbnails?.[0]?.url ||
+        thumbs[thumbs.length - 1]?.url ||
+        thumbs[0]?.url ||
         it?.image?.source?.url ||
-        it?.image?.thumb ||
         previewUrl;
       if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
         out.push({ url: previewUrl, thumb, source: "freepik", id: String(it?.id ?? "") });

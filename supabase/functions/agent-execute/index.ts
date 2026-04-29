@@ -53,21 +53,25 @@ async function searchFreepikVideo(
     const data = await r.json();
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
     for (const it of items) {
-      // Freepik video item: image.source.url is preview MP4, preview / thumbnails available
+      // Freepik video item: previews[] contains MP4 URLs (small/large), thumbnails[] contains JPG posters
+      const previews: any[] = Array.isArray(it?.previews) ? it.previews : [];
+      // Prefer the larger preview (last entry is usually 720p)
       const previewUrl =
+        previews[previews.length - 1]?.url ||
+        previews[0]?.url ||
         it?.image?.source?.url ||
         it?.video?.preview?.url ||
-        it?.preview?.url ||
-        it?.url;
+        it?.preview?.url;
+      const thumbs: any[] = Array.isArray(it?.thumbnails) ? it.thumbnails : [];
       const thumb =
-        it?.image?.source?.url ||
-        it?.thumbnails?.[0]?.url ||
-        it?.image?.thumb ||
+        thumbs[thumbs.length - 1]?.url ||
+        thumbs[0]?.url ||
         previewUrl;
       if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
         return { url: previewUrl, thumb };
       }
     }
+    console.log(`Freepik: no MP4 preview found in ${items.length} results for "${term}"`);
     return null;
   } catch (e) {
     console.error("Freepik search failed for", term, e);
