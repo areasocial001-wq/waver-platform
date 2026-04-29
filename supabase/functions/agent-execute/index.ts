@@ -386,6 +386,18 @@ serve(async (req) => {
           const found = await searchFreepikVideo(FREEPIK_API_KEY, ov.keyword);
           if (found) pick = { url: found.url, thumb: found.thumb, source: "freepik" };
         }
+        // Watermark/preview URL guard: never let a suspicious URL into the final render.
+        if (pick?.url && /watermark|\/preview\b|wm[-_]/i.test(pick.url)) {
+          await appendLog(
+            adminClient,
+            projectId,
+            `⚠️ Asset scartato per "${ov.keyword}": URL contiene "watermark"/"preview". Cerco alternativa pulita.`,
+            10 + Math.round((i / overrides.length) * 35),
+            "asset-collection"
+          );
+          const found = await searchFreepikVideo(FREEPIK_API_KEY, ov.keyword);
+          pick = found ? { url: found.url, thumb: found.thumb, source: "freepik" } : undefined;
+        }
         if (pick?.url) {
           assets.push({
             keyword: ov.keyword,

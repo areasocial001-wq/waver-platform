@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useInworldVoices } from "@/hooks/useInworldVoices";
+import { TransitionPreview } from "@/components/agent/TransitionPreview";
 
 type SceneOverride = {
   keyword: string;
@@ -84,8 +85,16 @@ type ProjectRow = {
   vidnoz_avatar_url: string | null;
   vidnoz_voice_id: string | null;
   use_vidnoz_for_talking_head: boolean;
+  image_source: "freepik" | "ai" | "piapi" | string;
+  voice_quality_strict: boolean;
   created_at: string;
 };
+
+const IMAGE_SOURCES: { id: "freepik" | "ai" | "piapi"; label: string; hint: string }[] = [
+  { id: "freepik", label: "Freepik (clean)", hint: "URL puliti via /v1/videos/{id}/download. Niente watermark." },
+  { id: "ai", label: "AI (Gemini Nano)", hint: "Generazione AI: zero watermark, stile coerente." },
+  { id: "piapi", label: "PiAPI / Flux", hint: "Generazione AI ad alta fedeltà via PiAPI." },
+];
 
 const LANGUAGES = [
   { code: "en", label: "English" },
@@ -132,7 +141,15 @@ export const OPUS_PRESET_DEFAULTS = {
 };
 
 export default function AgentPage() {
-  const [activeTab, setActiveTab] = useState<"create" | "history">("create");
+  const [activeTab, setActiveTab] = useState<"create" | "history">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("agent.activeTab") as any)) || "create",
+  );
+  // Persist inner Style/Subs/Branding tab so realtime updates don't reset it.
+  const [activeStyleTab, setActiveStyleTab] = useState<string>(
+    () => (typeof window !== "undefined" && localStorage.getItem("agent.activeStyleTab")) || "style",
+  );
+  useEffect(() => { localStorage.setItem("agent.activeTab", activeTab); }, [activeTab]);
+  useEffect(() => { localStorage.setItem("agent.activeStyleTab", activeStyleTab); }, [activeStyleTab]);
 
   // creation form
   const [brief, setBrief] = useState("");
@@ -995,7 +1012,7 @@ export default function AgentPage() {
 
                   {/* Style + Subtitles + Intro/Outro */}
                   <Card className="p-6">
-                    <Tabs defaultValue="style">
+                    <Tabs value={activeStyleTab} onValueChange={setActiveStyleTab}>
                       <TabsList>
                         <TabsTrigger value="style" className="gap-2"><Palette className="w-3.5 h-3.5" /> Stile</TabsTrigger>
                         <TabsTrigger value="subs" className="gap-2"><TypeIcon className="w-3.5 h-3.5" /> Sottotitoli</TabsTrigger>
@@ -1068,7 +1085,58 @@ export default function AgentPage() {
                           </div>
                         </div>
 
-                        {/* B-roll Mix: % talking-head vs sketch */}
+                        {/* Image source + watermark guard */}
+                        <div className="space-y-2 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="flex items-center gap-2">
+                              <ImageIcon className="w-3.5 h-3.5" /> Sorgente immagini
+                            </Label>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              ✓ Watermark guard attivo
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {IMAGE_SOURCES.map((src) => {
+                              const active = (project.image_source || "freepik") === src.id;
+                              return (
+                                <button
+                                  key={src.id}
+                                  type="button"
+                                  onClick={() => updateProject({ image_source: src.id } as any)}
+                                  className={`px-3 py-2 rounded-md border text-xs text-left max-w-[220px] transition ${
+                                    active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
+                                  }`}
+                                  title={src.hint}
+                                >
+                                  <div className="font-medium">{src.label}</div>
+                                  <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{src.hint}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Output finale sempre privo di preview/watermark: il backend usa <code>/v1/videos/&#123;id&#125;/download</code>
+                            per Freepik e scarta asset che contengono <code>watermark</code>/<code>preview</code> nell'URL.
+                          </p>
+                        </div>
+
+                        {/* Live transitions preview (CSS, no server render) */}
+                        <div className="space-y-2 pt-4 border-t border-border">
+                          <Label className="flex items-center gap-2">
+                            <Play className="w-3.5 h-3.5" /> Anteprima transizioni
+                          </Label>
+                          <TransitionPreview
+                            transitionLevel={project.transition_level}
+                            aspectRatio={project.aspect_ratio}
+                            frames={(project.scene_overrides || [])
+                              .map((s) => {
+                                const sel = s.suggestions?.[s.selectedIndex] || s.suggestions?.[0];
+                                return sel ? { url: sel.url, thumb: sel.thumb, keyword: s.keyword, duration: s.duration } : null;
+                              })
+                              .filter(Boolean) as any}
+                          />
+                        </div>
+
                         <div className="space-y-3 pt-4 border-t border-border">
                           <div className="flex items-center justify-between">
                             <Label className="flex items-center gap-2">
@@ -1439,19 +1507,69 @@ export default function AgentPage() {
                     <h2 className="text-2xl font-bold mt-1">{project.title}</h2>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{project.execution_step ?? "..."}</span>
-                      <span className="font-medium">{project.progress_pct}%</span>
-                    </div>
-                    <Progress value={project.progress_pct} />
-                  </div>
+                  {(() => {
+                    // Phase chips: detect which big stage we're in based on progress_pct + log keywords.
+                    const pct = project.progress_pct || 0;
+                    const logsTxt = (project.progress_log || []).map((l) => l.message?.toLowerCase() || "").join(" ");
+                    const phases = [
+                      { id: "plan", label: "Piano", icon: FileText, doneAt: 15 },
+                      { id: "voice", label: "Voce", icon: Mic, doneAt: 45, kw: ["tts", "narr", "voice", "voce"] },
+                      { id: "images", label: "Immagini", icon: ImageIcon, doneAt: 70, kw: ["freepik", "image", "asset", "scene", "immag"] },
+                      { id: "transitions", label: "Transizioni", icon: Wand2, doneAt: 85, kw: ["transition", "crossfade", "json2video", "render"] },
+                      { id: "render", label: "Render", icon: Play, doneAt: 100, kw: ["render", "final", "publish"] },
+                    ];
+                    return (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{project.execution_step ?? "..."}</span>
+                            <span className="font-medium">{pct}%</span>
+                          </div>
+                          <Progress value={pct} />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {phases.map((p) => {
+                            const isDone = pct >= p.doneAt;
+                            const isActive = !isDone && (pct >= (phases[phases.indexOf(p) - 1]?.doneAt ?? 0) || (p.kw && p.kw.some((k) => logsTxt.includes(k))));
+                            const Icon = p.icon;
+                            return (
+                              <Badge
+                                key={p.id}
+                                variant={isDone ? "default" : isActive ? "secondary" : "outline"}
+                                className={`text-[11px] gap-1 ${isActive && !isDone ? "animate-pulse" : ""}`}
+                              >
+                                <Icon className="w-3 h-3" />
+                                {p.label}
+                                {isDone && <CheckCircle2 className="w-3 h-3" />}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {project.progress_log?.length > 0 && (
-                    <div className="bg-muted/30 rounded-md p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-1">
-                      {project.progress_log.slice(-12).map((l, i) => (
-                        <div key={i} className="text-muted-foreground">{l.message}</div>
-                      ))}
+                    <div className="bg-muted/30 rounded-md p-3 max-h-64 overflow-y-auto text-xs font-mono space-y-1">
+                      {project.progress_log.slice(-30).map((l, i) => {
+                        const msg = l.message || "";
+                        const lower = msg.toLowerCase();
+                        const tag = lower.includes("tts") || lower.includes("voce") || lower.includes("narr")
+                          ? { txt: "VOCE", cls: "text-emerald-400" }
+                          : lower.includes("freepik") || lower.includes("immag") || lower.includes("asset") || lower.includes("scene")
+                          ? { txt: "IMG", cls: "text-sky-400" }
+                          : lower.includes("transition") || lower.includes("crossfade") || lower.includes("render") || lower.includes("json2video")
+                          ? { txt: "RNDR", cls: "text-fuchsia-400" }
+                          : lower.includes("⚠") || lower.includes("warn") || lower.includes("fallback")
+                          ? { txt: "WARN", cls: "text-amber-400" }
+                          : { txt: "•", cls: "text-muted-foreground" };
+                        return (
+                          <div key={i} className="flex gap-2">
+                            <span className={`shrink-0 w-10 ${tag.cls}`}>[{tag.txt}]</span>
+                            <span className="text-muted-foreground">{msg}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
