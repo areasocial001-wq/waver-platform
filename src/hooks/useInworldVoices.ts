@@ -49,6 +49,12 @@ export function useInworldVoices(opts: { autoload?: boolean } = { autoload: true
     setIsLoading(true);
     setError(null);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        // Not authenticated yet — skip silently, will retry on next call
+        setIsLoading(false);
+        return [];
+      }
       const { data, error: fnError } = await supabase.functions.invoke("inworld-list-voices", {
         method: "GET",
       });
