@@ -1012,7 +1012,7 @@ export default function AgentPage() {
 
                   {/* Style + Subtitles + Intro/Outro */}
                   <Card className="p-6">
-                    <Tabs defaultValue="style">
+                    <Tabs value={activeStyleTab} onValueChange={setActiveStyleTab}>
                       <TabsList>
                         <TabsTrigger value="style" className="gap-2"><Palette className="w-3.5 h-3.5" /> Stile</TabsTrigger>
                         <TabsTrigger value="subs" className="gap-2"><TypeIcon className="w-3.5 h-3.5" /> Sottotitoli</TabsTrigger>
