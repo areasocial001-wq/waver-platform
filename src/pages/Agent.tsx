@@ -141,7 +141,15 @@ export const OPUS_PRESET_DEFAULTS = {
 };
 
 export default function AgentPage() {
-  const [activeTab, setActiveTab] = useState<"create" | "history">("create");
+  const [activeTab, setActiveTab] = useState<"create" | "history">(
+    () => (typeof window !== "undefined" && (localStorage.getItem("agent.activeTab") as any)) || "create",
+  );
+  // Persist inner Style/Subs/Branding tab so realtime updates don't reset it.
+  const [activeStyleTab, setActiveStyleTab] = useState<string>(
+    () => (typeof window !== "undefined" && localStorage.getItem("agent.activeStyleTab")) || "style",
+  );
+  useEffect(() => { localStorage.setItem("agent.activeTab", activeTab); }, [activeTab]);
+  useEffect(() => { localStorage.setItem("agent.activeStyleTab", activeStyleTab); }, [activeStyleTab]);
 
   // creation form
   const [brief, setBrief] = useState("");
