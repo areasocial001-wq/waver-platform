@@ -443,12 +443,7 @@ serve(async (req) => {
       const audioBase64: string | undefined = ttsData?.audioContent;
       if (!audioBase64) throw new Error("TTS returned no audio");
 
-      if (ttsWarning) {
-        await adminClient
-          .from("agent_projects")
-          .update({ tts_warning: ttsWarning } as any)
-          .eq("id", projectId);
-      }
+      // Warning already surfaced via appendLog above; wizard polls logs.
 
       const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
       const audioPath = `${userId}/${projectId}/narration-${Date.now()}.mp3`;
