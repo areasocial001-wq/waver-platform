@@ -453,6 +453,15 @@ serve(async (req) => {
         if (!resolvedVoiceId) {
           throw new Error(`Nessuna voce Inworld nativa disponibile per ${lang.toUpperCase()}. Apri il selettore voce e scegli una voce realmente supportata.`);
         }
+        if (project.voice_id && project.voice_id !== resolvedVoiceId) {
+          await appendLog(
+            adminClient,
+            projectId,
+            `⚠️ La voce scelta "${project.voice_id}" non è nativa/disponibile per ${lang.toUpperCase()}. Uso "${resolvedVoiceId}".`,
+            53,
+            "narration",
+          );
+        }
       }
 
       // Always force the multilingual high-quality model for non-English narration.
