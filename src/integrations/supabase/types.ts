@@ -18,25 +18,33 @@ export type Database = {
         Row: {
           aspect_ratio: string
           brief: string
+          color_palette: Json
           created_at: string
           error_message: string | null
           execution_status: string
           execution_step: string | null
           final_video_url: string | null
           id: string
+          intro_title: Json | null
           json2video_project_id: string | null
           language: string
           narration_url: string | null
+          outro_cta: Json | null
           pdf_text: string | null
           pdf_url: string | null
           plan: Json | null
           plan_status: string
           progress_log: Json
           progress_pct: number
+          scene_overrides: Json
           selected_assets: Json
           storyboard: Json | null
+          style_preset: string
+          subtitle_config: Json
           target_duration: number
           title: string
+          transition_level: string
+          typography: string
           updated_at: string
           user_id: string
           voice_id: string | null
@@ -44,25 +52,33 @@ export type Database = {
         Insert: {
           aspect_ratio?: string
           brief: string
+          color_palette?: Json
           created_at?: string
           error_message?: string | null
           execution_status?: string
           execution_step?: string | null
           final_video_url?: string | null
           id?: string
+          intro_title?: Json | null
           json2video_project_id?: string | null
           language?: string
           narration_url?: string | null
+          outro_cta?: Json | null
           pdf_text?: string | null
           pdf_url?: string | null
           plan?: Json | null
           plan_status?: string
           progress_log?: Json
           progress_pct?: number
+          scene_overrides?: Json
           selected_assets?: Json
           storyboard?: Json | null
+          style_preset?: string
+          subtitle_config?: Json
           target_duration?: number
           title?: string
+          transition_level?: string
+          typography?: string
           updated_at?: string
           user_id: string
           voice_id?: string | null
@@ -70,25 +86,33 @@ export type Database = {
         Update: {
           aspect_ratio?: string
           brief?: string
+          color_palette?: Json
           created_at?: string
           error_message?: string | null
           execution_status?: string
           execution_step?: string | null
           final_video_url?: string | null
           id?: string
+          intro_title?: Json | null
           json2video_project_id?: string | null
           language?: string
           narration_url?: string | null
+          outro_cta?: Json | null
           pdf_text?: string | null
           pdf_url?: string | null
           plan?: Json | null
           plan_status?: string
           progress_log?: Json
           progress_pct?: number
+          scene_overrides?: Json
           selected_assets?: Json
           storyboard?: Json | null
+          style_preset?: string
+          subtitle_config?: Json
           target_duration?: number
           title?: string
+          transition_level?: string
+          typography?: string
           updated_at?: string
           user_id?: string
           voice_id?: string | null
