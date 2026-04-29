@@ -21,7 +21,7 @@ import { Slider } from "@/components/ui/slider";
 import {
   Bot, FileText, Loader2, Sparkles, CheckCircle2, AlertCircle, Play, Download,
   RefreshCw, Image as ImageIcon, Palette, Type as TypeIcon, Wand2, Copy, History,
-  Save, Trash2, Mic, PenTool, Zap,
+  Save, Trash2, Mic, PenTool, Zap, Upload, FileJson,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
