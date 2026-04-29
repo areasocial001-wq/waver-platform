@@ -317,6 +317,7 @@ export default function AgentPage() {
 
   const handleCreateAndPlan = async () => {
     if (!brief.trim()) { toast.error("Inserisci un brief"); return; }
+    const effectiveVoiceId = language !== "en" ? (voiceId || nativeVoices[0]?.voiceId || "") : voiceId;
     // Client-side validation: only language-native Inworld voices are allowed for non-EN.
     if (language !== "en") {
       const allowed = nativeVoices.map((v) => v.voiceId);
@@ -324,8 +325,8 @@ export default function AgentPage() {
         toast.error(`Nessuna voce Inworld nativa verificata per ${language.toUpperCase()}.`);
         return;
       }
-      if (!allowed.includes(voiceId)) {
-        toast.error(`Voce "${voiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
+      if (!allowed.includes(effectiveVoiceId)) {
+        toast.error(`Voce "${effectiveVoiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
         return;
       }
     }
@@ -341,7 +342,7 @@ export default function AgentPage() {
           user_id: uid,
           title: "New Agent project",
           brief, pdf_text: pdfText || null, language,
-          voice_id: voiceId || null, target_duration: duration, aspect_ratio: aspect,
+          voice_id: effectiveVoiceId || null, target_duration: duration, aspect_ratio: aspect,
         })
         .select("*").single();
       if (error) throw error;
