@@ -465,15 +465,16 @@ serve(async (req) => {
         ? sub.position
         : "bottom-center";
 
-    const elements: any[] = [
-      {
+    const elements: any[] = [];
+    if (narrationUrl) {
+      elements.push({
         type: "audio",
         src: narrationUrl,
         volume: 1,
         "fade-in": 0.2,
         "fade-out": 0.5,
-      },
-    ];
+      });
+    }
 
     if (sub?.enabled !== false) {
       elements.push({
