@@ -267,6 +267,10 @@ export const Navbar = () => {
                     <Film className="w-4 h-4 mr-2" />
                     Story Mode
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate("/agent")}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Video Agent
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate("/freepik")}>
                     <Wand2 className="w-4 h-4 mr-2" />
                     Freepik

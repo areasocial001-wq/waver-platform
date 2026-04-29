@@ -14,6 +14,87 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_projects: {
+        Row: {
+          aspect_ratio: string
+          brief: string
+          created_at: string
+          error_message: string | null
+          execution_status: string
+          execution_step: string | null
+          final_video_url: string | null
+          id: string
+          json2video_project_id: string | null
+          language: string
+          narration_url: string | null
+          pdf_text: string | null
+          pdf_url: string | null
+          plan: Json | null
+          plan_status: string
+          progress_log: Json
+          progress_pct: number
+          selected_assets: Json
+          storyboard: Json | null
+          target_duration: number
+          title: string
+          updated_at: string
+          user_id: string
+          voice_id: string | null
+        }
+        Insert: {
+          aspect_ratio?: string
+          brief: string
+          created_at?: string
+          error_message?: string | null
+          execution_status?: string
+          execution_step?: string | null
+          final_video_url?: string | null
+          id?: string
+          json2video_project_id?: string | null
+          language?: string
+          narration_url?: string | null
+          pdf_text?: string | null
+          pdf_url?: string | null
+          plan?: Json | null
+          plan_status?: string
+          progress_log?: Json
+          progress_pct?: number
+          selected_assets?: Json
+          storyboard?: Json | null
+          target_duration?: number
+          title?: string
+          updated_at?: string
+          user_id: string
+          voice_id?: string | null
+        }
+        Update: {
+          aspect_ratio?: string
+          brief?: string
+          created_at?: string
+          error_message?: string | null
+          execution_status?: string
+          execution_step?: string | null
+          final_video_url?: string | null
+          id?: string
+          json2video_project_id?: string | null
+          language?: string
+          narration_url?: string | null
+          pdf_text?: string | null
+          pdf_url?: string | null
+          plan?: Json | null
+          plan_status?: string
+          progress_log?: Json
+          progress_pct?: number
+          selected_assets?: Json
+          storyboard?: Json | null
+          target_duration?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+          voice_id?: string | null
+        }
+        Relationships: []
+      }
       ai_workflows: {
         Row: {
           created_at: string
@@ -168,51 +249,6 @@ export type Database = {
           id?: string
           name?: string
           settings?: Json
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      clip_projects: {
-        Row: {
-          analysis_error: string | null
-          analysis_status: string
-          created_at: string
-          id: string
-          rendered_clips: Json
-          search_prompt: string | null
-          source_video_duration: number | null
-          source_video_url: string
-          suggested_clips: Json
-          title: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          analysis_error?: string | null
-          analysis_status?: string
-          created_at?: string
-          id?: string
-          rendered_clips?: Json
-          search_prompt?: string | null
-          source_video_duration?: number | null
-          source_video_url: string
-          suggested_clips?: Json
-          title?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          analysis_error?: string | null
-          analysis_status?: string
-          created_at?: string
-          id?: string
-          rendered_clips?: Json
-          search_prompt?: string | null
-          source_video_duration?: number | null
-          source_video_url?: string
-          suggested_clips?: Json
-          title?: string
           updated_at?: string
           user_id?: string
         }

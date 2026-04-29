@@ -33,6 +33,7 @@ import StoryMode from "./pages/StoryMode";
 import VoiceTest from "./pages/VoiceTest";
 import TextToSpeech from "./pages/TextToSpeech";
 import Costs from "./pages/Costs";
+import AgentPage from "./pages/Agent";
 
 import NotFound from "./pages/NotFound";
 
@@ -73,6 +74,7 @@ const App = () => (
             <Route path="/faceless-video" element={<FacelessVideoPage />} />
             <Route path="/trailer-generator" element={<TrailerGeneratorPage />} />
             <Route path="/story-mode" element={<StoryMode />} />
+            <Route path="/agent" element={<AgentPage />} />
             <Route path="/story-mode/voice-test" element={<VoiceTest />} />
             <Route path="/tts" element={<TextToSpeech />} />
             <Route path="/costs" element={<Costs />} />
