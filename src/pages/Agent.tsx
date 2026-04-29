@@ -1085,7 +1085,58 @@ export default function AgentPage() {
                           </div>
                         </div>
 
-                        {/* B-roll Mix: % talking-head vs sketch */}
+                        {/* Image source + watermark guard */}
+                        <div className="space-y-2 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="flex items-center gap-2">
+                              <ImageIcon className="w-3.5 h-3.5" /> Sorgente immagini
+                            </Label>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              ✓ Watermark guard attivo
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {IMAGE_SOURCES.map((src) => {
+                              const active = (project.image_source || "freepik") === src.id;
+                              return (
+                                <button
+                                  key={src.id}
+                                  type="button"
+                                  onClick={() => updateProject({ image_source: src.id } as any)}
+                                  className={`px-3 py-2 rounded-md border text-xs text-left max-w-[220px] transition ${
+                                    active ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
+                                  }`}
+                                  title={src.hint}
+                                >
+                                  <div className="font-medium">{src.label}</div>
+                                  <div className="text-[10px] text-muted-foreground leading-tight mt-0.5">{src.hint}</div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-tight">
+                            Output finale sempre privo di preview/watermark: il backend usa <code>/v1/videos/&#123;id&#125;/download</code>
+                            per Freepik e scarta asset che contengono <code>watermark</code>/<code>preview</code> nell'URL.
+                          </p>
+                        </div>
+
+                        {/* Live transitions preview (CSS, no server render) */}
+                        <div className="space-y-2 pt-4 border-t border-border">
+                          <Label className="flex items-center gap-2">
+                            <Play className="w-3.5 h-3.5" /> Anteprima transizioni
+                          </Label>
+                          <TransitionPreview
+                            transitionLevel={project.transition_level}
+                            aspectRatio={project.aspect_ratio}
+                            frames={(project.scene_overrides || [])
+                              .map((s) => {
+                                const sel = s.suggestions?.[s.selectedIndex] || s.suggestions?.[0];
+                                return sel ? { url: sel.url, thumb: sel.thumb, keyword: s.keyword, duration: s.duration } : null;
+                              })
+                              .filter(Boolean) as any}
+                          />
+                        </div>
+
                         <div className="space-y-3 pt-4 border-t border-border">
                           <div className="flex items-center justify-between">
                             <Label className="flex items-center gap-2">
