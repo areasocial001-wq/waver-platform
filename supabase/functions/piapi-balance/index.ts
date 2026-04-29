@@ -16,27 +16,43 @@ serve(async (req) => {
     
     if (!PIAPI_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "PIAPI_API_KEY is not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ hasKey: false, error: "PIAPI_API_KEY is not configured", fallback: true, credits: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log("Fetching PiAPI account info...");
 
-    const response = await fetch("https://api.piapi.ai/account/info", {
-      method: "GET",
-      headers: {
-        "X-API-Key": PIAPI_API_KEY,
-        "Accept": "application/json",
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch("https://api.piapi.ai/account/info", {
+        method: "GET",
+        headers: {
+          "X-API-Key": PIAPI_API_KEY,
+          "Accept": "application/json",
+        },
+      });
+    } catch (fetchErr) {
+      console.error("PiAPI fetch network error:", fetchErr);
+      return new Response(
+        JSON.stringify({ hasKey: true, error: "SERVICE_UNAVAILABLE", fallback: true, credits: 0, equivalent_in_usd: 0 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("PiAPI balance check failed:", response.status, errorText);
+      const isFallbackable = response.status >= 500 || response.status === 429;
       return new Response(
-        JSON.stringify({ error: `Failed to fetch balance: ${response.status}` }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          hasKey: true,
+          error: isFallbackable ? "SERVICE_UNAVAILABLE" : `Failed to fetch balance: ${response.status}`,
+          fallback: isFallbackable,
+          credits: 0,
+          equivalent_in_usd: 0,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -60,8 +76,8 @@ serve(async (req) => {
     console.error("Error in piapi-balance function:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ error: errorMessage, fallback: true, credits: 0, equivalent_in_usd: 0 }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
