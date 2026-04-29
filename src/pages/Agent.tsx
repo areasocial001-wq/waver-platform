@@ -775,9 +775,97 @@ export default function AgentPage() {
                             </Select>
                           </div>
                         </div>
+
+                        {/* B-roll Mix: % talking-head vs sketch */}
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2">
+                              <Mic className="w-3.5 h-3.5" /> Mix B-roll: Talking-head vs Sketch
+                            </Label>
+                            <Badge variant="outline" className="text-xs">
+                              {project.broll_mix?.talking_head ?? 50}% / {project.broll_mix?.sketch ?? 50}%
+                            </Badge>
+                          </div>
+                          <Slider
+                            value={[project.broll_mix?.talking_head ?? 50]}
+                            min={0} max={100} step={10}
+                            onValueChange={([v]) => handleBrollMixChange(v)}
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><Mic className="w-3 h-3" /> Più talking-head</span>
+                            <span className="flex items-center gap-1"><PenTool className="w-3 h-3" /> Più sketch / blueprint</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {[
+                              { label: "Solo Talking", th: 100 },
+                              { label: "Opus-like (60/40)", th: 60 },
+                              { label: "Bilanciato", th: 50 },
+                              { label: "Solo Sketch", th: 0 },
+                            ].map((p) => (
+                              <button
+                                key={p.label}
+                                type="button"
+                                onClick={() => handleBrollMixChange(p.th)}
+                                className={`px-2 py-1 rounded text-xs border transition ${
+                                  (project.broll_mix?.talking_head ?? 50) === p.th
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border hover:bg-muted"
+                                }`}
+                              >{p.label}</button>
+                            ))}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Premi "Ricarica" sullo storyboard per rigenerare le miniature col nuovo mix.
+                          </p>
+                        </div>
+
+                        {/* Custom user presets */}
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-2"><Save className="w-3.5 h-3.5" /> Preset personalizzati</Label>
+                            <span className="text-xs text-muted-foreground">{userPresets.length} salvati</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Nome preset (es. Brand Opus 9:16)"
+                              value={newPresetName}
+                              onChange={(e) => setNewPresetName(e.target.value)}
+                              className="h-9"
+                            />
+                            <Button size="sm" onClick={handleSavePreset} className="gap-2 shrink-0">
+                              <Save className="w-3.5 h-3.5" /> Salva attuale
+                            </Button>
+                          </div>
+                          {userPresets.length > 0 && (
+                            <div className="space-y-2">
+                              {userPresets.map((up) => (
+                                <div key={up.id} className="flex items-center justify-between gap-2 p-2 border border-border rounded-md">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="flex gap-0.5 shrink-0">
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.primary }} />
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.secondary }} />
+                                      <span className="w-3 h-3 rounded-sm" style={{ background: up.color_palette.accent }} />
+                                    </span>
+                                    <span className="text-sm font-medium truncate">{up.name}</span>
+                                    <Badge variant="outline" className="text-xs shrink-0">{up.aspect_ratio}</Badge>
+                                    <Badge variant="outline" className="text-xs shrink-0">~{up.scene_duration_sec}s</Badge>
+                                    <Badge variant="outline" className="text-xs shrink-0">
+                                      {up.broll_mix?.talking_head ?? 50}/{up.broll_mix?.sketch ?? 50}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <Button size="sm" variant="outline" onClick={() => handleApplyUserPreset(up)}>Applica</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDeleteUserPreset(up.id)}>
+                                      <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </TabsContent>
 
-                      <TabsContent value="subs" className="space-y-4 pt-4">
                         <div className="flex items-center justify-between">
                           <Label>Abilita sottotitoli</Label>
                           <Switch checked={project.subtitle_config?.enabled !== false}
