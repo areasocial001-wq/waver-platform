@@ -49,6 +49,12 @@ export function useInworldVoices(opts: { autoload?: boolean } = { autoload: true
     setIsLoading(true);
     setError(null);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session?.access_token) {
+        // Not authenticated yet — skip silently, will retry on next call
+        setIsLoading(false);
+        return [];
+      }
       const { data, error: fnError } = await supabase.functions.invoke("inworld-list-voices", {
         method: "GET",
       });
@@ -73,7 +79,12 @@ export function useInworldVoices(opts: { autoload?: boolean } = { autoload: true
     if (opts.autoload !== false) fetchVoices();
     const listener = (v: InworldVoice[]) => setVoices(v);
     listeners.add(listener);
-    return () => { listeners.delete(listener); };
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        if (!cache) fetchVoices(true);
+      }
+    });
+    return () => { listeners.delete(listener); sub.subscription.unsubscribe(); };
   }, [fetchVoices, opts.autoload]);
 
   const systemVoices = voices.filter(v => v.source === "SYSTEM");
