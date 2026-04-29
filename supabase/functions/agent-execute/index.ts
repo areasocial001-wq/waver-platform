@@ -367,6 +367,21 @@ serve(async (req) => {
         );
         const idx = typeof ov.selectedIndex === "number" && ov.selectedIndex >= 0 ? ov.selectedIndex : 0;
         let pick = ov.suggestions?.[idx] ?? ov.suggestions?.[0];
+        if (pick?.source === "freepik" && pick?.id) {
+          const cleanUrl = await freepikDownloadUrl(FREEPIK_API_KEY, pick.id);
+          if (cleanUrl) {
+            pick = { ...pick, url: cleanUrl, thumb: pick.thumb || cleanUrl };
+          } else {
+            await appendLog(
+              adminClient,
+              projectId,
+              `⚠️ Asset Freepik "${ov.keyword}" ignorato: disponibile solo anteprima con watermark. Cerco un'alternativa pulita.`,
+              10 + Math.round((i / overrides.length) * 35),
+              "asset-collection"
+            );
+            pick = undefined;
+          }
+        }
         if (!pick?.url) {
           const found = await searchFreepikVideo(FREEPIK_API_KEY, ov.keyword);
           if (found) pick = { url: found.url, thumb: found.thumb, source: "freepik" };
