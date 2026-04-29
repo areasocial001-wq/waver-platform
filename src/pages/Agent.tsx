@@ -78,6 +78,7 @@ type ProjectRow = {
   subtitle_config: { enabled: boolean; language: string; fontSize: string; position: string };
   intro_title: { enabled: boolean; text: string; duration: number } | null;
   outro_cta: { enabled: boolean; text: string; duration: number } | null;
+  broll_mix: { talking_head: number; sketch: number };
   created_at: string;
 };
 
