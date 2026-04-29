@@ -158,6 +158,9 @@ export default function AgentPage() {
   const pollRef = useRef<number | null>(null);
 
   const { systemVoices, isLoading: voicesLoading } = useInworldVoices();
+  const nativeVoices = language === "en"
+    ? systemVoices
+    : systemVoices.filter((voice) => isVoiceNativeForLanguage(voice, language));
 
   // realtime
   useEffect(() => {
@@ -314,9 +317,13 @@ export default function AgentPage() {
 
   const handleCreateAndPlan = async () => {
     if (!brief.trim()) { toast.error("Inserisci un brief"); return; }
-    // Client-side validation: voice must belong to verified Inworld set for non-EN
-    if (language !== "en" && voiceId) {
-      const allowed = (NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => v.id);
+    // Client-side validation: only language-native Inworld voices are allowed for non-EN.
+    if (language !== "en") {
+      const allowed = nativeVoices.map((v) => v.voiceId);
+      if (allowed.length === 0) {
+        toast.error(`Nessuna voce Inworld nativa verificata per ${language.toUpperCase()}.`);
+        return;
+      }
       if (!allowed.includes(voiceId)) {
         toast.error(`Voce "${voiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
         return;
