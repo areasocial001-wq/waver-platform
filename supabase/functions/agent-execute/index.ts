@@ -470,8 +470,8 @@ serve(async (req) => {
             resize: "cover",
             muted: !isVidnoz, // keep Vidnoz audio (it's the voiceover)
             volume: isVidnoz ? 1 : 0,
-            "fade-in": 0.3,
-            "fade-out": 0.3,
+            // No per-clip fade: the scene `transition` already handles the
+            // crossover between scenes. Stacking both produces long black gaps.
           },
         ],
       });
