@@ -443,30 +443,16 @@ serve(async (req) => {
       const lang = (project.language?.slice(0, 2).toLowerCase() || "en");
       const isEnglish = lang === "en";
 
-      // Curated Inworld native voices per language. These all run on the
-      // multilingual model `inworld-tts-1.5-max` and produce native pronunciation
-      // (no English accent on Italian/Spanish/etc.). First entry is the default.
-      // Real Inworld voice names (language-agnostic). Pronunciation comes from
-      // the multilingual model `inworld-tts-1.5-max` + languageCode. Sending a
-      // non-existent name like "Giulia" returns 404 from Inworld.
-      const MULTILINGUAL_VOICES = ["Edward", "Mark", "Alex", "Roger", "Sarah", "Olivia", "Ashley", "Julia"];
-      const nativeList = MULTILINGUAL_VOICES;
-
-      // Decide which voice to send to Inworld:
-      //  - English: respect the user's voice_id (legacy ElevenLabs IDs are mapped server-side).
-      //  - Non-English: if the user picked a native voice (a plain Inworld name like "Giulia"
-      //    or "Alessandro") use it directly. Otherwise force the curated default for that
-      //    language and ignore any English-centric voice_id.
-      const looksLikeInworldName = (v?: string | null) =>
-        !!v && /^[A-Z][a-zA-Z]{2,30}$/.test(v);
-
+      const inworldVoices = await listInworldVoices(Deno.env.get("INWORLD_API_KEY"));
+      const languageVoice = resolveVoiceForLanguage(inworldVoices, project.voice_id, lang);
       let resolvedVoiceId: string | undefined;
       if (isEnglish) {
         resolvedVoiceId = project.voice_id || undefined;
-      } else if (looksLikeInworldName(project.voice_id) && nativeList.includes(project.voice_id!)) {
-        resolvedVoiceId = project.voice_id!;
       } else {
-        resolvedVoiceId = nativeList[0]; // curated native default for this language
+        resolvedVoiceId = languageVoice.selectedId || languageVoice.fallbackId;
+        if (!resolvedVoiceId) {
+          throw new Error(`Nessuna voce Inworld nativa disponibile per ${lang.toUpperCase()}. Apri il selettore voce e scegli una voce realmente supportata.`);
+        }
       }
 
       // Always force the multilingual high-quality model for non-English narration.
@@ -480,7 +466,7 @@ serve(async (req) => {
         "narration",
       );
 
-      const FALLBACK_VOICE = "Sarah"; // known-good multilingual default
+      const FALLBACK_VOICE = isEnglish ? "Sarah" : (languageVoice.fallbackId || resolvedVoiceId);
       async function callTts(voiceId: string | undefined) {
         return await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
           method: "POST",
@@ -507,8 +493,8 @@ serve(async (req) => {
           ttsResp.status === 404 ||
           /Unknown voice|not found/i.test(txt);
 
-        if (isUnknownVoice && resolvedVoiceId !== FALLBACK_VOICE) {
-          ttsWarning = `La voce "${resolvedVoiceId}" non è disponibile su Inworld per ${lang.toUpperCase()}. Uso fallback "${FALLBACK_VOICE}".`;
+        if (isUnknownVoice && FALLBACK_VOICE && resolvedVoiceId !== FALLBACK_VOICE) {
+          ttsWarning = `La voce "${resolvedVoiceId}" non è disponibile su Inworld per ${lang.toUpperCase()}. Uso fallback nativo "${FALLBACK_VOICE}".`;
           await appendLog(adminClient, projectId, `⚠️ ${ttsWarning}`, 53, "narration");
           ttsResp = await callTts(FALLBACK_VOICE);
           if (!ttsResp.ok) {
