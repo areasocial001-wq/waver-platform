@@ -866,6 +866,7 @@ export default function AgentPage() {
                         </div>
                       </TabsContent>
 
+                      <TabsContent value="subs" className="space-y-4 pt-4">
                         <div className="flex items-center justify-between">
                           <Label>Abilita sottotitoli</Label>
                           <Switch checked={project.subtitle_config?.enabled !== false}
