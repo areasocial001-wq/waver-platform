@@ -148,9 +148,115 @@ serve(async (req) => {
     const overrides: any[] = Array.isArray(project.scene_overrides) ? project.scene_overrides : [];
     const assets: SelectedAsset[] = [];
 
+    // Vidnoz substitution config
+    const useVidnoz = !!project.use_vidnoz_for_talking_head
+      && !!project.vidnoz_avatar_url
+      && !!project.vidnoz_voice_id;
+    const VIDNOZ_API_KEY = Deno.env.get("VIDNOZ_API_KEY");
+
+    // Pre-split transcript across talking-head scenes proportional to duration
+    const transcript: string = String(project.plan.transcript || "");
+    const transcriptWords = transcript.split(/\s+/).filter(Boolean);
+    const thIndices: number[] = useVidnoz
+      ? overrides
+          .map((o, i) => (o?.broll_type === "talking_head" ? i : -1))
+          .filter((i) => i >= 0)
+      : [];
+    const totalThDuration = thIndices.reduce((s, i) => s + (Number(overrides[i]?.duration) || 4), 0);
+    const wordSlices: Record<number, string> = {};
+    if (useVidnoz && thIndices.length > 0 && transcriptWords.length > 0) {
+      let cursor = 0;
+      for (let k = 0; k < thIndices.length; k++) {
+        const idx = thIndices[k];
+        const dur = Number(overrides[idx]?.duration) || 4;
+        const share = totalThDuration > 0 ? dur / totalThDuration : 1 / thIndices.length;
+        const isLast = k === thIndices.length - 1;
+        const wordCount = isLast
+          ? transcriptWords.length - cursor
+          : Math.max(1, Math.round(transcriptWords.length * share));
+        wordSlices[idx] = transcriptWords.slice(cursor, cursor + wordCount).join(" ");
+        cursor += wordCount;
+      }
+    }
+
     if (overrides.length > 0) {
       for (let i = 0; i < overrides.length; i++) {
         const ov = overrides[i];
+        const isTH = ov?.broll_type === "talking_head";
+        const dur = Number(ov.duration) || 4;
+
+        if (useVidnoz && isTH && VIDNOZ_API_KEY) {
+          const sliceText = wordSlices[i] || transcript.slice(0, 200);
+          await appendLog(
+            adminClient,
+            projectId,
+            `Generating Vidnoz avatar for scene "${ov.keyword}"...`,
+            10 + Math.round((i / overrides.length) * 35),
+            "vidnoz-avatar"
+          );
+          try {
+            const fd = new FormData();
+            fd.append("voice_id", project.vidnoz_voice_id);
+            fd.append("text", sliceText.slice(0, 1500));
+            fd.append("type", "0");
+            fd.append("avatar_url", project.vidnoz_avatar_url);
+            const startResp = await fetch(
+              "https://devapi.vidnoz.com/v2/task/generate-talking-head",
+              {
+                method: "POST",
+                headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
+                body: fd,
+              }
+            );
+            const startJson = await startResp.json();
+            if (!startResp.ok || startJson?.code !== 200) {
+              throw new Error(`Vidnoz start error: ${JSON.stringify(startJson).slice(0, 200)}`);
+            }
+            const taskId = String(startJson?.data?.id ?? startJson?.data?.task_id ?? "");
+            if (!taskId) throw new Error("Vidnoz returned no task id");
+
+            // Poll
+            let url = "";
+            const maxMs = 240_000;
+            const t0 = Date.now();
+            let delay = 4000;
+            while (Date.now() - t0 < maxMs && !url) {
+              await new Promise((r) => setTimeout(r, delay));
+              delay = Math.min(delay + 1000, 8000);
+              const dfd = new FormData();
+              dfd.append("id", taskId);
+              const dResp = await fetch("https://devapi.vidnoz.com/v2/task/detail", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
+                body: dfd,
+              });
+              const dJson = await dResp.json().catch(() => ({}));
+              const additional = dJson?.data?.additional_data || {};
+              url = additional?.video_720p?.url || additional?.url || "";
+            }
+            if (!url) throw new Error("Vidnoz polling timeout");
+
+            assets.push({
+              keyword: ov.keyword,
+              url,
+              thumb: project.vidnoz_avatar_url,
+              source: "vidnoz",
+              duration: dur,
+            });
+            continue; // skip Freepik fallback
+          } catch (vidErr) {
+            console.error("Vidnoz scene generation failed, falling back to Freepik:", vidErr);
+            await appendLog(
+              adminClient,
+              projectId,
+              `Vidnoz failed for "${ov.keyword}", using Freepik fallback`,
+              10 + Math.round((i / overrides.length) * 35),
+              "vidnoz-fallback"
+            );
+          }
+        }
+
+        // Default: use Freepik suggestion
         await appendLog(
           adminClient,
           projectId,
@@ -166,7 +272,7 @@ serve(async (req) => {
             url: pick.url,
             thumb: pick.thumb,
             source: pick.source || "freepik",
-            duration: Number(ov.duration) || 4,
+            duration: dur,
           });
         }
       }
@@ -199,7 +305,7 @@ serve(async (req) => {
     }
 
     if (assets.length === 0) {
-      throw new Error("No stock assets found for any keyword");
+      throw new Error("No assets generated for any keyword");
     }
 
     await adminClient
