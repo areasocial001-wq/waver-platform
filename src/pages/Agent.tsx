@@ -93,7 +93,7 @@ export default function AgentPage() {
           filter: `id=eq.${project.id}`,
         },
         (payload) => {
-          setProject(payload.new as ProjectRow);
+          setProject(payload.new as unknown as ProjectRow);
         }
       )
       .subscribe();
