@@ -96,6 +96,43 @@ const LANGUAGES = [
   { code: "pt", label: "Português" },
 ];
 
+// Curated native Inworld voices per language. Used by the Agent wizard so the
+// user picks a voice that matches the project language and the backend forces
+// inworld-tts-1.5-max for native pronunciation (no English accent).
+// Keep in sync with NATIVE_VOICES_BY_LANG in supabase/functions/agent-execute/index.ts
+const NATIVE_VOICES_BY_LANG: Record<string, Array<{ id: string; label: string }>> = {
+  it: [
+    { id: "Alessandro", label: "Alessandro · maschile" },
+    { id: "Giulia", label: "Giulia · femminile" },
+    { id: "Marco", label: "Marco · maschile profondo" },
+    { id: "Sofia", label: "Sofia · femminile calda" },
+  ],
+  es: [
+    { id: "Diego", label: "Diego · masculino" },
+    { id: "Lucia", label: "Lucia · femenino" },
+    { id: "Mateo", label: "Mateo · masculino narrativo" },
+    { id: "Valentina", label: "Valentina · femenino expresivo" },
+  ],
+  fr: [
+    { id: "Lucien", label: "Lucien · masculin" },
+    { id: "Camille", label: "Camille · féminin" },
+    { id: "Antoine", label: "Antoine · masculin chaleureux" },
+    { id: "Margaux", label: "Margaux · féminin expressif" },
+  ],
+  de: [
+    { id: "Friedrich", label: "Friedrich · männlich" },
+    { id: "Hannah", label: "Hannah · weiblich" },
+    { id: "Klaus", label: "Klaus · männlich tief" },
+    { id: "Anna", label: "Anna · weiblich warm" },
+  ],
+  pt: [
+    { id: "Rafael", label: "Rafael · masculino" },
+    { id: "Beatriz", label: "Beatriz · feminino" },
+    { id: "Tiago", label: "Tiago · masculino narrativo" },
+    { id: "Mariana", label: "Mariana · feminino expressivo" },
+  ],
+};
+
 const STYLE_PRESETS = [
   { id: "modern", label: "Modern", palette: { primary: "#3B82F6", secondary: "#0F172A", accent: "#F59E0B" }, font: "Inter" },
   { id: "corporate", label: "Corporate", palette: { primary: "#1E40AF", secondary: "#FFFFFF", accent: "#94A3B8" }, font: "Helvetica" },
