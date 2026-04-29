@@ -965,6 +965,9 @@ export default function AgentPage() {
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
                                     <Button size="sm" variant="outline" onClick={() => handleApplyUserPreset(up)}>Applica</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleExportPreset(up)} title="Esporta JSON">
+                                      <Download className="w-3.5 h-3.5" />
+                                    </Button>
                                     <Button size="sm" variant="ghost" onClick={() => handleDeleteUserPreset(up.id)}>
                                       <Trash2 className="w-3.5 h-3.5 text-destructive" />
                                     </Button>
