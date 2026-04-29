@@ -266,7 +266,7 @@ export default function AgentPage() {
     }
   };
 
-
+  const handlePdfUpload = async (file: File) => {
     setPdfFile(file);
     setExtractingPdf(true);
     try {
