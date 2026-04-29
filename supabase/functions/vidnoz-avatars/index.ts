@@ -90,16 +90,18 @@ serve(async (req) => {
       }));
 
     const voices = pickArray(voicesRoot, ["voices", "list", "items", "data"])
-      .filter((v: any) => v && v.voice_id)
       .map((v: any) => ({
-        voice_id: v.voice_id,
+        voice_id: v.voice_id || v.id,
         name: v.name,
         language: v.language,
         country_name: v.country_name,
         gender: v.gender,
         preview_audio_url: v.preview_audio_url,
-        styles: v.style_list || [],
-      }));
+        preview_image_url: v.preview_image_url,
+        emotions: v.emotions || [],
+        styles: v.style_list || v.emotions || [],
+      }))
+      .filter((v: any) => v.voice_id);
 
     return new Response(
       JSON.stringify({ avatars, voices }),
