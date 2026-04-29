@@ -1294,6 +1294,52 @@ export default function AgentPage() {
                     </Tabs>
                   </Card>
 
+                  {(() => {
+                    if (!project.use_vidnoz_for_talking_head) return null;
+                    const overrides = project.scene_overrides || [];
+                    const thScenes = overrides.filter(o => o?.broll_type !== "sketch");
+                    const thCount = thScenes.length;
+                    const thSeconds = thScenes.reduce((s, o) => s + (Number(o?.duration) || 4), 0);
+                    // Vidnoz pricing approx: ~€0.008 / sec (≈ $0.50/min). Update if plan changes.
+                    const estEur = thSeconds * 0.008;
+                    const ready = !!project.vidnoz_avatar_url && !!project.vidnoz_voice_id;
+                    return (
+                      <div className={`rounded-lg border p-3 text-sm flex items-start gap-2 ${
+                        ready ? "border-primary/30 bg-primary/5" : "border-destructive/40 bg-destructive/5"
+                      }`}>
+                        {ready ? (
+                          <Mic className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 mt-0.5 text-destructive shrink-0" />
+                        )}
+                        <div className="space-y-0.5">
+                          {ready ? (
+                            <>
+                              <div className="font-medium">
+                                Vidnoz attivo · {thCount} {thCount === 1 ? "scena" : "scene"} talking-head
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Verranno generati {thCount} clip avatar AI per un totale di ~{thSeconds.toFixed(1)}s.
+                                Stima crediti Vidnoz: <strong>~€{estEur.toFixed(2)}</strong> (indicativa, dipende dal piano attivo).
+                                La narrazione globale TTS sarà sostituita dalle voci degli avatar.
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-medium text-destructive">
+                                Vidnoz attivo ma manca la configurazione
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Seleziona un avatar e una voce nel pannello <strong>Stile → Avatar Vidnoz</strong>,
+                                oppure disattiva Vidnoz per usare Freepik. Senza configurazione il sistema userà comunque Freepik.
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute}>
                     <Play className="w-4 h-4" /> Conferma e Produci Video
                   </Button>
