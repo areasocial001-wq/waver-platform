@@ -330,7 +330,95 @@ export default function AgentPage() {
     updateProject(patch);
   };
 
-  const handleDuplicate = async (p: ProjectRow) => {
+  // Re-pace storyboard scenes to the Opus-style ~3s rhythm
+  const handleRepaceOpus = () => {
+    if (!project?.scene_overrides?.length) return;
+    const overrides = project.scene_overrides.map((s) => ({
+      ...s,
+      duration: OPUS_PRESET_DEFAULTS.scene_duration_sec,
+    }));
+    updateProject({ scene_overrides: overrides });
+    toast.success("Storyboard re-pacciato a ~3s per scena (Opus-style)");
+  };
+
+  // B-roll mix update + reload storyboard so suggestions match the new mix
+  const handleBrollMixChange = async (talkingHead: number) => {
+    if (!project) return;
+    const mix = { talking_head: talkingHead, sketch: 100 - talkingHead };
+    await updateProject({ broll_mix: mix });
+  };
+  const handleBrollTypeOverride = (sceneIdx: number, type: "talking_head" | "sketch") => {
+    if (!project) return;
+    const overrides = [...(project.scene_overrides || [])];
+    overrides[sceneIdx] = { ...overrides[sceneIdx], broll_type: type };
+    updateProject({ scene_overrides: overrides });
+  };
+
+  // Save current style as a personal preset
+  const handleSavePreset = async () => {
+    if (!project) return;
+    const name = newPresetName.trim() || `My ${project.style_preset} preset`;
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+    const avgDuration =
+      project.scene_overrides?.length
+        ? Math.round(
+            (project.scene_overrides.reduce((a, s) => a + (s.duration || 3), 0) /
+              project.scene_overrides.length) * 10
+          ) / 10
+        : 3;
+    const { error } = await supabase.from("agent_user_presets").insert({
+      user_id: uid,
+      name,
+      base_preset: project.style_preset,
+      color_palette: project.color_palette,
+      typography: project.typography,
+      transition_level: project.transition_level,
+      subtitle_config: project.subtitle_config,
+      intro_title: project.intro_title,
+      outro_cta: project.outro_cta,
+      broll_mix: project.broll_mix || { talking_head: 50, sketch: 50 },
+      aspect_ratio: project.aspect_ratio,
+      scene_duration_sec: avgDuration,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Preset "${name}" salvato`);
+    setNewPresetName("");
+    loadUserPresets();
+  };
+
+  const handleApplyUserPreset = async (preset: UserPreset) => {
+    if (!project) return;
+    const patch: any = {
+      color_palette: preset.color_palette,
+      typography: preset.typography,
+      transition_level: preset.transition_level,
+      subtitle_config: preset.subtitle_config,
+      intro_title: preset.intro_title,
+      outro_cta: preset.outro_cta,
+      broll_mix: preset.broll_mix,
+      aspect_ratio: preset.aspect_ratio,
+      style_preset: preset.base_preset,
+    };
+    if (project.scene_overrides?.length) {
+      patch.scene_overrides = project.scene_overrides.map((s) => ({
+        ...s,
+        duration: preset.scene_duration_sec || s.duration,
+      }));
+    }
+    await updateProject(patch);
+    toast.success(`Preset "${preset.name}" applicato`);
+  };
+
+  const handleDeleteUserPreset = async (id: string) => {
+    const { error } = await supabase.from("agent_user_presets").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Preset eliminato");
+    loadUserPresets();
+  };
+
+
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) return;
