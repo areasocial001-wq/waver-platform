@@ -313,47 +313,51 @@ serve(async (req) => {
       .update({ selected_assets: assets, storyboard: { scenes: assets } })
       .eq("id", projectId);
 
-    // === 2. Narration TTS ===
-    await appendLog(adminClient, projectId, "Generating narration voiceover...", 50, "narration");
+    // === 2. Narration TTS (skipped when Vidnoz handles voice) ===
+    let narrationUrl: string | null = null;
+    if (!useVidnoz) {
+      await appendLog(adminClient, projectId, "Generating narration voiceover...", 50, "narration");
 
-    const ttsResp = await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
-      method: "POST",
-      headers: {
-        Authorization: authHeader,
-        apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text: project.plan.transcript,
-        voiceId: project.voice_id || undefined,
-        languageCode: project.language?.slice(0, 2) || "en",
-      }),
-    });
+      const ttsResp = await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: project.plan.transcript,
+          voiceId: project.voice_id || undefined,
+          languageCode: project.language?.slice(0, 2) || "en",
+        }),
+      });
 
-    if (!ttsResp.ok) {
-      const txt = await ttsResp.text();
-      throw new Error(`TTS failed: ${ttsResp.status} ${txt.slice(0, 200)}`);
+      if (!ttsResp.ok) {
+        const txt = await ttsResp.text();
+        throw new Error(`TTS failed: ${ttsResp.status} ${txt.slice(0, 200)}`);
+      }
+      const ttsData = await ttsResp.json();
+      const audioBase64: string | undefined = ttsData?.audioContent;
+      if (!audioBase64) throw new Error("TTS returned no audio");
+
+      const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
+      const audioPath = `${userId}/${projectId}/narration-${Date.now()}.mp3`;
+      const { error: upErr } = await adminClient.storage
+        .from("agent-uploads")
+        .upload(audioPath, audioBytes, { contentType: "audio/mpeg", upsert: true });
+      if (upErr) throw new Error(`Audio upload failed: ${upErr.message}`);
+      const { data: audioUrlData } = adminClient.storage
+        .from("agent-uploads")
+        .getPublicUrl(audioPath);
+      narrationUrl = audioUrlData.publicUrl;
+
+      await adminClient
+        .from("agent_projects")
+        .update({ narration_url: narrationUrl })
+        .eq("id", projectId);
+    } else {
+      await appendLog(adminClient, projectId, "Vidnoz avatars provide voice, skipping TTS", 50, "narration");
     }
-    const ttsData = await ttsResp.json();
-    const audioBase64: string | undefined = ttsData?.audioContent;
-    if (!audioBase64) throw new Error("TTS returned no audio");
-
-    // Upload narration to storage (decode base64)
-    const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
-    const audioPath = `${userId}/${projectId}/narration-${Date.now()}.mp3`;
-    const { error: upErr } = await adminClient.storage
-      .from("agent-uploads")
-      .upload(audioPath, audioBytes, { contentType: "audio/mpeg", upsert: true });
-    if (upErr) throw new Error(`Audio upload failed: ${upErr.message}`);
-    const { data: audioUrlData } = adminClient.storage
-      .from("agent-uploads")
-      .getPublicUrl(audioPath);
-    const narrationUrl = audioUrlData.publicUrl;
-
-    await adminClient
-      .from("agent_projects")
-      .update({ narration_url: narrationUrl })
-      .eq("id", projectId);
 
     // === 3. Render via JSON2Video (with style + subtitles + intro/outro) ===
     await appendLog(adminClient, projectId, "Building storyboard & rendering...", 70, "render");
