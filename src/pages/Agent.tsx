@@ -78,7 +78,24 @@ const STYLE_PRESETS = [
   { id: "vibrant", label: "Vibrant", palette: { primary: "#EC4899", secondary: "#1E1B4B", accent: "#FBBF24" }, font: "Poppins" },
   { id: "minimal", label: "Minimal", palette: { primary: "#000000", secondary: "#FFFFFF", accent: "#737373" }, font: "Inter" },
   { id: "cinematic", label: "Cinematic", palette: { primary: "#F59E0B", secondary: "#000000", accent: "#DC2626" }, font: "Georgia" },
+  // Reference: Agent Opus output (9:16, ~3s scenes, talking-head + sketch B-roll, cyan/blue accents)
+  { id: "opus", label: "Opus-style", palette: { primary: "#00D4E0", secondary: "#0B1B2B", accent: "#2B8CD9" }, font: "Inter" },
 ];
+
+// Defaults applied when user picks the "opus" preset
+export const OPUS_PRESET_DEFAULTS = {
+  aspect_ratio: "9:16" as const,
+  transition_level: "subtle",
+  scene_duration_sec: 3,
+  subtitle_config: {
+    enabled: true,
+    language: "auto",
+    fontSize: "medium",
+    position: "bottom-center",
+  },
+  intro_title: { enabled: true, text: "", duration: 2 },
+  outro_cta: { enabled: true, text: "Follow for more", duration: 2.5 },
+};
 
 export default function AgentPage() {
   const [activeTab, setActiveTab] = useState<"create" | "history">("create");
@@ -254,11 +271,32 @@ export default function AgentPage() {
   const handleApplyStylePreset = (presetId: string) => {
     const preset = STYLE_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
-    updateProject({
+    const patch: any = {
       style_preset: preset.id,
       color_palette: preset.palette,
       typography: preset.font,
-    });
+    };
+    // "Opus-style": curated defaults inspired by Agent Opus reference output
+    if (preset.id === "opus") {
+      patch.aspect_ratio = OPUS_PRESET_DEFAULTS.aspect_ratio;
+      patch.transition_level = OPUS_PRESET_DEFAULTS.transition_level;
+      patch.subtitle_config = OPUS_PRESET_DEFAULTS.subtitle_config;
+      patch.intro_title = {
+        ...OPUS_PRESET_DEFAULTS.intro_title,
+        text: project?.intro_title?.text || project?.title || "",
+      };
+      patch.outro_cta = project?.outro_cta?.text
+        ? project.outro_cta
+        : OPUS_PRESET_DEFAULTS.outro_cta;
+      if (Array.isArray(project?.scene_overrides) && project.scene_overrides.length > 0) {
+        patch.scene_overrides = project.scene_overrides.map((s) => ({
+          ...s,
+          duration: OPUS_PRESET_DEFAULTS.scene_duration_sec,
+        }));
+      }
+      toast.success("Opus-style applied: 9:16, fast cuts, cyan/blue palette, captions on");
+    }
+    updateProject(patch);
   };
 
   const handleDuplicate = async (p: ProjectRow) => {
