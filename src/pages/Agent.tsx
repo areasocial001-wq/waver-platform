@@ -157,10 +157,10 @@ export default function AgentPage() {
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
-  const { systemVoices, isLoading: voicesLoading } = useInworldVoices();
+  const { voices, systemVoices, isLoading: voicesLoading } = useInworldVoices();
   const nativeVoices = language === "en"
     ? systemVoices
-    : systemVoices.filter((voice) => isVoiceNativeForLanguage(voice, language));
+    : voices.filter((voice) => isVoiceNativeForLanguage(voice, language));
 
   // realtime
   useEffect(() => {
