@@ -1507,19 +1507,69 @@ export default function AgentPage() {
                     <h2 className="text-2xl font-bold mt-1">{project.title}</h2>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{project.execution_step ?? "..."}</span>
-                      <span className="font-medium">{project.progress_pct}%</span>
-                    </div>
-                    <Progress value={project.progress_pct} />
-                  </div>
+                  {(() => {
+                    // Phase chips: detect which big stage we're in based on progress_pct + log keywords.
+                    const pct = project.progress_pct || 0;
+                    const logsTxt = (project.progress_log || []).map((l) => l.message?.toLowerCase() || "").join(" ");
+                    const phases = [
+                      { id: "plan", label: "Piano", icon: FileText, doneAt: 15 },
+                      { id: "voice", label: "Voce", icon: Mic, doneAt: 45, kw: ["tts", "narr", "voice", "voce"] },
+                      { id: "images", label: "Immagini", icon: ImageIcon, doneAt: 70, kw: ["freepik", "image", "asset", "scene", "immag"] },
+                      { id: "transitions", label: "Transizioni", icon: Wand2, doneAt: 85, kw: ["transition", "crossfade", "json2video", "render"] },
+                      { id: "render", label: "Render", icon: Play, doneAt: 100, kw: ["render", "final", "publish"] },
+                    ];
+                    return (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">{project.execution_step ?? "..."}</span>
+                            <span className="font-medium">{pct}%</span>
+                          </div>
+                          <Progress value={pct} />
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {phases.map((p) => {
+                            const isDone = pct >= p.doneAt;
+                            const isActive = !isDone && (pct >= (phases[phases.indexOf(p) - 1]?.doneAt ?? 0) || (p.kw && p.kw.some((k) => logsTxt.includes(k))));
+                            const Icon = p.icon;
+                            return (
+                              <Badge
+                                key={p.id}
+                                variant={isDone ? "default" : isActive ? "secondary" : "outline"}
+                                className={`text-[11px] gap-1 ${isActive && !isDone ? "animate-pulse" : ""}`}
+                              >
+                                <Icon className="w-3 h-3" />
+                                {p.label}
+                                {isDone && <CheckCircle2 className="w-3 h-3" />}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      </>
+                    );
+                  })()}
 
                   {project.progress_log?.length > 0 && (
-                    <div className="bg-muted/30 rounded-md p-3 max-h-48 overflow-y-auto text-xs font-mono space-y-1">
-                      {project.progress_log.slice(-12).map((l, i) => (
-                        <div key={i} className="text-muted-foreground">{l.message}</div>
-                      ))}
+                    <div className="bg-muted/30 rounded-md p-3 max-h-64 overflow-y-auto text-xs font-mono space-y-1">
+                      {project.progress_log.slice(-30).map((l, i) => {
+                        const msg = l.message || "";
+                        const lower = msg.toLowerCase();
+                        const tag = lower.includes("tts") || lower.includes("voce") || lower.includes("narr")
+                          ? { txt: "VOCE", cls: "text-emerald-400" }
+                          : lower.includes("freepik") || lower.includes("immag") || lower.includes("asset") || lower.includes("scene")
+                          ? { txt: "IMG", cls: "text-sky-400" }
+                          : lower.includes("transition") || lower.includes("crossfade") || lower.includes("render") || lower.includes("json2video")
+                          ? { txt: "RNDR", cls: "text-fuchsia-400" }
+                          : lower.includes("⚠") || lower.includes("warn") || lower.includes("fallback")
+                          ? { txt: "WARN", cls: "text-amber-400" }
+                          : { txt: "•", cls: "text-muted-foreground" };
+                        return (
+                          <div key={i} className="flex gap-2">
+                            <span className={`shrink-0 w-10 ${tag.cls}`}>[{tag.txt}]</span>
+                            <span className="text-muted-foreground">{msg}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
