@@ -926,6 +926,103 @@ export default function AgentPage() {
                           </p>
                         </div>
 
+                        {/* Vidnoz talking-head replacement */}
+                        <div className="space-y-3 pt-4 border-t border-border">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <Label className="flex items-center gap-2">
+                              <Mic className="w-3.5 h-3.5" /> Avatar Vidnoz per scene Talking-head
+                            </Label>
+                            <Switch
+                              checked={!!project.use_vidnoz_for_talking_head}
+                              onCheckedChange={(v) => {
+                                updateProject({ use_vidnoz_for_talking_head: v } as any);
+                                if (v) loadVidnozCatalog();
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Quando attivo, le scene marcate "Talking-head" useranno un avatar AI Vidnoz che pronuncia
+                            la trascrizione invece dello stock Freepik. La narrazione TTS viene saltata (la voce è quella dell'avatar).
+                          </p>
+
+                          {project.use_vidnoz_for_talking_head && (
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-muted-foreground">
+                                  {vidnozLoading ? "Caricamento..." : `${vidnozAvatars.length} avatar · ${vidnozVoices.length} voci`}
+                                </span>
+                                <Button size="sm" variant="outline" onClick={loadVidnozCatalog} disabled={vidnozLoading} className="gap-1">
+                                  {vidnozLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                  Ricarica catalogo
+                                </Button>
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label className="text-xs">Avatar</Label>
+                                {vidnozAvatars.length === 0 ? (
+                                  <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded">
+                                    Nessun avatar caricato. Premi "Ricarica catalogo".
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
+                                    {vidnozAvatars.slice(0, 60).map((av) => (
+                                      <button
+                                        key={av.avatar_id}
+                                        type="button"
+                                        onClick={() => updateProject({ vidnoz_avatar_id: av.avatar_id, vidnoz_avatar_url: av.avatar_url } as any)}
+                                        className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition ${
+                                          project.vidnoz_avatar_id === av.avatar_id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
+                                        }`}
+                                        title={`${av.name} (${av.gender})`}
+                                      >
+                                        {av.thumb && <img src={av.thumb} alt={av.name} className="w-full h-full object-cover" loading="lazy" />}
+                                        {project.vidnoz_avatar_id === av.avatar_id && (
+                                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                          </div>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label className="text-xs">Voce</Label>
+                                <Select
+                                  value={project.vidnoz_voice_id || ""}
+                                  onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
+                                  disabled={vidnozVoices.length === 0}
+                                >
+                                  <SelectTrigger><SelectValue placeholder="Seleziona voce" /></SelectTrigger>
+                                  <SelectContent className="max-h-72">
+                                    {vidnozVoices
+                                      .filter((v) => !project.language || v.language?.startsWith(project.language.slice(0, 2)) || v.language === "en")
+                                      .slice(0, 80)
+                                      .map((v) => (
+                                        <SelectItem key={v.voice_id} value={v.voice_id}>
+                                          {v.name} · {v.language} · {v.gender}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                                {project.vidnoz_voice_id && (() => {
+                                  const v = vidnozVoices.find((x) => x.voice_id === project.vidnoz_voice_id);
+                                  return v?.preview_audio_url ? (
+                                    <audio src={v.preview_audio_url} controls className="w-full h-8 mt-1" />
+                                  ) : null;
+                                })()}
+                              </div>
+
+                              {(!project.vidnoz_avatar_id || !project.vidnoz_voice_id) && (
+                                <div className="text-xs text-amber-500">
+                                  Seleziona un avatar e una voce per attivare Vidnoz, altrimenti il sistema userà comunque Freepik.
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
                         {/* Custom user presets */}
                         <div className="space-y-3 pt-4 border-t border-border">
                           <div className="flex items-center justify-between flex-wrap gap-2">
