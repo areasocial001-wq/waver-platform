@@ -547,10 +547,10 @@ serve(async (req) => {
     const fontFamily = project.typography || "Inter";
     const transitionLevel = project.transition_level || "medium";
     const transitionMap: Record<string, { style: string; duration: number }> = {
-      none: { style: "fade", duration: 0 },
-      subtle: { style: "fade", duration: 0.3 },
-      medium: { style: "fade", duration: 0.6 },
-      bold: { style: "wipeleft", duration: 0.8 },
+      none: { style: "crossfade", duration: 0 },
+      subtle: { style: "crossfade", duration: 0.3 },
+      medium: { style: "crossfade", duration: 0.6 },
+      bold: { style: "crossfade", duration: 0.8 },
     };
     const t = transitionMap[transitionLevel] || transitionMap.medium;
 
@@ -591,6 +591,8 @@ serve(async (req) => {
           {
             type: "video",
             src: a.url,
+            duration: a.duration,
+            loop: -1,
             resize: "cover",
             muted: !isVidnoz, // keep Vidnoz audio (it's the voiceover)
             volume: isVidnoz ? 1 : 0,
