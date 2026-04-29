@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navbar } from "@/components/Navbar";
 import { AuthGuard } from "@/components/AuthGuard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -650,6 +651,7 @@ export default function AgentPage() {
             </TabsList>
 
             <TabsContent value="create" className="space-y-6">
+              <ErrorBoundary label="agent-create">
               {!project && (
                 <Card className="p-6 space-y-5">
                   <div className="space-y-2">
@@ -1399,6 +1401,7 @@ export default function AgentPage() {
                   </div>
                 </Card>
               )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="history" className="space-y-3">
