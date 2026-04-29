@@ -366,14 +366,11 @@ serve(async (req) => {
       // Curated Inworld native voices per language. These all run on the
       // multilingual model `inworld-tts-1.5-max` and produce native pronunciation
       // (no English accent on Italian/Spanish/etc.). First entry is the default.
-      const NATIVE_VOICES_BY_LANG: Record<string, string[]> = {
-        it: ["Alessandro", "Giulia", "Marco", "Sofia"],
-        es: ["Diego", "Lucia", "Mateo", "Valentina"],
-        fr: ["Lucien", "Camille", "Antoine", "Margaux"],
-        de: ["Friedrich", "Hannah", "Klaus", "Anna"],
-        pt: ["Rafael", "Beatriz", "Tiago", "Mariana"],
-      };
-      const nativeList = NATIVE_VOICES_BY_LANG[lang] ?? [];
+      // Real Inworld voice names (language-agnostic). Pronunciation comes from
+      // the multilingual model `inworld-tts-1.5-max` + languageCode. Sending a
+      // non-existent name like "Giulia" returns 404 from Inworld.
+      const MULTILINGUAL_VOICES = ["Edward", "Mark", "Alex", "Roger", "Sarah", "Olivia", "Ashley", "Julia"];
+      const nativeList = MULTILINGUAL_VOICES;
 
       // Decide which voice to send to Inworld:
       //  - English: respect the user's voice_id (legacy ElevenLabs IDs are mapped server-side).
