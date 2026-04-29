@@ -419,6 +419,7 @@ export default function AgentPage() {
   };
 
 
+  const handleDuplicate = async (p: ProjectRow) => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) return;
