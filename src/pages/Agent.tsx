@@ -441,6 +441,7 @@ export default function AgentPage() {
         subtitle_config: p.subtitle_config,
         intro_title: p.intro_title,
         outro_cta: p.outro_cta,
+        broll_mix: p.broll_mix || { talking_head: 50, sketch: 50 },
       })
       .select("*").single();
     if (error) { toast.error(error.message); return; }
