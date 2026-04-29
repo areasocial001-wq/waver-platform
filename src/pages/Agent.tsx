@@ -179,6 +179,16 @@ export default function AgentPage() {
     })();
   }, [activeTab, project?.id]);
 
+  // Load user-saved style presets
+  const loadUserPresets = async () => {
+    const { data } = await supabase
+      .from("agent_user_presets")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (data) setUserPresets(data as unknown as UserPreset[]);
+  };
+  useEffect(() => { loadUserPresets(); }, []);
+
   const handlePdfUpload = async (file: File) => {
     setPdfFile(file);
     setExtractingPdf(true);
