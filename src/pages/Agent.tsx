@@ -31,7 +31,23 @@ type SceneOverride = {
   keyword: string;
   duration: number;
   selectedIndex: number;
+  broll_type?: "talking_head" | "sketch";
   suggestions: { url: string; thumb: string; source: string; id?: string }[];
+};
+
+type UserPreset = {
+  id: string;
+  name: string;
+  base_preset: string;
+  color_palette: { primary: string; secondary: string; accent: string };
+  typography: string;
+  transition_level: string;
+  subtitle_config: { enabled: boolean; language: string; fontSize: string; position: string };
+  intro_title: any;
+  outro_cta: any;
+  broll_mix: { talking_head: number; sketch: number };
+  aspect_ratio: string;
+  scene_duration_sec: number;
 };
 
 type ProjectRow = {
