@@ -753,7 +753,11 @@ export default function AgentPage() {
                         )}
                       </Label>
                       {language === "en" ? (
-                        <Select value={voiceId} onValueChange={setVoiceId} disabled={voicesLoading}>
+                        <Select
+                          value={voiceId || "__auto__"}
+                          onValueChange={(v) => setVoiceId(v === "__auto__" ? "" : v)}
+                          disabled={voicesLoading}
+                        >
                           <SelectTrigger><SelectValue placeholder="Auto" /></SelectTrigger>
                           <SelectContent className="max-h-72">
                             <SelectItem value="__auto__">Auto (default)</SelectItem>
