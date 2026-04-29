@@ -754,7 +754,7 @@ export default function AgentPage() {
                           </span>
                         )}
                         <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          ✓ {(language === "en" ? systemVoices.length : (NATIVE_VOICES_BY_LANG[language]?.length ?? 0))} voci verificate Inworld
+                          ✓ {nativeVoices.length} voci verificate Inworld
                         </span>
                       </Label>
                       {language === "en" ? (
@@ -773,14 +773,15 @@ export default function AgentPage() {
                         </Select>
                       ) : (
                         <Select
-                          value={voiceId || (NATIVE_VOICES_BY_LANG[language]?.[0]?.id ?? "")}
+                          value={voiceId || nativeVoices[0]?.voiceId || ""}
                           onValueChange={(v) => setVoiceId(v === "__auto__" ? "" : v)}
+                          disabled={voicesLoading || nativeVoices.length === 0}
                         >
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent className="max-h-72">
                             <SelectItem value="__auto__">Auto · pronuncia nativa</SelectItem>
-                            {(NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => (
-                              <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>
+                            {nativeVoices.map((v) => (
+                              <SelectItem key={v.voiceId} value={v.voiceId}>{v.displayName}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
