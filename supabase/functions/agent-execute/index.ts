@@ -63,6 +63,73 @@ async function freepikDownloadUrl(apiKey: string, resourceId: string | number): 
   }
 }
 
+interface InworldVoice {
+  name?: string;
+  voiceId?: string;
+  displayName?: string;
+  langCode?: string;
+  tags?: string[];
+  source?: string;
+}
+
+const normalizeLang = (value?: string | null) =>
+  (value || "").toLowerCase().replace("_", "-").split("-")[0];
+
+const normalizeVoiceId = (voice: InworldVoice): string => {
+  if (voice.source === "IVC" && voice.name?.startsWith("workspaces/")) return voice.name;
+  return String(voice.voiceId || voice.name || voice.displayName || "");
+};
+
+function voiceSupportsLanguage(voice: InworldVoice, lang: string): boolean {
+  const target = normalizeLang(lang);
+  const direct = normalizeLang(voice.langCode);
+  if (direct) return direct === target;
+  const tags = Array.isArray(voice.tags) ? voice.tags : [];
+  return tags.some((tag) => normalizeLang(tag) === target || tag.toLowerCase().includes(`language:${target}`));
+}
+
+async function listInworldVoices(apiKey?: string): Promise<InworldVoice[]> {
+  if (!apiKey) return [];
+  const call = (scheme: "Basic" | "Bearer") =>
+    fetch("https://api.inworld.ai/voices/v1/voices", {
+      headers: { Authorization: `${scheme} ${apiKey}` },
+    });
+  let resp = await call("Basic");
+  if (resp.status === 401 || resp.status === 403) resp = await call("Bearer");
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    console.warn("Inworld voice list unavailable:", resp.status, body.slice(0, 180));
+    return [];
+  }
+  const json = await resp.json().catch(() => ({}));
+  return Array.isArray(json?.voices) ? json.voices : [];
+}
+
+function resolveVoiceForLanguage(voices: InworldVoice[], requestedVoiceId: string | null | undefined, lang: string) {
+  const supported = voices
+    .map((voice) => ({ voice, id: normalizeVoiceId(voice) }))
+    .filter((entry) => entry.id && voiceSupportsLanguage(entry.voice, lang));
+  const requested = requestedVoiceId || "";
+  const selected = requested
+    ? supported.find((entry) =>
+        entry.id === requested ||
+        entry.voice.name === requested ||
+        entry.voice.displayName === requested ||
+        entry.voice.voiceId === requested,
+      )
+    : undefined;
+  const fallback = supported.find((entry) =>
+    /female|woman|girl|donna|femminile|mujer|femme|weiblich/i.test(
+      `${entry.voice.displayName || ""} ${(entry.voice.tags || []).join(" ")}`,
+    ),
+  ) || supported[0];
+  return {
+    selectedId: selected?.id,
+    fallbackId: fallback?.id,
+    supportedCount: supported.length,
+  };
+}
+
 async function searchFreepikVideo(
   apiKey: string,
   term: string
@@ -97,10 +164,8 @@ async function searchFreepikVideo(
           return { url: cleanUrl, thumb: thumb || cleanUrl };
         }
       }
-      // Fallback to watermarked preview if download endpoint is unavailable
       if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
-        console.warn(`Freepik: falling back to watermarked preview for "${term}" (id=${resourceId})`);
-        return { url: previewUrl, thumb };
+        console.warn(`Freepik: skipped watermarked preview for "${term}" (id=${resourceId})`);
       }
     }
     console.log(`Freepik: no usable video found in ${items.length} results for "${term}"`);
