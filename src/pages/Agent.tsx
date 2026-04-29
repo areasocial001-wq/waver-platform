@@ -271,11 +271,32 @@ export default function AgentPage() {
   const handleApplyStylePreset = (presetId: string) => {
     const preset = STYLE_PRESETS.find((p) => p.id === presetId);
     if (!preset) return;
-    updateProject({
+    const patch: any = {
       style_preset: preset.id,
       color_palette: preset.palette,
       typography: preset.font,
-    });
+    };
+    // "Opus-style": curated defaults inspired by Agent Opus reference output
+    if (preset.id === "opus") {
+      patch.aspect_ratio = OPUS_PRESET_DEFAULTS.aspect_ratio;
+      patch.transition_level = OPUS_PRESET_DEFAULTS.transition_level;
+      patch.subtitle_config = OPUS_PRESET_DEFAULTS.subtitle_config;
+      patch.intro_title = {
+        ...OPUS_PRESET_DEFAULTS.intro_title,
+        text: project?.intro_title?.text || project?.title || "",
+      };
+      patch.outro_cta = project?.outro_cta?.text
+        ? project.outro_cta
+        : OPUS_PRESET_DEFAULTS.outro_cta;
+      if (Array.isArray(project?.scene_overrides) && project.scene_overrides.length > 0) {
+        patch.scene_overrides = project.scene_overrides.map((s) => ({
+          ...s,
+          duration: OPUS_PRESET_DEFAULTS.scene_duration_sec,
+        }));
+      }
+      toast.success("Opus-style applied: 9:16, fast cuts, cyan/blue palette, captions on");
+    }
+    updateProject(patch);
   };
 
   const handleDuplicate = async (p: ProjectRow) => {
