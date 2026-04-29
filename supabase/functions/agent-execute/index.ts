@@ -493,7 +493,7 @@ serve(async (req) => {
         settings: {
           style: "classic-progressive",
           position: subPosition,
-          "font-family": `${fontFamily} Bold`,
+          "font-family": fontFamily,
           "font-size": fontSizeMap[sub?.fontSize] || fontSizeMap.medium,
           "word-color": "#FFFFFF",
           "line-color": "#FFFFFF",
