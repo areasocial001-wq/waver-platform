@@ -194,7 +194,20 @@ export default function AgentPage() {
       .channel(`agent_project_${project.id}`)
       .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "agent_projects", filter: `id=eq.${project.id}` },
-        (payload) => setProject(payload.new as unknown as ProjectRow))
+        (payload) => {
+          // Merge instead of replace: realtime payloads can omit large jsonb
+          // fields (plan, scene_overrides) which would unmount the wizard
+          // (planReady becomes false) and "kick the user out" mid-edit.
+          const incoming = payload.new as Partial<ProjectRow>;
+          setProject((prev) => {
+            if (!prev) return incoming as ProjectRow;
+            const merged: any = { ...prev };
+            for (const [k, v] of Object.entries(incoming)) {
+              if (v !== null && v !== undefined) merged[k] = v;
+            }
+            return merged as ProjectRow;
+          });
+        })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [project?.id]);
