@@ -126,7 +126,7 @@ export default function AgentPage() {
 
   // creation form
   const [brief, setBrief] = useState("");
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState("it");
   const [duration, setDuration] = useState(35);
   const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [voiceId, setVoiceId] = useState<string>("");
