@@ -96,43 +96,15 @@ const LANGUAGES = [
   { code: "pt", label: "Português" },
 ];
 
-// Curated native Inworld voices per language. Used by the Agent wizard so the
-// user picks a voice that matches the project language and the backend forces
-// inworld-tts-1.5-max for native pronunciation (no English accent).
-// Keep in sync with NATIVE_VOICES_BY_LANG in supabase/functions/agent-execute/index.ts
-// Inworld voices are language-agnostic: pronunciation is driven by the
-// multilingual model `inworld-tts-1.5-max` + languageCode. We expose the same
-// curated set of REAL Inworld voice names per language so users get a friendly
-// gendered choice without invalid IDs.
-const MULTILINGUAL_VOICES: Array<{ id: string; gender: "m" | "f"; tone: string }> = [
-  { id: "Edward",   gender: "m", tone: "profondo" },
-  { id: "Mark",     gender: "m", tone: "narrativo" },
-  { id: "Alex",     gender: "m", tone: "professionale" },
-  { id: "Roger",    gender: "m", tone: "caldo" },
-  { id: "Sarah",    gender: "f", tone: "naturale" },
-  { id: "Olivia",   gender: "f", tone: "giovane" },
-  { id: "Ashley",   gender: "f", tone: "matura" },
-  { id: "Julia",    gender: "f", tone: "espressiva" },
-];
+const normalizeVoiceLang = (value?: string | null) =>
+  (value || "").toLowerCase().replace("_", "-").split("-")[0];
 
-const LANG_GENDER_LABELS: Record<string, { m: string; f: string }> = {
-  it: { m: "maschile", f: "femminile" },
-  es: { m: "masculino", f: "femenino" },
-  fr: { m: "masculin", f: "féminin" },
-  de: { m: "männlich", f: "weiblich" },
-  pt: { m: "masculino", f: "feminino" },
-  en: { m: "male", f: "female" },
+const isVoiceNativeForLanguage = (voice: { langCode?: string; tags?: string[] }, lang: string) => {
+  const target = normalizeVoiceLang(lang);
+  const direct = normalizeVoiceLang(voice.langCode);
+  if (direct) return direct === target;
+  return (voice.tags || []).some((tag) => normalizeVoiceLang(tag) === target || tag.toLowerCase().includes(`language:${target}`));
 };
-
-const NATIVE_VOICES_BY_LANG: Record<string, Array<{ id: string; label: string }>> = Object.fromEntries(
-  Object.keys(LANG_GENDER_LABELS).map((lang) => [
-    lang,
-    MULTILINGUAL_VOICES.map((v) => ({
-      id: v.id,
-      label: `${v.id} · ${LANG_GENDER_LABELS[lang][v.gender]} ${v.tone}`,
-    })),
-  ]),
-);
 
 const STYLE_PRESETS = [
   { id: "modern", label: "Modern", palette: { primary: "#3B82F6", secondary: "#0F172A", accent: "#F59E0B" }, font: "Inter" },
@@ -185,7 +157,10 @@ export default function AgentPage() {
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
-  const { systemVoices, isLoading: voicesLoading } = useInworldVoices();
+  const { voices, systemVoices, isLoading: voicesLoading } = useInworldVoices();
+  const nativeVoices = language === "en"
+    ? systemVoices
+    : voices.filter((voice) => isVoiceNativeForLanguage(voice, language));
 
   // realtime
   useEffect(() => {
@@ -342,11 +317,16 @@ export default function AgentPage() {
 
   const handleCreateAndPlan = async () => {
     if (!brief.trim()) { toast.error("Inserisci un brief"); return; }
-    // Client-side validation: voice must belong to verified Inworld set for non-EN
-    if (language !== "en" && voiceId) {
-      const allowed = (NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => v.id);
-      if (!allowed.includes(voiceId)) {
-        toast.error(`Voce "${voiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
+    const effectiveVoiceId = language !== "en" ? (voiceId || nativeVoices[0]?.voiceId || "") : voiceId;
+    // Client-side validation: only language-native Inworld voices are allowed for non-EN.
+    if (language !== "en") {
+      const allowed = nativeVoices.map((v) => v.voiceId);
+      if (allowed.length === 0) {
+        toast.error(`Nessuna voce Inworld nativa verificata per ${language.toUpperCase()}.`);
+        return;
+      }
+      if (!allowed.includes(effectiveVoiceId)) {
+        toast.error(`Voce "${effectiveVoiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
         return;
       }
     }
@@ -362,7 +342,7 @@ export default function AgentPage() {
           user_id: uid,
           title: "New Agent project",
           brief, pdf_text: pdfText || null, language,
-          voice_id: voiceId || null, target_duration: duration, aspect_ratio: aspect,
+          voice_id: effectiveVoiceId || null, target_duration: duration, aspect_ratio: aspect,
         })
         .select("*").single();
       if (error) throw error;
@@ -774,7 +754,7 @@ export default function AgentPage() {
                           </span>
                         )}
                         <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                          ✓ {(language === "en" ? systemVoices.length : (NATIVE_VOICES_BY_LANG[language]?.length ?? 0))} voci verificate Inworld
+                          ✓ {nativeVoices.length} voci verificate Inworld
                         </span>
                       </Label>
                       {language === "en" ? (
@@ -793,14 +773,15 @@ export default function AgentPage() {
                         </Select>
                       ) : (
                         <Select
-                          value={voiceId || (NATIVE_VOICES_BY_LANG[language]?.[0]?.id ?? "")}
+                          value={voiceId || nativeVoices[0]?.voiceId || ""}
                           onValueChange={(v) => setVoiceId(v === "__auto__" ? "" : v)}
+                          disabled={voicesLoading || nativeVoices.length === 0}
                         >
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent className="max-h-72">
                             <SelectItem value="__auto__">Auto · pronuncia nativa</SelectItem>
-                            {(NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => (
-                              <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>
+                            {nativeVoices.map((v) => (
+                              <SelectItem key={v.voiceId} value={v.voiceId}>{v.displayName}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -808,7 +789,7 @@ export default function AgentPage() {
                       {language !== "en" && (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           Modello forzato: Inworld 1.5 Max multilingue. Pronuncia garantita {language.toUpperCase()}.
-                          Solo voci della lista sono testate; in caso di errore 404 il backend ricade automaticamente su <span className="font-mono">Sarah</span>.
+                          Solo voci native della lista sono testate; in caso di errore 404 il backend ricade su una voce nativa disponibile.
                         </p>
                       )}
                     </div>

@@ -20,6 +20,54 @@ const requestSchema = z.object({
   modelId: z.string().max(100).optional(),
 });
 
+const normalizeLang = (value?: string | null) =>
+  (value || "").toLowerCase().replace("_", "-").split("-")[0];
+
+const DEFAULT_BY_LANGUAGE: Record<string, string> = {
+  en: "Sarah",
+};
+
+interface InworldVoice {
+  name?: string;
+  voiceId?: string;
+  displayName?: string;
+  langCode?: string;
+  tags?: string[];
+  source?: string;
+}
+
+function normalizeInworldVoiceId(voice: InworldVoice): string {
+  if (voice.source === "IVC" && voice.name?.startsWith("workspaces/")) return voice.name;
+  return String(voice.voiceId || voice.name || voice.displayName || "");
+}
+
+function voiceSupportsLanguage(voice: InworldVoice, lang: string): boolean {
+  const target = normalizeLang(lang);
+  const direct = normalizeLang(voice.langCode);
+  if (direct) return direct === target;
+  return (voice.tags || []).some((tag) => normalizeLang(tag) === target || tag.toLowerCase().includes(`language:${target}`));
+}
+
+async function getLanguageNativeVoice(apiKey: string, lang: string, requested?: string): Promise<string | null> {
+  const call = (scheme: "Basic" | "Bearer") =>
+    fetch("https://api.inworld.ai/voices/v1/voices", { headers: { Authorization: `${scheme} ${apiKey}` } });
+  let resp = await call("Basic");
+  if (resp.status === 401 || resp.status === 403) resp = await call("Bearer");
+  if (!resp.ok) return null;
+  const json = await resp.json().catch(() => ({}));
+  const voices: InworldVoice[] = Array.isArray(json?.voices) ? json.voices : [];
+  const native = voices
+    .map((voice) => ({ voice, id: normalizeInworldVoiceId(voice) }))
+    .filter((entry) => entry.id && voiceSupportsLanguage(entry.voice, lang));
+  const requestedMatch = requested ? native.find((entry) =>
+    entry.id === requested ||
+    entry.voice.name === requested ||
+    entry.voice.displayName === requested ||
+    entry.voice.voiceId === requested,
+  ) : undefined;
+  return requestedMatch?.id || native[0]?.id || null;
+}
+
 /**
  * Map ElevenLabs default voice IDs (and a few common names) to Inworld voice names.
  * Inworld voices: Sarah, Roger, Liam, Ashley, Alex, Edward, Olivia, Mark, Hades,
@@ -147,11 +195,15 @@ serve(async (req) => {
       console.warn("[inworld-tts] could not load voice_mappings, using hardcoded map", e);
     }
 
-    const selectedVoice = mapToInworldVoice(voiceId, dbMap);
-    const normalizedLang = parseResult.data.languageCode?.toUpperCase();
+    const normalizedLang = normalizeLang(parseResult.data.languageCode || "en");
+    const mappedVoice = mapToInworldVoice(voiceId, dbMap);
+    const languageNativeVoice = normalizedLang !== "en"
+      ? await getLanguageNativeVoice(INWORLD_API_KEY, normalizedLang, voiceId || mappedVoice)
+      : null;
+    const selectedVoice = languageNativeVoice || DEFAULT_BY_LANGUAGE[normalizedLang] || mappedVoice;
     const isLikelyIvcVoice = selectedVoice.startsWith("workspaces/");
     const selectedModel = modelId || (
-      normalizedLang && normalizedLang !== "EN"
+      normalizedLang && normalizedLang !== "en"
         ? "inworld-tts-1.5-max"
         : isLikelyIvcVoice
           ? "inworld-tts-1.5-max"

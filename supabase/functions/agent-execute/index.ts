@@ -63,6 +63,73 @@ async function freepikDownloadUrl(apiKey: string, resourceId: string | number): 
   }
 }
 
+interface InworldVoice {
+  name?: string;
+  voiceId?: string;
+  displayName?: string;
+  langCode?: string;
+  tags?: string[];
+  source?: string;
+}
+
+const normalizeLang = (value?: string | null) =>
+  (value || "").toLowerCase().replace("_", "-").split("-")[0];
+
+const normalizeVoiceId = (voice: InworldVoice): string => {
+  if (voice.source === "IVC" && voice.name?.startsWith("workspaces/")) return voice.name;
+  return String(voice.voiceId || voice.name || voice.displayName || "");
+};
+
+function voiceSupportsLanguage(voice: InworldVoice, lang: string): boolean {
+  const target = normalizeLang(lang);
+  const direct = normalizeLang(voice.langCode);
+  if (direct) return direct === target;
+  const tags = Array.isArray(voice.tags) ? voice.tags : [];
+  return tags.some((tag) => normalizeLang(tag) === target || tag.toLowerCase().includes(`language:${target}`));
+}
+
+async function listInworldVoices(apiKey?: string): Promise<InworldVoice[]> {
+  if (!apiKey) return [];
+  const call = (scheme: "Basic" | "Bearer") =>
+    fetch("https://api.inworld.ai/voices/v1/voices", {
+      headers: { Authorization: `${scheme} ${apiKey}` },
+    });
+  let resp = await call("Basic");
+  if (resp.status === 401 || resp.status === 403) resp = await call("Bearer");
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    console.warn("Inworld voice list unavailable:", resp.status, body.slice(0, 180));
+    return [];
+  }
+  const json = await resp.json().catch(() => ({}));
+  return Array.isArray(json?.voices) ? json.voices : [];
+}
+
+function resolveVoiceForLanguage(voices: InworldVoice[], requestedVoiceId: string | null | undefined, lang: string) {
+  const supported = voices
+    .map((voice) => ({ voice, id: normalizeVoiceId(voice) }))
+    .filter((entry) => entry.id && voiceSupportsLanguage(entry.voice, lang));
+  const requested = requestedVoiceId || "";
+  const selected = requested
+    ? supported.find((entry) =>
+        entry.id === requested ||
+        entry.voice.name === requested ||
+        entry.voice.displayName === requested ||
+        entry.voice.voiceId === requested,
+      )
+    : undefined;
+  const fallback = supported.find((entry) =>
+    /female|woman|girl|donna|femminile|mujer|femme|weiblich/i.test(
+      `${entry.voice.displayName || ""} ${(entry.voice.tags || []).join(" ")}`,
+    ),
+  ) || supported[0];
+  return {
+    selectedId: selected?.id,
+    fallbackId: fallback?.id,
+    supportedCount: supported.length,
+  };
+}
+
 async function searchFreepikVideo(
   apiKey: string,
   term: string
@@ -97,10 +164,8 @@ async function searchFreepikVideo(
           return { url: cleanUrl, thumb: thumb || cleanUrl };
         }
       }
-      // Fallback to watermarked preview if download endpoint is unavailable
       if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
-        console.warn(`Freepik: falling back to watermarked preview for "${term}" (id=${resourceId})`);
-        return { url: previewUrl, thumb };
+        console.warn(`Freepik: skipped watermarked preview for "${term}" (id=${resourceId})`);
       }
     }
     console.log(`Freepik: no usable video found in ${items.length} results for "${term}"`);
@@ -302,6 +367,21 @@ serve(async (req) => {
         );
         const idx = typeof ov.selectedIndex === "number" && ov.selectedIndex >= 0 ? ov.selectedIndex : 0;
         let pick = ov.suggestions?.[idx] ?? ov.suggestions?.[0];
+        if (pick?.source === "freepik" && pick?.id) {
+          const cleanUrl = await freepikDownloadUrl(FREEPIK_API_KEY, pick.id);
+          if (cleanUrl) {
+            pick = { ...pick, url: cleanUrl, thumb: pick.thumb || cleanUrl };
+          } else {
+            await appendLog(
+              adminClient,
+              projectId,
+              `⚠️ Asset Freepik "${ov.keyword}" ignorato: disponibile solo anteprima con watermark. Cerco un'alternativa pulita.`,
+              10 + Math.round((i / overrides.length) * 35),
+              "asset-collection"
+            );
+            pick = undefined;
+          }
+        }
         if (!pick?.url) {
           const found = await searchFreepikVideo(FREEPIK_API_KEY, ov.keyword);
           if (found) pick = { url: found.url, thumb: found.thumb, source: "freepik" };
@@ -363,30 +443,25 @@ serve(async (req) => {
       const lang = (project.language?.slice(0, 2).toLowerCase() || "en");
       const isEnglish = lang === "en";
 
-      // Curated Inworld native voices per language. These all run on the
-      // multilingual model `inworld-tts-1.5-max` and produce native pronunciation
-      // (no English accent on Italian/Spanish/etc.). First entry is the default.
-      // Real Inworld voice names (language-agnostic). Pronunciation comes from
-      // the multilingual model `inworld-tts-1.5-max` + languageCode. Sending a
-      // non-existent name like "Giulia" returns 404 from Inworld.
-      const MULTILINGUAL_VOICES = ["Edward", "Mark", "Alex", "Roger", "Sarah", "Olivia", "Ashley", "Julia"];
-      const nativeList = MULTILINGUAL_VOICES;
-
-      // Decide which voice to send to Inworld:
-      //  - English: respect the user's voice_id (legacy ElevenLabs IDs are mapped server-side).
-      //  - Non-English: if the user picked a native voice (a plain Inworld name like "Giulia"
-      //    or "Alessandro") use it directly. Otherwise force the curated default for that
-      //    language and ignore any English-centric voice_id.
-      const looksLikeInworldName = (v?: string | null) =>
-        !!v && /^[A-Z][a-zA-Z]{2,30}$/.test(v);
-
+      const inworldVoices = await listInworldVoices(Deno.env.get("INWORLD_API_KEY"));
+      const languageVoice = resolveVoiceForLanguage(inworldVoices, project.voice_id, lang);
       let resolvedVoiceId: string | undefined;
       if (isEnglish) {
         resolvedVoiceId = project.voice_id || undefined;
-      } else if (looksLikeInworldName(project.voice_id) && nativeList.includes(project.voice_id!)) {
-        resolvedVoiceId = project.voice_id!;
       } else {
-        resolvedVoiceId = nativeList[0]; // curated native default for this language
+        resolvedVoiceId = languageVoice.selectedId || languageVoice.fallbackId;
+        if (!resolvedVoiceId) {
+          throw new Error(`Nessuna voce Inworld nativa disponibile per ${lang.toUpperCase()}. Apri il selettore voce e scegli una voce realmente supportata.`);
+        }
+        if (project.voice_id && project.voice_id !== resolvedVoiceId) {
+          await appendLog(
+            adminClient,
+            projectId,
+            `⚠️ La voce scelta "${project.voice_id}" non è nativa/disponibile per ${lang.toUpperCase()}. Uso "${resolvedVoiceId}".`,
+            53,
+            "narration",
+          );
+        }
       }
 
       // Always force the multilingual high-quality model for non-English narration.
@@ -400,7 +475,7 @@ serve(async (req) => {
         "narration",
       );
 
-      const FALLBACK_VOICE = "Sarah"; // known-good multilingual default
+      const FALLBACK_VOICE = isEnglish ? "Sarah" : (languageVoice.fallbackId || resolvedVoiceId);
       async function callTts(voiceId: string | undefined) {
         return await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
           method: "POST",
@@ -427,8 +502,8 @@ serve(async (req) => {
           ttsResp.status === 404 ||
           /Unknown voice|not found/i.test(txt);
 
-        if (isUnknownVoice && resolvedVoiceId !== FALLBACK_VOICE) {
-          ttsWarning = `La voce "${resolvedVoiceId}" non è disponibile su Inworld per ${lang.toUpperCase()}. Uso fallback "${FALLBACK_VOICE}".`;
+        if (isUnknownVoice && FALLBACK_VOICE && resolvedVoiceId !== FALLBACK_VOICE) {
+          ttsWarning = `La voce "${resolvedVoiceId}" non è disponibile su Inworld per ${lang.toUpperCase()}. Uso fallback nativo "${FALLBACK_VOICE}".`;
           await appendLog(adminClient, projectId, `⚠️ ${ttsWarning}`, 53, "narration");
           ttsResp = await callTts(FALLBACK_VOICE);
           if (!ttsResp.ok) {
@@ -481,10 +556,10 @@ serve(async (req) => {
     const fontFamily = project.typography || "Inter";
     const transitionLevel = project.transition_level || "medium";
     const transitionMap: Record<string, { style: string; duration: number }> = {
-      none: { style: "fade", duration: 0 },
-      subtle: { style: "fade", duration: 0.3 },
-      medium: { style: "fade", duration: 0.6 },
-      bold: { style: "wipeleft", duration: 0.8 },
+      none: { style: "crossfade", duration: 0 },
+      subtle: { style: "crossfade", duration: 0.3 },
+      medium: { style: "crossfade", duration: 0.6 },
+      bold: { style: "crossfade", duration: 0.8 },
     };
     const t = transitionMap[transitionLevel] || transitionMap.medium;
 
@@ -525,6 +600,8 @@ serve(async (req) => {
           {
             type: "video",
             src: a.url,
+            duration: a.duration,
+            loop: -1,
             resize: "cover",
             muted: !isVidnoz, // keep Vidnoz audio (it's the voiceover)
             volume: isVidnoz ? 1 : 0,
