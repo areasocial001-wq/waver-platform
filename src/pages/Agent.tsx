@@ -27,6 +27,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useInworldVoices } from "@/hooks/useInworldVoices";
+import { TransitionPreview } from "@/components/agent/TransitionPreview";
 
 type SceneOverride = {
   keyword: string;
@@ -84,8 +85,16 @@ type ProjectRow = {
   vidnoz_avatar_url: string | null;
   vidnoz_voice_id: string | null;
   use_vidnoz_for_talking_head: boolean;
+  image_source: "freepik" | "ai" | "piapi" | string;
+  voice_quality_strict: boolean;
   created_at: string;
 };
+
+const IMAGE_SOURCES: { id: "freepik" | "ai" | "piapi"; label: string; hint: string }[] = [
+  { id: "freepik", label: "Freepik (clean)", hint: "URL puliti via /v1/videos/{id}/download. Niente watermark." },
+  { id: "ai", label: "AI (Gemini Nano)", hint: "Generazione AI: zero watermark, stile coerente." },
+  { id: "piapi", label: "PiAPI / Flux", hint: "Generazione AI ad alta fedeltà via PiAPI." },
+];
 
 const LANGUAGES = [
   { code: "en", label: "English" },
