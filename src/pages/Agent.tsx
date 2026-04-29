@@ -184,7 +184,7 @@ export default function AgentPage() {
         .single();
       if (error) throw error;
 
-      setProject(created as ProjectRow);
+      setProject(created as unknown as ProjectRow);
 
       const { error: planErr } = await supabase.functions.invoke("agent-plan", {
         body: { projectId: created.id },
@@ -197,7 +197,7 @@ export default function AgentPage() {
         .select("*")
         .eq("id", created.id)
         .single();
-      if (refreshed) setProject(refreshed as ProjectRow);
+      if (refreshed) setProject(refreshed as unknown as ProjectRow);
       toast.success("Piano video pronto");
     } catch (e) {
       console.error(e);
