@@ -412,6 +412,7 @@ serve(async (req) => {
 
     // Body scenes from assets
     for (const a of assets) {
+      const isVidnoz = a.source === "vidnoz";
       scenes.push({
         duration: a.duration,
         transition: { style: t.style, duration: t.duration },
@@ -420,7 +421,8 @@ serve(async (req) => {
             type: "video",
             src: a.url,
             resize: "cover",
-            muted: true,
+            muted: !isVidnoz, // keep Vidnoz audio (it's the voiceover)
+            volume: isVidnoz ? 1 : 0,
             "fade-in": 0.3,
             "fade-out": 0.3,
           },
