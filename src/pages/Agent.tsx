@@ -329,6 +329,14 @@ export default function AgentPage() {
 
   const handleCreateAndPlan = async () => {
     if (!brief.trim()) { toast.error("Inserisci un brief"); return; }
+    // Client-side validation: voice must belong to verified Inworld set for non-EN
+    if (language !== "en" && voiceId) {
+      const allowed = (NATIVE_VOICES_BY_LANG[language] ?? []).map((v) => v.id);
+      if (!allowed.includes(voiceId)) {
+        toast.error(`Voce "${voiceId}" non valida per ${language.toUpperCase()}. Scegline una dalla lista verificata.`);
+        return;
+      }
+    }
     setCreating(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
