@@ -47,7 +47,11 @@ export type Database = {
           transition_level: string
           typography: string
           updated_at: string
+          use_vidnoz_for_talking_head: boolean
           user_id: string
+          vidnoz_avatar_id: string | null
+          vidnoz_avatar_url: string | null
+          vidnoz_voice_id: string | null
           voice_id: string | null
         }
         Insert: {
@@ -82,7 +86,11 @@ export type Database = {
           transition_level?: string
           typography?: string
           updated_at?: string
+          use_vidnoz_for_talking_head?: boolean
           user_id: string
+          vidnoz_avatar_id?: string | null
+          vidnoz_avatar_url?: string | null
+          vidnoz_voice_id?: string | null
           voice_id?: string | null
         }
         Update: {
@@ -117,7 +125,11 @@ export type Database = {
           transition_level?: string
           typography?: string
           updated_at?: string
+          use_vidnoz_for_talking_head?: boolean
           user_id?: string
+          vidnoz_avatar_id?: string | null
+          vidnoz_avatar_url?: string | null
+          vidnoz_voice_id?: string | null
           voice_id?: string | null
         }
         Relationships: []
