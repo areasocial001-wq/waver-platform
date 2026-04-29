@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           aspect_ratio: string
           brief: string
+          broll_mix: Json
           color_palette: Json
           created_at: string
           error_message: string | null
@@ -52,6 +53,7 @@ export type Database = {
         Insert: {
           aspect_ratio?: string
           brief: string
+          broll_mix?: Json
           color_palette?: Json
           created_at?: string
           error_message?: string | null
@@ -86,6 +88,7 @@ export type Database = {
         Update: {
           aspect_ratio?: string
           brief?: string
+          broll_mix?: Json
           color_palette?: Json
           created_at?: string
           error_message?: string | null
@@ -116,6 +119,60 @@ export type Database = {
           updated_at?: string
           user_id?: string
           voice_id?: string | null
+        }
+        Relationships: []
+      }
+      agent_user_presets: {
+        Row: {
+          aspect_ratio: string
+          base_preset: string
+          broll_mix: Json
+          color_palette: Json
+          created_at: string
+          id: string
+          intro_title: Json | null
+          name: string
+          outro_cta: Json | null
+          scene_duration_sec: number
+          subtitle_config: Json
+          transition_level: string
+          typography: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string
+          base_preset?: string
+          broll_mix?: Json
+          color_palette?: Json
+          created_at?: string
+          id?: string
+          intro_title?: Json | null
+          name: string
+          outro_cta?: Json | null
+          scene_duration_sec?: number
+          subtitle_config?: Json
+          transition_level?: string
+          typography?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          base_preset?: string
+          broll_mix?: Json
+          color_palette?: Json
+          created_at?: string
+          id?: string
+          intro_title?: Json | null
+          name?: string
+          outro_cta?: Json | null
+          scene_duration_sec?: number
+          subtitle_config?: Json
+          transition_level?: string
+          typography?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
