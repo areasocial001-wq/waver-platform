@@ -78,7 +78,24 @@ const STYLE_PRESETS = [
   { id: "vibrant", label: "Vibrant", palette: { primary: "#EC4899", secondary: "#1E1B4B", accent: "#FBBF24" }, font: "Poppins" },
   { id: "minimal", label: "Minimal", palette: { primary: "#000000", secondary: "#FFFFFF", accent: "#737373" }, font: "Inter" },
   { id: "cinematic", label: "Cinematic", palette: { primary: "#F59E0B", secondary: "#000000", accent: "#DC2626" }, font: "Georgia" },
+  // Reference: Agent Opus output (9:16, ~3s scenes, talking-head + sketch B-roll, cyan/blue accents)
+  { id: "opus", label: "Opus-style", palette: { primary: "#00D4E0", secondary: "#0B1B2B", accent: "#2B8CD9" }, font: "Inter" },
 ];
+
+// Defaults applied when user picks the "opus" preset
+export const OPUS_PRESET_DEFAULTS = {
+  aspect_ratio: "9:16" as const,
+  transition_level: "subtle",
+  scene_duration_sec: 3,
+  subtitle_config: {
+    enabled: true,
+    language: "auto",
+    fontSize: "medium",
+    position: "bottom-center",
+  },
+  intro_title: { enabled: true, text: "", duration: 2 },
+  outro_cta: { enabled: true, text: "Follow for more", duration: 2.5 },
+};
 
 export default function AgentPage() {
   const [activeTab, setActiveTab] = useState<"create" | "history">("create");
