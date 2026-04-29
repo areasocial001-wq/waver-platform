@@ -400,28 +400,55 @@ serve(async (req) => {
         "narration",
       );
 
-      const ttsResp = await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-          apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: project.plan.transcript,
-          voiceId: resolvedVoiceId,
-          languageCode: lang,
-          modelId: forcedModel,
-        }),
-      });
+      const FALLBACK_VOICE = "Sarah"; // known-good multilingual default
+      async function callTts(voiceId: string | undefined) {
+        return await fetch(`${SUPABASE_URL}/functions/v1/inworld-tts`, {
+          method: "POST",
+          headers: {
+            Authorization: authHeader,
+            apikey: Deno.env.get("SUPABASE_ANON_KEY")!,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            text: project.plan.transcript,
+            voiceId,
+            languageCode: lang,
+            modelId: forcedModel,
+          }),
+        });
+      }
+
+      let ttsResp = await callTts(resolvedVoiceId);
+      let ttsWarning: string | null = null;
 
       if (!ttsResp.ok) {
         const txt = await ttsResp.text();
-        throw new Error(`TTS failed: ${ttsResp.status} ${txt.slice(0, 200)}`);
+        const isUnknownVoice =
+          ttsResp.status === 404 ||
+          /Unknown voice|not found/i.test(txt);
+
+        if (isUnknownVoice && resolvedVoiceId !== FALLBACK_VOICE) {
+          ttsWarning = `La voce "${resolvedVoiceId}" non è disponibile su Inworld per ${lang.toUpperCase()}. Uso fallback "${FALLBACK_VOICE}".`;
+          await appendLog(adminClient, projectId, `⚠️ ${ttsWarning}`, 53, "narration");
+          ttsResp = await callTts(FALLBACK_VOICE);
+          if (!ttsResp.ok) {
+            const txt2 = await ttsResp.text();
+            throw new Error(`TTS failed (fallback): ${ttsResp.status} ${txt2.slice(0, 200)}`);
+          }
+        } else {
+          throw new Error(`TTS failed: ${ttsResp.status} ${txt.slice(0, 200)}`);
+        }
       }
       const ttsData = await ttsResp.json();
       const audioBase64: string | undefined = ttsData?.audioContent;
       if (!audioBase64) throw new Error("TTS returned no audio");
+
+      if (ttsWarning) {
+        await adminClient
+          .from("agent_projects")
+          .update({ tts_warning: ttsWarning } as any)
+          .eq("id", projectId);
+      }
 
       const audioBytes = Uint8Array.from(atob(audioBase64), (c) => c.charCodeAt(0));
       const audioPath = `${userId}/${projectId}/narration-${Date.now()}.mp3`;
