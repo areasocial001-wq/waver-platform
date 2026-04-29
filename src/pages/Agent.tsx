@@ -214,7 +214,59 @@ export default function AgentPage() {
     }
   };
 
-  const handlePdfUpload = async (file: File) => {
+  // Compute the proportional transcript slice for a given talking-head scene
+  // (mirrors the splitting logic used server-side in agent-execute).
+  const getSceneTranscriptSlice = (sceneIdx: number): string => {
+    if (!project?.plan?.transcript) return "";
+    const overrides = project.scene_overrides || [];
+    const thIdxs = overrides.map((o, i) => (o?.broll_type !== "sketch" ? i : -1)).filter(i => i >= 0);
+    if (!thIdxs.includes(sceneIdx)) return "";
+    const totalDur = thIdxs.reduce((s, i) => s + (Number(overrides[i]?.duration) || 4), 0);
+    const words = String(project.plan.transcript).split(/\s+/).filter(Boolean);
+    let cursor = 0;
+    for (const i of thIdxs) {
+      const share = totalDur > 0 ? (Number(overrides[i]?.duration) || 4) / totalDur : 1 / thIdxs.length;
+      const wc = Math.max(1, Math.round(words.length * share));
+      if (i === sceneIdx) return words.slice(cursor, cursor + wc).join(" ");
+      cursor += wc;
+    }
+    return "";
+  };
+
+  const handlePreviewVidnozScene = async (sceneIdx: number) => {
+    if (!project) return;
+    if (!project.vidnoz_avatar_url || !project.vidnoz_voice_id) {
+      toast.error("Seleziona prima un avatar e una voce Vidnoz nel pannello Stile");
+      return;
+    }
+    const text = getSceneTranscriptSlice(sceneIdx);
+    if (!text) {
+      toast.error("Nessun testo disponibile per questa scena");
+      return;
+    }
+    setVidnozPreviewLoading(sceneIdx);
+    setVidnozPreview(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("vidnoz-talking-avatar", {
+        body: {
+          text,
+          voice_id: project.vidnoz_voice_id,
+          avatar_url: project.vidnoz_avatar_url,
+        },
+      });
+      if (error) throw error;
+      if (!data?.url) throw new Error("Nessun URL video restituito");
+      setVidnozPreview({ sceneIdx, url: data.url });
+      toast.success(`Anteprima Vidnoz scena ${sceneIdx + 1} pronta`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "Errore generazione anteprima Vidnoz");
+    } finally {
+      setVidnozPreviewLoading(null);
+    }
+  };
+
+
     setPdfFile(file);
     setExtractingPdf(true);
     try {
