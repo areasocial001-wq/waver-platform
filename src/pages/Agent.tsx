@@ -745,13 +745,16 @@ export default function AgentPage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>
+                      <Label className="flex items-center gap-2">
                         Voce narrante
                         {language !== "en" && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wide text-primary/80">
+                          <span className="text-[10px] uppercase tracking-wide text-primary/80">
                             nativa {language.toUpperCase()}
                           </span>
                         )}
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                          ✓ {(language === "en" ? systemVoices.length : (NATIVE_VOICES_BY_LANG[language]?.length ?? 0))} voci verificate Inworld
+                        </span>
                       </Label>
                       {language === "en" ? (
                         <Select
@@ -784,6 +787,7 @@ export default function AgentPage() {
                       {language !== "en" && (
                         <p className="text-[11px] text-muted-foreground leading-tight">
                           Modello forzato: Inworld 1.5 Max multilingue. Pronuncia garantita {language.toUpperCase()}.
+                          Solo voci della lista sono testate; in caso di errore 404 il backend ricade automaticamente su <span className="font-mono">Sarah</span>.
                         </p>
                       )}
                     </div>
