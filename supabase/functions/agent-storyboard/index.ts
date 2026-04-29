@@ -16,6 +16,21 @@ interface Suggestion {
   id?: string;
 }
 
+async function freepikDownloadUrl(apiKey: string, resourceId: string | number): Promise<string | null> {
+  try {
+    const r = await fetch(`https://api.freepik.com/v1/videos/${resourceId}/download`, {
+      headers: { "x-freepik-api-key": apiKey },
+    });
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => ({}));
+    const url: string | undefined = data?.data?.url || data?.url;
+    return url && /^https?:\/\//.test(url) ? url : null;
+  } catch (e) {
+    console.error("freepik download err", resourceId, e);
+    return null;
+  }
+}
+
 async function searchFreepik(apiKey: string, term: string, limit = 6): Promise<Suggestion[]> {
   try {
     const params = new URLSearchParams({ term, limit: String(limit) });
@@ -40,8 +55,12 @@ async function searchFreepik(apiKey: string, term: string, limit = 6): Promise<S
         thumbs[0]?.url ||
         it?.image?.source?.url ||
         previewUrl;
-      if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
-        out.push({ url: previewUrl, thumb, source: "freepik", id: String(it?.id ?? "") });
+      const resourceId = it?.id;
+      const cleanUrl = resourceId ? await freepikDownloadUrl(apiKey, resourceId) : null;
+      if (cleanUrl) {
+        out.push({ url: cleanUrl, thumb: thumb || cleanUrl, source: "freepik", id: String(resourceId) });
+      } else if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
+        console.warn(`freepik skipped watermarked preview for "${term}" (id=${resourceId})`);
       }
     }
     return out;
