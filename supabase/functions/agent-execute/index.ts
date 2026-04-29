@@ -143,34 +143,58 @@ serve(async (req) => {
       throw new Error("Missing FREEPIK_API_KEY or JSON2VIDEO_API_KEY");
     }
 
-    // === 1. Asset collection ===
+    // === 1. Asset collection (honor user overrides if present) ===
     await appendLog(adminClient, projectId, "Locking visual style...", 5, "style");
-    const keywords: string[] = (project.plan.scene_keywords || []).slice(0, 6);
+    const overrides: any[] = Array.isArray(project.scene_overrides) ? project.scene_overrides : [];
     const assets: SelectedAsset[] = [];
 
-    const sceneDuration = Math.max(
-      3,
-      Math.round((project.target_duration / Math.max(keywords.length, 1)) * 10) / 10
-    );
-
-    for (let i = 0; i < keywords.length; i++) {
-      const kw = keywords[i];
-      await appendLog(
-        adminClient,
-        projectId,
-        `Searching for "${kw}"...`,
-        10 + Math.round((i / keywords.length) * 35),
-        "asset-collection"
+    if (overrides.length > 0) {
+      for (let i = 0; i < overrides.length; i++) {
+        const ov = overrides[i];
+        await appendLog(
+          adminClient,
+          projectId,
+          `Using selected asset for "${ov.keyword}"...`,
+          10 + Math.round((i / overrides.length) * 35),
+          "asset-collection"
+        );
+        const idx = typeof ov.selectedIndex === "number" ? ov.selectedIndex : 0;
+        const pick = ov.suggestions?.[idx] ?? ov.suggestions?.[0];
+        if (pick?.url) {
+          assets.push({
+            keyword: ov.keyword,
+            url: pick.url,
+            thumb: pick.thumb,
+            source: pick.source || "freepik",
+            duration: Number(ov.duration) || 4,
+          });
+        }
+      }
+    } else {
+      const keywords: string[] = (project.plan.scene_keywords || []).slice(0, 6);
+      const sceneDuration = Math.max(
+        3,
+        Math.round((project.target_duration / Math.max(keywords.length, 1)) * 10) / 10
       );
-      const found = await searchFreepikVideo(FREEPIK_API_KEY, kw);
-      if (found) {
-        assets.push({
-          keyword: kw,
-          url: found.url,
-          thumb: found.thumb,
-          source: "freepik",
-          duration: sceneDuration,
-        });
+      for (let i = 0; i < keywords.length; i++) {
+        const kw = keywords[i];
+        await appendLog(
+          adminClient,
+          projectId,
+          `Searching for "${kw}"...`,
+          10 + Math.round((i / keywords.length) * 35),
+          "asset-collection"
+        );
+        const found = await searchFreepikVideo(FREEPIK_API_KEY, kw);
+        if (found) {
+          assets.push({
+            keyword: kw,
+            url: found.url,
+            thumb: found.thumb,
+            source: "freepik",
+            duration: sceneDuration,
+          });
+        }
       }
     }
 
