@@ -249,7 +249,7 @@ serve(async (req) => {
       .update({ narration_url: narrationUrl })
       .eq("id", projectId);
 
-    // === 3. Render via JSON2Video ===
+    // === 3. Render via JSON2Video (with style + subtitles + intro/outro) ===
     await appendLog(adminClient, projectId, "Building storyboard & rendering...", 70, "render");
 
     const resolution =
@@ -259,19 +259,127 @@ serve(async (req) => {
         ? { width: 1080, height: 1080 }
         : { width: 1920, height: 1080 };
 
-    const scenes = assets.map((a) => ({
-      duration: a.duration,
-      elements: [
-        {
-          type: "video",
-          src: a.url,
-          resize: "cover",
-          muted: true,
-          "fade-in": 0.3,
-          "fade-out": 0.3,
+    const palette = (project.color_palette || {}) as any;
+    const primary = palette.primary || "#3B82F6";
+    const secondary = palette.secondary || "#0F172A";
+    const accent = palette.accent || "#F59E0B";
+    const fontFamily = project.typography || "Inter";
+    const transitionLevel = project.transition_level || "medium";
+    const transitionMap: Record<string, { style: string; duration: number }> = {
+      none: { style: "fade", duration: 0 },
+      subtle: { style: "fade", duration: 0.3 },
+      medium: { style: "fade", duration: 0.6 },
+      bold: { style: "wipeleft", duration: 0.8 },
+    };
+    const t = transitionMap[transitionLevel] || transitionMap.medium;
+
+    const scenes: any[] = [];
+
+    // Intro title scene
+    const intro = project.intro_title as any;
+    if (intro?.enabled && intro?.text) {
+      scenes.push({
+        duration: Number(intro.duration) || 2.5,
+        "background-color": secondary,
+        elements: [
+          {
+            type: "text",
+            text: String(intro.text).slice(0, 120),
+            settings: {
+              "font-family": fontFamily,
+              "font-size": project.aspect_ratio === "9:16" ? 90 : 72,
+              "font-weight": "700",
+              color: primary,
+              "text-align": "center",
+              "vertical-align": "center",
+            },
+            "fade-in": 0.4,
+            "fade-out": 0.4,
+          },
+        ],
+      });
+    }
+
+    // Body scenes from assets
+    for (const a of assets) {
+      scenes.push({
+        duration: a.duration,
+        transition: { style: t.style, duration: t.duration },
+        elements: [
+          {
+            type: "video",
+            src: a.url,
+            resize: "cover",
+            muted: true,
+            "fade-in": 0.3,
+            "fade-out": 0.3,
+          },
+        ],
+      });
+    }
+
+    // Outro CTA scene
+    const outro = project.outro_cta as any;
+    if (outro?.enabled && outro?.text) {
+      scenes.push({
+        duration: Number(outro.duration) || 3,
+        "background-color": secondary,
+        elements: [
+          {
+            type: "text",
+            text: String(outro.text).slice(0, 120),
+            settings: {
+              "font-family": fontFamily,
+              "font-size": project.aspect_ratio === "9:16" ? 80 : 64,
+              "font-weight": "700",
+              color: accent,
+              "text-align": "center",
+              "vertical-align": "center",
+            },
+            "fade-in": 0.4,
+          },
+        ],
+      });
+    }
+
+    const sub = (project.subtitle_config || {}) as any;
+    const fontSizeMap: Record<string, number> = {
+      small: project.aspect_ratio === "9:16" ? 54 : 42,
+      medium: project.aspect_ratio === "9:16" ? 70 : 56,
+      large: project.aspect_ratio === "9:16" ? 88 : 72,
+    };
+    const subPosition: string =
+      sub?.position && ["bottom-center", "top-center", "mid-center"].includes(sub.position)
+        ? sub.position
+        : "bottom-center";
+
+    const elements: any[] = [
+      {
+        type: "audio",
+        src: narrationUrl,
+        volume: 1,
+        "fade-in": 0.2,
+        "fade-out": 0.5,
+      },
+    ];
+
+    if (sub?.enabled !== false) {
+      elements.push({
+        type: "subtitles",
+        language: sub?.language && sub.language !== "auto" ? sub.language : (project.language?.slice(0, 2) || "auto"),
+        settings: {
+          style: "classic-progressive",
+          position: subPosition,
+          "font-family": `${fontFamily} Bold`,
+          "font-size": fontSizeMap[sub?.fontSize] || fontSizeMap.medium,
+          "word-color": "#FFFFFF",
+          "line-color": "#FFFFFF",
+          "outline-color": "#000000",
+          "outline-width": 3,
+          "max-words-per-line": 6,
         },
-      ],
-    }));
+      });
+    }
 
     const movie: any = {
       resolution: "custom",
@@ -280,30 +388,7 @@ serve(async (req) => {
       quality: "high",
       draft: false,
       scenes,
-      elements: [
-        {
-          type: "audio",
-          src: narrationUrl,
-          volume: 1,
-          "fade-in": 0.2,
-          "fade-out": 0.5,
-        },
-        {
-          type: "subtitles",
-          language: project.language?.slice(0, 2) || "auto",
-          settings: {
-            style: "classic-progressive",
-            position: "bottom-center",
-            "font-family": "Arial Bold",
-            "font-size": project.aspect_ratio === "9:16" ? 70 : 56,
-            "word-color": "#FFFFFF",
-            "line-color": "#FFFFFF",
-            "outline-color": "#000000",
-            "outline-width": 3,
-            "max-words-per-line": 6,
-          },
-        },
-      ],
+      elements,
     };
 
     const renderResp = await fetch("https://api.json2video.com/v2/movies", {
