@@ -40,6 +40,29 @@ async function appendLog(
     .eq("id", projectId);
 }
 
+// Resolve a clean (non-watermarked) MP4 URL for a given Freepik video resource ID.
+// Consumes 1 download credit on the Freepik account.
+async function freepikDownloadUrl(apiKey: string, resourceId: string | number): Promise<string | null> {
+  try {
+    const r = await fetch(`https://api.freepik.com/v1/videos/${resourceId}/download`, {
+      headers: { "x-freepik-api-key": apiKey },
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      console.warn(`Freepik download failed for ${resourceId}: ${r.status} ${t.slice(0, 160)}`);
+      return null;
+    }
+    const data = await r.json();
+    // Freepik response shape: { data: { url: "https://..." } }
+    const cleanUrl: string | undefined = data?.data?.url || data?.url;
+    if (cleanUrl && /^https?:\/\//.test(cleanUrl)) return cleanUrl;
+    return null;
+  } catch (e) {
+    console.error("Freepik download error", resourceId, e);
+    return null;
+  }
+}
+
 async function searchFreepikVideo(
   apiKey: string,
   term: string
@@ -53,9 +76,8 @@ async function searchFreepikVideo(
     const data = await r.json();
     const items: any[] = Array.isArray(data?.data) ? data.data : [];
     for (const it of items) {
-      // Freepik video item: previews[] contains MP4 URLs (small/large), thumbnails[] contains JPG posters
+      const resourceId = it?.id;
       const previews: any[] = Array.isArray(it?.previews) ? it.previews : [];
-      // Prefer the larger preview (last entry is usually 720p)
       const previewUrl =
         previews[previews.length - 1]?.url ||
         previews[0]?.url ||
@@ -67,11 +89,21 @@ async function searchFreepikVideo(
         thumbs[thumbs.length - 1]?.url ||
         thumbs[0]?.url ||
         previewUrl;
+
+      // Try to fetch the clean (non-watermarked) URL via the download endpoint
+      if (resourceId) {
+        const cleanUrl = await freepikDownloadUrl(apiKey, resourceId);
+        if (cleanUrl) {
+          return { url: cleanUrl, thumb: thumb || cleanUrl };
+        }
+      }
+      // Fallback to watermarked preview if download endpoint is unavailable
       if (previewUrl && /\.(mp4|webm|mov)(\?|$)/i.test(previewUrl)) {
+        console.warn(`Freepik: falling back to watermarked preview for "${term}" (id=${resourceId})`);
         return { url: previewUrl, thumb };
       }
     }
-    console.log(`Freepik: no MP4 preview found in ${items.length} results for "${term}"`);
+    console.log(`Freepik: no usable video found in ${items.length} results for "${term}"`);
     return null;
   } catch (e) {
     console.error("Freepik search failed for", term, e);
