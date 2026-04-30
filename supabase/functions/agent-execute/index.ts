@@ -287,14 +287,28 @@ serve(async (req) => {
       });
     }
 
+    const isResume = !!resume || (Array.isArray(retryScenes) && retryScenes.length > 0);
+    const heartbeatAt = project.heartbeat_at ? new Date(project.heartbeat_at).getTime() : 0;
+    const isFreshRun =
+      (project.execution_status === "running" || project.execution_status === "rendering") &&
+      heartbeatAt > 0 &&
+      Date.now() - heartbeatAt < 2 * 60 * 1000;
+    if (isFreshRun && !isResume) {
+      return new Response(JSON.stringify({ error: "Produzione già in corso. Attendi il completamento o usa Riprendi solo se si blocca." }), {
+        status: 409,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // If resuming, preserve previously generated assets and progress log so we
     // skip already-completed scenes. Clear failed_scenes for the ones we are
     // about to retry.
-    const isResume = !!resume || (Array.isArray(retryScenes) && retryScenes.length > 0);
     const initPatch: Record<string, unknown> = {
       execution_status: "running",
       error_message: null,
       heartbeat_at: new Date().toISOString(),
+      json2video_project_id: null,
+      final_video_url: null,
     };
     if (!isResume) {
       initPatch.progress_pct = 0;
