@@ -244,6 +244,11 @@ serve(async (req) => {
       throw new Error("Missing FREEPIK_API_KEY or JSON2VIDEO_API_KEY");
     }
 
+    // Run the heavy pipeline in the background to avoid the 150s edge idle timeout.
+    // The client polls agent_projects (realtime + agent-status) for progress.
+    const runPipeline = async () => {
+      try {
+
     // === 1. Asset collection (honor user overrides if present) ===
     await appendLog(adminClient, projectId, "Locking visual style...", 5, "style");
     const overrides: any[] = Array.isArray(project.scene_overrides) ? project.scene_overrides : [];
