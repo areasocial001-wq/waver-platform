@@ -100,6 +100,8 @@ type ProjectRow = {
   image_source: "freepik" | "ai" | "piapi" | string;
   voice_quality_strict: boolean;
   created_at: string;
+  heartbeat_at: string | null;
+  failed_scenes: Array<{ index: number; keyword: string; reason: string; provider: string; at: number }>;
 };
 
 const IMAGE_SOURCES: { id: "freepik" | "ai" | "piapi"; label: string; hint: string }[] = [
