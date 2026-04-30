@@ -406,98 +406,139 @@ serve(async (req) => {
         );
       }
       let completedCount = 0;
-      await Promise.all(
-        targets.map(async (i) => {
-          const ov = overrides[i];
-          const sliceText = wordSlices[i] || transcript.slice(0, 200);
-          try {
-            const fd = new FormData();
-            fd.append("voice_id", project.vidnoz_voice_id);
-            fd.append("text", sliceText.slice(0, 1500));
-            fd.append("type", "0");
-            fd.append("avatar_url", project.vidnoz_avatar_url);
-            if (project.vidnoz_voice_style) {
-              fd.append("emotion", project.vidnoz_voice_style);
-              fd.append("style", project.vidnoz_voice_style);
+
+      // Vidnoz API rate-limits aggressive bursts (code 803 "frequent requests").
+      // We cap concurrency at 2 and retry the START call with exponential backoff
+      // when we hit 803 or other transient errors.
+      const VIDNOZ_CONCURRENCY = 2;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      const startVidnozTask = async (sliceText: string): Promise<string> => {
+        let attempt = 0;
+        const maxAttempts = 5;
+        let lastErr = "";
+        while (attempt < maxAttempts) {
+          const fd = new FormData();
+          fd.append("voice_id", project.vidnoz_voice_id);
+          fd.append("text", sliceText.slice(0, 1500));
+          fd.append("type", "0");
+          fd.append("avatar_url", project.vidnoz_avatar_url);
+          if (project.vidnoz_voice_style) {
+            fd.append("emotion", project.vidnoz_voice_style);
+            fd.append("style", project.vidnoz_voice_style);
+          }
+          const startResp = await fetch(
+            "https://devapi.vidnoz.com/v2/task/generate-talking-head",
+            {
+              method: "POST",
+              headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
+              body: fd,
             }
-            const startResp = await fetch(
-              "https://devapi.vidnoz.com/v2/task/generate-talking-head",
-              {
-                method: "POST",
-                headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
-                body: fd,
-              }
-            );
-            const startJson = await startResp.json();
-            if (!startResp.ok || startJson?.code !== 200) {
-              throw new Error(`Vidnoz start error: ${JSON.stringify(startJson).slice(0, 200)}`);
-            }
+          );
+          const startJson = await startResp.json().catch(() => ({}));
+          const code = startJson?.code;
+          if (startResp.ok && code === 200) {
             const taskId = String(startJson?.data?.id ?? startJson?.data?.task_id ?? "");
             if (!taskId) throw new Error("Vidnoz returned no task id");
-
-            let url = "";
-            const maxMs = 180_000;
-            const t0 = Date.now();
-            let delay = 4000;
-            let lastBeat = Date.now();
-            while (Date.now() - t0 < maxMs && !url) {
-              await new Promise((r) => setTimeout(r, delay));
-              delay = Math.min(delay + 1000, 8000);
-              const dfd = new FormData();
-              dfd.append("id", taskId);
-              const dResp = await fetch("https://devapi.vidnoz.com/v2/task/detail", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
-                body: dfd,
-              });
-              const dJson = await dResp.json().catch(() => ({}));
-              const additional = dJson?.data?.additional_data || {};
-              url = additional?.video_720p?.url || additional?.url || "";
-              // Heartbeat at most every 20s during long polls.
-              if (Date.now() - lastBeat > 20_000) {
-                await heartbeat(adminClient, projectId);
-                lastBeat = Date.now();
-              }
-            }
-            if (!url) throw new Error("Vidnoz polling timeout (180s)");
-            vidnozResults[i] = { url };
-            // Persist immediately so a future resume won't re-run this scene.
-            await persistVidnozScene(adminClient, projectId, i, {
-              keyword: ov.keyword,
-              url,
-              thumb: project.vidnoz_avatar_url,
-              source: "vidnoz",
-              duration: Number(ov.duration) || 4,
-            });
-            completedCount++;
-            await appendLog(
-              adminClient,
-              projectId,
-              `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${targets.length})`,
-              12 + Math.round((completedCount / targets.length) * 30),
-              "vidnoz-avatar"
-            );
-          } catch (vidErr) {
-            const reason = String((vidErr as Error)?.message || vidErr);
-            console.error(`Vidnoz failed for scene ${i}:`, reason);
-            vidnozResults[i] = { url: "", error: reason };
-            completedCount++;
-            await recordFailedScene(adminClient, projectId, {
-              index: i,
-              keyword: ov.keyword,
-              reason,
-              provider: "vidnoz",
-            });
-            await appendLog(
-              adminClient,
-              projectId,
-              `⚠ Vidnoz failed for "${ov.keyword}": ${reason.slice(0, 80)} — using Freepik fallback`,
-              12 + Math.round((completedCount / targets.length) * 30),
-              "vidnoz-fallback"
-            );
+            return taskId;
           }
-        })
-      );
+          lastErr = `Vidnoz start error: ${JSON.stringify(startJson).slice(0, 200)}`;
+          // 803 = frequent requests rate limit; 429 / 5xx also retryable
+          const retryable = code === 803 || startResp.status === 429 || startResp.status >= 500;
+          if (!retryable) throw new Error(lastErr);
+          attempt++;
+          // Exponential backoff with jitter: 5s, 10s, 20s, 40s
+          const backoff = Math.min(5000 * Math.pow(2, attempt - 1), 40_000);
+          const jitter = Math.floor(Math.random() * 2000);
+          await sleep(backoff + jitter);
+        }
+        throw new Error(lastErr || "Vidnoz start failed after retries");
+      };
+
+      const processOne = async (i: number, slot: number) => {
+        // Stagger initial starts to avoid simultaneous burst hitting Vidnoz.
+        await sleep(slot * 1500);
+        const ov = overrides[i];
+        const sliceText = wordSlices[i] || transcript.slice(0, 200);
+        try {
+          const taskId = await startVidnozTask(sliceText);
+
+          let url = "";
+          const maxMs = 180_000;
+          const t0 = Date.now();
+          let delay = 4000;
+          let lastBeat = Date.now();
+          while (Date.now() - t0 < maxMs && !url) {
+            await sleep(delay);
+            delay = Math.min(delay + 1000, 8000);
+            const dfd = new FormData();
+            dfd.append("id", taskId);
+            const dResp = await fetch("https://devapi.vidnoz.com/v2/task/detail", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
+              body: dfd,
+            });
+            const dJson = await dResp.json().catch(() => ({}));
+            const additional = dJson?.data?.additional_data || {};
+            url = additional?.video_720p?.url || additional?.url || "";
+            if (Date.now() - lastBeat > 20_000) {
+              await heartbeat(adminClient, projectId);
+              lastBeat = Date.now();
+            }
+          }
+          if (!url) throw new Error("Vidnoz polling timeout (180s)");
+          vidnozResults[i] = { url };
+          await persistVidnozScene(adminClient, projectId, i, {
+            keyword: ov.keyword,
+            url,
+            thumb: project.vidnoz_avatar_url,
+            source: "vidnoz",
+            duration: Number(ov.duration) || 4,
+          });
+          completedCount++;
+          await appendLog(
+            adminClient,
+            projectId,
+            `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${targets.length})`,
+            12 + Math.round((completedCount / targets.length) * 30),
+            "vidnoz-avatar"
+          );
+        } catch (vidErr) {
+          const reason = String((vidErr as Error)?.message || vidErr);
+          console.error(`Vidnoz failed for scene ${i}:`, reason);
+          vidnozResults[i] = { url: "", error: reason };
+          completedCount++;
+          await recordFailedScene(adminClient, projectId, {
+            index: i,
+            keyword: ov.keyword,
+            reason,
+            provider: "vidnoz",
+          });
+          await appendLog(
+            adminClient,
+            projectId,
+            `⚠ Vidnoz failed for "${ov.keyword}": ${reason.slice(0, 80)} — using Freepik fallback`,
+            12 + Math.round((completedCount / targets.length) * 30),
+            "vidnoz-fallback"
+          );
+        }
+      };
+
+      // Concurrency-limited worker pool
+      const queue = [...targets];
+      const workers: Promise<void>[] = [];
+      for (let s = 0; s < Math.min(VIDNOZ_CONCURRENCY, queue.length); s++) {
+        workers.push(
+          (async () => {
+            while (queue.length > 0) {
+              const next = queue.shift();
+              if (next === undefined) break;
+              await processOne(next, s);
+            }
+          })()
+        );
+      }
+      await Promise.all(workers);
     }
 
 
