@@ -100,6 +100,8 @@ type ProjectRow = {
   image_source: "freepik" | "ai" | "piapi" | string;
   voice_quality_strict: boolean;
   created_at: string;
+  heartbeat_at: string | null;
+  failed_scenes: Array<{ index: number; keyword: string; reason: string; provider: string; at: number }>;
 };
 
 const IMAGE_SOURCES: { id: "freepik" | "ai" | "piapi"; label: string; hint: string }[] = [
@@ -812,8 +814,9 @@ export default function AgentPage() {
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
 
-  // Stale-detection: if no progress log entry has arrived in > 3 minutes
-  // while the pipeline says it's "running", the background worker likely died.
+  // Stale-detection: prefer the dedicated `heartbeat_at` column updated by the
+  // worker. Falls back to the latest progress log entry for projects that ran
+  // before the column existed.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!isExecuting) return;
@@ -823,22 +826,47 @@ export default function AgentPage() {
   const lastLogAt = project?.progress_log?.length
     ? project.progress_log[project.progress_log.length - 1]?.at || 0
     : 0;
-  const isStalled = isExecuting && lastLogAt > 0 && now - lastLogAt > 3 * 60 * 1000;
+  const heartbeatMs = project?.heartbeat_at ? new Date(project.heartbeat_at).getTime() : 0;
+  const lastBeatAt = Math.max(heartbeatMs, lastLogAt);
+  const STALE_MS = 3 * 60 * 1000;
+  const isStalled = isExecuting && lastBeatAt > 0 && now - lastBeatAt > STALE_MS;
+  const stalledMinutes = lastBeatAt > 0 ? Math.round((now - lastBeatAt) / 60000) : 0;
+
   const [resuming, setResuming] = useState(false);
-  const handleResume = async () => {
+  const handleResume = async (retryScenes?: number[]) => {
     if (!project) return;
     setResuming(true);
     try {
-      toast.info("Ripresa produzione...");
-      const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
+      const isRetry = Array.isArray(retryScenes) && retryScenes.length > 0;
+      toast.info(isRetry ? `Riprovo ${retryScenes!.length} scena/e...` : "Ripresa produzione...");
+      const { error } = await supabase.functions.invoke("agent-execute", {
+        body: { projectId: project.id, resume: true, ...(isRetry ? { retryScenes } : {}) },
+      });
       if (error) throw error;
-      toast.success("Produzione ripresa");
+      toast.success(isRetry ? "Retry scena avviato" : "Produzione ripresa");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore ripresa");
     } finally {
       setResuming(false);
     }
   };
+
+  // Surface a one-shot toast when new failed scenes appear.
+  const failedScenes = project?.failed_scenes ?? [];
+  const lastFailedKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (!project || failedScenes.length === 0) return;
+    const key = failedScenes.map((f) => `${f.index}:${f.at}`).join("|");
+    if (key === lastFailedKeyRef.current) return;
+    lastFailedKeyRef.current = key;
+    const latest = failedScenes[failedScenes.length - 1];
+    if (latest) {
+      toast.error(`Scena "${latest.keyword}" fallita`, {
+        description: latest.reason.slice(0, 120),
+      });
+    }
+  }, [failedScenes, project?.id]);
+
 
   return (
     <AuthGuard>
@@ -1936,11 +1964,11 @@ export default function AgentPage() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm">La produzione sembra bloccata</h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Nessun aggiornamento da {Math.round((now - lastLogAt) / 60000)} minuti. Il worker in background potrebbe essere stato terminato.
+                        Nessun aggiornamento da {stalledMinutes} minut{stalledMinutes === 1 ? "o" : "i"}. Il worker in background potrebbe essere stato terminato.
                         Puoi riprendere la produzione: le scene già completate non verranno rigenerate.
                       </p>
                       <div className="flex gap-2 mt-3">
-                        <Button size="sm" onClick={handleResume} disabled={resuming} className="gap-2">
+                        <Button size="sm" onClick={() => handleResume()} disabled={resuming} className="gap-2">
                           {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                           Riprendi produzione
                         </Button>
@@ -1950,6 +1978,57 @@ export default function AgentPage() {
                   </div>
                 </Card>
               )}
+
+              {project && failedScenes.length > 0 && !isDone && (
+                <Card className="p-4 mt-4 border-destructive/30 bg-destructive/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">
+                        {failedScenes.length} scena/e Vidnoz fallit{failedScenes.length === 1 ? "a" : "e"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Il pipeline ha usato Freepik come fallback. Puoi riprovare le scene fallite con Vidnoz senza ricominciare tutto.
+                      </p>
+                      <div className="space-y-2 mt-3">
+                        {failedScenes.map((f) => (
+                          <div key={`${f.index}-${f.at}`} className="flex items-start justify-between gap-3 bg-background/50 rounded-md p-2 border border-border/50">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px]">scena #{f.index + 1}</Badge>
+                                <span className="text-sm font-medium truncate">{f.keyword}</span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 truncate" title={f.reason}>{f.reason}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleResume([f.index])}
+                              disabled={resuming || isExecuting}
+                              className="gap-1 shrink-0"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" /> Riprova
+                            </Button>
+                          </div>
+                        ))}
+                        {failedScenes.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleResume(failedScenes.map((f) => f.index))}
+                            disabled={resuming || isExecuting}
+                            className="gap-2 w-full"
+                          >
+                            {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Riprova tutte ({failedScenes.length})
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
 
               {project && hasError && (
                 <Card className="p-6 mt-4 border-destructive/30">

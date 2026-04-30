@@ -36,7 +36,63 @@ async function appendLog(
       progress_log: log,
       progress_pct: pct,
       execution_step: step ?? message,
+      heartbeat_at: new Date().toISOString(),
     })
+    .eq("id", projectId);
+}
+
+// Lightweight heartbeat — call inside long-running loops so the client knows
+// the worker is still alive even when no log line is being added.
+async function heartbeat(supabase: any, projectId: string) {
+  try {
+    await supabase
+      .from("agent_projects")
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq("id", projectId);
+  } catch (_) {
+    // best-effort
+  }
+}
+
+// Append a failed scene record (or replace the entry for the same scene index).
+async function recordFailedScene(
+  supabase: any,
+  projectId: string,
+  entry: { index: number; keyword: string; reason: string; provider: string }
+) {
+  const { data } = await supabase
+    .from("agent_projects")
+    .select("failed_scenes")
+    .eq("id", projectId)
+    .single();
+  const list = Array.isArray(data?.failed_scenes) ? data.failed_scenes : [];
+  const filtered = list.filter((f: any) => f?.index !== entry.index);
+  filtered.push({ ...entry, at: Date.now() });
+  await supabase
+    .from("agent_projects")
+    .update({ failed_scenes: filtered, heartbeat_at: new Date().toISOString() })
+    .eq("id", projectId);
+}
+
+// Persist a single Vidnoz scene asset incrementally into selected_assets so a
+// resume invocation doesn't have to regenerate it.
+async function persistVidnozScene(
+  supabase: any,
+  projectId: string,
+  index: number,
+  asset: SelectedAsset
+) {
+  const { data } = await supabase
+    .from("agent_projects")
+    .select("selected_assets")
+    .eq("id", projectId)
+    .single();
+  const list = Array.isArray(data?.selected_assets) ? data.selected_assets : [];
+  const filtered = list.filter((a: any) => a?._vidnozScene !== index);
+  filtered.push({ ...asset, _vidnozScene: index });
+  await supabase
+    .from("agent_projects")
+    .update({ selected_assets: filtered, heartbeat_at: new Date().toISOString() })
     .eq("id", projectId);
 }
 
@@ -212,7 +268,12 @@ serve(async (req) => {
       userId = data.user.id;
     }
 
-    const { projectId } = await req.json();
+    const reqBody = await req.json().catch(() => ({}));
+    const { projectId, resume, retryScenes } = reqBody as {
+      projectId: string;
+      resume?: boolean;
+      retryScenes?: number[];
+    };
     const { data: project } = await adminClient
       .from("agent_projects")
       .select("*")
@@ -226,14 +287,32 @@ serve(async (req) => {
       });
     }
 
+    // If resuming, preserve previously generated assets and progress log so we
+    // skip already-completed scenes. Clear failed_scenes for the ones we are
+    // about to retry.
+    const isResume = !!resume || (Array.isArray(retryScenes) && retryScenes.length > 0);
+    const initPatch: Record<string, unknown> = {
+      execution_status: "running",
+      error_message: null,
+      heartbeat_at: new Date().toISOString(),
+    };
+    if (!isResume) {
+      initPatch.progress_pct = 0;
+      initPatch.progress_log = [];
+      initPatch.selected_assets = [];
+      initPatch.failed_scenes = [];
+    } else if (Array.isArray(retryScenes) && retryScenes.length > 0) {
+      // Drop only the entries we're about to retry; keep the rest.
+      const keepFailed = (Array.isArray(project.failed_scenes) ? project.failed_scenes : [])
+        .filter((f: any) => !retryScenes.includes(f?.index));
+      const keepAssets = (Array.isArray(project.selected_assets) ? project.selected_assets : [])
+        .filter((a: any) => !retryScenes.includes(a?._vidnozScene));
+      initPatch.failed_scenes = keepFailed;
+      initPatch.selected_assets = keepAssets;
+    }
     await adminClient
       .from("agent_projects")
-      .update({
-        execution_status: "running",
-        progress_pct: 0,
-        progress_log: [],
-        error_message: null,
-      })
+      .update(initPatch)
       .eq("id", projectId);
 
     const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
@@ -288,18 +367,47 @@ serve(async (req) => {
     // === Vidnoz: parallel generation across all talking-head scenes ===
     // Sequential per-scene polling (each up to ~3 min) blew the edge worker
     // background-task budget and left projects stuck mid-pipeline. Run in parallel.
+    // On a resume invocation, scenes already persisted in selected_assets are
+    // skipped so the user doesn't pay/wait twice.
     const vidnozResults: Record<number, { url: string; error?: string }> = {};
+    const previouslyPersisted: any[] = Array.isArray(project.selected_assets)
+      ? project.selected_assets
+      : [];
     if (useVidnoz && VIDNOZ_API_KEY && thIndices.length > 0) {
-      await appendLog(
-        adminClient,
-        projectId,
-        `Generating ${thIndices.length} Vidnoz avatar scene(s) in parallel...`,
-        12,
-        "vidnoz-avatar"
-      );
+      // Pre-load already-completed scenes so we don't regenerate them.
+      const alreadyDone = new Set<number>();
+      for (const a of previouslyPersisted) {
+        if (typeof a?._vidnozScene === "number" && a?.url) {
+          vidnozResults[a._vidnozScene] = { url: a.url };
+          alreadyDone.add(a._vidnozScene);
+        }
+      }
+      const targets = (Array.isArray(retryScenes) && retryScenes.length > 0)
+        ? thIndices.filter((i) => retryScenes.includes(i))
+        : thIndices.filter((i) => !alreadyDone.has(i));
+
+      if (alreadyDone.size > 0 && targets.length < thIndices.length) {
+        await appendLog(
+          adminClient,
+          projectId,
+          `Resume: skipping ${alreadyDone.size} Vidnoz scene(s) already generated`,
+          12,
+          "vidnoz-avatar"
+        );
+      }
+
+      if (targets.length > 0) {
+        await appendLog(
+          adminClient,
+          projectId,
+          `Generating ${targets.length} Vidnoz avatar scene(s) in parallel...`,
+          12,
+          "vidnoz-avatar"
+        );
+      }
       let completedCount = 0;
       await Promise.all(
-        thIndices.map(async (i) => {
+        targets.map(async (i) => {
           const ov = overrides[i];
           const sliceText = wordSlices[i] || transcript.slice(0, 200);
           try {
@@ -331,6 +439,7 @@ serve(async (req) => {
             const maxMs = 180_000;
             const t0 = Date.now();
             let delay = 4000;
+            let lastBeat = Date.now();
             while (Date.now() - t0 < maxMs && !url) {
               await new Promise((r) => setTimeout(r, delay));
               delay = Math.min(delay + 1000, 8000);
@@ -344,32 +453,53 @@ serve(async (req) => {
               const dJson = await dResp.json().catch(() => ({}));
               const additional = dJson?.data?.additional_data || {};
               url = additional?.video_720p?.url || additional?.url || "";
+              // Heartbeat at most every 20s during long polls.
+              if (Date.now() - lastBeat > 20_000) {
+                await heartbeat(adminClient, projectId);
+                lastBeat = Date.now();
+              }
             }
-            if (!url) throw new Error("Vidnoz polling timeout");
+            if (!url) throw new Error("Vidnoz polling timeout (180s)");
             vidnozResults[i] = { url };
+            // Persist immediately so a future resume won't re-run this scene.
+            await persistVidnozScene(adminClient, projectId, i, {
+              keyword: ov.keyword,
+              url,
+              thumb: project.vidnoz_avatar_url,
+              source: "vidnoz",
+              duration: Number(ov.duration) || 4,
+            });
             completedCount++;
             await appendLog(
               adminClient,
               projectId,
-              `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${thIndices.length})`,
-              12 + Math.round((completedCount / thIndices.length) * 30),
+              `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${targets.length})`,
+              12 + Math.round((completedCount / targets.length) * 30),
               "vidnoz-avatar"
             );
           } catch (vidErr) {
-            console.error(`Vidnoz failed for scene ${i}:`, vidErr);
-            vidnozResults[i] = { url: "", error: String((vidErr as Error)?.message || vidErr) };
+            const reason = String((vidErr as Error)?.message || vidErr);
+            console.error(`Vidnoz failed for scene ${i}:`, reason);
+            vidnozResults[i] = { url: "", error: reason };
             completedCount++;
+            await recordFailedScene(adminClient, projectId, {
+              index: i,
+              keyword: ov.keyword,
+              reason,
+              provider: "vidnoz",
+            });
             await appendLog(
               adminClient,
               projectId,
-              `⚠ Vidnoz failed for "${ov.keyword}", using Freepik fallback`,
-              12 + Math.round((completedCount / thIndices.length) * 30),
+              `⚠ Vidnoz failed for "${ov.keyword}": ${reason.slice(0, 80)} — using Freepik fallback`,
+              12 + Math.round((completedCount / targets.length) * 30),
               "vidnoz-fallback"
             );
           }
         })
       );
     }
+
 
     if (overrides.length > 0) {
       for (let i = 0; i < overrides.length; i++) {

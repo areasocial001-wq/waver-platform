@@ -24,7 +24,9 @@ export type Database = {
           error_message: string | null
           execution_status: string
           execution_step: string | null
+          failed_scenes: Json
           final_video_url: string | null
+          heartbeat_at: string | null
           id: string
           image_source: string
           intro_title: Json | null
@@ -66,7 +68,9 @@ export type Database = {
           error_message?: string | null
           execution_status?: string
           execution_step?: string | null
+          failed_scenes?: Json
           final_video_url?: string | null
+          heartbeat_at?: string | null
           id?: string
           image_source?: string
           intro_title?: Json | null
@@ -108,7 +112,9 @@ export type Database = {
           error_message?: string | null
           execution_status?: string
           execution_step?: string | null
+          failed_scenes?: Json
           final_video_url?: string | null
+          heartbeat_at?: string | null
           id?: string
           image_source?: string
           intro_title?: Json | null
