@@ -1362,26 +1362,73 @@ export default function AgentPage() {
                                   })()}
                                 </div>
                                 {(() => {
-                                  const filtered = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  const compatibles = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  const q = voiceSearch.trim().toLowerCase();
+                                  const filtered = q
+                                    ? compatibles.filter(
+                                        (v) =>
+                                          v.name?.toLowerCase().includes(q) ||
+                                          v.country_name?.toLowerCase().includes(q) ||
+                                          v.gender?.toLowerCase().includes(q)
+                                      )
+                                    : compatibles;
+                                  const PAGE_SIZE = 25;
+                                  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                                  const safePage = Math.min(voicePage, totalPages - 1);
+                                  const pageItems = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
                                   return (
                                     <>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          placeholder="Cerca per nome, paese, genere..."
+                                          value={voiceSearch}
+                                          onChange={(e) => { setVoiceSearch(e.target.value); setVoicePage(0); }}
+                                          className="h-8 text-xs flex-1"
+                                          disabled={compatibles.length === 0}
+                                        />
+                                      </div>
                                       <Select
                                         value={project.vidnoz_voice_id || ""}
                                         onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
-                                        disabled={filtered.length === 0}
+                                        disabled={compatibles.length === 0}
                                       >
                                         <SelectTrigger>
-                                          <SelectValue placeholder={filtered.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : "Seleziona voce"} />
+                                          <SelectValue placeholder={compatibles.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : `Seleziona voce (${filtered.length} risultati)`} />
                                         </SelectTrigger>
                                         <SelectContent className="max-h-72">
-                                          {filtered.slice(0, 120).map((v) => (
+                                          {pageItems.length === 0 ? (
+                                            <div className="p-3 text-xs text-muted-foreground">Nessun risultato per "{voiceSearch}"</div>
+                                          ) : pageItems.map((v) => (
                                             <SelectItem key={v.voice_id} value={v.voice_id}>
                                               {v.name} · {v.language}{v.country_name ? ` (${v.country_name})` : ""} · {v.gender}
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
                                       </Select>
-                                      {filtered.length === 0 && vidnozVoices.length > 0 && (
+                                      {totalPages > 1 && (
+                                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 px-2 text-[11px]"
+                                            disabled={safePage === 0}
+                                            onClick={() => setVoicePage((p) => Math.max(0, p - 1))}
+                                          >
+                                            ← Prec
+                                          </Button>
+                                          <span>Pagina {safePage + 1} / {totalPages} · {filtered.length} voci</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 px-2 text-[11px]"
+                                            disabled={safePage >= totalPages - 1}
+                                            onClick={() => setVoicePage((p) => Math.min(totalPages - 1, p + 1))}
+                                          >
+                                            Succ →
+                                          </Button>
+                                        </div>
+                                      )}
+                                      {compatibles.length === 0 && vidnozVoices.length > 0 && (
                                         <div className="text-[11px] text-amber-500">
                                           Nessuna voce nativa per {project.language?.toUpperCase()}. Cambia lingua o disattiva Vidnoz.
                                         </div>
