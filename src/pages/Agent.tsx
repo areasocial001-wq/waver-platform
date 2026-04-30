@@ -523,6 +523,12 @@ export default function AgentPage() {
   const handleConfirmAndExecute = async () => {
     if (!project) return;
     try {
+      if (isExecuting && !isStalled) {
+        toast.warning("Produzione già in corso", {
+          description: "Evito un nuovo avvio per non consumare crediti con tentativi duplicati.",
+        });
+        return;
+      }
       toast.info("Avvio produzione...");
       const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
       if (error) throw error;
@@ -813,6 +819,7 @@ export default function AgentPage() {
   const isExecuting = project?.execution_status === "running" || project?.execution_status === "rendering";
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
+  const canResumeAfterError = !!project && hasError && ((project.selected_assets?.length || 0) > 0 || (project.failed_scenes?.length || 0) > 0);
 
   // Stale-detection: prefer the dedicated `heartbeat_at` column updated by the
   // worker. Falls back to the latest progress log entry for projects that ran
@@ -1860,8 +1867,9 @@ export default function AgentPage() {
                     );
                   })()}
 
-                  <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute}>
-                    <Play className="w-4 h-4" /> Conferma e Produci Video
+                  <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute} disabled={isExecuting && !isStalled}>
+                    {isExecuting && !isStalled ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    {isExecuting && !isStalled ? "Produzione in corso" : "Conferma e Produci Video"}
                   </Button>
                 </>
               )}
@@ -2037,7 +2045,15 @@ export default function AgentPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold">Si è verificato un errore</h3>
                       <p className="text-sm text-muted-foreground mt-1">{project.error_message || "Errore sconosciuto"}</p>
-                      <Button variant="outline" size="sm" onClick={handleReset} className="mt-3">Riprova</Button>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {canResumeAfterError && (
+                          <Button size="sm" onClick={() => handleResume()} disabled={resuming} className="gap-2">
+                            {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Riprendi senza rigenerare
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={handleReset}>Nuovo tentativo</Button>
+                      </div>
                     </div>
                   </div>
                 </Card>

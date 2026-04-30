@@ -49,6 +49,11 @@ serve(async (req) => {
       .eq("id", projectId)
       .eq("user_id", userId)
       .single();
+    if (project?.execution_status !== "rendering") {
+      return new Response(JSON.stringify({ status: project?.execution_status || "idle" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (!project?.json2video_project_id) {
       return new Response(JSON.stringify({ error: "No render in progress" }), {
         status: 400,
