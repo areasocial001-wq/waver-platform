@@ -438,19 +438,46 @@ serve(async (req) => {
         return status >= 500 && status < 600;
       };
 
-      const startVidnozTask = async (sliceText: string): Promise<string> => {
+      type VidnozPreset = {
+        label: string;
+        voiceStyle: string | null; // null = omit emotion/style
+        textLimit: number;
+        type: string; // Vidnoz "type" param (0 preset voice, 1 cloned, etc.)
+      };
+
+      // Ordered list of attempts. The first uses user config; subsequent ones
+      // progressively relax parameters that commonly trigger Vidnoz failures
+      // (unsupported emotion/style, long text, etc.) before giving up.
+      const buildVidnozPresets = (): VidnozPreset[] => {
+        const base = project.vidnoz_voice_style?.trim() || null;
+        const presets: VidnozPreset[] = [
+          { label: "default", voiceStyle: base, textLimit: 1500, type: "0" },
+        ];
+        if (base) {
+          presets.push({ label: "no-emotion", voiceStyle: null, textLimit: 1500, type: "0" });
+        }
+        // Last-ditch: shorten text and drop style entirely (works around some
+        // 803/validation errors observed on long inputs with custom emotion).
+        presets.push({ label: "short-neutral", voiceStyle: null, textLimit: 600, type: "0" });
+        return presets;
+      };
+
+      const startVidnozTask = async (
+        sliceText: string,
+        preset: VidnozPreset
+      ): Promise<string> => {
         let attempt = 0;
         const maxAttempts = 5;
         let lastErr = "";
         while (attempt < maxAttempts) {
           const fd = new FormData();
           fd.append("voice_id", project.vidnoz_voice_id);
-          fd.append("text", sliceText.slice(0, 1500));
-          fd.append("type", "0");
+          fd.append("text", sliceText.slice(0, preset.textLimit));
+          fd.append("type", preset.type);
           fd.append("avatar_url", project.vidnoz_avatar_url);
-          if (project.vidnoz_voice_style) {
-            fd.append("emotion", project.vidnoz_voice_style);
-            fd.append("style", project.vidnoz_voice_style);
+          if (preset.voiceStyle) {
+            fd.append("emotion", preset.voiceStyle);
+            fd.append("style", preset.voiceStyle);
           }
           const startResp = await fetch(
             "https://devapi.vidnoz.com/v2/task/generate-talking-head",
@@ -478,6 +505,37 @@ serve(async (req) => {
           await sleep(backoff + jitter);
         }
         throw new Error(lastErr || "Vidnoz start failed after retries");
+      };
+
+      const pollVidnozTask = async (taskId: string, maxMs = 180_000): Promise<string> => {
+        let url = "";
+        const t0 = Date.now();
+        let delay = 4000;
+        let lastBeat = Date.now();
+        while (Date.now() - t0 < maxMs && !url) {
+          await sleep(delay);
+          delay = Math.min(delay + 1000, 8000);
+          const dfd = new FormData();
+          dfd.append("id", taskId);
+          const dResp = await fetch("https://devapi.vidnoz.com/v2/task/detail", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
+            body: dfd,
+          });
+          const dJson = await dResp.json().catch(() => ({}));
+          const additional = dJson?.data?.additional_data || {};
+          const status = dJson?.data?.status;
+          if (status === -3 || status === 3) {
+            throw new Error(`Vidnoz task failed (status ${status})`);
+          }
+          url = additional?.video_720p?.url || additional?.url || "";
+          if (Date.now() - lastBeat > 20_000) {
+            await heartbeat(adminClient, projectId);
+            lastBeat = Date.now();
+          }
+        }
+        if (!url) throw new Error("Vidnoz polling timeout");
+        return url;
       };
 
       const processOne = async (i: number, slot: number) => {
