@@ -819,6 +819,7 @@ export default function AgentPage() {
   const isExecuting = project?.execution_status === "running" || project?.execution_status === "rendering";
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
+  const canResumeAfterError = !!project && hasError && (project.selected_assets?.length > 0 || failedScenes.length > 0);
 
   // Stale-detection: prefer the dedicated `heartbeat_at` column updated by the
   // worker. Falls back to the latest progress log entry for projects that ran
@@ -2044,7 +2045,15 @@ export default function AgentPage() {
                     <div className="flex-1">
                       <h3 className="font-semibold">Si è verificato un errore</h3>
                       <p className="text-sm text-muted-foreground mt-1">{project.error_message || "Errore sconosciuto"}</p>
-                      <Button variant="outline" size="sm" onClick={handleReset} className="mt-3">Riprova</Button>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {canResumeAfterError && (
+                          <Button size="sm" onClick={() => handleResume()} disabled={resuming} className="gap-2">
+                            {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Riprendi senza rigenerare
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={handleReset}>Nuovo tentativo</Button>
+                      </div>
                     </div>
                   </div>
                 </Card>
