@@ -812,6 +812,34 @@ export default function AgentPage() {
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
 
+  // Stale-detection: if no progress log entry has arrived in > 3 minutes
+  // while the pipeline says it's "running", the background worker likely died.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isExecuting) return;
+    const t = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(t);
+  }, [isExecuting]);
+  const lastLogAt = project?.progress_log?.length
+    ? project.progress_log[project.progress_log.length - 1]?.at || 0
+    : 0;
+  const isStalled = isExecuting && lastLogAt > 0 && now - lastLogAt > 3 * 60 * 1000;
+  const [resuming, setResuming] = useState(false);
+  const handleResume = async () => {
+    if (!project) return;
+    setResuming(true);
+    try {
+      toast.info("Ripresa produzione...");
+      const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
+      if (error) throw error;
+      toast.success("Produzione ripresa");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore ripresa");
+    } finally {
+      setResuming(false);
+    }
+  };
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
@@ -1898,6 +1926,28 @@ export default function AgentPage() {
                       </div>
                     </div>
                   )}
+                </Card>
+              )}
+
+              {project && isStalled && !hasError && (
+                <Card className="p-4 mt-4 border-amber-500/40 bg-amber-500/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">La produzione sembra bloccata</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Nessun aggiornamento da {Math.round((now - lastLogAt) / 60000)} minuti. Il worker in background potrebbe essere stato terminato.
+                        Puoi riprendere la produzione: le scene già completate non verranno rigenerate.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <Button size="sm" onClick={handleResume} disabled={resuming} className="gap-2">
+                          {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          Riprendi produzione
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleReset}>Annulla</Button>
+                      </div>
+                    </div>
+                  </div>
                 </Card>
               )}
 
