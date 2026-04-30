@@ -141,6 +141,8 @@ export const OPUS_PRESET_DEFAULTS = {
   outro_cta: { enabled: true, text: "Follow for more", duration: 2.5 },
 };
 
+const ACTIVE_PROJECT_KEY = "agent.activeProjectId";
+
 export default function AgentPage() {
   const [activeTab, setActiveTab] = useState<"create" | "history">(
     () => (typeof window !== "undefined" && (localStorage.getItem("agent.activeTab") as any)) || "create",
@@ -151,6 +153,25 @@ export default function AgentPage() {
   );
   useEffect(() => { localStorage.setItem("agent.activeTab", activeTab); }, [activeTab]);
   useEffect(() => { localStorage.setItem("agent.activeStyleTab", activeStyleTab); }, [activeStyleTab]);
+
+  useEffect(() => {
+    const projectId = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_PROJECT_KEY) : null;
+    if (!projectId) return;
+    let cancelled = false;
+    setRestoringProject(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("agent_projects")
+        .select("*")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (!cancelled) {
+        if (data && !error) setProject(data as unknown as ProjectRow);
+        setRestoringProject(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // creation form
   const [brief, setBrief] = useState("");
@@ -163,6 +184,7 @@ export default function AgentPage() {
   const [pdfText, setPdfText] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [loadingStoryboard, setLoadingStoryboard] = useState(false);
+  const [restoringProject, setRestoringProject] = useState(false);
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
@@ -440,6 +462,7 @@ export default function AgentPage() {
         .select("*").single();
       if (error) throw error;
 
+      localStorage.setItem(ACTIVE_PROJECT_KEY, created.id);
       setProject(created as unknown as ProjectRow);
 
       const { error: planErr } = await supabase.functions.invoke("agent-plan", { body: { projectId: created.id } });
@@ -748,11 +771,13 @@ export default function AgentPage() {
   };
 
   const handleOpenProject = (p: ProjectRow) => {
+    localStorage.setItem(ACTIVE_PROJECT_KEY, p.id);
     setProject(p);
     setActiveTab("create");
   };
 
   const handleReset = () => {
+    localStorage.removeItem(ACTIVE_PROJECT_KEY);
     setProject(null);
     setBrief(""); setPdfFile(null); setPdfText("");
   };
