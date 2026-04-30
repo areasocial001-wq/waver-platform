@@ -543,68 +543,66 @@ serve(async (req) => {
         await sleep(slot * 1500);
         const ov = overrides[i];
         const sliceText = wordSlices[i] || transcript.slice(0, 200);
-        try {
-          const taskId = await startVidnozTask(sliceText);
+        const presets = buildVidnozPresets();
+        let lastReason = "";
 
-          let url = "";
-          const maxMs = 180_000;
-          const t0 = Date.now();
-          let delay = 4000;
-          let lastBeat = Date.now();
-          while (Date.now() - t0 < maxMs && !url) {
-            await sleep(delay);
-            delay = Math.min(delay + 1000, 8000);
-            const dfd = new FormData();
-            dfd.append("id", taskId);
-            const dResp = await fetch("https://devapi.vidnoz.com/v2/task/detail", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" },
-              body: dfd,
-            });
-            const dJson = await dResp.json().catch(() => ({}));
-            const additional = dJson?.data?.additional_data || {};
-            url = additional?.video_720p?.url || additional?.url || "";
-            if (Date.now() - lastBeat > 20_000) {
-              await heartbeat(adminClient, projectId);
-              lastBeat = Date.now();
+        for (let p = 0; p < presets.length; p++) {
+          const preset = presets[p];
+          try {
+            if (p > 0) {
+              await appendLog(
+                adminClient,
+                projectId,
+                `↻ Retry Vidnoz "${ov.keyword}" with preset "${preset.label}" (attempt ${p + 1}/${presets.length})`,
+                12 + Math.round((completedCount / targets.length) * 30),
+                "vidnoz-retry"
+              );
+              // Small spacing between preset attempts to avoid rate limits.
+              await sleep(2500);
             }
+            const taskId = await startVidnozTask(sliceText, preset);
+            const url = await pollVidnozTask(taskId, 180_000);
+            vidnozResults[i] = { url };
+            await persistVidnozScene(adminClient, projectId, i, {
+              keyword: ov.keyword,
+              url,
+              thumb: project.vidnoz_avatar_url,
+              source: "vidnoz",
+              duration: Number(ov.duration) || 4,
+            });
+            completedCount++;
+            await appendLog(
+              adminClient,
+              projectId,
+              `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${targets.length})${p > 0 ? ` [preset: ${preset.label}]` : ""}`,
+              12 + Math.round((completedCount / targets.length) * 30),
+              "vidnoz-avatar"
+            );
+            return; // success — stop trying further presets
+          } catch (vidErr) {
+            lastReason = String((vidErr as Error)?.message || vidErr);
+            console.error(`Vidnoz preset "${preset.label}" failed for scene ${i}:`, lastReason);
+            // Try next preset (if any)
           }
-          if (!url) throw new Error("Vidnoz polling timeout (180s)");
-          vidnozResults[i] = { url };
-          await persistVidnozScene(adminClient, projectId, i, {
-            keyword: ov.keyword,
-            url,
-            thumb: project.vidnoz_avatar_url,
-            source: "vidnoz",
-            duration: Number(ov.duration) || 4,
-          });
-          completedCount++;
-          await appendLog(
-            adminClient,
-            projectId,
-            `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${targets.length})`,
-            12 + Math.round((completedCount / targets.length) * 30),
-            "vidnoz-avatar"
-          );
-        } catch (vidErr) {
-          const reason = String((vidErr as Error)?.message || vidErr);
-          console.error(`Vidnoz failed for scene ${i}:`, reason);
-          vidnozResults[i] = { url: "", error: reason };
-          completedCount++;
-          await recordFailedScene(adminClient, projectId, {
-            index: i,
-            keyword: ov.keyword,
-            reason,
-            provider: "vidnoz",
-          });
-          await appendLog(
-            adminClient,
-            projectId,
-            `⚠ Vidnoz failed for "${ov.keyword}": ${reason.slice(0, 80)} — using Freepik fallback`,
-            12 + Math.round((completedCount / targets.length) * 30),
-            "vidnoz-fallback"
-          );
         }
+
+        // All presets exhausted → record failure and let Freepik take over
+        vidnozResults[i] = { url: "", error: lastReason };
+        completedCount++;
+        await recordFailedScene(adminClient, projectId, {
+          index: i,
+          keyword: ov.keyword,
+          reason: lastReason,
+          provider: "vidnoz",
+          attempted_presets: presets.map((p) => p.label),
+        });
+        await appendLog(
+          adminClient,
+          projectId,
+          `⚠ Vidnoz failed for "${ov.keyword}" after ${presets.length} preset(s): ${lastReason.slice(0, 80)} — using Freepik fallback`,
+          12 + Math.round((completedCount / targets.length) * 30),
+          "vidnoz-fallback"
+        );
       };
 
       // Concurrency-limited worker pool
