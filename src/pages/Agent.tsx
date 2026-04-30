@@ -16,6 +16,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Slider } from "@/components/ui/slider";
@@ -258,6 +269,20 @@ export default function AgentPage() {
       if (data) setHistory(data as unknown as ProjectRow[]);
     })();
   }, [activeTab, project?.id]);
+
+  const handleDeleteProject = async (id: string, title: string) => {
+    const { error } = await supabase.from("agent_projects").delete().eq("id", id);
+    if (error) {
+      toast.error(`Impossibile eliminare: ${error.message}`);
+      return;
+    }
+    setHistory((prev) => prev.filter((p) => p.id !== id));
+    if (project?.id === id) {
+      localStorage.removeItem(ACTIVE_PROJECT_KEY);
+      setProject(null);
+    }
+    toast.success(`Progetto "${title}" eliminato`);
+  };
 
   // Load user-saved style presets
   const loadUserPresets = async () => {
@@ -1923,6 +1948,30 @@ export default function AgentPage() {
                     <Button size="sm" onClick={() => handleDuplicate(h)} className="gap-1">
                       <Copy className="w-3.5 h-3.5" /> Duplica
                     </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-1" aria-label="Elimina progetto">
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Eliminare "{h.title}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Questa azione è irreversibile. Il progetto e tutti i suoi dati associati verranno eliminati definitivamente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annulla</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteProject(h.id, h.title)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Elimina
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </Card>
               ))}
