@@ -561,7 +561,7 @@ serve(async (req) => {
               await sleep(2500);
             }
             const taskId = await startVidnozTask(sliceText, preset);
-            const url = await pollVidnozTask(taskId, 180_000);
+            const url = await pollVidnozTask(taskId, 360_000);
             vidnozResults[i] = { url };
             await persistVidnozScene(adminClient, projectId, i, {
               keyword: ov.keyword,
