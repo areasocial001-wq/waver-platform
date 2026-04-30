@@ -247,14 +247,40 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
+  const VIDNOZ_CACHE_KEY = "agent.vidnoz.catalog.v1";
+  const VIDNOZ_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
   const loadVidnozCatalog = async (force = false) => {
+    // Try localStorage cache first (avoids edge round-trip on tab switches / re-mounts)
+    if (!force) {
+      try {
+        const raw = localStorage.getItem(VIDNOZ_CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached?.ts && Date.now() - cached.ts < VIDNOZ_CACHE_TTL_MS) {
+            if (Array.isArray(cached.avatars) && Array.isArray(cached.voices)) {
+              if (vidnozAvatars.length === 0) setVidnozAvatars(cached.avatars);
+              if (vidnozVoices.length === 0) setVidnozVoices(cached.voices);
+              return;
+            }
+          }
+        }
+      } catch (_) { /* ignore corrupt cache */ }
+    }
     if (!force && vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
     setVidnozLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {});
+      const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {
+        body: force ? { refresh: true } : {},
+      });
       if (error) throw error;
-      setVidnozAvatars(Array.isArray(data?.avatars) ? data.avatars : []);
-      setVidnozVoices(Array.isArray(data?.voices) ? data.voices : []);
+      const avatars = Array.isArray(data?.avatars) ? data.avatars : [];
+      const voices = Array.isArray(data?.voices) ? data.voices : [];
+      setVidnozAvatars(avatars);
+      setVidnozVoices(voices);
+      try {
+        localStorage.setItem(VIDNOZ_CACHE_KEY, JSON.stringify({ ts: Date.now(), avatars, voices }));
+      } catch (_) {}
     } catch (e) {
       console.error(e);
       toast.error("Impossibile caricare avatar/voci Vidnoz");
@@ -274,23 +300,37 @@ export default function AgentPage() {
     return vl === target;
   };
 
-  // Auto-refresh Vidnoz catalog when avatar or language changes (only when Vidnoz is enabled).
+  // Auto-load Vidnoz catalog when enabled or language changes (uses cache, no refetch).
+  // Avatar selection no longer triggers a reload (cache covers it).
   useEffect(() => {
     if (!project?.use_vidnoz_for_talking_head) return;
-    loadVidnozCatalog(true);
+    loadVidnozCatalog(false);
+    setVoicePage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.vidnoz_avatar_id, project?.language, project?.use_vidnoz_for_talking_head]);
+  }, [project?.language, project?.use_vidnoz_for_talking_head]);
 
   // If the current selected voice is no longer compatible with the chosen language, clear it.
   useEffect(() => {
     if (!project?.vidnoz_voice_id || vidnozVoices.length === 0) return;
     const current = vidnozVoices.find((v) => v.voice_id === project.vidnoz_voice_id);
     if (current && !isVidnozVoiceCompatible(current, project.language)) {
-      updateProject({ vidnoz_voice_id: null } as any);
+      updateProject({ vidnoz_voice_id: null, vidnoz_voice_style: null } as any);
       toast.info(`Voce Vidnoz rimossa: non compatibile con la lingua ${project.language?.toUpperCase()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.language, vidnozVoices]);
+
+  // Reset selected style when voice changes (emotions are voice-specific)
+  useEffect(() => {
+    if (!project?.vidnoz_voice_id) return;
+    const v = vidnozVoices.find((x) => x.voice_id === project.vidnoz_voice_id);
+    if (!v) return;
+    const available = (v.emotions && v.emotions.length > 0 ? v.emotions : v.styles) || [];
+    if (project.vidnoz_voice_style && !available.includes(project.vidnoz_voice_style)) {
+      updateProject({ vidnoz_voice_style: null } as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.vidnoz_voice_id, vidnozVoices]);
 
 
   // Compute the proportional transcript slice for a given talking-head scene
