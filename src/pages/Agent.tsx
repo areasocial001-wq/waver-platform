@@ -371,6 +371,7 @@ export default function AgentPage() {
           text,
           voice_id: project.vidnoz_voice_id,
           avatar_url: project.vidnoz_avatar_url,
+          voice_style: project.vidnoz_voice_style || undefined,
         },
       });
       if (error) throw error;
