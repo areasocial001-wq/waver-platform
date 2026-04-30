@@ -1477,13 +1477,39 @@ export default function AgentPage() {
 
                                       {emotionList.length > 0 && (
                                         <div>
-                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Emozioni / Stili</div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">
+                                            Emozione / Stile {project.vidnoz_voice_style && <span className="text-primary normal-case">· {project.vidnoz_voice_style}</span>}
+                                          </div>
                                           <div className="flex flex-wrap gap-1">
-                                            {emotionList.slice(0, 12).map((e, i) => (
-                                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/30 text-foreground capitalize">
-                                                {String(e)}
-                                              </span>
-                                            ))}
+                                            <button
+                                              type="button"
+                                              onClick={() => updateProject({ vidnoz_voice_style: null } as any)}
+                                              className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                                                !project.vidnoz_voice_style
+                                                  ? "bg-primary text-primary-foreground border-primary"
+                                                  : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                                              }`}
+                                            >
+                                              neutro
+                                            </button>
+                                            {emotionList.slice(0, 16).map((e, i) => {
+                                              const val = String(e);
+                                              const active = project.vidnoz_voice_style === val;
+                                              return (
+                                                <button
+                                                  key={i}
+                                                  type="button"
+                                                  onClick={() => updateProject({ vidnoz_voice_style: val } as any)}
+                                                  className={`text-[10px] px-1.5 py-0.5 rounded border transition capitalize ${
+                                                    active
+                                                      ? "bg-primary text-primary-foreground border-primary"
+                                                      : "bg-accent/30 border-border text-foreground hover:bg-accent/50"
+                                                  }`}
+                                                >
+                                                  {val}
+                                                </button>
+                                              );
+                                            })}
                                           </div>
                                         </div>
                                       )}
