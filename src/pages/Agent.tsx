@@ -1964,11 +1964,11 @@ export default function AgentPage() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm">La produzione sembra bloccata</h3>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Nessun aggiornamento da {Math.round((now - lastLogAt) / 60000)} minuti. Il worker in background potrebbe essere stato terminato.
+                        Nessun aggiornamento da {stalledMinutes} minut{stalledMinutes === 1 ? "o" : "i"}. Il worker in background potrebbe essere stato terminato.
                         Puoi riprendere la produzione: le scene già completate non verranno rigenerate.
                       </p>
                       <div className="flex gap-2 mt-3">
-                        <Button size="sm" onClick={handleResume} disabled={resuming} className="gap-2">
+                        <Button size="sm" onClick={() => handleResume()} disabled={resuming} className="gap-2">
                           {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                           Riprendi produzione
                         </Button>
@@ -1978,6 +1978,57 @@ export default function AgentPage() {
                   </div>
                 </Card>
               )}
+
+              {project && failedScenes.length > 0 && !isDone && (
+                <Card className="p-4 mt-4 border-destructive/30 bg-destructive/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">
+                        {failedScenes.length} scena/e Vidnoz fallit{failedScenes.length === 1 ? "a" : "e"}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Il pipeline ha usato Freepik come fallback. Puoi riprovare le scene fallite con Vidnoz senza ricominciare tutto.
+                      </p>
+                      <div className="space-y-2 mt-3">
+                        {failedScenes.map((f) => (
+                          <div key={`${f.index}-${f.at}`} className="flex items-start justify-between gap-3 bg-background/50 rounded-md p-2 border border-border/50">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px]">scena #{f.index + 1}</Badge>
+                                <span className="text-sm font-medium truncate">{f.keyword}</span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground mt-0.5 truncate" title={f.reason}>{f.reason}</p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleResume([f.index])}
+                              disabled={resuming || isExecuting}
+                              className="gap-1 shrink-0"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" /> Riprova
+                            </Button>
+                          </div>
+                        ))}
+                        {failedScenes.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => handleResume(failedScenes.map((f) => f.index))}
+                            disabled={resuming || isExecuting}
+                            className="gap-2 w-full"
+                          >
+                            {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            Riprova tutte ({failedScenes.length})
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
 
               {project && hasError && (
                 <Card className="p-6 mt-4 border-destructive/30">
