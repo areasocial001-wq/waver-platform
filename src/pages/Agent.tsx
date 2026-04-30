@@ -819,7 +819,7 @@ export default function AgentPage() {
   const isExecuting = project?.execution_status === "running" || project?.execution_status === "rendering";
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
-  const canResumeAfterError = !!project && hasError && (project.selected_assets?.length > 0 || failedScenes.length > 0);
+  const canResumeAfterError = !!project && hasError && ((project.selected_assets?.length || 0) > 0 || (project.failed_scenes?.length || 0) > 0);
 
   // Stale-detection: prefer the dedicated `heartbeat_at` column updated by the
   // worker. Falls back to the latest progress log entry for projects that ran
