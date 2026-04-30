@@ -814,8 +814,9 @@ export default function AgentPage() {
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
 
-  // Stale-detection: if no progress log entry has arrived in > 3 minutes
-  // while the pipeline says it's "running", the background worker likely died.
+  // Stale-detection: prefer the dedicated `heartbeat_at` column updated by the
+  // worker. Falls back to the latest progress log entry for projects that ran
+  // before the column existed.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!isExecuting) return;
@@ -825,22 +826,47 @@ export default function AgentPage() {
   const lastLogAt = project?.progress_log?.length
     ? project.progress_log[project.progress_log.length - 1]?.at || 0
     : 0;
-  const isStalled = isExecuting && lastLogAt > 0 && now - lastLogAt > 3 * 60 * 1000;
+  const heartbeatMs = project?.heartbeat_at ? new Date(project.heartbeat_at).getTime() : 0;
+  const lastBeatAt = Math.max(heartbeatMs, lastLogAt);
+  const STALE_MS = 3 * 60 * 1000;
+  const isStalled = isExecuting && lastBeatAt > 0 && now - lastBeatAt > STALE_MS;
+  const stalledMinutes = lastBeatAt > 0 ? Math.round((now - lastBeatAt) / 60000) : 0;
+
   const [resuming, setResuming] = useState(false);
-  const handleResume = async () => {
+  const handleResume = async (retryScenes?: number[]) => {
     if (!project) return;
     setResuming(true);
     try {
-      toast.info("Ripresa produzione...");
-      const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
+      const isRetry = Array.isArray(retryScenes) && retryScenes.length > 0;
+      toast.info(isRetry ? `Riprovo ${retryScenes!.length} scena/e...` : "Ripresa produzione...");
+      const { error } = await supabase.functions.invoke("agent-execute", {
+        body: { projectId: project.id, resume: true, ...(isRetry ? { retryScenes } : {}) },
+      });
       if (error) throw error;
-      toast.success("Produzione ripresa");
+      toast.success(isRetry ? "Retry scena avviato" : "Produzione ripresa");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Errore ripresa");
     } finally {
       setResuming(false);
     }
   };
+
+  // Surface a one-shot toast when new failed scenes appear.
+  const failedScenes = project?.failed_scenes ?? [];
+  const lastFailedKeyRef = useRef<string>("");
+  useEffect(() => {
+    if (!project || failedScenes.length === 0) return;
+    const key = failedScenes.map((f) => `${f.index}:${f.at}`).join("|");
+    if (key === lastFailedKeyRef.current) return;
+    lastFailedKeyRef.current = key;
+    const latest = failedScenes[failedScenes.length - 1];
+    if (latest) {
+      toast.error(`Scena "${latest.keyword}" fallita`, {
+        description: latest.reason.slice(0, 120),
+      });
+    }
+  }, [failedScenes, project?.id]);
+
 
   return (
     <AuthGuard>
