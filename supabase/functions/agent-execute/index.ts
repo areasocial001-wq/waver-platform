@@ -507,7 +507,7 @@ serve(async (req) => {
         throw new Error(lastErr || "Vidnoz start failed after retries");
       };
 
-      const pollVidnozTask = async (taskId: string, maxMs = 180_000): Promise<string> => {
+      const pollVidnozTask = async (taskId: string, maxMs = 360_000): Promise<string> => {
         let url = "";
         const t0 = Date.now();
         let delay = 4000;
