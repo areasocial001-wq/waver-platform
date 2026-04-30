@@ -812,6 +812,34 @@ export default function AgentPage() {
   const isDone = project?.execution_status === "done" && !!project?.final_video_url;
   const hasError = project?.execution_status === "error" || project?.plan_status === "error";
 
+  // Stale-detection: if no progress log entry has arrived in > 3 minutes
+  // while the pipeline says it's "running", the background worker likely died.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isExecuting) return;
+    const t = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(t);
+  }, [isExecuting]);
+  const lastLogAt = project?.progress_log?.length
+    ? project.progress_log[project.progress_log.length - 1]?.at || 0
+    : 0;
+  const isStalled = isExecuting && lastLogAt > 0 && now - lastLogAt > 3 * 60 * 1000;
+  const [resuming, setResuming] = useState(false);
+  const handleResume = async () => {
+    if (!project) return;
+    setResuming(true);
+    try {
+      toast.info("Ripresa produzione...");
+      const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
+      if (error) throw error;
+      toast.success("Produzione ripresa");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Errore ripresa");
+    } finally {
+      setResuming(false);
+    }
+  };
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
