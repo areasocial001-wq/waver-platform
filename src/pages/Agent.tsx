@@ -167,11 +167,15 @@ export default function AgentPage() {
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
   const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
-  const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
+  const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string; category?: string; is_business?: boolean }>>([]);
   const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; country_name?: string; gender: string; preview_audio_url?: string; preview_image_url?: string; emotions?: string[]; styles?: string[] }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
   const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
   const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
+  // Voice browser: search + pagination + business-only filter for avatars
+  const [voiceSearch, setVoiceSearch] = useState("");
+  const [voicePage, setVoicePage] = useState(0);
+  const [avatarBusinessOnly, setAvatarBusinessOnly] = useState(true);
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
