@@ -507,7 +507,7 @@ serve(async (req) => {
         throw new Error(lastErr || "Vidnoz start failed after retries");
       };
 
-      const pollVidnozTask = async (taskId: string, maxMs = 180_000): Promise<string> => {
+      const pollVidnozTask = async (taskId: string, maxMs = 360_000): Promise<string> => {
         let url = "";
         const t0 = Date.now();
         let delay = 4000;
@@ -561,7 +561,7 @@ serve(async (req) => {
               await sleep(2500);
             }
             const taskId = await startVidnozTask(sliceText, preset);
-            const url = await pollVidnozTask(taskId, 180_000);
+            const url = await pollVidnozTask(taskId, 360_000);
             vidnozResults[i] = { url };
             await persistVidnozScene(adminClient, projectId, i, {
               keyword: ov.keyword,
@@ -637,7 +637,10 @@ serve(async (req) => {
             thumb: project.vidnoz_avatar_url,
             source: "vidnoz",
             duration: dur,
-          });
+            // Preserve marker so subsequent resumes can detect already-generated
+            // Vidnoz scenes and avoid re-billing the user.
+            _vidnozScene: i,
+          } as any);
           continue;
         }
 
