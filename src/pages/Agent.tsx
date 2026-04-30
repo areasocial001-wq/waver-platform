@@ -154,6 +154,25 @@ export default function AgentPage() {
   useEffect(() => { localStorage.setItem("agent.activeTab", activeTab); }, [activeTab]);
   useEffect(() => { localStorage.setItem("agent.activeStyleTab", activeStyleTab); }, [activeStyleTab]);
 
+  useEffect(() => {
+    const projectId = typeof window !== "undefined" ? localStorage.getItem(ACTIVE_PROJECT_KEY) : null;
+    if (!projectId) return;
+    let cancelled = false;
+    setRestoringProject(true);
+    (async () => {
+      const { data, error } = await supabase
+        .from("agent_projects")
+        .select("*")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (!cancelled) {
+        if (data && !error) setProject(data as unknown as ProjectRow);
+        setRestoringProject(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   // creation form
   const [brief, setBrief] = useState("");
   const [language, setLanguage] = useState("it");
