@@ -1948,6 +1948,30 @@ export default function AgentPage() {
                     <Button size="sm" onClick={() => handleDuplicate(h)} className="gap-1">
                       <Copy className="w-3.5 h-3.5" /> Duplica
                     </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="outline" className="gap-1" aria-label="Elimina progetto">
+                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Eliminare "{h.title}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Questa azione è irreversibile. Il progetto e tutti i suoi dati associati verranno eliminati definitivamente.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annulla</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteProject(h.id, h.title)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Elimina
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </Card>
               ))}
