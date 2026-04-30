@@ -247,7 +247,7 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
-  const VIDNOZ_CACHE_KEY = "agent.vidnoz.catalog.v1";
+  const VIDNOZ_CACHE_KEY = "agent.vidnoz.catalog.v2";
   const VIDNOZ_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   const loadVidnozCatalog = async (force = false) => {

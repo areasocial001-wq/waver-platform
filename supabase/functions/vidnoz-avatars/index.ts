@@ -154,14 +154,14 @@ serve(async (req) => {
         voice_id: v.voice_id || v.id,
         name: v.name,
         language: v.language,
-        country_name: v.country_name,
+        country_name: v.country_name || v.country || "",
         gender: v.gender,
         preview_audio_url: v.preview_audio_url,
-        preview_image_url: v.preview_image_url,
+        preview_image_url: v.preview_image_url || v.preview_flag_url || "",
         emotions: v.emotions || [],
-        styles: v.style_list || v.emotions || [],
+        styles: v.style_list || v.styles || v.emotions || [],
       }))
-      .filter((v: any) => v.voice_id);
+      .filter((v: any) => !!v.voice_id);
 
     const payload = { avatars, voices };
     _cache = { ts: Date.now(), payload };
