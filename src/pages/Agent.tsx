@@ -167,7 +167,7 @@ export default function AgentPage() {
   const [history, setHistory] = useState<ProjectRow[]>([]);
   const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
   const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
-  const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; gender: string; preview_audio_url?: string }>>([]);
+  const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; country_name?: string; gender: string; preview_audio_url?: string; preview_image_url?: string; emotions?: string[]; styles?: string[] }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
   const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
   const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
@@ -242,8 +242,8 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
-  const loadVidnozCatalog = async () => {
-    if (vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
+  const loadVidnozCatalog = async (force = false) => {
+    if (!force && vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
     setVidnozLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {});
@@ -257,6 +257,36 @@ export default function AgentPage() {
       setVidnozLoading(false);
     }
   };
+
+  // Compatibility helper: voice matches the project language (2-letter prefix).
+  const isVidnozVoiceCompatible = (
+    v: { language?: string },
+    lang?: string | null
+  ) => {
+    if (!lang) return true;
+    const target = lang.slice(0, 2).toLowerCase();
+    const vl = (v.language || "").slice(0, 2).toLowerCase();
+    return vl === target;
+  };
+
+  // Auto-refresh Vidnoz catalog when avatar or language changes (only when Vidnoz is enabled).
+  useEffect(() => {
+    if (!project?.use_vidnoz_for_talking_head) return;
+    loadVidnozCatalog(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.vidnoz_avatar_id, project?.language, project?.use_vidnoz_for_talking_head]);
+
+  // If the current selected voice is no longer compatible with the chosen language, clear it.
+  useEffect(() => {
+    if (!project?.vidnoz_voice_id || vidnozVoices.length === 0) return;
+    const current = vidnozVoices.find((v) => v.voice_id === project.vidnoz_voice_id);
+    if (current && !isVidnozVoiceCompatible(current, project.language)) {
+      updateProject({ vidnoz_voice_id: null } as any);
+      toast.info(`Voce Vidnoz rimossa: non compatibile con la lingua ${project.language?.toUpperCase()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.language, vidnozVoices]);
+
 
   // Compute the proportional transcript slice for a given talking-head scene
   // (mirrors the splitting logic used server-side in agent-execute).
@@ -1204,7 +1234,7 @@ export default function AgentPage() {
                                 <span className="text-xs text-muted-foreground">
                                   {vidnozLoading ? "Caricamento..." : `${vidnozAvatars.length} avatar · ${vidnozVoices.length} voci`}
                                 </span>
-                                <Button size="sm" variant="outline" onClick={loadVidnozCatalog} disabled={vidnozLoading} className="gap-1">
+                                <Button size="sm" variant="outline" onClick={() => loadVidnozCatalog(true)} disabled={vidnozLoading} className="gap-1">
                                   {vidnozLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                                   Ricarica catalogo
                                 </Button>
@@ -1240,30 +1270,108 @@ export default function AgentPage() {
                                 )}
                               </div>
 
-                              <div className="space-y-1">
-                                <Label className="text-xs">Voce</Label>
-                                <Select
-                                  value={project.vidnoz_voice_id || ""}
-                                  onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
-                                  disabled={vidnozVoices.length === 0}
-                                >
-                                  <SelectTrigger><SelectValue placeholder="Seleziona voce" /></SelectTrigger>
-                                  <SelectContent className="max-h-72">
-                                    {vidnozVoices
-                                      .filter((v) => !project.language || v.language?.startsWith(project.language.slice(0, 2)) || v.language === "en")
-                                      .slice(0, 80)
-                                      .map((v) => (
-                                        <SelectItem key={v.voice_id} value={v.voice_id}>
-                                          {v.name} · {v.language} · {v.gender}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs">Voce</Label>
+                                  {project.language && (() => {
+                                    const compatCount = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language)).length;
+                                    return (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {compatCount} compatibili con {project.language.toUpperCase()}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                {(() => {
+                                  const filtered = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  return (
+                                    <>
+                                      <Select
+                                        value={project.vidnoz_voice_id || ""}
+                                        onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
+                                        disabled={filtered.length === 0}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder={filtered.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : "Seleziona voce"} />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-72">
+                                          {filtered.slice(0, 120).map((v) => (
+                                            <SelectItem key={v.voice_id} value={v.voice_id}>
+                                              {v.name} · {v.language}{v.country_name ? ` (${v.country_name})` : ""} · {v.gender}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      {filtered.length === 0 && vidnozVoices.length > 0 && (
+                                        <div className="text-[11px] text-amber-500">
+                                          Nessuna voce nativa per {project.language?.toUpperCase()}. Cambia lingua o disattiva Vidnoz.
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+
+                                {/* Rich preview panel for the selected voice */}
                                 {project.vidnoz_voice_id && (() => {
                                   const v = vidnozVoices.find((x) => x.voice_id === project.vidnoz_voice_id);
-                                  return v?.preview_audio_url ? (
-                                    <audio src={v.preview_audio_url} controls className="w-full h-8 mt-1" />
-                                  ) : null;
+                                  if (!v) return null;
+                                  const emotionList = (v.emotions && v.emotions.length > 0 ? v.emotions : v.styles) || [];
+                                  return (
+                                    <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                                      <div className="flex items-start gap-3">
+                                        {v.preview_image_url ? (
+                                          <img
+                                            src={v.preview_image_url}
+                                            alt={v.name}
+                                            className="w-12 h-12 rounded-full object-cover border border-border flex-shrink-0"
+                                            loading="lazy"
+                                          />
+                                        ) : (
+                                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <Mic className="w-5 h-5 text-primary" />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium truncate">{v.name}</div>
+                                          <div className="flex flex-wrap gap-1 mt-1">
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                                              {v.language}
+                                            </span>
+                                            {v.country_name && (
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                                {v.country_name}
+                                              </span>
+                                            )}
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                                              {v.gender}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {emotionList.length > 0 && (
+                                        <div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Emozioni / Stili</div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {emotionList.slice(0, 12).map((e, i) => (
+                                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/30 text-foreground capitalize">
+                                                {String(e)}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {v.preview_audio_url ? (
+                                        <div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Sample audio</div>
+                                          <audio src={v.preview_audio_url} controls className="w-full h-8" preload="none" />
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] text-muted-foreground italic">Nessun sample audio fornito da Vidnoz</div>
+                                      )}
+                                    </div>
+                                  );
                                 })()}
                               </div>
 
