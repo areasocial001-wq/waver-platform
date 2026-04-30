@@ -523,6 +523,12 @@ export default function AgentPage() {
   const handleConfirmAndExecute = async () => {
     if (!project) return;
     try {
+      if (isExecuting && !isStalled) {
+        toast.warning("Produzione già in corso", {
+          description: "Evito un nuovo avvio per non consumare crediti con tentativi duplicati.",
+        });
+        return;
+      }
       toast.info("Avvio produzione...");
       const { error } = await supabase.functions.invoke("agent-execute", { body: { projectId: project.id } });
       if (error) throw error;
@@ -1860,8 +1866,9 @@ export default function AgentPage() {
                     );
                   })()}
 
-                  <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute}>
-                    <Play className="w-4 h-4" /> Conferma e Produci Video
+                  <Button size="lg" className="w-full gap-2" onClick={handleConfirmAndExecute} disabled={isExecuting && !isStalled}>
+                    {isExecuting && !isStalled ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    {isExecuting && !isStalled ? "Produzione in corso" : "Conferma e Produci Video"}
                   </Button>
                 </>
               )}
