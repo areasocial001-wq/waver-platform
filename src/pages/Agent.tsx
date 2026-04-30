@@ -270,6 +270,20 @@ export default function AgentPage() {
     })();
   }, [activeTab, project?.id]);
 
+  const handleDeleteProject = async (id: string, title: string) => {
+    const { error } = await supabase.from("agent_projects").delete().eq("id", id);
+    if (error) {
+      toast.error(`Impossibile eliminare: ${error.message}`);
+      return;
+    }
+    setHistory((prev) => prev.filter((p) => p.id !== id));
+    if (project?.id === id) {
+      localStorage.removeItem(ACTIVE_PROJECT_KEY);
+      setProject(null);
+    }
+    toast.success(`Progetto "${title}" eliminato`);
+  };
+
   // Load user-saved style presets
   const loadUserPresets = async () => {
     const { data } = await supabase
