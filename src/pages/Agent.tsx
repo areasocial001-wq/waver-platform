@@ -1287,33 +1287,66 @@ export default function AgentPage() {
                               </div>
 
                               <div className="space-y-1">
-                                <Label className="text-xs">Avatar</Label>
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs">Avatar</Label>
+                                  {vidnozAvatars.some((a) => a.is_business) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAvatarBusinessOnly((v) => !v)}
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
+                                        avatarBusinessOnly
+                                          ? "bg-primary/15 border-primary/40 text-primary"
+                                          : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                                      }`}
+                                    >
+                                      {avatarBusinessOnly ? "Solo business ✓" : "Solo business"}
+                                    </button>
+                                  )}
+                                </div>
                                 {vidnozAvatars.length === 0 ? (
                                   <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded">
                                     Nessun avatar caricato. Premi "Ricarica catalogo".
                                   </div>
-                                ) : (
-                                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
-                                    {vidnozAvatars.slice(0, 60).map((av) => (
-                                      <button
-                                        key={av.avatar_id}
-                                        type="button"
-                                        onClick={() => updateProject({ vidnoz_avatar_id: av.avatar_id, vidnoz_avatar_url: av.avatar_url } as any)}
-                                        className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition ${
-                                          project.vidnoz_avatar_id === av.avatar_id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
-                                        }`}
-                                        title={`${av.name} (${av.gender})`}
-                                      >
-                                        {av.thumb && <img src={av.thumb} alt={av.name} className="w-full h-full object-cover" loading="lazy" />}
-                                        {project.vidnoz_avatar_id === av.avatar_id && (
-                                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                          </div>
-                                        )}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                ) : (() => {
+                                  const filteredAvatars = avatarBusinessOnly
+                                    ? vidnozAvatars.filter((a) => a.is_business)
+                                    : vidnozAvatars;
+                                  const displayAvatars = filteredAvatars.length > 0 ? filteredAvatars : vidnozAvatars;
+                                  return (
+                                    <>
+                                      {avatarBusinessOnly && filteredAvatars.length === 0 && (
+                                        <div className="text-[11px] text-amber-500 mb-1">
+                                          Nessun avatar business rilevato — mostro tutti.
+                                        </div>
+                                      )}
+                                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
+                                        {displayAvatars.slice(0, 80).map((av) => (
+                                          <button
+                                            key={av.avatar_id}
+                                            type="button"
+                                            onClick={() => updateProject({ vidnoz_avatar_id: av.avatar_id, vidnoz_avatar_url: av.avatar_url } as any)}
+                                            className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition ${
+                                              project.vidnoz_avatar_id === av.avatar_id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
+                                            }`}
+                                            title={`${av.name} (${av.gender})${av.is_business ? " · business" : ""}`}
+                                          >
+                                            {av.thumb && <img src={av.thumb} alt={av.name} className="w-full h-full object-cover" loading="lazy" />}
+                                            {av.is_business && (
+                                              <div className="absolute top-1 left-1 bg-primary/80 text-primary-foreground text-[8px] px-1 rounded">
+                                                BIZ
+                                              </div>
+                                            )}
+                                            {project.vidnoz_avatar_id === av.avatar_id && (
+                                              <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                              </div>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </>
+                                  );
+                                })()}
                               </div>
 
                               <div className="space-y-2">
