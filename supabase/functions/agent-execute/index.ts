@@ -244,6 +244,11 @@ serve(async (req) => {
       throw new Error("Missing FREEPIK_API_KEY or JSON2VIDEO_API_KEY");
     }
 
+    // Run the heavy pipeline in the background to avoid the 150s edge idle timeout.
+    // The client polls agent_projects (realtime + agent-status) for progress.
+    const runPipeline = async () => {
+      try {
+
     // === 1. Asset collection (honor user overrides if present) ===
     await appendLog(adminClient, projectId, "Locking visual style...", 5, "style");
     const overrides: any[] = Array.isArray(project.scene_overrides) ? project.scene_overrides : [];
@@ -723,10 +728,30 @@ serve(async (req) => {
       })
       .eq("id", projectId);
     await appendLog(adminClient, projectId, "Rendering on JSON2Video...", 80, "rendering");
+      } catch (err) {
+        console.error("agent-execute pipeline error:", err);
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        try {
+          await adminClient
+            .from("agent_projects")
+            .update({ execution_status: "error", error_message: msg })
+            .eq("id", projectId);
+          await appendLog(adminClient, projectId, `[ERROR] ${msg}`, 0, "error");
+        } catch (_) {}
+      }
+    };
+
+    // @ts-ignore EdgeRuntime is provided by Supabase Deno runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(runPipeline());
+    } else {
+      runPipeline();
+    }
 
     return new Response(
-      JSON.stringify({ success: true, projectId: j2vProjectId, narrationUrl, scenes: assets.length }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ success: true, queued: true, projectId }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 202 }
     );
   } catch (e) {
     console.error("agent-execute error:", e);
