@@ -10,6 +10,29 @@ const corsHeaders = {
 
 const VIDNOZ_BASE = "https://devapi.vidnoz.com/v2";
 
+// In-memory cache (per warm edge instance). TTL = 10 minutes.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+let _cache: { ts: number; payload: { avatars: any[]; voices: any[] } } | null = null;
+
+// Heuristic: keywords that suggest a corporate/business-friendly avatar.
+const BUSINESS_KEYWORDS = [
+  "business", "office", "suit", "executive", "ceo", "manager", "professional",
+  "corporate", "formal", "presenter", "anchor", "host", "interview", "consultant",
+  "doctor", "lawyer", "teacher", "lecturer", "speaker", "broadcast", "newscaster",
+  "uomo d'affari", "donna d'affari", "manager", "professionista",
+];
+
+function isBusinessAvatar(a: any): boolean {
+  const haystack = [
+    a.name, a.avatar_name, a.category, a.tags, a.description, a.style, a.scene,
+  ]
+    .filter(Boolean)
+    .map((x: any) => (Array.isArray(x) ? x.join(" ") : String(x)))
+    .join(" ")
+    .toLowerCase();
+  return BUSINESS_KEYWORDS.some((k) => haystack.includes(k));
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
