@@ -53,6 +53,7 @@ export type Database = {
           vidnoz_avatar_id: string | null
           vidnoz_avatar_url: string | null
           vidnoz_voice_id: string | null
+          vidnoz_voice_style: string | null
           voice_id: string | null
           voice_quality_strict: boolean
         }
@@ -94,6 +95,7 @@ export type Database = {
           vidnoz_avatar_id?: string | null
           vidnoz_avatar_url?: string | null
           vidnoz_voice_id?: string | null
+          vidnoz_voice_style?: string | null
           voice_id?: string | null
           voice_quality_strict?: boolean
         }
@@ -135,6 +137,7 @@ export type Database = {
           vidnoz_avatar_id?: string | null
           vidnoz_avatar_url?: string | null
           vidnoz_voice_id?: string | null
+          vidnoz_voice_style?: string | null
           voice_id?: string | null
           voice_quality_strict?: boolean
         }
