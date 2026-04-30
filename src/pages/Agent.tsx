@@ -242,8 +242,8 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
-  const loadVidnozCatalog = async () => {
-    if (vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
+  const loadVidnozCatalog = async (force = false) => {
+    if (!force && vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
     setVidnozLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {});
@@ -257,6 +257,36 @@ export default function AgentPage() {
       setVidnozLoading(false);
     }
   };
+
+  // Compatibility helper: voice matches the project language (2-letter prefix).
+  const isVidnozVoiceCompatible = (
+    v: { language?: string },
+    lang?: string | null
+  ) => {
+    if (!lang) return true;
+    const target = lang.slice(0, 2).toLowerCase();
+    const vl = (v.language || "").slice(0, 2).toLowerCase();
+    return vl === target;
+  };
+
+  // Auto-refresh Vidnoz catalog when avatar or language changes (only when Vidnoz is enabled).
+  useEffect(() => {
+    if (!project?.use_vidnoz_for_talking_head) return;
+    loadVidnozCatalog(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.vidnoz_avatar_id, project?.language, project?.use_vidnoz_for_talking_head]);
+
+  // If the current selected voice is no longer compatible with the chosen language, clear it.
+  useEffect(() => {
+    if (!project?.vidnoz_voice_id || vidnozVoices.length === 0) return;
+    const current = vidnozVoices.find((v) => v.voice_id === project.vidnoz_voice_id);
+    if (current && !isVidnozVoiceCompatible(current, project.language)) {
+      updateProject({ vidnoz_voice_id: null } as any);
+      toast.info(`Voce Vidnoz rimossa: non compatibile con la lingua ${project.language?.toUpperCase()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.language, vidnozVoices]);
+
 
   // Compute the proportional transcript slice for a given talking-head scene
   // (mirrors the splitting logic used server-side in agent-execute).
