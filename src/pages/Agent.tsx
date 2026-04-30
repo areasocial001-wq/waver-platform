@@ -167,7 +167,7 @@ export default function AgentPage() {
   const [history, setHistory] = useState<ProjectRow[]>([]);
   const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
   const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
-  const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; gender: string; preview_audio_url?: string }>>([]);
+  const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; country_name?: string; gender: string; preview_audio_url?: string; preview_image_url?: string; emotions?: string[]; styles?: string[] }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
   const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
   const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
