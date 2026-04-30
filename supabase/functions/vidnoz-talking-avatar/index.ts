@@ -12,13 +12,18 @@ const corsHeaders = {
 const VIDNOZ_BASE = "https://devapi.vidnoz.com/v2";
 
 async function startGenerate(apiKey: string, payload: {
-  text: string; voice_id: string; avatar_url: string;
+  text: string; voice_id: string; avatar_url: string; voice_style?: string;
 }) {
   const fd = new FormData();
   fd.append("voice_id", payload.voice_id);
   fd.append("text", payload.text.slice(0, 1500));
   fd.append("type", "0"); // preset voice
   fd.append("avatar_url", payload.avatar_url);
+  if (payload.voice_style) {
+    // Vidnoz accepts emotion / style fields depending on voice version. Send both for safety.
+    fd.append("emotion", payload.voice_style);
+    fd.append("style", payload.voice_style);
+  }
 
   const r = await fetch(`${VIDNOZ_BASE}/task/generate-talking-head`, {
     method: "POST",
@@ -99,7 +104,7 @@ serve(async (req) => {
     if (!VIDNOZ_API_KEY) throw new Error("VIDNOZ_API_KEY not configured");
 
     const body = await req.json();
-    const { text, voice_id, avatar_url } = body || {};
+    const { text, voice_id, avatar_url, voice_style } = body || {};
     if (!text || !voice_id || !avatar_url) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: text, voice_id, avatar_url" }),
@@ -107,7 +112,7 @@ serve(async (req) => {
       );
     }
 
-    const taskId = await startGenerate(VIDNOZ_API_KEY, { text, voice_id, avatar_url });
+    const taskId = await startGenerate(VIDNOZ_API_KEY, { text, voice_id, avatar_url, voice_style });
     const result = await pollDetail(VIDNOZ_API_KEY, taskId);
 
     return new Response(

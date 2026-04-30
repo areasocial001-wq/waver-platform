@@ -306,6 +306,10 @@ serve(async (req) => {
             fd.append("text", sliceText.slice(0, 1500));
             fd.append("type", "0");
             fd.append("avatar_url", project.vidnoz_avatar_url);
+            if (project.vidnoz_voice_style) {
+              fd.append("emotion", project.vidnoz_voice_style);
+              fd.append("style", project.vidnoz_voice_style);
+            }
             const startResp = await fetch(
               "https://devapi.vidnoz.com/v2/task/generate-talking-head",
               {

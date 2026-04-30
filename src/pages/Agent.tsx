@@ -84,6 +84,7 @@ type ProjectRow = {
   vidnoz_avatar_id: string | null;
   vidnoz_avatar_url: string | null;
   vidnoz_voice_id: string | null;
+  vidnoz_voice_style: string | null;
   use_vidnoz_for_talking_head: boolean;
   image_source: "freepik" | "ai" | "piapi" | string;
   voice_quality_strict: boolean;
@@ -166,11 +167,15 @@ export default function AgentPage() {
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
   const [userPresets, setUserPresets] = useState<UserPreset[]>([]);
-  const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string }>>([]);
+  const [vidnozAvatars, setVidnozAvatars] = useState<Array<{ avatar_id: string; name: string; thumb: string; avatar_url: string; gender: string; category?: string; is_business?: boolean }>>([]);
   const [vidnozVoices, setVidnozVoices] = useState<Array<{ voice_id: string; name: string; language: string; country_name?: string; gender: string; preview_audio_url?: string; preview_image_url?: string; emotions?: string[]; styles?: string[] }>>([]);
   const [vidnozLoading, setVidnozLoading] = useState(false);
   const [vidnozPreview, setVidnozPreview] = useState<{ sceneIdx: number; url: string } | null>(null);
   const [vidnozPreviewLoading, setVidnozPreviewLoading] = useState<number | null>(null);
+  // Voice browser: search + pagination + business-only filter for avatars
+  const [voiceSearch, setVoiceSearch] = useState("");
+  const [voicePage, setVoicePage] = useState(0);
+  const [avatarBusinessOnly, setAvatarBusinessOnly] = useState(true);
   const [newPresetName, setNewPresetName] = useState("");
   const pollRef = useRef<number | null>(null);
 
@@ -242,14 +247,40 @@ export default function AgentPage() {
   };
   useEffect(() => { loadUserPresets(); }, []);
 
+  const VIDNOZ_CACHE_KEY = "agent.vidnoz.catalog.v1";
+  const VIDNOZ_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
   const loadVidnozCatalog = async (force = false) => {
+    // Try localStorage cache first (avoids edge round-trip on tab switches / re-mounts)
+    if (!force) {
+      try {
+        const raw = localStorage.getItem(VIDNOZ_CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached?.ts && Date.now() - cached.ts < VIDNOZ_CACHE_TTL_MS) {
+            if (Array.isArray(cached.avatars) && Array.isArray(cached.voices)) {
+              if (vidnozAvatars.length === 0) setVidnozAvatars(cached.avatars);
+              if (vidnozVoices.length === 0) setVidnozVoices(cached.voices);
+              return;
+            }
+          }
+        }
+      } catch (_) { /* ignore corrupt cache */ }
+    }
     if (!force && vidnozAvatars.length > 0 && vidnozVoices.length > 0) return;
     setVidnozLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {});
+      const { data, error } = await supabase.functions.invoke("vidnoz-avatars", {
+        body: force ? { refresh: true } : {},
+      });
       if (error) throw error;
-      setVidnozAvatars(Array.isArray(data?.avatars) ? data.avatars : []);
-      setVidnozVoices(Array.isArray(data?.voices) ? data.voices : []);
+      const avatars = Array.isArray(data?.avatars) ? data.avatars : [];
+      const voices = Array.isArray(data?.voices) ? data.voices : [];
+      setVidnozAvatars(avatars);
+      setVidnozVoices(voices);
+      try {
+        localStorage.setItem(VIDNOZ_CACHE_KEY, JSON.stringify({ ts: Date.now(), avatars, voices }));
+      } catch (_) {}
     } catch (e) {
       console.error(e);
       toast.error("Impossibile caricare avatar/voci Vidnoz");
@@ -269,23 +300,37 @@ export default function AgentPage() {
     return vl === target;
   };
 
-  // Auto-refresh Vidnoz catalog when avatar or language changes (only when Vidnoz is enabled).
+  // Auto-load Vidnoz catalog when enabled or language changes (uses cache, no refetch).
+  // Avatar selection no longer triggers a reload (cache covers it).
   useEffect(() => {
     if (!project?.use_vidnoz_for_talking_head) return;
-    loadVidnozCatalog(true);
+    loadVidnozCatalog(false);
+    setVoicePage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.vidnoz_avatar_id, project?.language, project?.use_vidnoz_for_talking_head]);
+  }, [project?.language, project?.use_vidnoz_for_talking_head]);
 
   // If the current selected voice is no longer compatible with the chosen language, clear it.
   useEffect(() => {
     if (!project?.vidnoz_voice_id || vidnozVoices.length === 0) return;
     const current = vidnozVoices.find((v) => v.voice_id === project.vidnoz_voice_id);
     if (current && !isVidnozVoiceCompatible(current, project.language)) {
-      updateProject({ vidnoz_voice_id: null } as any);
+      updateProject({ vidnoz_voice_id: null, vidnoz_voice_style: null } as any);
       toast.info(`Voce Vidnoz rimossa: non compatibile con la lingua ${project.language?.toUpperCase()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.language, vidnozVoices]);
+
+  // Reset selected style when voice changes (emotions are voice-specific)
+  useEffect(() => {
+    if (!project?.vidnoz_voice_id) return;
+    const v = vidnozVoices.find((x) => x.voice_id === project.vidnoz_voice_id);
+    if (!v) return;
+    const available = (v.emotions && v.emotions.length > 0 ? v.emotions : v.styles) || [];
+    if (project.vidnoz_voice_style && !available.includes(project.vidnoz_voice_style)) {
+      updateProject({ vidnoz_voice_style: null } as any);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.vidnoz_voice_id, vidnozVoices]);
 
 
   // Compute the proportional transcript slice for a given talking-head scene
@@ -326,6 +371,7 @@ export default function AgentPage() {
           text,
           voice_id: project.vidnoz_voice_id,
           avatar_url: project.vidnoz_avatar_url,
+          voice_style: project.vidnoz_voice_style || undefined,
         },
       });
       if (error) throw error;
@@ -1241,33 +1287,66 @@ export default function AgentPage() {
                               </div>
 
                               <div className="space-y-1">
-                                <Label className="text-xs">Avatar</Label>
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs">Avatar</Label>
+                                  {vidnozAvatars.some((a) => a.is_business) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setAvatarBusinessOnly((v) => !v)}
+                                      className={`text-[10px] px-2 py-0.5 rounded-full border transition ${
+                                        avatarBusinessOnly
+                                          ? "bg-primary/15 border-primary/40 text-primary"
+                                          : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                                      }`}
+                                    >
+                                      {avatarBusinessOnly ? "Solo business ✓" : "Solo business"}
+                                    </button>
+                                  )}
+                                </div>
                                 {vidnozAvatars.length === 0 ? (
                                   <div className="text-xs text-muted-foreground p-3 border border-dashed border-border rounded">
                                     Nessun avatar caricato. Premi "Ricarica catalogo".
                                   </div>
-                                ) : (
-                                  <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
-                                    {vidnozAvatars.slice(0, 60).map((av) => (
-                                      <button
-                                        key={av.avatar_id}
-                                        type="button"
-                                        onClick={() => updateProject({ vidnoz_avatar_id: av.avatar_id, vidnoz_avatar_url: av.avatar_url } as any)}
-                                        className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition ${
-                                          project.vidnoz_avatar_id === av.avatar_id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
-                                        }`}
-                                        title={`${av.name} (${av.gender})`}
-                                      >
-                                        {av.thumb && <img src={av.thumb} alt={av.name} className="w-full h-full object-cover" loading="lazy" />}
-                                        {project.vidnoz_avatar_id === av.avatar_id && (
-                                          <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
-                                            <CheckCircle2 className="w-3 h-3" />
-                                          </div>
-                                        )}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                ) : (() => {
+                                  const filteredAvatars = avatarBusinessOnly
+                                    ? vidnozAvatars.filter((a) => a.is_business)
+                                    : vidnozAvatars;
+                                  const displayAvatars = filteredAvatars.length > 0 ? filteredAvatars : vidnozAvatars;
+                                  return (
+                                    <>
+                                      {avatarBusinessOnly && filteredAvatars.length === 0 && (
+                                        <div className="text-[11px] text-amber-500 mb-1">
+                                          Nessun avatar business rilevato — mostro tutti.
+                                        </div>
+                                      )}
+                                      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 max-h-64 overflow-y-auto p-1">
+                                        {displayAvatars.slice(0, 80).map((av) => (
+                                          <button
+                                            key={av.avatar_id}
+                                            type="button"
+                                            onClick={() => updateProject({ vidnoz_avatar_id: av.avatar_id, vidnoz_avatar_url: av.avatar_url } as any)}
+                                            className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition ${
+                                              project.vidnoz_avatar_id === av.avatar_id ? "border-primary ring-2 ring-primary/30" : "border-transparent hover:border-border"
+                                            }`}
+                                            title={`${av.name} (${av.gender})${av.is_business ? " · business" : ""}`}
+                                          >
+                                            {av.thumb && <img src={av.thumb} alt={av.name} className="w-full h-full object-cover" loading="lazy" />}
+                                            {av.is_business && (
+                                              <div className="absolute top-1 left-1 bg-primary/80 text-primary-foreground text-[8px] px-1 rounded">
+                                                BIZ
+                                              </div>
+                                            )}
+                                            {project.vidnoz_avatar_id === av.avatar_id && (
+                                              <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                              </div>
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </>
+                                  );
+                                })()}
                               </div>
 
                               <div className="space-y-2">
@@ -1283,26 +1362,73 @@ export default function AgentPage() {
                                   })()}
                                 </div>
                                 {(() => {
-                                  const filtered = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  const compatibles = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  const q = voiceSearch.trim().toLowerCase();
+                                  const filtered = q
+                                    ? compatibles.filter(
+                                        (v) =>
+                                          v.name?.toLowerCase().includes(q) ||
+                                          v.country_name?.toLowerCase().includes(q) ||
+                                          v.gender?.toLowerCase().includes(q)
+                                      )
+                                    : compatibles;
+                                  const PAGE_SIZE = 25;
+                                  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+                                  const safePage = Math.min(voicePage, totalPages - 1);
+                                  const pageItems = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
                                   return (
                                     <>
+                                      <div className="flex gap-2">
+                                        <Input
+                                          placeholder="Cerca per nome, paese, genere..."
+                                          value={voiceSearch}
+                                          onChange={(e) => { setVoiceSearch(e.target.value); setVoicePage(0); }}
+                                          className="h-8 text-xs flex-1"
+                                          disabled={compatibles.length === 0}
+                                        />
+                                      </div>
                                       <Select
                                         value={project.vidnoz_voice_id || ""}
                                         onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
-                                        disabled={filtered.length === 0}
+                                        disabled={compatibles.length === 0}
                                       >
                                         <SelectTrigger>
-                                          <SelectValue placeholder={filtered.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : "Seleziona voce"} />
+                                          <SelectValue placeholder={compatibles.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : `Seleziona voce (${filtered.length} risultati)`} />
                                         </SelectTrigger>
                                         <SelectContent className="max-h-72">
-                                          {filtered.slice(0, 120).map((v) => (
+                                          {pageItems.length === 0 ? (
+                                            <div className="p-3 text-xs text-muted-foreground">Nessun risultato per "{voiceSearch}"</div>
+                                          ) : pageItems.map((v) => (
                                             <SelectItem key={v.voice_id} value={v.voice_id}>
                                               {v.name} · {v.language}{v.country_name ? ` (${v.country_name})` : ""} · {v.gender}
                                             </SelectItem>
                                           ))}
                                         </SelectContent>
                                       </Select>
-                                      {filtered.length === 0 && vidnozVoices.length > 0 && (
+                                      {totalPages > 1 && (
+                                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 px-2 text-[11px]"
+                                            disabled={safePage === 0}
+                                            onClick={() => setVoicePage((p) => Math.max(0, p - 1))}
+                                          >
+                                            ← Prec
+                                          </Button>
+                                          <span>Pagina {safePage + 1} / {totalPages} · {filtered.length} voci</span>
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 px-2 text-[11px]"
+                                            disabled={safePage >= totalPages - 1}
+                                            onClick={() => setVoicePage((p) => Math.min(totalPages - 1, p + 1))}
+                                          >
+                                            Succ →
+                                          </Button>
+                                        </div>
+                                      )}
+                                      {compatibles.length === 0 && vidnozVoices.length > 0 && (
                                         <div className="text-[11px] text-amber-500">
                                           Nessuna voce nativa per {project.language?.toUpperCase()}. Cambia lingua o disattiva Vidnoz.
                                         </div>
@@ -1351,13 +1477,39 @@ export default function AgentPage() {
 
                                       {emotionList.length > 0 && (
                                         <div>
-                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Emozioni / Stili</div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">
+                                            Emozione / Stile {project.vidnoz_voice_style && <span className="text-primary normal-case">· {project.vidnoz_voice_style}</span>}
+                                          </div>
                                           <div className="flex flex-wrap gap-1">
-                                            {emotionList.slice(0, 12).map((e, i) => (
-                                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/30 text-foreground capitalize">
-                                                {String(e)}
-                                              </span>
-                                            ))}
+                                            <button
+                                              type="button"
+                                              onClick={() => updateProject({ vidnoz_voice_style: null } as any)}
+                                              className={`text-[10px] px-1.5 py-0.5 rounded border transition ${
+                                                !project.vidnoz_voice_style
+                                                  ? "bg-primary text-primary-foreground border-primary"
+                                                  : "bg-muted border-border text-muted-foreground hover:text-foreground"
+                                              }`}
+                                            >
+                                              neutro
+                                            </button>
+                                            {emotionList.slice(0, 16).map((e, i) => {
+                                              const val = String(e);
+                                              const active = project.vidnoz_voice_style === val;
+                                              return (
+                                                <button
+                                                  key={i}
+                                                  type="button"
+                                                  onClick={() => updateProject({ vidnoz_voice_style: val } as any)}
+                                                  className={`text-[10px] px-1.5 py-0.5 rounded border transition capitalize ${
+                                                    active
+                                                      ? "bg-primary text-primary-foreground border-primary"
+                                                      : "bg-accent/30 border-border text-foreground hover:bg-accent/50"
+                                                  }`}
+                                                >
+                                                  {val}
+                                                </button>
+                                              );
+                                            })}
                                           </div>
                                         </div>
                                       )}

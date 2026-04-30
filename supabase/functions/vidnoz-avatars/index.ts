@@ -10,6 +10,29 @@ const corsHeaders = {
 
 const VIDNOZ_BASE = "https://devapi.vidnoz.com/v2";
 
+// In-memory cache (per warm edge instance). TTL = 10 minutes.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+let _cache: { ts: number; payload: { avatars: any[]; voices: any[] } } | null = null;
+
+// Heuristic: keywords that suggest a corporate/business-friendly avatar.
+const BUSINESS_KEYWORDS = [
+  "business", "office", "suit", "executive", "ceo", "manager", "professional",
+  "corporate", "formal", "presenter", "anchor", "host", "interview", "consultant",
+  "doctor", "lawyer", "teacher", "lecturer", "speaker", "broadcast", "newscaster",
+  "uomo d'affari", "donna d'affari", "manager", "professionista",
+];
+
+function isBusinessAvatar(a: any): boolean {
+  const haystack = [
+    a.name, a.avatar_name, a.category, a.tags, a.description, a.style, a.scene,
+  ]
+    .filter(Boolean)
+    .map((x: any) => (Array.isArray(x) ? x.join(" ") : String(x)))
+    .join(" ")
+    .toLowerCase();
+  return BUSINESS_KEYWORDS.some((k) => haystack.includes(k));
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   try {
@@ -43,6 +66,37 @@ serve(async (req) => {
 
     const VIDNOZ_API_KEY = Deno.env.get("VIDNOZ_API_KEY");
     if (!VIDNOZ_API_KEY) throw new Error("VIDNOZ_API_KEY not configured");
+
+    // Allow forced refresh via ?refresh=1 or { refresh: true } in body
+    let forceRefresh = false;
+    try {
+      const url = new URL(req.url);
+      if (url.searchParams.get("refresh") === "1") forceRefresh = true;
+    } catch (_) {}
+    if (!forceRefresh && req.method === "POST") {
+      try {
+        const body = await req.clone().json();
+        if (body?.refresh === true) forceRefresh = true;
+      } catch (_) {}
+    }
+
+    // Serve from in-memory cache when fresh
+    if (!forceRefresh && _cache && Date.now() - _cache.ts < CACHE_TTL_MS) {
+      return new Response(
+        JSON.stringify({
+          ...(_cache.payload),
+          cached: true,
+          cache_age_ms: Date.now() - _cache.ts,
+        }),
+        {
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+            "Cache-Control": "public, max-age=300",
+          },
+        }
+      );
+    }
 
     const headers = { Authorization: `Bearer ${VIDNOZ_API_KEY}`, accept: "application/json" };
 
@@ -78,16 +132,22 @@ serve(async (req) => {
       voicesCode: voicesJson?.code,
     });
 
-    const avatars = pickArray(avatarsRoot, ["avatars", "list", "items", "data"])
-      .filter((a: any) => a && (a.avatar_id || a.id))
+    const rawAvatars = pickArray(avatarsRoot, ["avatars", "list", "items", "data"])
+      .filter((a: any) => a && (a.avatar_id || a.id));
+
+    // Normalize, tag business-friendly, and sort business-first
+    const avatars = rawAvatars
       .map((a: any) => ({
         avatar_id: a.avatar_id || a.id,
         name: a.name || a.avatar_name || "Avatar",
         gender: a.gender || "unknown",
+        category: a.category || a.style || "",
         thumb: a.preview_image_url || a.thumb_url || a.image_url || a.avatar_url || "",
         avatar_url: a.avatar_url || a.image_url || a.preview_image_url || "",
         preview_video_url: a.preview_video_url || "",
-      }));
+        is_business: isBusinessAvatar(a),
+      }))
+      .sort((a: any, b: any) => Number(b.is_business) - Number(a.is_business));
 
     const voices = pickArray(voicesRoot, ["voices", "list", "items", "data"])
       .map((v: any) => ({
@@ -103,9 +163,18 @@ serve(async (req) => {
       }))
       .filter((v: any) => v.voice_id);
 
+    const payload = { avatars, voices };
+    _cache = { ts: Date.now(), payload };
+
     return new Response(
-      JSON.stringify({ avatars, voices }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ ...payload, cached: false, business_count: avatars.filter((a: any) => a.is_business).length }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300",
+        },
+      }
     );
   } catch (e) {
     console.error("vidnoz-avatars error:", e);
