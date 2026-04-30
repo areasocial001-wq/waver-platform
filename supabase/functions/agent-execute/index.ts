@@ -268,7 +268,12 @@ serve(async (req) => {
       userId = data.user.id;
     }
 
-    const { projectId } = await req.json();
+    const reqBody = await req.json().catch(() => ({}));
+    const { projectId, resume, retryScenes } = reqBody as {
+      projectId: string;
+      resume?: boolean;
+      retryScenes?: number[];
+    };
     const { data: project } = await adminClient
       .from("agent_projects")
       .select("*")
@@ -282,14 +287,32 @@ serve(async (req) => {
       });
     }
 
+    // If resuming, preserve previously generated assets and progress log so we
+    // skip already-completed scenes. Clear failed_scenes for the ones we are
+    // about to retry.
+    const isResume = !!resume || (Array.isArray(retryScenes) && retryScenes.length > 0);
+    const initPatch: Record<string, unknown> = {
+      execution_status: "running",
+      error_message: null,
+      heartbeat_at: new Date().toISOString(),
+    };
+    if (!isResume) {
+      initPatch.progress_pct = 0;
+      initPatch.progress_log = [];
+      initPatch.selected_assets = [];
+      initPatch.failed_scenes = [];
+    } else if (Array.isArray(retryScenes) && retryScenes.length > 0) {
+      // Drop only the entries we're about to retry; keep the rest.
+      const keepFailed = (Array.isArray(project.failed_scenes) ? project.failed_scenes : [])
+        .filter((f: any) => !retryScenes.includes(f?.index));
+      const keepAssets = (Array.isArray(project.selected_assets) ? project.selected_assets : [])
+        .filter((a: any) => !retryScenes.includes(a?._vidnozScene));
+      initPatch.failed_scenes = keepFailed;
+      initPatch.selected_assets = keepAssets;
+    }
     await adminClient
       .from("agent_projects")
-      .update({
-        execution_status: "running",
-        progress_pct: 0,
-        progress_log: [],
-        error_message: null,
-      })
+      .update(initPatch)
       .eq("id", projectId);
 
     const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
