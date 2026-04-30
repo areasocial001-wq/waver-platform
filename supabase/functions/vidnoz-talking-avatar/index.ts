@@ -104,7 +104,7 @@ serve(async (req) => {
     if (!VIDNOZ_API_KEY) throw new Error("VIDNOZ_API_KEY not configured");
 
     const body = await req.json();
-    const { text, voice_id, avatar_url } = body || {};
+    const { text, voice_id, avatar_url, voice_style } = body || {};
     if (!text || !voice_id || !avatar_url) {
       return new Response(
         JSON.stringify({ error: "Missing required fields: text, voice_id, avatar_url" }),
@@ -112,7 +112,7 @@ serve(async (req) => {
       );
     }
 
-    const taskId = await startGenerate(VIDNOZ_API_KEY, { text, voice_id, avatar_url });
+    const taskId = await startGenerate(VIDNOZ_API_KEY, { text, voice_id, avatar_url, voice_style });
     const result = await pollDetail(VIDNOZ_API_KEY, taskId);
 
     return new Response(
