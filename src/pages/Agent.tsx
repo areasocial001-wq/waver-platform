@@ -1270,30 +1270,108 @@ export default function AgentPage() {
                                 )}
                               </div>
 
-                              <div className="space-y-1">
-                                <Label className="text-xs">Voce</Label>
-                                <Select
-                                  value={project.vidnoz_voice_id || ""}
-                                  onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
-                                  disabled={vidnozVoices.length === 0}
-                                >
-                                  <SelectTrigger><SelectValue placeholder="Seleziona voce" /></SelectTrigger>
-                                  <SelectContent className="max-h-72">
-                                    {vidnozVoices
-                                      .filter((v) => !project.language || v.language?.startsWith(project.language.slice(0, 2)) || v.language === "en")
-                                      .slice(0, 80)
-                                      .map((v) => (
-                                        <SelectItem key={v.voice_id} value={v.voice_id}>
-                                          {v.name} · {v.language} · {v.gender}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs">Voce</Label>
+                                  {project.language && (() => {
+                                    const compatCount = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language)).length;
+                                    return (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {compatCount} compatibili con {project.language.toUpperCase()}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                                {(() => {
+                                  const filtered = vidnozVoices.filter((v) => isVidnozVoiceCompatible(v, project.language));
+                                  return (
+                                    <>
+                                      <Select
+                                        value={project.vidnoz_voice_id || ""}
+                                        onValueChange={(v) => updateProject({ vidnoz_voice_id: v } as any)}
+                                        disabled={filtered.length === 0}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue placeholder={filtered.length === 0 ? `Nessuna voce ${project.language?.toUpperCase() || ""} disponibile` : "Seleziona voce"} />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-72">
+                                          {filtered.slice(0, 120).map((v) => (
+                                            <SelectItem key={v.voice_id} value={v.voice_id}>
+                                              {v.name} · {v.language}{v.country_name ? ` (${v.country_name})` : ""} · {v.gender}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                      {filtered.length === 0 && vidnozVoices.length > 0 && (
+                                        <div className="text-[11px] text-amber-500">
+                                          Nessuna voce nativa per {project.language?.toUpperCase()}. Cambia lingua o disattiva Vidnoz.
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+
+                                {/* Rich preview panel for the selected voice */}
                                 {project.vidnoz_voice_id && (() => {
                                   const v = vidnozVoices.find((x) => x.voice_id === project.vidnoz_voice_id);
-                                  return v?.preview_audio_url ? (
-                                    <audio src={v.preview_audio_url} controls className="w-full h-8 mt-1" />
-                                  ) : null;
+                                  if (!v) return null;
+                                  const emotionList = (v.emotions && v.emotions.length > 0 ? v.emotions : v.styles) || [];
+                                  return (
+                                    <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                                      <div className="flex items-start gap-3">
+                                        {v.preview_image_url ? (
+                                          <img
+                                            src={v.preview_image_url}
+                                            alt={v.name}
+                                            className="w-12 h-12 rounded-full object-cover border border-border flex-shrink-0"
+                                            loading="lazy"
+                                          />
+                                        ) : (
+                                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                            <Mic className="w-5 h-5 text-primary" />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="text-sm font-medium truncate">{v.name}</div>
+                                          <div className="flex flex-wrap gap-1 mt-1">
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary uppercase">
+                                              {v.language}
+                                            </span>
+                                            {v.country_name && (
+                                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                                {v.country_name}
+                                              </span>
+                                            )}
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground capitalize">
+                                              {v.gender}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {emotionList.length > 0 && (
+                                        <div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Emozioni / Stili</div>
+                                          <div className="flex flex-wrap gap-1">
+                                            {emotionList.slice(0, 12).map((e, i) => (
+                                              <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-accent/30 text-foreground capitalize">
+                                                {String(e)}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {v.preview_audio_url ? (
+                                        <div>
+                                          <div className="text-[10px] uppercase text-muted-foreground mb-1">Sample audio</div>
+                                          <audio src={v.preview_audio_url} controls className="w-full h-8" preload="none" />
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] text-muted-foreground italic">Nessun sample audio fornito da Vidnoz</div>
+                                      )}
+                                    </div>
+                                  );
                                 })()}
                               </div>
 
