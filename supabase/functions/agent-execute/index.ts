@@ -637,7 +637,10 @@ serve(async (req) => {
             thumb: project.vidnoz_avatar_url,
             source: "vidnoz",
             duration: dur,
-          });
+            // Preserve marker so subsequent resumes can detect already-generated
+            // Vidnoz scenes and avoid re-billing the user.
+            _vidnozScene: i,
+          } as any);
           continue;
         }
 
