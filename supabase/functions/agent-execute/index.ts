@@ -285,21 +285,23 @@ serve(async (req) => {
       }
     }
 
-    if (overrides.length > 0) {
-      for (let i = 0; i < overrides.length; i++) {
-        const ov = overrides[i];
-        const isTH = ov?.broll_type === "talking_head";
-        const dur = Number(ov.duration) || 4;
-
-        if (useVidnoz && isTH && VIDNOZ_API_KEY) {
+    // === Vidnoz: parallel generation across all talking-head scenes ===
+    // Sequential per-scene polling (each up to ~3 min) blew the edge worker
+    // background-task budget and left projects stuck mid-pipeline. Run in parallel.
+    const vidnozResults: Record<number, { url: string; error?: string }> = {};
+    if (useVidnoz && VIDNOZ_API_KEY && thIndices.length > 0) {
+      await appendLog(
+        adminClient,
+        projectId,
+        `Generating ${thIndices.length} Vidnoz avatar scene(s) in parallel...`,
+        12,
+        "vidnoz-avatar"
+      );
+      let completedCount = 0;
+      await Promise.all(
+        thIndices.map(async (i) => {
+          const ov = overrides[i];
           const sliceText = wordSlices[i] || transcript.slice(0, 200);
-          await appendLog(
-            adminClient,
-            projectId,
-            `Generating Vidnoz avatar for scene "${ov.keyword}"...`,
-            10 + Math.round((i / overrides.length) * 35),
-            "vidnoz-avatar"
-          );
           try {
             const fd = new FormData();
             fd.append("voice_id", project.vidnoz_voice_id);
@@ -325,9 +327,8 @@ serve(async (req) => {
             const taskId = String(startJson?.data?.id ?? startJson?.data?.task_id ?? "");
             if (!taskId) throw new Error("Vidnoz returned no task id");
 
-            // Poll
             let url = "";
-            const maxMs = 240_000;
+            const maxMs = 180_000;
             const t0 = Date.now();
             let delay = 4000;
             while (Date.now() - t0 < maxMs && !url) {
@@ -345,25 +346,47 @@ serve(async (req) => {
               url = additional?.video_720p?.url || additional?.url || "";
             }
             if (!url) throw new Error("Vidnoz polling timeout");
-
-            assets.push({
-              keyword: ov.keyword,
-              url,
-              thumb: project.vidnoz_avatar_url,
-              source: "vidnoz",
-              duration: dur,
-            });
-            continue; // skip Freepik fallback
-          } catch (vidErr) {
-            console.error("Vidnoz scene generation failed, falling back to Freepik:", vidErr);
+            vidnozResults[i] = { url };
+            completedCount++;
             await appendLog(
               adminClient,
               projectId,
-              `Vidnoz failed for "${ov.keyword}", using Freepik fallback`,
-              10 + Math.round((i / overrides.length) * 35),
+              `✓ Vidnoz ready for "${ov.keyword}" (${completedCount}/${thIndices.length})`,
+              12 + Math.round((completedCount / thIndices.length) * 30),
+              "vidnoz-avatar"
+            );
+          } catch (vidErr) {
+            console.error(`Vidnoz failed for scene ${i}:`, vidErr);
+            vidnozResults[i] = { url: "", error: String((vidErr as Error)?.message || vidErr) };
+            completedCount++;
+            await appendLog(
+              adminClient,
+              projectId,
+              `⚠ Vidnoz failed for "${ov.keyword}", using Freepik fallback`,
+              12 + Math.round((completedCount / thIndices.length) * 30),
               "vidnoz-fallback"
             );
           }
+        })
+      );
+    }
+
+    if (overrides.length > 0) {
+      for (let i = 0; i < overrides.length; i++) {
+        const ov = overrides[i];
+        const isTH = ov?.broll_type === "talking_head";
+        const dur = Number(ov.duration) || 4;
+
+        const vidRes = vidnozResults[i];
+        if (vidRes && vidRes.url) {
+          assets.push({
+            keyword: ov.keyword,
+            url: vidRes.url,
+            thumb: project.vidnoz_avatar_url,
+            source: "vidnoz",
+            duration: dur,
+          });
+          continue;
         }
 
         // Default: use selected suggestion, else fallback to live Freepik search
