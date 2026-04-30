@@ -36,7 +36,63 @@ async function appendLog(
       progress_log: log,
       progress_pct: pct,
       execution_step: step ?? message,
+      heartbeat_at: new Date().toISOString(),
     })
+    .eq("id", projectId);
+}
+
+// Lightweight heartbeat — call inside long-running loops so the client knows
+// the worker is still alive even when no log line is being added.
+async function heartbeat(supabase: any, projectId: string) {
+  try {
+    await supabase
+      .from("agent_projects")
+      .update({ heartbeat_at: new Date().toISOString() })
+      .eq("id", projectId);
+  } catch (_) {
+    // best-effort
+  }
+}
+
+// Append a failed scene record (or replace the entry for the same scene index).
+async function recordFailedScene(
+  supabase: any,
+  projectId: string,
+  entry: { index: number; keyword: string; reason: string; provider: string }
+) {
+  const { data } = await supabase
+    .from("agent_projects")
+    .select("failed_scenes")
+    .eq("id", projectId)
+    .single();
+  const list = Array.isArray(data?.failed_scenes) ? data.failed_scenes : [];
+  const filtered = list.filter((f: any) => f?.index !== entry.index);
+  filtered.push({ ...entry, at: Date.now() });
+  await supabase
+    .from("agent_projects")
+    .update({ failed_scenes: filtered, heartbeat_at: new Date().toISOString() })
+    .eq("id", projectId);
+}
+
+// Persist a single Vidnoz scene asset incrementally into selected_assets so a
+// resume invocation doesn't have to regenerate it.
+async function persistVidnozScene(
+  supabase: any,
+  projectId: string,
+  index: number,
+  asset: SelectedAsset
+) {
+  const { data } = await supabase
+    .from("agent_projects")
+    .select("selected_assets")
+    .eq("id", projectId)
+    .single();
+  const list = Array.isArray(data?.selected_assets) ? data.selected_assets : [];
+  const filtered = list.filter((a: any) => a?._vidnozScene !== index);
+  filtered.push({ ...asset, _vidnozScene: index });
+  await supabase
+    .from("agent_projects")
+    .update({ selected_assets: filtered, heartbeat_at: new Date().toISOString() })
     .eq("id", projectId);
 }
 
