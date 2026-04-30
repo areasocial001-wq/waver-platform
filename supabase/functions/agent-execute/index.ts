@@ -421,11 +421,22 @@ serve(async (req) => {
       }
       let completedCount = 0;
 
-      // Vidnoz API rate-limits aggressive bursts (code 803 "frequent requests").
-      // We cap concurrency at 2 and retry the START call with exponential backoff
-      // when we hit 803 or other transient errors.
-      const VIDNOZ_CONCURRENCY = 2;
+      // Vidnoz charges/queues per generated clip and rate-limits aggressive bursts.
+      // Keep this deliberately sequential: slower, but prevents paid failures from
+      // duplicate starts and provider-side burst limits.
+      const VIDNOZ_CONCURRENCY = 1;
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+      const summarizeVidnozError = (status: number, data: any) => {
+        const code = data?.code;
+        const message = String(data?.message || data?.msg || data?.error || JSON.stringify(data || {}));
+        return `Vidnoz start error${code ? ` code ${code}` : ""}: HTTP ${status} - ${message.slice(0, 220)}`;
+      };
+
+      const isRetryableVidnozStart = (status: number, code: unknown) => {
+        if (code === 803 || status === 429 || status === 408) return true;
+        return status >= 500 && status < 600;
+      };
 
       const startVidnozTask = async (sliceText: string): Promise<string> => {
         let attempt = 0;
@@ -456,9 +467,9 @@ serve(async (req) => {
             if (!taskId) throw new Error("Vidnoz returned no task id");
             return taskId;
           }
-          lastErr = `Vidnoz start error: ${JSON.stringify(startJson).slice(0, 200)}`;
+          lastErr = summarizeVidnozError(startResp.status, startJson);
           // 803 = frequent requests rate limit; 429 / 5xx also retryable
-          const retryable = code === 803 || startResp.status === 429 || startResp.status >= 500;
+          const retryable = isRetryableVidnozStart(startResp.status, code);
           if (!retryable) throw new Error(lastErr);
           attempt++;
           // Exponential backoff with jitter: 5s, 10s, 20s, 40s
