@@ -12,13 +12,18 @@ const corsHeaders = {
 const VIDNOZ_BASE = "https://devapi.vidnoz.com/v2";
 
 async function startGenerate(apiKey: string, payload: {
-  text: string; voice_id: string; avatar_url: string;
+  text: string; voice_id: string; avatar_url: string; voice_style?: string;
 }) {
   const fd = new FormData();
   fd.append("voice_id", payload.voice_id);
   fd.append("text", payload.text.slice(0, 1500));
   fd.append("type", "0"); // preset voice
   fd.append("avatar_url", payload.avatar_url);
+  if (payload.voice_style) {
+    // Vidnoz accepts emotion / style fields depending on voice version. Send both for safety.
+    fd.append("emotion", payload.voice_style);
+    fd.append("style", payload.voice_style);
+  }
 
   const r = await fetch(`${VIDNOZ_BASE}/task/generate-talking-head`, {
     method: "POST",
