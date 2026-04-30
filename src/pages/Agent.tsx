@@ -1234,7 +1234,7 @@ export default function AgentPage() {
                                 <span className="text-xs text-muted-foreground">
                                   {vidnozLoading ? "Caricamento..." : `${vidnozAvatars.length} avatar · ${vidnozVoices.length} voci`}
                                 </span>
-                                <Button size="sm" variant="outline" onClick={loadVidnozCatalog} disabled={vidnozLoading} className="gap-1">
+                                <Button size="sm" variant="outline" onClick={() => loadVidnozCatalog(true)} disabled={vidnozLoading} className="gap-1">
                                   {vidnozLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
                                   Ricarica catalogo
                                 </Button>
