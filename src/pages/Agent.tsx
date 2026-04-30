@@ -1929,6 +1929,28 @@ export default function AgentPage() {
                 </Card>
               )}
 
+              {project && isStalled && !hasError && (
+                <Card className="p-4 mt-4 border-amber-500/40 bg-amber-500/5">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-sm">La produzione sembra bloccata</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Nessun aggiornamento da {Math.round((now - lastLogAt) / 60000)} minuti. Il worker in background potrebbe essere stato terminato.
+                        Puoi riprendere la produzione: le scene già completate non verranno rigenerate.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <Button size="sm" onClick={handleResume} disabled={resuming} className="gap-2">
+                          {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          Riprendi produzione
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleReset}>Annulla</Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
               {project && hasError && (
                 <Card className="p-6 mt-4 border-destructive/30">
                   <div className="flex items-start gap-3">
