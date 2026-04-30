@@ -462,6 +462,7 @@ export default function AgentPage() {
         .select("*").single();
       if (error) throw error;
 
+      localStorage.setItem(ACTIVE_PROJECT_KEY, created.id);
       setProject(created as unknown as ProjectRow);
 
       const { error: planErr } = await supabase.functions.invoke("agent-plan", { body: { projectId: created.id } });
@@ -770,11 +771,13 @@ export default function AgentPage() {
   };
 
   const handleOpenProject = (p: ProjectRow) => {
+    localStorage.setItem(ACTIVE_PROJECT_KEY, p.id);
     setProject(p);
     setActiveTab("create");
   };
 
   const handleReset = () => {
+    localStorage.removeItem(ACTIVE_PROJECT_KEY);
     setProject(null);
     setBrief(""); setPdfFile(null); setPdfText("");
   };
