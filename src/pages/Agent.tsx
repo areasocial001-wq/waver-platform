@@ -141,6 +141,8 @@ export const OPUS_PRESET_DEFAULTS = {
   outro_cta: { enabled: true, text: "Follow for more", duration: 2.5 },
 };
 
+const ACTIVE_PROJECT_KEY = "agent.activeProjectId";
+
 export default function AgentPage() {
   const [activeTab, setActiveTab] = useState<"create" | "history">(
     () => (typeof window !== "undefined" && (localStorage.getItem("agent.activeTab") as any)) || "create",
@@ -163,6 +165,7 @@ export default function AgentPage() {
   const [pdfText, setPdfText] = useState<string>("");
   const [creating, setCreating] = useState(false);
   const [loadingStoryboard, setLoadingStoryboard] = useState(false);
+  const [restoringProject, setRestoringProject] = useState(false);
 
   const [project, setProject] = useState<ProjectRow | null>(null);
   const [history, setHistory] = useState<ProjectRow[]>([]);
