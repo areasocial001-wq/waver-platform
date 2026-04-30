@@ -84,6 +84,7 @@ type ProjectRow = {
   vidnoz_avatar_id: string | null;
   vidnoz_avatar_url: string | null;
   vidnoz_voice_id: string | null;
+  vidnoz_voice_style: string | null;
   use_vidnoz_for_talking_head: boolean;
   image_source: "freepik" | "ai" | "piapi" | string;
   voice_quality_strict: boolean;
